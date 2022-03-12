@@ -14,8 +14,8 @@ A Windows system wit a working [MSYS2](https://www.msys2.org/) shell and the [wi
 ## Folders
 
 The following build recipe folders are provided:
- - `recipes`: known to build
- - `recipes_work_in_progress`: don't build (yet)
+ - `recipes`: can be built
+ - `recipes_work_in_progress`: don't build (yet) or not usable (yet)
  - `recipes_not_portable`: will never work on Windows (intended for other operating system(s))
 
 ## Recipe Format
