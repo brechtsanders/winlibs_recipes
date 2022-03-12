@@ -176,6 +176,8 @@ cp -rf * $INSTALLPREFIX/src/mingw-w64/
 #EOF
 #fi
 wl-showstatus configure &&
+ #mkdir -p m4 &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  mkdir -p build &&
  cd build &&
  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-crt --with-libraries=libmangle --with-tools=all LDFLAGS="-Wl,-no-undefined" &&
@@ -188,6 +190,7 @@ wl-showstatus configure &&
  #../configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libraries=all --with-tools=all --enable-sdk=all --enable-secure-api --enable-wildcard --enable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --disable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 32; else echo 64; fi) --disable-libarm32 --disable-libarm64 CFLAGS="-fcommon $(gcc --help -v 2>/dev/null|grep -q " -Wexpansion-to-defined" && echo "-Wno-expansion-to-defined")" LDFLAGS="-Wl,-no-undefined" &&
  #../configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrt"; else echo "msvcrt-os"; fi) --with-libraries=all --with-tools=all --enable-sdk=all --enable-secure-api --enable-wildcard --enable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --disable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 32; else echo 64; fi) --disable-libarm32 --disable-libarm64 CFLAGS="-fcommon $(gcc --help -v 2>/dev/null|grep -q " -Wexpansion-to-defined" && echo "-Wno-expansion-to-defined")" LDFLAGS="-Wl,-no-undefined" &&
  ../configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrt"; else echo "msvcrt-os"; fi) --with-libraries=all --with-tools=all --enable-sdk=all --enable-secure-api --enable-wildcard --enable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --disable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 32; else echo 64; fi) --disable-libarm32 --disable-libarm64 --enable-idl CFLAGS="-fcommon $(gcc --help -v 2>/dev/null|grep -q " -Wexpansion-to-defined" && echo "-Wno-expansion-to-defined")" LDFLAGS="-Wl,-no-undefined" &&
+ #--with-libraries=libmangle,winpthreads,winstorecompat 
  #-DUSE_NO_MINGW_SETJMP_TWO_ARGS 
  #Windows XP: --with-default-win32-winnt=0x0501
  cd .. &&
@@ -203,8 +206,14 @@ wl-showstatus configure &&
   ../mingw-w64-libraries/winstorecompat/configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
   cd ..
  fi &&
+ ## fix link issues when using LLVM/CLang
+ #sed -i.bak -e "s?\(-o \)\([^ ]*\)\(.*\) -link \(-dll\)?-shared -s -mwindows \1.libs/libwinpthread-1.dll -Wl,--out-implib,\2 \3 \4?" build/mingw-w64-libraries/winpthreads/libtool &&
+ #sed -i.bak -e "s?\$(AM_V_CCLD).*\$(libwinpthread_la_OBJECTS).*?& \&\& \$(AR) \$(ARFLAGS) .libs/libwinpthread.a \$(libwinpthread_la_OBJECTS:.lo=.o) \&\& cp -f .libs/libwinpthread.a .libs/libwinpthread.lib?" build/mingw-w64-libraries/winpthreads/Makefile &&
  wl-showstatus build-install &&
  ( make -Cbuild install-strip || make -j1 -Cbuild install-strip ) &&
+ #sed -i.bak -e "s/-link //" build/mingw-w64-libraries/winpthreads/libtool &&
+ ## fix issue with llvm-rc when using LLVM/CLang
+ #make -Cbuild install-strip RC=llvm-windres.exe &&
  if [ ! -f mingw-w64-tools/widl/Makefile ]; then
   make -Cbuild_widl install-strip
  fi &&
