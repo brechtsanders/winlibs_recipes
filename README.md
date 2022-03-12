@@ -11,6 +11,13 @@ These recipes descripy how to build each package from source into a package that
 
 A Windows system wit a working [MSYS2](https://www.msys2.org/) shell and the [winlibs_tools](https://github.com/brechtsanders/winlibs_tools/) are needed to build these recipes.
 
+## Folders
+
+The following build recipe folders are provided:
+ - `recipes`: known to build
+ - `recipes_work_in_progress`: don't build (yet)
+ - `recipes_not_portable`: will never work on Windows (intended for other operating system(s))
+
 ## Recipe Format
 
 A `.winlib` build recipe is written as a series of shell commands that can be run manually in the [MSYS2](https://www.msys2.org/) shell.
