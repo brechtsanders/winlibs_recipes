@@ -1,0 +1,127 @@
+export NAME="audiofile"
+export STATUS=
+export URL=http://audiofile.68k.org/
+export BASENAME=audiofile
+export DESCRIPTION="This audio file library is an implementation of the SGI audio file library. At present, not all features of the SGI audio file library are implemented. This library allows the processing of audio data to and from audio files of many common formats (currently AIFF, AIFC, WAVE, and NeXT/Sun)."
+export CATEGORY=audio,fileformat
+export TYPE=library
+#export VERSION=0.2.7
+#export VERSIONDATE=20101008
+####.libs/lt-printmarkers.c:95:3: warning: implicit declaration of function 'strcpy'
+####.libs/lt-printmarkers.c:95:19: warning: incompatible implicit declaration of built-in function 'strcpy'
+####.libs/lt-printmarkers.c:95:3: warning: implicit declaration of function 'strlen'
+#export VERSION=0.3.1
+#export VERSIONDATE=20110919
+#export VERSION=0.3.3
+#export VERSIONDATE=20120116
+#export VERSION=0.3.4
+#export VERSIONDATE=20120501
+#export VERSION=0.3.5
+#export VERSIONDATE=20130106
+export VERSION=0.3.6
+export VERSIONDATE=20130307
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="LGPL/GPL"
+#export DOWNLOADURL="http://audiofile.68k.org/"
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/audiofile/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix invalid %j format in libaudiofile/debug.cpp (version >= 0.3.1)
+patch -ulbf libaudiofile/debug.cpp << EOF
+--- libaudiofile/debug.cpp  2011-08-22 03:02:48 +0200
++++ libaudiofile/debug.cpp  2011-09-19 14:18:34 +0200
+@@ -55,3 +55,3 @@
+        printf("list.valid: %d\n", list->valid);
+-       printf("list.count: %zu\n", list->count);
++       printf("list.count: %lu\n", (long)list->count);
+
+@@ -159,21 +159,21 @@
+                _af_print_audioformat(&track->v);
+-               printf(" total file frames: %jd\n",
+-                       (intmax_t) track->totalfframes);
+-               printf(" total virtual frames: %jd\n",
+-                       (intmax_t) track->totalvframes);
+-               printf(" next file frame: %jd\n",
+-                       (intmax_t) track->nextfframe);
+-               printf(" next virtual frame: %jd\n",
+-                       (intmax_t) track->nextvframe);
+-               printf(" frames to ignore: %jd\n",
+-                       (intmax_t) track->frames2ignore);
+-
+-               printf(" data_size: %jd\n",
+-                       (intmax_t) track->data_size);
+-               printf(" fpos_first_frame: %jd\n",
+-                       (intmax_t) track->fpos_first_frame);
+-               printf(" fpos_next_frame: %jd\n",
+-                       (intmax_t) track->fpos_next_frame);
+-               printf(" fpos_after_data: %jd\n",
+-                       (intmax_t) track->fpos_after_data);
++               printf(" total file frames: %ld\n",
++                       (long) track->totalfframes);
++               printf(" total virtual frames: %ld\n",
++                       (long) track->totalvframes);
++               printf(" next file frame: %ld\n",
++                       (long) track->nextfframe);
++               printf(" next virtual frame: %ld\n",
++                       (long) track->nextvframe);
++               printf(" frames to ignore: %ld\n",
++                       (long) track->frames2ignore);
++
++               printf(" data_size: %ld\n",
++                       (long) track->data_size);
++               printf(" fpos_first_frame: %ld\n",
++                       (long) track->fpos_first_frame);
++               printf(" fpos_next_frame: %ld\n",
++                       (long) track->fpos_next_frame);
++               printf(" fpos_after_data: %ld\n",
++                       (long) track->fpos_after_data);
+
+@@ -254,3 +254,3 @@
+
+-       printf("%05jd ", (intmax_t) frameno);
++       printf("%05ld ", (long) frameno);
+
+EOF
+# fix invalid %j format in libaudiofile/Track.cpp (version >= 0.3.1)
+mv libaudiofile/Track.cpp libaudiofile/Track.cpp.bak
+sed -e "s/%j\(.*\)(intmax_t)/%l\1(long)/" libaudiofile/Track.cpp.bak > libaudiofile/Track.cpp
+# fix missing bzero in libaudiofile/CAF.cpp (version >= 0.3.6)
+mv libaudiofile/CAF.cpp libaudiofile/CAF.cpp.bak
+echo "#define bzero(b,len) memset(b, 0, len)" > libaudiofile/CAF.cpp
+cat libaudiofile/CAF.cpp.bak >> libaudiofile/CAF.cpp
+# skip making docs
+cat > docs/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+cp -f docs/Makefile.in docs/Makefile.am
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+# do not abort on warnings (needed for 64-bit) (version >= 0.3.1)
+sed -i.bak -e "s/-Wall//" libaudiofile/Makefile.in
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#sed -i.bak -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool &&
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip CXX="g++ -std=c++98" ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

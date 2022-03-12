@@ -1,0 +1,72 @@
+export NAME="FastCGI"
+export STATUS=
+#export URL=http://www.fastcgi.com/
+export URL=http://www.nongnu.org/fastcgi/
+#export URL=https://repo.or.cz/fcgi2.git
+export BASENAME=fcgi
+export DESCRIPTION="CGI library"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=2.4.0
+export VERSIONDATE=20111219
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.TERMS
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.fastcgi.com/dist/"
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.fastcgi.com/dist/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://www.fastcgi.com/dist/fcgi.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix libfcgi/fcgio.cpp
+mv libfcgi/fcgio.cpp libfcgi/fcgio.cpp.bak
+echo "#include <stdio.h>" > libfcgi/fcgio.cpp
+cat libfcgi/fcgio.cpp.bak >> libfcgi/fcgio.cpp
+# fix src/mod_webdav.c
+mv src/mod_webdav.c src/mod_webdav.c.bak
+cat > src/mod_webdav.c << EOF
+#define S_IRGRP 0
+#define S_IWGRP 0
+#define S_IROTH 0
+#define S_IWOTH 0
+#define S_IRWXG 0
+#define S_IRWXO 0
+EOF
+sed -e 's/\(mkdir([^),]*\),[^),]*)/\1)/' src/mod_webdav.c.bak >> src/mod_webdav.c
+# fix src/test.c
+mv src/test.c src/test.c.bak
+cat > src/test.c << EOF
+#include <pwd.h>
+#include <grp.h>
+EOF
+cat src/test.c.bak >> src/test.c
+wl-showstatus configure &&
+#autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+# fix configure
+mv configure configure.bak
+sed -e "s/\(SYSTEM=\)unix/\1win32/" configure.bak > configure
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--disable-auto-import -Wl,--export-all-symbols -Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ ## fix building DLLs and invalid DLL entry point
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/; s/\(_DllMainCRTStartup\)@12/_\1/" libtool.bak > libtool &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm CMakeCache.txt &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,186 @@
+export NAME="libglvnd"
+export STATUS=
+export URL=https://github.com/NVIDIA/libglvnd
+export BASENAME=libglvnd
+export DESCRIPTION="libglvnd is a vendor-neutral dispatch layer for arbitrating OpenGL API calls between multiple vendors. It allows multiple drivers from different vendors to coexist on the same filesystem, and determines which vendor to dispatch each API call to at runtime."
+export CATEGORY=graphics,hardware
+export TYPE=library
+export VERSION=1.2.0
+export VERSIONDATE=20200107
+#export VERSION=1.3.0
+#export VERSIONDATE=20200107
+#export VERSION=1.3.1
+#export VERSIONDATE=20200222
+#export VERSION=1.3.2
+#export VERSIONDATE=20200626
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=README.md
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/NVIDIA/libglvnd/releases"
+export DOWNLOADURL="https://gitlab.freedesktop.org/glvnd/libglvnd/-/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/NVIDIA/libglvnd/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/NVIDIA/libglvnd/archive/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/v$VERSION/libglvnd-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/libglvnd-v$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+#cd libglvnd-v$VERSION
+## fix src/GLdispatch/vnd-glapi/glapi.h
+#patch -ulbf src/GLdispatch/vnd-glapi/glapi.h << EOF
+#@@ -61,4 +61,6 @@
+# #      define _GLAPI_EXPORT __declspec(dllexport)
+#+#      define _GLAPI_EXPORT_VAR __declspec(dllexport)
+# #    else
+# #      define _GLAPI_EXPORT __declspec(dllimport)
+#+#      define _GLAPI_EXPORT_VAR __declspec(dllimport) extern
+# #    endif
+#@@ -66,4 +68,6 @@
+# #    define _GLAPI_EXPORT __attribute__((visibility("default")))
+#+#    define _GLAPI_EXPORT_VAR __attribute__((visibility("default"))) extern
+# #  else
+# #    define _GLAPI_EXPORT
+#+#    define _GLAPI_EXPORT_VAR extern
+# #  endif
+#@@ -88,3 +92,3 @@
+#  */
+#-_GLAPI_EXPORT extern const __thread void *
+#+_GLAPI_EXPORT_VAR const __thread void *
+#     _glapi_tls_Current[GLAPI_NUM_CURRENT_ENTRIES]
+#@@ -105,3 +109,3 @@
+#  */
+#-_GLAPI_EXPORT extern const void *_glapi_Current[GLAPI_NUM_CURRENT_ENTRIES];
+#+_GLAPI_EXPORT_VAR const void *_glapi_Current[GLAPI_NUM_CURRENT_ENTRIES];
+#
+#EOF
+# fix src/util/utils_misc.c
+patch -ulbf src/util/utils_misc.c << EOF
+@@ -237,2 +237,7 @@
+     // Don't use the environment variables if we're running as setuid.
++#ifdef _WIN32
++    if ((dirs[count] = getenv("TEMP")) != NULL) {
++        count++;
++    }
++#else
+     if (getuid() == geteuid()) {
+@@ -249,2 +254,3 @@
+     dirs[count++] = "/tmp";
++#endif
+     dirs[count] = NULL;
+EOF
+## fix src/GLdispatch/vnd-glapi/mapi_glapi.c
+#patch -ulbf src/GLdispatch/vnd-glapi/mapi_glapi.c << EOF
+#@@ -69,3 +69,3 @@
+#
+#-const struct _glapi_table *
+#+_GLAPI_EXPORT const struct _glapi_table *
+# _glapi_get_current(void)
+#EOF
+# fix redefinition of SetLastError in tests/dummy/EGL_dummy.c (version >= 1.3.0)
+sed -i.bak -e "s/SetLastError/MY_&/" tests/dummy/EGL_dummy.c
+## fix missing file (version >= 1.2.0)
+#touch tests/config.h
+# fix missing dllexport (version >= 1.2.0)
+mv src/GLdispatch/vnd-glapi/Makefile.in src/GLdispatch/vnd-glapi/Makefile.in.bak &&
+echo "CFLAGS += -D_GLAPI_DLL_EXPORTS" > src/GLdispatch/vnd-glapi/Makefile.in &&
+cat src/GLdispatch/vnd-glapi/Makefile.in.bak >> src/GLdispatch/vnd-glapi/Makefile.in
+wl-showstatus configure &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --enable-egl --disable-tls --disable-x11 --disable-glx CFLAGS="-Wno-attributes -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --disable-egl --disable-tls --disable-x11 --disable-glx PYTHON=$PYDIR/python.exe CFLAGS="-Wno-attributes -D_GLAPI_NO_EXPORTS -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --disable-egl --enable-tls --disable-x11 --disable-glx PYTHON=$PYDIR/python.exe CFLAGS="-Wno-attributes -D_GLAPI_NO_EXPORTS -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-egl --disable-tls --disable-x11 --disable-glx PYTHON=$PYDIR/python.exe CFLAGS="-Wno-attributes -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-egl --enable-tls --disable-x11 --disable-glx CFLAGS="-Wno-attributes -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix missing func__fatal_error in libtool
+ sed -i.bak2 -e "s/func__fatal_error/echo/" libtool &&
+ sed -i.bak3 -e "s/^\(build_libtool_libs=\)no/\1yes/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+####TO DO: make check fails
+
+## fix exporting symbols src/GLdispatch/vnd-glapi/u_compiler.h (version >= 1.3.2)
+#patch -ulbf src/GLdispatch/vnd-glapi/u_compiler.h << EOF
+#@@ -13,3 +13,5 @@
+# #ifndef PUBLIC
+#-#  if defined(__GNUC__) || (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x590))
+#+#  if defined(__MINGW32__)
+#+#    define PUBLIC __declspec(dllexport)
+#+#  elif defined(__GNUC__) || (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x590))
+# #    define PUBLIC __attribute__((visibility("default")))
+#EOF
+### fix src/GLdispatch/GLdispatch.c (version >= 1.3.2)
+##patch -ulbf src/GLdispatch/GLdispatch.c << EOF
+##@@ -172,2 +172,3 @@
+##
+##+PUBLIC
+## void __glDispatchInit(void)
+##@@ -715,2 +716,3 @@
+##  */
+##+PUBLIC
+## void __glDispatchFini(void)
+##EOF
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Degl=false -Dtls=disabled -Dx11=disabled -Dglx=disabled -Dc_args="['-D_GLAPI_DLL_EXPORTS','-I$MINGWPREFIX/include/mman-win32']" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+# ## fix slash/backslash path issue when calling Python from Ninja
+# #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+#    echo OK && find . -name '*.a'
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export BUILDDEPENDANCIES=meson,ninja
+## fix src/GLdispatch/vnd-glapi/u_compiler.h (version >= 1.3.2)
+#patch -ulbf src/GLdispatch/vnd-glapi/u_compiler.h << EOF
+#@@ -13,6 +13,10 @@
+# #ifndef PUBLIC
+#-#  if defined(__GNUC__) || (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x590))
+#+#  if defined(_WIN32) && !defined(_GLAPI_NO_EXPORTS)
+#+#    if defined(_GLAPI_DLL_EXPORTS)
+#+#      define PUBLIC __declspec(dllexport)
+#+#    else
+#+#      define PUBLIC __declspec(dllimport)
+#+#    endif
+#+#  elif defined(__GNUC__) || (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x590))
+# #    define PUBLIC __attribute__((visibility("default")))
+#-#  elif defined(_MSC_VER)
+#-#    define PUBLIC __declspec(dllexport)
+# #  else
+#EOF
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dheaders=true -Dtls=disabled -Degl=false -Dglx=disabled -Dx11=disabled -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+# ## fix slash/backslash path issue when calling Python from Ninja
+# #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+# ## fix Python path issues in meson_exe
+# #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+# ## fix executing shell scripts
+# #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+# ## fix dllexport
+# #sed -i.bak -e "s?^build src/GLdispatch/vnd-glapi[^:]*: c_COMPILER?& -D_GLAPI_DLL_EXPORTS?" build_both/build.ninja &&
+# #sed -i.bak -e "s?command.*-c.*?& -D_GLAPI_DLL_EXPORTS?" build_both/build.ninja &&
+# sed -i.bak -e "s/\(ARGS\s*=\s*\)\(\"-Isrc\\\\GLdispatch\\\\vnd-glapi\\\\\)/\1\"-D_GLAPI_DLL_EXPORTS\" \2/" build_both/build.ninja &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+# #PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+#    echo OK && find . -name '*.a'

@@ -1,0 +1,65 @@
+export NAME="OBEXFTP"
+export STATUS=
+export URL=http://dev.zuckschwerdt.org/openobex/
+export BASENAME=obexftp
+export DESCRIPTION="Free open source implementation of the Object Exchange (OBEX) protocol."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=0.24
+export VERSIONDATE=20160118
+#export VERSION=0.24.2
+#export VERSIONDATE=20160408
+########multicobex/multi_cobex_io.c:(.text+0xaa): undefined reference to `_imp__select@20'
+wl-showstatus --package-version
+export DEPENDANCIES=openobex
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://sourceforge.net/projects/openobex/files/obexftp/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/openobex/obexftp/$VERSION/obexftp-$VERSION-Source.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/obexftp-$VERSION-Source.tar.gz
+cd obexftp-$VERSION-Source
+# fix missing files
+mkdir -p winfix/sys
+touch winfix/sys/select.h
+# fix missing strcasestr in obexftp/cache.c
+mv obexftp/cache.c obexftp/cache.c.bak
+cat > obexftp/cache.c << EOF
+#include <shlwapi.h>
+#define strcasestr StrStrIA
+EOF
+cat obexftp/cache.c.bak >> obexftp/cache.c
+# fix linking with ws2_32
+patch -ulbf obexftp/CMakeLists.txt << EOF
+--- obexftp/CMakeLists.txt  2013-03-05 21:43:50.000000000 +0100
++++ obexftp/CMakeLists.txt  2016-01-18 21:31:34.197567000 +0100
+@@ -52,2 +52,3 @@
+   \${OpenObex_LIBRARIES}
++  -Wl,--as-needed -lws2_32
+ )
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$(pwd)/../winfix" .. &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$(pwd)/../winfix" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" .. &&
+ echo "-Wl,--as-needed -lws2_32" >> bfb/CMakeFiles/bfb.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lopenobex" >> multicobex/CMakeFiles/multicobex.dir/linklibs.rsp &&
+ cd .. &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf obexftp-$VERSION-Source
+
+
+

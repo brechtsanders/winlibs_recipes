@@ -1,0 +1,146 @@
+export NAME="talloc"
+export STATUS=
+export URL=http://talloc.samba.org/talloc/doc/html/index.html
+export BASENAME=talloc
+export DESCRIPTION="talloc is a hierarchical, reference counted memory pool system with destructors. It is the core memory allocator used in Samba."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=2.0.1
+export VERSIONDATE=20101005
+#export VERSION=2.0.5
+#export VERSIONDATE=20110115
+#export VERSION=2.0.6
+#export VERSIONDATE=20110809
+#export VERSION=2.0.7
+#export VERSIONDATE=20110916
+#export VERSION=2.0.8
+#export VERSIONDATE=20121130
+#export VERSION=2.1.0
+#export VERSIONDATE=20130908
+#export VERSION=2.1.1
+#export VERSIONDATE=20140520
+#export VERSION=2.1.2
+#export VERSIONDATE=20150311
+####/bin/sh: waf: command not found
+#export VERSION=2.1.3
+#export VERSIONDATE=20150722
+#export VERSION=2.1.4
+#export VERSIONDATE=20151013
+#export VERSION=2.1.5
+#export VERSIONDATE=20151106
+#export VERSION=2.1.6
+#export VERSIONDATE=20160406
+#export VERSION=2.1.7
+#export VERSIONDATE=20160507
+#export VERSION=2.1.8
+#export VERSIONDATE=20160728
+#export VERSION=2.1.9
+#export VERSIONDATE=20170228
+#export VERSION=2.1.10
+#export VERSIONDATE=20170724
+####Checking simple C program: buildtools\wafsamba\wscript:309: error: the configuration failed (see 'r:\\i686-pc-mingw32\\talloc-2.1.3\\bin\\config.log')
+#export VERSION=2.1.11
+#export VERSIONDATE=20180113
+#export VERSION=2.1.12
+#export VERSIONDATE=20180322
+#export VERSION=2.1.13
+#export VERSIONDATE=20180406
+####AttributeError: 'module' object has no attribute 'symlink'
+#export VERSION=2.1.14
+#export VERSIONDATE=20180712
+#export VERSION=2.1.15
+#export VERSIONDATE=20190115
+#export VERSION=2.1.16
+#export VERSIONDATE=20190226
+#export VERSION=2.2.0
+#export VERSIONDATE=20190321
+####SyntaxError: encoding problem: iso-8859-1
+#export VERSION=2.3.0
+#export VERSIONDATE=20190904
+#export VERSION=2.3.1
+#export VERSIONDATE=20191216
+#export VERSION=2.3.2
+#export VERSIONDATE=20210125
+#export VERSION=2.3.3
+#export VERSIONDATE=20210715
+####OSError: symbolic link privilege not held
+wl-showstatus --package-version
+export DEPENDANCIES=libcrypt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=waf
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://samba.org/ftp/talloc/ talloc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://samba.org/ftp/talloc/talloc-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/talloc-$VERSION.tar.gz
+cd talloc-$VERSION
+# fix definition of rep_readlink in libreplace/replace.c
+patch -ulbf libreplace/replace.c << EOF
+--- libreplace/replace.c  2009-06-29 16:50:44 +0200
++++ libreplace/replace.c  2010-10-05 08:34:30 +0200
+@@ -652,3 +652,3 @@
+ #ifndef HAVE_READLINK
+-int rep_readlink(const char *path, char *buf, size_t bufsiz)
++ssize_t rep_readlink(const char *path, char *buf, size_t bufsiz)
+ {
+EOF
+# fix missing VA_COPY in libreplace/snprintf.c
+mv libreplace/snprintf.c libreplace/snprintf.c.bak
+echo "#define VA_COPY va_copy" > libreplace/snprintf.c
+cat libreplace/snprintf.c.bak >> libreplace/snprintf.c
+# fix redefinitions and missing int32 in libreplace/win32_replace.h (version >= 2.0.1)
+sed -i.bak -e "s/^#define\s*\(E[A-Z_]*\)\s.*$/#ifndef \1\n&\n#endif/; s/#include <windows\.h>/&\n#include <stdint.h>\n#define int32 int32_t/" libreplace/win32_replace.h
+# fix missing StrnCpy in libreplace/crypt.c (version >= 2.0.1)
+sed -i.bak -e "s/StrnCpy/strncpy/" libreplace/crypt.c
+# fix invalid compiler switch -MD in buildtools/wafsamba/wscript (version >= 2.1.11)
+cp buildtools/wafsamba/wscript buildtools/wafsamba/wscript.bak &&
+sed -e "s/'-MD'/''/" buildtools/wafsamba/wscript.bak > buildtools/wafsamba/wscript
+# fix missing python3 in test_pytalloc.py (version >= 2.3.0)
+sed -i.bak -e "s/python3/python/" test_pytalloc.py
+wl-showstatus configure &&
+ #PATH=$PYDIR:$PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-talloc-compat1 LDFLAGS="-Wl,-no-undefined" &&
+ PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-talloc-compat1 LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ echo "#define HAVE_C99_VSNPRINTF" >> config.h &&
+ #( make install || (
+ # make libtalloc.a &&
+ # mkdir -p $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/include &&
+ # cp libtalloc.a $INSTALLPREFIX/lib/ &&
+ # cp talloc.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ # cp talloc.h $INSTALLPREFIX/include/
+ #) ) &&
+ make install SHLIBEXT=dll TALLOC_SOLIB=libtalloc.dll TALLOC_SONAME= TALLOC_COMPAT1_SONAME= &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf talloc-$VERSION
+
+
+
+## don't abort if symlinks are not supported (version >= 2.3.1)
+#patch -ulbf buildtools/wafsamba/samba_utils.py << EOF
+#@@ -275,12 +275,4 @@
+# def symlink(src, dst, force=True):
+#     """Can create symlink by force"""
+#-    try:
+#-        os.symlink(src, dst)
+#-    except OSError as exc:
+#-        if exc.errno == errno.EEXIST and force:
+#-            os.remove(dst)
+#-            os.symlink(src, dst)
+#-        else:
+#-            raise
+#
+#
+#EOF
+#wl-showstatus configure &&
+# $PYDIR/python.exe buildtools/bin/waf configure --disable-python --prefix=$INSTALLPREFIX &&
+# wl-showstatus build &&
+# $PYDIR/python.exe buildtools/bin/waf build &&
+# wl-showstatus install &&
+# $PYDIR/python.exe buildtools/bin/waf install &&
+#    echo OK

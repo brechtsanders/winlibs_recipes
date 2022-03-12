@@ -1,0 +1,84 @@
+export NAME="libxfce4ui"
+export STATUS=
+export URL=https://gitlab.xfce.org/xfce/libxfce4ui
+#export URL=https://github.com/xfce-mirror/libxfce4ui
+export BASENAME=libxfce4ui
+export DESCRIPTION="Widgets library for the Xfce desktop environment"
+export CATEGORY=gui
+export TYPE=library
+#export VERSION=4.16.0
+#export VERSIONDATE=20201223
+#export VERSION=4.16.1
+#export VERSIONDATE=20210906
+#export VERSION=4.17.0
+#export VERSIONDATE=20210627
+#export VERSION=4.17.1
+#export VERSIONDATE=20210906
+#export VERSION=4.17.2
+#export VERSIONDATE=20211210
+#export VERSION=4.17.3
+#export VERSIONDATE=20211227
+export VERSION=4.17.4
+export VERSIONDATE=20220222
+wl-showstatus --package-version
+export DEPENDANCIES=xfconf
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://gitlab.xfce.org/xfce/libxfce4ui/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.xfce.org/xfce/libxfce4ui/-/archive/libxfce4ui-$VERSION/libxfce4ui-libxfce4ui-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/libxfce4ui-libxfce4ui-$VERSION.tar.bz2
+cd libxfce4ui-libxfce4ui-$VERSION
+# fix missing gdk/gdkx.h
+mkdir -p winfix/gdk
+cat > winfix/gdk/gdkx.h << EOF
+#include <gdk/gdkwin32.h>
+#define Window HWND
+#define gdk_x11_window_foreign_new_for_display gdk_win32_window_foreign_new_for_display
+EOF
+# fix docs/Makefile.am
+sed -i.bak -e "s/\(EXTRA_DIST\s*\)+=/\1=/" docs/Makefile.am
+# fix missing files
+touch gtk-doc.make
+cp configure.ac.in configure.ac
+# fix globbing issues with glib-mkenums
+sed -i.bak -e "s/\(--fprod \"\)\(\/\*\)/\1\\\\n\2/g" libxfce4ui/Makefile.am
+wl-showstatus configure &&
+ # fix missing po/Makefile.in.in
+ intltoolize -f -c &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-maintainer-mode --disable-debug --disable-glibtop --disable-startup-notification --disable-gudev --disable-introspection --disable-vala --disable-tests CFLAGS="-I$(pwd)/winfix" &&
+ #--disable-nls 
+ #--disable-keyboard-library 
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ ( PATH=$PYDIR:$PATH make install-strip || PATH=$PYDIR:$PATH make install-strip POFILES=en_GB.po GMOFILES=en_GB.gmo CATALOGS=en_GB.gmo ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libxfce4ui-libxfce4ui-$VERSION
+
+
+

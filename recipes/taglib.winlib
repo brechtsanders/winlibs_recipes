@@ -1,0 +1,194 @@
+export NAME="TagLib"
+export STATUS=
+#export URL=http://developer.kde.org/~wheeler/taglib.html
+#export URL=http://taglib.github.com/
+export URL=https://taglib.org/
+export BASENAME=taglib
+export DESCRIPTION="TagLib is a library for reading and editing the meta-data of several popular audio formats. Currently it supports both ID3v1 and ID3v2 for MP3 files, Ogg Vorbis comments and ID3 tags and Vorbis comments in FLAC, MPC, Speex, WavPack and TrueAudio files."
+export CATEGORY=metadata
+export TYPE=library
+#export VERSION=1.4
+#export VERSION=1.5
+#export VERSION=1.6
+#export VERSION=1.6.1
+#export VERSIONDATE=20091101
+#export VERSION=1.6.2
+#export VERSIONDATE=20100409
+#export VERSION=1.6.3
+#export VERSIONDATE=20100423
+#export VERSION=1.7
+#export VERSIONDATE=20110312
+#export VERSION=1.7.1
+#export VERSIONDATE=20120319
+#export VERSION=1.7.2
+#export VERSIONDATE=20120531
+#export VERSION=1.8
+#export VERSIONDATE=20120907
+#export VERSION=1.9
+#export VERSIONDATE=20131006
+#export VERSION=1.9.1
+#export VERSIONDATE=20131009
+#export VERSION=1.10
+#export VERSIONDATE=20151112
+#export VERSION=1.11
+#export VERSIONDATE=20160429
+#export VERSION=1.11.1
+#export VERSIONDATE=20161024
+export VERSION=1.12
+export VERSIONDATE=20210215
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=COPYING
+export LICENSEFILE=COPYING.LGPL
+export LICENSETYPE=GPL2
+#export LICENSETYPE="LGPL and MPL"
+#export DOWNLOADURL="http://developer.kde.org/~wheeler/files/src/"
+#export DOWNLOADURL="http://developer.kde.org/~wheeler/taglib.html"
+#export DOWNLOADURL="http://taglib.github.com/"
+#export DOWNLOADURL="https://taglib.org/"
+export DOWNLOADURL="https://github.com/taglib/taglib/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://developer.kde.org/~wheeler/files/src/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/downloads/taglib/taglib/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://taglib.github.io/releases/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://taglib.org/releases/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/taglib/taglib/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing strlen and memcmp (version <= 1.6.1)
+#mv taglib/toolkit/tstring.cpp taglib/toolkit/tstring.cpp.bak
+#echo "#include <string.h>" > taglib/toolkit/tstring.cpp
+#cat taglib/toolkit/tstring.cpp.bak >> taglib/toolkit/tstring.cpp
+#mv taglib/toolkit/tbytevector.cpp taglib/toolkit/tbytevector.cpp.bak
+#echo "#include <string.h>" > taglib/toolkit/tbytevector.cpp
+#cat taglib/toolkit/tbytevector.cpp.bak >> taglib/toolkit/tbytevector.cpp
+#mv taglib/toolkit/tfile.cpp taglib/toolkit/tfile.cpp.bak
+#cat > taglib/toolkit/tfile.cpp << EOF
+##include <string.h>
+##include <malloc.h>
+#EOF
+#cat taglib/toolkit/tfile.cpp.bak >> taglib/toolkit/tfile.cpp
+#mv bindings/c/tag_c.cpp bindings/c/tag_c.cpp.bak
+#echo "#include <string.h>" > bindings/c/tag_c.cpp
+#cat bindings/c/tag_c.cpp.bak >> bindings/c/tag_c.cpp
+#### taglib/toolkit/tstring.cpp:74: error: definition of static data member 'TagLib::String::null' of dllimport'd class
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static CFLAGS="-DMAKE_TAGLIB_LIB" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+## fix problems with cppunit-config not being a shell script instead of an executable (version >= 1.7 <= 1.11)
+#####Error: -- Found cppunit: CreateProcessError: %1 is not a valid Win32 application.
+#mv cmake/modules/FindCppUnit.cmake cmake/modules/FindCppUnit.cmake.bak
+#sed -e "s/\${CPPUNIT_CONFIG_EXECUTABLE} ARGS/sh ARGS \${CPPUNIT_CONFIG_EXECUTABLE}/" cmake/modules/FindCppUnit.cmake.bak > cmake/modules/FindCppUnit.cmake
+## fix cmake build (version <= 1.7.2)
+#patch -ulbf CMakeLists.txt << EOF
+#--- CMakeLists.txt  2011-03-11 14:15:38 +0100
+#+++ CMakeLists.txt  2011-03-12 20:53:04 +0100
+#@@ -51,5 +51,3 @@
+# 
+#-if(NOT WIN32)
+#-  configure_file(\${CMAKE_CURRENT_SOURCE_DIR}/taglib.pc.cmake \${CMAKE_CURRENT_BINARY_DIR}/taglib.pc )
+#-endif(NOT WIN32)
+#+configure_file(\${CMAKE_CURRENT_SOURCE_DIR}/taglib.pc.cmake \${CMAKE_CURRENT_BINARY_DIR}/taglib.pc )
+# include_directories(\${CMAKE_CURRENT_BINARY_DIR})
+#@@ -72,5 +70,3 @@
+# ADD_SUBDIRECTORY(bindings)
+#-if(NOT WIN32)
+#-  install( FILES  \${CMAKE_CURRENT_BINARY_DIR}/taglib.pc DESTINATION \${LIB_INSTALL_DIR}/pkgconfig )
+#-endif(NOT WIN32)
+#+install( FILES  \${CMAKE_CURRENT_BINARY_DIR}/taglib.pc DESTINATION \${LIB_INSTALL_DIR}/pkgconfig )
+# 
+#EOF
+# avoid redefinition of NOMINMAX in taglib/toolkit/trefcounter.h (version >= 1.9.1)
+patch -ulbf taglib/toolkit/trefcounter.h << EOF
+--- taglib/toolkit/trefcounter.h  2013-10-08 17:50:01.000000000 +0200
++++ taglib/toolkit/trefcounter.h  2015-06-07 20:03:25.739196900 +0200
+@@ -35,3 +35,5 @@
+ #elif defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__CYGWIN__)
+-#  define NOMINMAX
++#  if !defined(NOMINMAX)
++#    define NOMINMAX
++#  endif
+ #  include <windows.h>
+EOF
+## fix taglib-config.cmake (version >= 1.10 <= 1.11)
+#sed -i.bak -e "s/\${CMAKE_INSTALL_PREFIX}/\$MINGWPREFIX/; s/\${LIB_INSTALL_DIR}/\$MINGWPREFIX\/lib/; s/\${INCLUDE_INSTALL_DIR}/\$MINGWPREFIX\/include/" taglib-config.cmake
+# fix taglib-config.cmake (version >= 1.11.1)
+sed -i.bak -e "s?\${CMAKE_INSTALL_PREFIX}?\$(realpath -m \$(basename \$0)/..)?; s?\${LIB_INSTALL_DIR}?\$(realpath -m \$(basename \$0)/../lib)?; s?\${INCLUDE_INSTALL_DIR}?\$(realpath -m \$(basename \$0)/../include)?" taglib-config.cmake
+## fix cmake build (version >= 1.8 <= 1.9.1)
+#patch -ulbf CMakeLists.txt << EOF
+#--- CMakeLists.txt  2012-09-06 20:03:16 +0200
+#+++ CMakeLists.txt  2013-04-01 21:22:00 +0200
+#@@ -71,6 +71,4 @@
+#
+#-if(NOT WIN32 AND NOT BUILD_FRAMEWORK)
+#   configure_file(\${CMAKE_CURRENT_SOURCE_DIR}/taglib.pc.cmake \${CMAKE_CURRENT_BINARY_DIR}/taglib.pc )
+#   install(FILES \${CMAKE_CURRENT_BINARY_DIR}/taglib.pc DESTINATION \${LIB_INSTALL_DIR}/pkgconfig)
+#-endif()
+#
+#EOF
+## fix cmake build (version >= 1.10 <= 1.11)
+#patch -ulbf CMakeLists.txt << EOF
+#--- CMakeLists.txt  2016-02-15 13:06:02.195126200 +0100
+#+++ CMakeLists.txt  2016-02-15 13:08:03.756281100 +0100
+#@@ -78,11 +78,4 @@
+#
+#-if(NOT WIN32)
+#-  configure_file("\${CMAKE_CURRENT_SOURCE_DIR}/taglib-config.cmake" "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config")
+#-  install(PROGRAMS "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config" DESTINATION "\${BIN_INSTALL_DIR}")
+#-endif()
+#-
+#-if(WIN32)
+#-  configure_file("\${CMAKE_CURRENT_SOURCE_DIR}/taglib-config.cmd.cmake" "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config.cmd")
+#-  install(PROGRAMS "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config.cmd" DESTINATION "\${BIN_INSTALL_DIR}")
+#-endif()
+#+configure_file("\${CMAKE_CURRENT_SOURCE_DIR}/taglib-config.cmake" "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config")
+#+install(PROGRAMS "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config" DESTINATION "\${BIN_INSTALL_DIR}")
+#
+#EOF
+# fix CMakeLists.txt (version >= 1.11.1)
+patch -ulbf CMakeLists.txt << EOF
+@@ -102,3 +102,3 @@
+
+-if(NOT WIN32)
++if(NOT MSVC)
+   configure_file("\${CMAKE_CURRENT_SOURCE_DIR}/taglib-config.cmake" "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config")
+@@ -107,3 +107,3 @@
+
+-if(WIN32)
++if(MSVC)
+   configure_file("\${CMAKE_CURRENT_SOURCE_DIR}/taglib-config.cmd.cmake" "\${CMAKE_CURRENT_BINARY_DIR}/taglib-config.cmd")
+EOF
+## build twice - cmake no longer builds static libraries (-DENABLE_STATIC=ON builds only static, not shared) &&
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DWITH_MP4=ON -DWITH_ASF=ON -S. -Bbuild_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DWITH_MP4=ON -DWITH_ASF=ON -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=OFF -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DWITH_MP4=ON -DWITH_ASF=ON -S. -Bbuild_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DWITH_MP4=ON -DWITH_ASF=ON -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# ( make -Cbuild_shared install/strip || make -Cbuild_shared install ) &&
+# wl-showstatus build-install &&
+# ( make -Cbuild_static install/strip || make -Cbuild_static install ) &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DWITH_MP4=ON -DWITH_ASF=ON -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DWITH_MP4=ON -DWITH_ASF=ON -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#### TO DO: https://github.com/taglib/taglib/issues/864
+
+
+

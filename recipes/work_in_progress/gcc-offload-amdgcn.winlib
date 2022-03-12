@@ -1,0 +1,220 @@
+export NAME="GCC, the GNU Compiler Collection (offload engine for AMD GCN)"
+export STATUS=
+export URL=https://gcc.gnu.org/
+export BASENAME=gcc-offload-amdgcn
+export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom. This build is for the offload engine for AMD GCN."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=10.2.0
+#export VERSIONDATE=20200723
+#export VERSION=10.3.0
+#export VERSIONDATE=20210408
+#export VERSION=11.1.0
+#export VERSIONDATE=20210427
+export VERSION=11.2.0
+export VERSIONDATE=20210728
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=newlib
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://gcc.gnu.org/releases.html gcc-"
+#export DOWNLOADURL="https://ftp.gnu.org/gnu/gcc/ gcc-"
+export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/releases/ gcc-"
+#export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/snapshots/ gcc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.mpi-sb.mpg.de/pub/gnu/mirror/gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/gcc/gcc-$VERSION/gcc-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/snapshots/$VERSION/gcc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/gcc $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfJlh $TARBALLDIR/gcc/gcc-$VERSION.tar.xz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/gcc-$VERSION
+## download and extract newlib
+##export NEWLIBVERSION=4.0.0
+#export NEWLIBVERSION=4.1.0
+#export NEWLIBDOWNLOADSOURCEURL=https://www.sourceware.org/ftp/newlib/newlib-$NEWLIBVERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/newlib $NEWLIBDOWNLOADSOURCEURL
+#tar xfz $TARBALLDIR/newlib/newlib-$NEWLIBVERSION.tar.gz
+#cp -rf newlib-$NEWLIBVERSION/newlib .
+cp -rf $MINGWPREFIX/src/newlib .
+# fix missing sys/wait.h fixincludes/fixincl.c (version >= 9.3.0)
+patch -ulbf fixincludes/fixincl.c << EOF
+@@ -28,4 +28,12 @@
+ #ifndef SEPARATE_FIX_PROC
++#ifdef _WIN32
++#include <Windows.h>
++#define wait(p) Sleep(0)
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#else
+ #include <sys/wait.h>
+ #endif
++#endif
+
+EOF
+# fix conflicting basename() in include/libiberty.h (version >= 10.2.0)
+patch -ulbf include/libiberty.h << EOF
+@@ -111,3 +111,3 @@
+  || defined (__DragonFly__) || defined (HAVE_DECL_BASENAME)
+-extern char *basename (const char *) ATTRIBUTE_RETURNS_NONNULL ATTRIBUTE_NONNULL(1);
++extern char *basename (char *) ATTRIBUTE_RETURNS_NONNULL ATTRIBUTE_NONNULL(1);
+ #else
+EOF
+# fix missing .exe extension of mkoffload in in gcc/lto-wrapper.c (version >= 10.2.0)
+#### bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98145
+#sed -i.bak -e "s?/mkoffload?&.exe?" gcc/lto-wrapper.c
+patch -ulbf gcc/lto-wrapper.c << EOF
+@@ -548,4 +548,10 @@
+ /* Parse STR, saving found tokens into PVALUES and return their number.
+-   Tokens are assumed to be delimited by ':'.  If APPEND is non-null,
+-   append it to every token we find.  */
++   Tokens are assumed to be delimited by ':' (or ';' on Windows).
++   If APPEND is non-null, append it to every token we find.  */
++
++#ifdef _WIN32
++#define PATH_LIST_SEPARATOR ';'
++#else
++#define PATH_LIST_SEPARATOR ':'
++#endif
+
+@@ -558,3 +564,3 @@
+
+-  curval = strchr (str, ':');
++  curval = strchr (str, PATH_LIST_SEPARATOR);
+   while (curval)
+@@ -562,3 +568,3 @@
+       num++;
+-      curval = strchr (curval + 1, ':');
++      curval = strchr (curval + 1, PATH_LIST_SEPARATOR);
+     }
+@@ -567,3 +573,3 @@
+   curval = str;
+-  nextval = strchr (curval, ':');
++  nextval = strchr (curval, PATH_LIST_SEPARATOR);
+   if (nextval == NULL)
+@@ -581,3 +587,3 @@
+       curval = nextval + 1;
+-      nextval = strchr (curval, ':');
++      nextval = strchr (curval, PATH_LIST_SEPARATOR);
+       if (nextval == NULL)
+@@ -816,2 +822,8 @@
+
++#ifdef _WIN32
++#define BIN_EXT ".exe"
++#else
++#define BIN_EXT ""
++#endif
++
+ static char *
+@@ -827,6 +839,6 @@
+   char *suffix
+-    = XALLOCAVEC (char, sizeof ("/accel//mkoffload") + strlen (target));
++    = XALLOCAVEC (char, sizeof ("/accel//mkoffload" BIN_EXT) + strlen (target));
+   strcpy (suffix, "/accel/");
+   strcat (suffix, target);
+-  strcat (suffix, "/mkoffload");
++  strcat (suffix, "/mkoffload" BIN_EXT);
+
+EOF
+# fix missing .exe extension of mkoffload in in gcc/config/amdgcn/mkoffload.c (version >= 10.2.0)
+#### bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98145
+patch -ulbf gcc/config/gcn/mkoffload.c << EOF
+@@ -131,3 +131,9 @@
+ /* Parse STR, saving found tokens into PVALUES and return their number.
+-   Tokens are assumed to be delimited by ':'.  */
++   Tokens are assumed to be delimited by ':' (or ';' on Windows).  */
++
++#ifdef _WIN32
++#define PATH_LIST_SEPARATOR ';'
++#else
++#define PATH_LIST_SEPARATOR ':'
++#endif
+
+@@ -140,3 +146,3 @@
+
+-  curval = strchr (str, ':');
++  curval = strchr (str, PATH_LIST_SEPARATOR);
+   while (curval)
+@@ -144,3 +150,3 @@
+       num++;
+-      curval = strchr (curval + 1, ':');
++      curval = strchr (curval + 1, PATH_LIST_SEPARATOR);
+     }
+@@ -149,3 +155,3 @@
+   curval = str;
+-  nextval = strchr (curval, ':');
++  nextval = strchr (curval, PATH_LIST_SEPARATOR);
+   if (nextval == NULL)
+@@ -160,3 +166,3 @@
+       curval = nextval + 1;
+-      nextval = strchr (curval, ':');
++      nextval = strchr (curval, PATH_LIST_SEPARATOR);
+       if (nextval == NULL)
+@@ -520,2 +526,8 @@
+
++#ifdef _WIN32
++#define BIN_EXT ".exe"
++#else
++#define BIN_EXT ""
++#endif
++
+ int
+@@ -540,3 +552,3 @@
+
+-  size_t len = (strlen (gcc_path) + 1 + strlen (GCC_INSTALL_NAME) + 1);
++  size_t len = (strlen (gcc_path) + 1 + strlen (GCC_INSTALL_NAME BIN_EXT) + 1);   char *driver = XALLOCAVEC (char, len);
+@@ -551,3 +563,3 @@
+     driver_used = sprintf (driver, "%s/", gcc_path);
+-  sprintf (driver + driver_used, "%s", GCC_INSTALL_NAME);
++  sprintf (driver + driver_used, "%s", GCC_INSTALL_NAME BIN_EXT);
+
+@@ -568,5 +580,5 @@
+        {
+-         len = strlen (paths[i]) + 1 + strlen (GCC_INSTALL_NAME) + 1;
++         len = strlen (paths[i]) + 1 + strlen (GCC_INSTALL_NAME BIN_EXT) + 1;
+          driver = XRESIZEVEC (char, driver, len);
+-         sprintf (driver, "%s/%s", paths[i], GCC_INSTALL_NAME);
++         sprintf (driver, "%s/%s", paths[i], GCC_INSTALL_NAME BIN_EXT);
+          if (access_check (driver, X_OK) == 0)
+@@ -582,3 +594,3 @@
+     fatal_error (input_location,
+-                "offload compiler %s not found", GCC_INSTALL_NAME);
++                "offload compiler %s not found", GCC_INSTALL_NAME BIN_EXT);
+EOF
+# copy link tools
+mkdir -p linktools
+PATH=$MINGWPREFIX/share/llvm/bin:$PATH cp -u $(which llvm-mc.exe) linktools/as.exe
+PATH=$MINGWPREFIX/share/llvm/bin:$PATH cp -u $(which lld.exe) linktools/ld.exe
+PATH=$MINGWPREFIX/share/llvm/bin:$PATH cp -u $(which llvm-nm.exe) linktools/nm.exe
+PATH=$MINGWPREFIX/share/llvm/bin:$PATH cp -u $(which llvm-ar.exe) linktools/amdgcn-amdhsa-ar.exe
+#PATH=$MINGWPREFIX/share/llvm/bin:$PATH cp -u $(which llvm-ranlib.exe) linktools/amdgcn-amdhsa-ranlib.exe
+PATH=$MINGWPREFIX/share/llvm/bin:$PATH cp -u $(which llvm-ar.exe) linktools/amdgcn-amdhsa-ranlib.exe
+mkdir -p build_win_offload-amdgcn &&
+ wl-showstatus configure &&
+ cd build_win_offload-amdgcn &&
+ #PATH=$MINGWPREFIX/share/amdgcn-tools/bin:$MINGWPREFIX/share/amdgcn-gcc/bin:$PATH 
+ #../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=amdgcn-amdhsa --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/amdgcn-tools/amdgcn-amdhsa/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=amdgcn-amdhsa --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/amdgcn-tools/amdgcn-amdhsa/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --with-newlib --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ PATH=$(pwd)/linktools:$MINGWPREFIX/share/llvm/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=amdgcn-amdhsa --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/amdgcn-tools/amdgcn-amdhsa/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --with-newlib --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #,fortran
+ cd .. &&
+ wl-showstatus build &&
+ PATH=$(pwd)/linktools:$MINGWPREFIX/share/llvm/bin:$PATH make -Cbuild_win_offload-amdgcn &&
+ wl-showstatus build-install &&
+ make -Cbuild_win_offload-amdgcn install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####clradeonextender
+####cp $(which clrxasm.exe) build_win_offload-amdgcn/gcc/as.exe
+####see also: https://gcc.gnu.org/install/specific.html#amdgcn-x-amdhsa
+
+
+
+####Bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100141

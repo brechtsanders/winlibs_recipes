@@ -1,0 +1,233 @@
+export NAME="Cpio"
+export STATUS=
+export URL=http://www.gnu.org/software/cpio/
+export BASENAME=cpio
+export DESCRIPTION="GNU cpio copies files into or out of a cpio or tar archive. The archive can be another file on the disk, a magnetic tape, or a pipe."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=2.9
+#export VERSION=2.11
+#export VERSIONDATE=20110220
+#export VERSION=2.12
+#export VERSIONDATE=20150912
+export VERSION=2.13
+export VERSIONDATE=20191106
+####lib/rtapelib.c:(.text+0x747): undefined reference to `gethostbyname'
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/cpio/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/$BASENAME/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix lib/rtapelib.c (version = 2.11)
+#patch -ulbf lib/rtapelib.c << EOF
+#--- lib/rtapelib.c  2007-06-27 15:49:46 +0200
+#+++ lib/rtapelib.c  2010-11-20 08:49:00 +0100
+#@@ -119,4 +119,8 @@
+# do_command (int handle, const char *buffer)
+# {
+#+#ifndef HAVE_PIPE
+#+  errno = ENOSYS;
+#+  return -1;
+#+#else
+#   /* Save the current pipe handler and try to make the request.  */
+#
+#@@ -133,4 +137,5 @@
+#   _rmt_shutdown (handle, EIO);
+#   return -1;
+#+#endif
+# }
+#
+#@@ -362,4 +367,8 @@
+#             const char *remote_shell)
+# {
+#+#ifndef HAVE_PIPE
+#+  errno = ENOSYS;
+#+  return -1;
+#+#else
+#   int remote_pipe_number;      /* pseudo, biased file descriptor */
+#   char *file_name_copy;                /* copy of file_name string */
+#@@ -542,4 +551,5 @@
+#   free (file_name_copy);
+#   return remote_pipe_number + bias;
+#+#endif
+# }
+#
+#@@ -592,4 +602,8 @@
+# rmt_write__ (int handle, char *buffer, size_t length)
+# {
+#+#ifndef HAVE_PIPE
+#+  errno = ENOSYS;
+#+  return -1;
+#+#else
+#   char command_buffer[COMMAND_BUFFER_SIZE];
+#   RETSIGTYPE (*pipe_handler) ();
+#@@ -617,4 +631,5 @@
+#   _rmt_shutdown (handle, EIO);
+#   return written;
+#+#endif
+# }
+#EOF
+## fix lib/util.c (version <= 2.11)
+#patch -ulbf src/util.c << EOF
+#--- src/util.c  2010-03-10 11:22:30 +0100
+#+++ src/util.c  2011-02-20 23:29:30 +0100
+#@@ -1321,8 +1321,11 @@
+# fchown_or_chown (int fd, const char *name, uid_t uid, uid_t gid)
+# {
+#+#if defined(HAVE_FCHOWN) && HAVE_FCHOWN
+#   if (HAVE_FCHOWN && fd != -1)
+#     return fchown (fd, uid, gid);
+#   else
+#+#else
+#     return chown (name, uid, gid);
+#+#endif
+# }
+#
+#@@ -1330,8 +1333,11 @@
+# fchmod_or_chmod (int fd, const char *name, mode_t mode)
+# {
+#+#if defined(HAVE_FCHMOD) && HAVE_FCHMOD
+#   if (HAVE_FCHMOD && fd != -1)
+#     return fchmod (fd, mode);
+#   else
+#+#else
+#     return chmod (name, mode);
+#+#endif
+# }
+#EOF
+## fix missing gethostbyname in lib/rtapelib.c (version >= 2.11 <= 2.12)
+#mv lib/rtapelib.c lib/rtapelib.c.bak &&
+#echo "#include <winsock2.h>" > lib/rtapelib.c &&
+#cat lib/rtapelib.c.bak >> lib/rtapelib.c
+## fix lib/rtapelib.c (version = 2.12)
+#patch -ulbf lib/rtapelib.c << EOF
+#--- lib/rtapelib.c  2015-08-31 21:43:05.000000000 +0200
+#+++ lib/rtapelib.c  2015-09-14 20:48:06.297583500 +0200
+#@@ -59,4 +59,10 @@
+# # include <netdb.h>
+# #endif
+#+#ifdef _WIN32
+#+# include <winsock2.h>
+#+# include <ws2tcpip.h>
+#+# define pipe(fds) -1
+#+# define fork() -1
+#+#endif
+#
+# #include <rmt.h>
+#@@ -119,4 +125,8 @@
+# do_command (int handle, const char *buffer)
+# {
+#+#ifndef HAVE_PIPE
+#+  errno = ENOSYS;
+#+  return -1;
+#+#else
+#   /* Save the current pipe handler and try to make the request.  */
+#
+#@@ -133,4 +143,5 @@
+#   _rmt_shutdown (handle, EIO);
+#   return -1;
+#+#endif
+# }
+#
+#@@ -605,7 +616,11 @@
+#     return 0;
+#
+#+#ifdef SIGPIPE
+#   pipe_handler = signal (SIGPIPE, SIG_IGN);
+#+#endif
+#   written = full_write (WRITE_SIDE (handle), buffer, length);
+#+#ifdef SIGPIPE
+#   signal (SIGPIPE, pipe_handler);
+#+#endif
+#   if (written == length)
+#     {
+#EOF
+## fix missing files (version <= 2.12)
+#mkdir -p winfix
+#cat > winfix/pwd.h << EOF
+##ifndef PWD_H_INCLUDED
+##define PWD_H_INCLUDED
+##define getpwuid(uid) NULL
+##define getpwnam(username) NULL
+##undef HAVE_DECL_GETPWNAM
+##define HAVE_DECL_GETPWNAM 1
+#struct passwd {
+# int pw_uid;
+# int pw_gid;
+# char *pw_name;
+#};
+##endif
+##define setuid(uid) -1
+#EOF
+#cat > winfix/grp.h << EOF
+##ifndef GRP_H_INCLUDED
+##define GRP_H_INCLUDED
+##define getgrgid(gid) NULL
+##undef HAVE_DECL_GETGRGID
+##define HAVE_DECL_GETGRGID 1
+##define getgrnam(groupname) NULL
+##undef HAVE_DECL_GETGRNAM
+##define HAVE_DECL_GETGRNAM 1
+#struct group {
+# int gr_gid;
+# char *gr_name;
+#};
+##endif
+##define setgid(gid) -1
+#EOF
+## fix missing files (version <= 2.12)
+#mkdir -p winfix/sys
+#touch winfix/sys/ioctl.h
+## fix src/filetypes.h (version >= 2.11 <= 2.12)
+#patch -ulbf src/filetypes.h << EOF
+#--- src/filetypes.h  2010-02-12 11:19:24 +0100
+#+++ src/filetypes.h  2011-02-20 22:39:16 +0100
+#@@ -80,2 +80,5 @@
+#
+#+#ifdef __MINGW32__
+#+#undef stat
+#+#else
+# #ifndef S_ISLNK
+#@@ -83,2 +86,3 @@
+# #endif
+#+#endif
+# int lstat ();
+#EOF
+## fix src/copyout.c (version >= 2.11 <= 2.12)
+#patch -ulbf src/copyout.c << EOF
+#--- src/copyout.c  2010-02-12 11:19:24 +0100
+#+++ src/copyout.c  2011-02-20 22:42:00 +0100
+#@@ -802,3 +802,3 @@
+#
+#-#ifdef CP_IFLNK
+#+#if defined(CP_IFLNK) && !defined(__MINGW32__)
+#            case CP_IFLNK:
+#EOF
+# fix missing readlink/fchown/fchmod (version >= 2.13)
+sed -i.bak -e "s/#ifdef \(CP_IFLNK\|S_ISLNK\)/#if defined(\1) \&\& \!defined(__MINGW32__)/; s/\(fchown\|fchmod\) (.*)/-1/; s/extern int errno;/\/\/&/" src/copyin.c src/copyout.c src/copypass.c src/util.c src/tar.c
+# fix missing gethostbyname in lib/rtapelib.c (version >= 2.13)
+mv lib/rtapelib.c lib/rtapelib.c.bak &&
+echo "#include <winsock2.h>" > lib/rtapelib.c &&
+cat lib/rtapelib.c.bak >> lib/rtapelib.c
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mt CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mt CFLAGS="-I$(pwd)/winfix" LIBS="-Wl,--as-needed -lws2_32" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mt CFLAGS="-fcommon -I$(pwd)/winfix" LIBS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build-install &&
+ #( make install-strip || make install-strip LDFLAGS="-Wl,--as-needed -lws2_32" ) &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# See also: http://www.mail-archive.com/bug-cpio@gnu.org/msg00193.html
+
+
+

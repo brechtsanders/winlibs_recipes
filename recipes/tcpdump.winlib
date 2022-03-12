@@ -1,0 +1,147 @@
+export NAME="tcpdump"
+export STATUS=
+export URL=http://www.tcpdump.org/
+export BASENAME=tcpdump
+export DESCRIPTION="tcpdump - dump traffic on a network"
+export CATEGORY=network
+export TYPE=application
+#export VERSION=4.7.4
+#export VERSIONDATE=20160228
+#export VERSION=4.8.0
+#export VERSIONDATE=20160802
+####tcpdump.o:tcpdump.c:(.text+0x5cb): undefined reference to `pcap_wsockinit'
+#export VERSION=4.8.1
+#export VERSIONDATE=20161026
+#export VERSION=4.9.0
+#export VERSIONDATE=20170202
+#export VERSION=4.9.1
+#export VERSIONDATE=20170724
+#export VERSION=4.9.2
+#export VERSIONDATE=20170905
+####print-icmp6.o:print-icmp6.c:(.text+0x158): undefined reference to `inet_ntop'
+#export VERSION=4.9.3
+#export VERSIONDATE=20191002
+#export VERSION=4.99.0
+#export VERSIONDATE=20201231
+export VERSION=4.99.1
+export VERSIONDATE=20210610
+wl-showstatus --package-version
+#export DEPENDANCIES=winpcap,libsmi
+export DEPENDANCIES=libpcap,libsmi
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://www.tcpdump.org/release/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.tcpdump.org/release/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/net
+touch winfix/net/netdb.h
+#echo "#include <pcap/namedb.h>" > winfix/pcap-namedb.h
+## fix missing/inet_pton.c
+#mv missing/inet_pton.c missing/inet_pton.c.bak &&
+#echo '#include "config.h"' > missing/inet_pton.c &&
+#cat missing/inet_pton.c.bak >> missing/inet_pton.c
+# fix missing/inet_aton.c
+mv missing/inet_aton.c missing/inet_aton.c.bak &&
+echo '#include "config.h"' > missing/inet_aton.c &&
+cat missing/inet_aton.c.bak >> missing/inet_aton.c
+## fix missing pcap_wsockinit in tcpdump.c (version >= 4.8.0 <= 4.9.3)
+#sed -i.bak -e "s/pcap_\(wsockinit\)/\1/" tcpdump.c
+# fix missing inet_ntop in print-icmp6.c (version >= 4.8.1)
+mv print-icmp6.c print-icmp6.c.bak
+cat > print-icmp6.c << EOF
+#include <stdio.h>
+#include <winsock2.h>
+const char* inet_ntop (int af, void const *src, char *dst, size_t size)
+{
+  switch (af) {
+    case AF_INET:
+    {
+      char tmp[16];
+      sprintf(tmp, "%u.%u.%u.%u", ((unsigned char*)src)[0], ((unsigned char*)src)[1], ((unsigned char*)src)[2], ((unsigned char*)src)[3]);
+      return strcpy(dst, tmp);
+    }
+    default:
+      return NULL;//to do: implement AF_INET6
+  }
+}
+EOF
+cat print-icmp6.c.bak >> print-icmp6.c
+# fix netdissect-stdinc.h (version >= 4.99.1)
+patch -ulbf netdissect-stdinc.h << EOF
+@@ -178,4 +178,8 @@
+    */
++#endif
++#ifdef _WIN32
+   #define our_fstat _fstati64
+   #define our_statb struct _stati64
++#endif
++#ifdef _MSC_VER
+
+EOF
+## fix tcpdump.c (version >= 4.99.1)
+#patch -ulbf tcpdump.c << EOF
+#@@ -118,2 +118,3 @@
+# #include <windows.h>
+#+#include <pcap/remote-ext.h>
+# #else
+#EOF
+# fix tcpdump.c (version >= 4.9.3)
+patch -ulbf tcpdump.c << EOF
+@@ -1162,4 +1162,6 @@
+ #ifdef _WIN32
+-       if (pcap_wsockinit() != 0)
++       static WSADATA wsaData;
++       if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
+                error("Attempting to initialize Winsock failed");
++       atexit((void(*)())WSACleanup);
+ #endif /* _WIN32 */
+EOF
+# fix missing getservent/endservent in addrtoname.c (version >= 4.9.3)
+patch -ulbf addrtoname.c << EOF
+@@ -768,2 +768,3 @@
+
++#ifndef _WIN32
+        while ((sv = getservent()) != NULL) {
+@@ -792,2 +793,3 @@
+        endservent();
++#endif
+ }
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix -I$(pwd)/win32/include -I$MINGWPREFIX/include/pcap" LIBS="-Wl,--as-needed -lws2_32 -lwinmm" &&
+ # fix definitions of u_int16_t/u_int32_t/u_int64_t/u_int8_t/uint in config.h
+ mv config.h config.h.bak &&
+ sed -e "s/^\(#define u_int\)\([0-9]*_t\).*$/\1\2 uint\2/" config.h.bak > config.h &&
+ echo "#define HAVE_U_INT8_T" >> config.h &&
+ echo "#define HAVE_U_INT16_T" >> config.h &&
+ echo "#define HAVE_U_INT32_T" >> config.h &&
+ echo "#define HAVE_U_INT64_T" >> config.h &&
+ echo "#define uint unsigned int" >> config.h &&
+ # fix alarm error
+ #echo "#undef HAVE_ALARM" >> config.h &&
+ echo "#define USE_WIN32_MM_TIMER" >> config.h &&
+ # fix missing includes
+ echo "#include <winsock2.h>" >> config.h &&
+ #echo "#include <pcap/pcap.h>" >> config.h &&
+ # fix multiple definition of version in tcpdump.c
+ echo "#define HAVE_GENERATED_VERSION" >> config.h &&
+ wl-showstatus build &&
+ make &&
+ strip *.exe &&
+ wl-showstatus build-install &&
+ make install &&
+ #$INSTALLPREFIX/sbin/tcpdump.exe --help &> /dev/null &&
+ $INSTALLPREFIX/bin/tcpdump.exe --help &> /dev/null &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

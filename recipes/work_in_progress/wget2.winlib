@@ -1,0 +1,149 @@
+export NAME="GNU Wget2"
+export STATUS=
+#export URL=https://gitlab.com/gnuwget/wget2
+export URL=https://github.com/rockdaboot/wget2
+export BASENAME=wget2
+export DESCRIPTION="GNU Wget2 is the successor of GNU Wget, a file and recursive website downloader."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.99.2
+#export VERSIONDATE=20200528
+export VERSION=2.0.0
+export VERSIONDATE=20210912
+####utils.c:35:10: fatal error: glob.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libbz2,xz,brotli,zstd,libpsl,nghttp2,gpgme,libidn,libidn2,pcre,pcre2,libhsts,libmicrohttpd
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://gitlab.com/gnuwget/wget2/-/releases"
+export DOWNLOADURL="https://github.com/rockdaboot/wget2/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://gitlab.com/gnuwget/wget2/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://github.com/rockdaboot/wget2/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/rockdaboot/wget2/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix libwget/io.c (version >= 1.99.2)
+patch -ulbf libwget/io.c << EOF
+@@ -42,3 +42,8 @@
+        #include <winsock2.h>
++#ifdef __MINGW32__
++       #include <libgen.h>
++       #define base_name(f) basename(f)
++#else
+        #include <msvc-nothrow.h> // make _get_osfhandle() return error
++#endif
+ #else
+@@ -421,3 +426,3 @@
+        FILE *fp;
+-       const char *tmpdir, *basename;
++       const char *tmpdir, *basefile;
+        int lockfd;
+@@ -432,5 +437,5 @@
+
+-       basename = base_name(fname);
++       basefile = base_name(fname);
+
+-       if (!basename)
++       if (!basefile)
+                return WGET_E_MEMORY;
+@@ -443,13 +448,13 @@
+        if (!tmplen)
+-               lockfile = wget_aprintf("%s_lck_%u", basename, (unsigned) getuid());
++               lockfile = wget_aprintf("%s_lck_%u", basefile, (unsigned) getuid());
+        else
+-               lockfile = wget_aprintf("%s/%s_lck_%u", tmpdir, basename, (unsigned) getuid());
++               lockfile = wget_aprintf("%s/%s_lck_%u", tmpdir, basefile, (unsigned) getuid());
+ #else
+        if (!tmplen)
+-               lockfile = wget_aprintf("%s_lck", basename);
++               lockfile = wget_aprintf("%s_lck", basefile);
+        else
+-               lockfile = wget_aprintf("%s/%s_lck", tmpdir, basename);
++               lockfile = wget_aprintf("%s/%s_lck", tmpdir, basefile);
+ #endif
+
+-       xfree(basename);
++       xfree(basefile);
+
+@@ -459,3 +464,3 @@
+        // create & open the lock file
+-       if ((lockfd = open(lockfile, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
++       if ((lockfd = open(lockfile, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+                error_printf(_("Failed to create '%s' (%d)\\n"), lockfile, errno);
+@@ -466,2 +471,3 @@
+        // set the lock
++#ifdef LOCK_EX
+        if (flock(lockfd, LOCK_EX) == -1) {
+@@ -472,2 +478,3 @@
+        }
++#endif
+
+EOF
+# fix src/utils.c (version >= 1.99.2)
+patch -ulbf src/utils.c << EOF
+@@ -28,3 +28,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <glob.h>
++#endif
+
+@@ -111,2 +113,3 @@
+
++#ifndef _WIN32
+        if (*fname == '~') {
+@@ -115,2 +118,3 @@
+        }
++#endif
+
+EOF
+# fix missing files
+touch lib/gnulib.mk
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/netinet/in.h
+echo "#include <ws2tcpip.h>" > winfix/netdb.h
+touch winfix/arpa/inet.h
+touch winfix/dirname.h
+cat > winfix/c-ctype.h << EOF
+#include <ctype.h>
+#define c_isspace isspace
+#define c_isdigit isdigit
+EOF
+touch README
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ # fix undefined gl_WARN_ADD in configure.ac
+ sed -i.bak -e "s/^\(\s*\)\(gl_WARN_ADD.*\)$/\1echo \"\2\"/" configure &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls CFLAGS="-I$MINGWPREFIX/share/gettext -I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

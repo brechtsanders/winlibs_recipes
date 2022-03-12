@@ -1,0 +1,95 @@
+export NAME="mecab"
+export STATUS=
+#export URL=https://taku910.github.io/mecab/
+export URL=https://github.com/taku910/mecab
+export BASENAME=mecab
+export DESCRIPTION="Yet another Japanese morphological analyzer"
+export CATEGORY=language
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20170622
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=mecab/COPYING
+export LICENSETYPE="GPL/LGPL/BSD"
+export DOWNLOADURL="https://github.com/taku910/mecab/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/taku910/mecab/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## use relative directory in mecab/src/utils.cpp
+#patch -ulbf mecab/src/utils.cpp << EOF
+#@@ -368,2 +368,14 @@
+#
+#+#ifdef _WIN32
+#+  if (rcfile.empty()) {
+#+    char exefilename[MAX_PATH];
+#+    DWORD exefilenamelen = GetModuleFileNameA(NULL, exefilename, MAX_PATH);
+#+    while (exefilenamelen-- > 0 && exefilename[exefilenamelen] != '\\\\')
+#+      ;
+#+    if (exefilenamelen >= 13 && stricmp(exefilename + exefilenamelen - 13, "libexec\\\\mecab") == 0) {
+#+      strcpy(exefilename + exefilenamelen - 13, "etc\\\\mecabrc");
+#+      rcfile = exefilename;
+#+    }
+#+  }
+#+#endif
+#   if (rcfile.empty()) {
+#EOF
+# fix missing WinMain in mecab/src/winmain.h
+patch -ulbf mecab/src/winmain.h << EOF
+@@ -62,2 +62,10 @@
+ #if defined(__MINGW32__)
++extern "C" int WinMain(HINSTANCE Inst, HINSTANCE PrevInst, LPSTR CmdLine, int CmdShow)
++{
++  int argc;
++  wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
++  CommandLine cmd(argc, argv);
++  return wmain_to_main_wrapper(cmd.argc(), cmd.argv());
++}
++
+ extern "C"
+EOF
+# avoid invalid -municode in configure
+sed -i.bak -e "s/-municode//" mecab/configure
+cd mecab
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ cp -f src/.libs/*.exe $INSTALLPREFIX/libexec/mecab &&
+ strip $INSTALLPREFIX/libexec/mecab/*.exe &&
+ cd .. &&
+ cd mecab-ipadic &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-mecab-config=$INSTALLPREFIX/bin/mecab-config &&
+ wl-showstatus build-install &&
+ PATH=$(pwd)/../mecab/src/.libs:$PATH make install-strip &&
+ cd .. &&
+ cd mecab-jumandic &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-mecab-config=$INSTALLPREFIX/bin/mecab-config &&
+ wl-showstatus build-install &&
+ PATH=$(pwd)/../mecab/src/.libs:$PATH make install-strip &&
+ cd .. &&
+ # fix /bin/mecab-config
+ mv -f $INSTALLPREFIX/bin/mecab-config $INSTALLPREFIX/bin/mecab-config.bak &&
+ sed "s?$INSTALLPREFIX?$MINGWPREFIX?g" $INSTALLPREFIX/bin/mecab-config.bak > $INSTALLPREFIX/bin/mecab-config &&
+ rm -f $INSTALLPREFIX/bin/mecab-config.bak &&
+ # fix /etc/mecabrc
+ mv -f $INSTALLPREFIX/etc/mecabrc $INSTALLPREFIX/etc/mecabrc.bak &&
+ sed "s?$INSTALLPREFIX?$MINGWPREFIX?g" $INSTALLPREFIX/etc/mecabrc.bak > $INSTALLPREFIX/etc/mecabrc &&
+ rm -f $INSTALLPREFIX/etc/mecabrc.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: $MINGWPREFIX/libexec/mecab/mecab.exe returns:
+####param.cpp(69) [ifs] no such file or directory: c:\Program Files\mecab\etc\mecabrc
+
+
+

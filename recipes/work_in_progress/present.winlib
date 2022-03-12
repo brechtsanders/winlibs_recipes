@@ -1,0 +1,80 @@
+export NAME="present"
+export STATUS=
+export URL=http://live.gnome.org/libpresent
+export BASENAME=present
+export DESCRIPTION="part of goffice"
+export CATEGORY=
+export TYPE=library
+export VERSION=0.0.3
+export VERSIONDATE=20101008
+####configure: error: Package requirements ( libgoffice-0.8 >= 0.0.2 ) were not met.
+wl-showstatus --package-version
+export DEPENDANCIES=libgoffice
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/present/"
+export DOWNLOADURL="https://download.gnome.org/sources/present/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://download.gnome.org/sources/present/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing UN_PER_IN in libpresent/load-ppt.c
+mv libpresent/load-ppt.c libpresent/load-ppt.c.bak
+cat > libpresent/load-ppt.c << EOF
+#define UN_PER_IN GO_UN_PER_IN
+#define go_unit_t gint64
+#define GoRect GORect
+EOF
+cat libpresent/load-ppt.c.bak >> libpresent/load-ppt.c
+# fix missing GoRect in libpresent/god-drawing-ms-client-handler-ppt.c
+mv libpresent/god-drawing-ms-client-handler-ppt.c libpresent/god-drawing-ms-client-handler-ppt.c.bak
+cat > libpresent/god-drawing-ms-client-handler-ppt.c << EOF
+#define GoRect GORect
+#define GOD_DRAWING_MS_CLIENT_HANDLER_TYPE god_drawing_ms_client_handler_get_type()
+EOF
+cat libpresent/god-drawing-ms-client-handler-ppt.c.bak >> libpresent/god-drawing-ms-client-handler-ppt.c
+# fix missing #define GOD_TEXT_MODEL_TYPE in libpresent/present-text.c
+mv libpresent/present-text.c libpresent/present-text.c.bak
+cat > libpresent/present-text.c << EOF
+#define GOD_TEXT_MODEL_TYPE god_text_model_get_type()
+EOF
+cat libpresent/present-text.c.bak >> libpresent/present-text.c
+# fix missing UN_PER_IN in libpresent/ppt-parsing-helper.c
+mv libpresent/ppt-parsing-helper.c libpresent/ppt-parsing-helper.c.bak
+cat > libpresent/ppt-parsing-helper.c << EOF
+#define UN_PER_IN GO_UN_PER_IN
+EOF
+cat libpresent/ppt-parsing-helper.c.bak >> libpresent/ppt-parsing-helper.c
+# fix libgoffice detection in configure
+mv configure configure.bak
+sed -e "s/libgoffice-1/libgoffice-0.8/" configure.bak > configure
+#sed -e "s/libgoffice-1/libgoffice-0.10/" configure.bak > configure
+# skip making tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #( make install-strip || make install-strip LIBS="-Wl,--as-needed `$PKG_CONFIG --libs pango` `$PKG_CONFIG --libs libgoffice-0.8` `$PKG_CONFIG --libs gtk+-2.0` `$PKG_CONFIG --libs libgsf-1`" ) &&
+ #( make install-strip || make install-strip LIBS="-Wl,--as-needed $($PKG_CONFIG --libs pango | sed -e s/$'\x01'//g) $($PKG_CONFIG --libs libgoffice-0.8 | sed -e s/$'\x01'//g) $($PKG_CONFIG --libs gtk+-2.0 | sed -e s/$'\x01'//g) $($PKG_CONFIG --libs libgsf-1 | sed -e s/$'\x01'//g)" ) &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed $($PKG_CONFIG --libs pango libgoffice-0.8 gtk+-2.0 libgsf-1)" ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

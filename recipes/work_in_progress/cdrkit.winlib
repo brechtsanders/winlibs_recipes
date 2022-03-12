@@ -1,0 +1,119 @@
+export NAME="cdrkit"
+export STATUS=
+export URL=https://github.com/Distrotech/cdrkit
+export BASENAME=cdrkit
+export DESCRIPTION="portable command-line CD/DVD recorder software (contains: cdda2wav, wodim, genisoimage, mkhybrid, readcd, usalcheck, libusal)"
+export CATEGORY=
+export TYPE=library
+export VERSION=1.1.11
+export VERSIONDATE=20160106
+####tar: cdrkit-release_1.1.11/icedax/cdda2mp3: Cannot create symlink to 'cdda2ogg': No such file or directory
+####include/usal/usalcmd.h:129:2: error: unknown type name 'caddr_t'
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://packages.debian.org/source/stable/cdrkit cdrkit_ .orig.tar.gz"
+#export DOWNLOADURL="https://github.com/Distrotech/cdrkit/releases release_"
+export DOWNLOADURL="https://github.com/Distrotech/cdrkit/tags release_"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/Distrotech/cdrkit/archive/release_$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/Distrotech/cdrkit/archive/refs/tags/release_$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/release_$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/release_$VERSION.tar.gz
+cd cdrkit-release_$VERSION
+# fix include/AddNetworkBits.cmake for winsock
+patch -ulbf include/AddNetworkBits.cmake << EOF
+--- include/AddNetworkBits.cmake  2010-10-18 00:28:24.000000000 +0200
++++ include/AddNetworkBits.cmake  2016-01-06 20:03:39.771568900 +0100
+@@ -25,4 +25,8 @@
+    CHECK_C_SOURCE_COMPILES("\${TESTSRC}" USE_LIBSOCKET)
+-   IF(NOT USE_LIBSOCKET)
++   IF (WIN32)
++      LIST(APPEND EXTRA_LIBS winsock2)
++      SET(USE_LIBC_SOCKET 1)
++   ELSEIF(NOT USE_LIBSOCKET)
+       MESSAGE(FATAL_ERROR "No working socket(...) found in libc or libsocket")
++
+    ENDIF(NOT USE_LIBSOCKET)
+@@ -51,3 +55,4 @@
+       CHECK_C_SOURCE_COMPILES("\${TESTSRC}" USE_LIBXNET)
+-      IF(NOT USE_LIBXNET)
++      IF (WIN32)
++      ELSEIF(NOT USE_LIBXNET)
+          MESSAGE(FATAL_ERROR "Error: Could not find a system library providing gethostbyname.")
+EOF
+# fix include/unixstd.h for Windows
+patch -ulbf include/unixstd.h << EOF
+--- include/unixstd.h  2010-10-18 00:28:24.000000000 +0200
++++ include/unixstd.h  2016-01-06 20:07:52.697787800 +0100
+@@ -115,3 +115,3 @@
+
+-#if    !defined(HAVE_UNISTD_H) || !defined(_POSIX_VERSION)
++#if    (!defined(HAVE_UNISTD_H) || !defined(_POSIX_VERSION)) && !defined(__MINGW32__)
+ /*
+EOF
+# fix missing caddr_t in include/usal/usalcmd.h
+mv include/usal/usalcmd.h include/usal/usalcmd.h.bak
+echo "typedef char * caddr_t;" > include/usal/usalcmd.h
+cat include/usal/usalcmd.h.bak >> include/usal/usalcmd.h
+# fix libusal/scsihack.c
+patch -ulbf libusal/scsihack.c << EOF
+--- libusal/scsihack.c  2010-10-18 00:28:24.000000000 +0200
++++ libusal/scsihack.c  2016-01-06 20:13:25.835662000 +0100
+@@ -62,3 +62,5 @@
+ #include <timedefs.h>
++#ifndef __MINGW32__
+ #include <sys/ioctl.h>
++#endif
+ #include <fctldefs.h>
+EOF
+# fix detection of -lws2_32
+patch -ulbf include/AddNetworkBits.cmake << EOF
+@@ -21,9 +21,10 @@
+
+-   LIST(APPEND EXTRA_LIBS socket)
++   LIST(APPEND EXTRA_LIBS ws2_32)
+
+    SET(CMAKE_REQUIRED_LIBRARIES socket)
+-   CHECK_C_SOURCE_COMPILES("\${TESTSRC}" USE_LIBSOCKET)
+-   IF(NOT USE_LIBSOCKET)
+-      MESSAGE(FATAL_ERROR "No working socket(...) found in libc or libsocket")
+-   ENDIF(NOT USE_LIBSOCKET)
++   #CHECK_C_SOURCE_COMPILES("\${TESTSRC}" USE_LIBSOCKET)
++   #IF(NOT USE_LIBSOCKET)
++   #   MESSAGE(FATAL_ERROR "No working socket(...) found in libc or libsocket")
++   #ENDIF(NOT USE_LIBSOCKET)
++   SET(USE_LIBSOCKET TRUE)
+
+@@ -44,6 +45,7 @@
+ IF(NOT USE_LIBC_NLS)
+-   SET(CMAKE_REQUIRED_LIBRARIES nls)
+-   CHECK_C_SOURCE_COMPILES("\${TESTSRC}" USE_LIBNLS)
++   SET(CMAKE_REQUIRED_LIBRARIES ws2_32)
++   #CHECK_C_SOURCE_COMPILES("\${TESTSRC}" USE_LIBNLS)
++   SET(USE_LIBNLS TRUE)
+    IF(USE_LIBNLS)
+-      LIST(APPEND EXTRA_LIBS nls)
++      LIST(APPEND EXTRA_LIBS ws2_32)
+    ELSE(USE_LIBNLS)
+EOF
+# fix missing Unix stuff in libusal/scsi-remote.c
+mv libusal/scsi-remote.c libusal/scsi-remote.c.bak
+grep -v "^#define\s*USE_REMOTE" libusal/scsi-remote.c.bak > libusal/scsi-remote.c
+wl-showstatus configure &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+ wl-showstatus build-install &&
+ make install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cdrkit-release_$VERSION
+
+
+

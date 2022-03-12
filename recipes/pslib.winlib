@@ -1,0 +1,54 @@
+export NAME="pslib"
+export STATUS=
+export URL=http://pslib.sourceforge.net/
+export BASENAME=pslib
+export DESCRIPTION="pslib is a C-library to create PostScript files on the fly."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=0.4.5
+#export VERSIONDATE=20111215
+export VERSION=0.4.6
+export VERSIONDATE=20191102
+wl-showstatus --package-version
+export DEPENDANCIES=libpng,libjpeg,giflib,libtiff
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sourceforge.net/projects/pslib/files/pslib/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/pslib/pslib/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing definition of max in src/ps_strbuf.c
+mv src/ps_strbuf.c src/ps_strbuf.c.bak &&
+echo "#include <windows.h>" > src/ps_strbuf.c &&
+cat src/ps_strbuf.c.bak >> src/ps_strbuf.c
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+wl-showstatus configure &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lintl -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export BUILDDEPENDANCIES=cmake
+#sed -i.bak -e "s/^\(\s*ADD_LIBRARY\s*(\)\([^\s]*\)\s\s*\(.*\)$/\1\2 SHARED \3\n\1\2_static STATIC \3\nSET_TARGET_PROPERTIES(\2_static PROPERTIES OUTPUT_NAME \2)/" CMakeLists.txt
+#wl-showstatus configure &&
+#cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build &&
+# make &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK

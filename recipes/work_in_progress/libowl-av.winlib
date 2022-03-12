@@ -1,0 +1,96 @@
+export NAME="libowl-av (OpenedHand Widget Library - Audio/Video)"
+export STATUS=
+export URL=http://labs.o-hand.com/av-widget-library/
+export BASENAME=libowl-av
+export DESCRIPTION="libowl-av (OpenedHand Widget Library - Audio/Video) is a collection of objects for use in multimedia applications. These include a video widget, as well as audio player and metadata reader objects. All of these are backed by GStreamer and include Vala bindings."
+export CATEGORY=audio,video
+export TYPE=library
+export VERSION=0.1
+export VERSIONDATE=20101018
+####No package 'gstreamer-0.10' found
+####No package 'gstreamer-plugins-base-0.10' found
+wl-showstatus --package-version
+export DEPENDANCIES=gtk2,atk,pango,cairo,gstreamer,gst-plugins-base,gdk-pixbuf,freetype2,fontconfig,pthreads,pixman,libpng,libopenjpeg,expat,libxml2,glib2,libiconv,gettext
+export OPTIONALDEPENDANCIES=vala
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://labs.o-hand.com/av-widget-library/"
+export DOWNLOADURL="http://downloads.yoctoproject.org/releases/libowl-av/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://labs.o-hand.com/sources/libowl-av/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.yoctoproject.org/releases/libowl-av/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing gdk/gdkx.h
+mkdir -p gdk
+cat > gdk/gdkx.h << EOF
+#include <gdk/gdkwin32.h>
+#include <X11/X.h>
+//#include <X11/Xlib.h>
+#define GDK_WINDOW_XID(dw) (int)GDK_WINDOW_HWND(dw)
+EOF
+# fix missing redefined ERROR and undefined LAST_SIGNAL/XSync/GDK_WINDOW_XDISPLAY in libowl-av/owl-video-widget.c
+patch -ulbf libowl-av/owl-video-widget.c << EOF
+--- libowl-av/owl-video-widget.c  2010-10-25 15:42:26 +0200
++++ libowl-av/owl-video-widget.c  2010-10-25 15:58:34 +0200
+@@ -76,3 +76,3 @@
+         EOS,
+-        ERROR,
++        ERROR_,
+         LAST_SIGNAL
+@@ -137,3 +137,5 @@
+          **/
++#ifndef __MINGW32__
+         XSync (GDK_WINDOW_XDISPLAY (video_widget->priv->dummy_window), FALSE);
++#endif
+
+@@ -247,3 +249,3 @@
+         g_signal_emit (video_widget,
+-                       signals[ERROR],
++                       signals[ERROR_],
+                        0,
+@@ -763,3 +765,5 @@
+          **/
++#ifndef __MINGW32__
+         XSync (GDK_WINDOW_XDISPLAY (widget->window), FALSE);
++#endif
+
+@@ -1088,3 +1092,3 @@
+
+-        signals[ERROR] =
++        signals[ERROR_] =
+                 g_signal_new ("error",
+EOF
+# fix libowl-av/owl-tag-reader.c (version >= 0.1)
+patch -ulbf libowl-av/owl-tag-reader.c << EOF
+@@ -82,3 +82,3 @@
+         tag_reader->priv->src =
+-                gst_element_make_from_uri (GST_URI_SRC, data->uri, "src");
++                gst_element_make_from_uri (GST_URI_SRC, data->uri, "src", NULL);
+
+@@ -252,3 +252,3 @@
+                         tag_reader->priv->current_tag_list =
+-                                gst_tag_list_new ();
++                                gst_tag_list_new_empty ();
+                 }
+EOF
+# fix detection of gstreamer 1.0
+sed -i.bak -e "s/\(gstreamer[-a-z]*\)-0.10/\1-1.0/g" configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ sed -i.bak -e "s/^        /\t/" Makefile &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

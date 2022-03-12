@@ -1,0 +1,372 @@
+#export NAME="Ulfius"
+#export STATUS=
+#export URL=https://babelouest.github.io/ulfius/
+#export BASENAME=ulfius
+#export DESCRIPTION="Web Framework for REST API in C, using JSON or not"
+#export CATEGORY=communication
+#export TYPE=library
+##export VERSION=1.0.4
+##export VERSIONDATE=20170517
+##export VERSION=2.0.0
+##export VERSIONDATE=20170522
+#####src/u_send_request.c:672:48: warning: unknown conversion type character 'T' in format [-Wformat=]
+##export VERSION=2.0.1
+##export VERSIONDATE=20170529
+#####ulfius.h:883:3: error: unknown type name 'pthread_mutex_t'
+##export VERSION=2.0.2
+##export VERSIONDATE=20170605
+##export VERSION=2.1.0
+##export VERSIONDATE=20170607
+#####ulfius.h:859:17: error: field 'fds' has incomplete type
+##export VERSION=2.1.1
+##export VERSIONDATE=20170720
+##export VERSION=2.1.2
+##export VERSIONDATE=20170814
+##export VERSION=2.2
+##export VERSIONDATE=20171106
+#####ulfius.h:34:10: fatal error: sys/poll.h: No such file or directory
+##export VERSION=2.2.1
+##export VERSIONDATE=20180103
+##export VERSION=2.2.2
+##export VERSIONDATE=20180106
+##export VERSION=2.2.4
+##export VERSIONDATE=20180117
+##export VERSION=2.3.0
+##export VERSIONDATE=20180217
+##export VERSION=2.3.1
+##export VERSIONDATE=20180224
+##export VERSION=2.3.2
+##export VERSIONDATE=20180319
+##export VERSION=2.3.3
+##export VERSIONDATE=20180401
+##export VERSION=2.3.4
+##export VERSIONDATE=20180413
+##export VERSION=2.3.5
+##export VERSIONDATE=20180513
+##export VERSION=2.3.6
+##export VERSIONDATE=20180609
+##export VERSION=2.3.7
+##export VERSIONDATE=20180629
+##export VERSION=2.3.8
+##export VERSIONDATE=20180728
+#export VERSION=2.3.1
+#export VERSIONDATE=20181009
+#wl-showstatus --package-version
+#export DEPENDANCIES=yder,orcania,libmicrohttpd,libjansson,libcurl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://github.com/babelouest/ulfius/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=https://github.com/babelouest/ulfius/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/babelouest/ulfius/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+##mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+##mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+### fix missing uint in src/ulfius.h (version <= 2.0.1)
+##mv src/ulfius.h src/ulfius.h.bak
+##cat > src/ulfius.h << EOF
+###include <pthread.h>
+###ifndef uint
+###define uint unsigned int
+###endif
+##EOF
+##cat src/ulfius.h.bak >> src/ulfius.h
+## fix missing folders
+#mkdir -p lib/orcania lib/yder/src
+### fix missing o_strdup/o_strndup/o_malloc/o_realloc/o_free in src/ulfius.c (version >= 2.0.1)
+##mv src/ulfius.c src/ulfius.c.bak &&
+##cat > src/ulfius.c << EOF
+###include <string.h>
+##char* strndup (const char *str, size_t maxlen)
+##{
+##  int l = strnlen(str, maxlen);
+##  char* s = (char*)malloc(l + 1);
+##  memcpy(s, str, l);
+##  s[l] = 0;
+##  return s;
+##}
+##EOF
+##sed -e "s/\bo_\(strdup\|strndup\|malloc\|realloc\|free\)/\1/g" src/ulfius.c.bak >> src/ulfius.c
+## don't use missing MSG_NOSIGNAL in src/u_websocket.c (version >= 2.0.1)
+#mv src/u_websocket.c src/u_websocket.c.bak &&
+#sed -e "s/MSG_NOSIGNAL/0/" src/u_websocket.c.bak > src/u_websocket.c
+## fix missing strtok_r in src/u_request.c (version >= 2.0.1)
+#if ! ( gcc --version | grep -q MinGW-W64); then
+# mv src/u_request.c src/u_request.c.bak &&
+# sed -e "s/strtok_r/strtok_s/g" src/u_request.c.bak > src/u_request.c
+#fi
+## fix missing strtok_r in src/u_send_request.c (version >= 2.0.1 <= 2.2.4)
+#if ! ( gcc --version | grep -q MinGW-W64); then
+# mv src/u_send_request.c src/u_send_request.c.bak &&
+# sed -e "s/strtok_r/strtok_s/g" src/u_send_request.c.bak > src/u_send_request.c
+#fi
+### fix missing sys/poll.h (version >= 2.0.2)
+##for F in src/u_websocket.c src/ulfius.h; do
+## mv $F $F.bak2 &&
+## grep -v "sys/poll\.h" $F.bak2 > $F
+##done
+### fix missing sys/poll.h in src/ulfius.h (version >= 2.2.1 <= 2.2.2)
+##patch -ulbf src/ulfius.h << EOF
+##@@ -33,3 +33,8 @@
+## /** External dependencies **/
+##+#ifdef _WIN32
+##+#define _WIN32_WINNT 0x0600
+##+#include <winsock2.h>
+##+#else
+## #include <sys/poll.h>
+##+#endif
+## #include <pthread.h>
+##@@ -907,3 +912,7 @@
+##   pthread_mutex_t write_lock;
+##+#ifdef _WIN32
+##+  WSAPOLLFD fds;
+##+#else
+##   struct pollfd fds;
+##+#endif
+## };
+##EOF
+## fix missing poll.h in src/ulfius.h (version >= 2.2.4)
+#patch -ulbf src/ulfius.h << EOF
+#@@ -29,3 +29,8 @@
+# /** External dependencies **/
+#+#ifdef _WIN32
+#+#define _WIN32_WINNT 0x0600
+#+#include <winsock2.h>
+#+#else
+# #include <poll.h>
+#+#endif
+# #include <pthread.h>
+#@@ -903,3 +908,7 @@
+#   pthread_mutex_t write_lock;
+#+#ifdef _WIN32
+#+  WSAPOLLFD fds;
+#+#else
+#   struct pollfd fds;
+#+#endif
+# };
+#EOF
+### fix missing sys/poll.h in src/u_websocket.c (version >= 2.2.1 <= 2.2.2)
+##patch -ulbf src/u_websocket.c << EOF
+##@@ -34,3 +34,9 @@
+## #include <unistd.h>
+##+#ifdef _WIN32
+##+#define _WIN32_WINNT 0x0600
+##+#include <winsock2.h>
+##+#define poll WSAPoll
+##+#else
+## #include <sys/poll.h>
+##+#endif
+## #include <gnutls/gnutls.h>
+##EOF
+## fix missing sys/poll.h in src/u_websocket.c (version >= 2.2.4)
+#patch -ulbf src/u_websocket.c << EOF
+#@@ -35,2 +35,10 @@
+# #include <gnutls/gnutls.h>
+#+#ifdef _WIN32
+#+#define _WIN32_WINNT 0x0600
+#+#include <winsock2.h>
+#+#define poll WSAPoll
+#+#ifndef MSG_NOSIGNAL
+#+#define MSG_NOSIGNAL 0
+#+#endif
+#+#endif
+#
+#EOF
+## fix include/ulfius.h (version >= 2.3.5)
+#patch -ulbf include/ulfius.h << EOF
+#@@ -31,4 +31,8 @@
+# /** External dependencies **/
+#
+#+#if defined(_WIN32) && !defined(U_DISABLE_WEBSOCKET)
+#+  #define U_DISABLE_WEBSOCKET
+#+#endif
+#+
+# #ifndef U_DISABLE_WEBSOCKET
+#   #ifndef _GNU_SOURCE
+#@@ -40,8 +44,4 @@
+# #include <microhttpd.h>
+#
+#-#if defined(_WIN32) && !defined(U_DISABLE_WEBSOCKET)
+#-  #define U_DISABLE_WEBSOCKET
+#-#endif
+#-
+# #if (MHD_VERSION < 0x00095300) && !defined(U_DISABLE_WEBSOCKET)
+#   #define U_DISABLE_WEBSOCKET
+#EOF
+## skip building lib/orcania
+#cat > lib/orcania/Makefile << EOF
+#clean:
+#all:
+#install:
+#install-strip:
+#EOF
+#cp -f lib/orcania/Makefile lib/yder/src/
+## fix src/Makefile
+#mv src/Makefile src/Makefile.bak &&
+#sed -e "s/-lc//; s/\.so/.dll/; s/-Wl,-soname,\(\$(OUTPUT)\)[^ ]* -o \$(OUTPUT)\.\$(VERSION)/-s -Wl,-soname,\1 -o \1 -Wl,--out-implib,\1.a/; s/ln -sf \$(OUTPUT).\$(VERSION).*$/ar cru libulfius.a ulfius.o/; s/cp \$(OUTPUT).\$(VERSION)/cp -f *.a/; s/[^ \t]*ldconfig.*/cp -f \$(OUTPUT) \$(PREFIX)\/bin/" src/Makefile.bak > src/Makefile
+#wl-showstatus build &&
+# ( make || make LCURL="-Wl,--as-needed -lcurl -lws2_32" ) &&
+# wl-showstatus build-install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# # fix missing src/ulfius.h (version >= 2.3.0)
+# cp -f include/ulfius.h src/ &&
+# make install PREFIX=$INSTALLPREFIX DESTDIR=$INSTALLPREFIX &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="Ulfius"
+export STATUS=
+export URL=https://babelouest.github.io/ulfius/
+export BASENAME=ulfius
+export DESCRIPTION="Web Framework for REST API in C, using JSON or not"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=2.4.2
+#export VERSIONDATE=20181010
+#export VERSION=2.4.3
+#export VERSIONDATE=20181018
+#export VERSION=2.4.4
+#export VERSIONDATE=20181024
+#export VERSION=2.5.0
+#export VERSIONDATE=20181211
+#export VERSION=2.5.1
+#export VERSIONDATE=20181214
+#export VERSION=2.5.2
+#export VERSIONDATE=20181224
+#export VERSION=2.5.3
+#export VERSIONDATE=20190112
+#export VERSION=2.5.4
+#export VERSIONDATE=20190407
+#export VERSION=2.5.5
+#export VERSIONDATE=20190628
+#export VERSION=2.6.0
+#export VERSIONDATE=20190415
+#export VERSION=2.6.1
+#export VERSIONDATE=20190701
+####src/u_send_request.c:288:50: error: implicit declaration of function 'mstrcatf'
+#export VERSION=2.6.2
+#export VERSIONDATE=20190708
+#export VERSION=2.6.3
+#export VERSIONDATE=20190804
+#export VERSION=2.6.4
+#export VERSIONDATE=20191006
+#export VERSION=2.6.5
+#export VERSIONDATE=20191216
+#export DEPENDANCIES=yder,orcania,libmicrohttpd,libjansson,libcurl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+#export VERSION=2.6.6
+#export VERSIONDATE=20200401
+#export VERSION=2.6.7
+#export VERSIONDATE=20200516
+#export VERSION=2.6.8
+#export VERSIONDATE=20200704
+#export VERSION=2.6.9
+#export VERSIONDATE=20200828
+#export VERSION=2.6.10
+#export VERSIONDATE=20201031
+#export VERSION=2.7.0
+#export VERSIONDATE=20201207
+#export VERSION=2.7.1
+#export VERSIONDATE=20210103
+#export VERSION=2.7.2
+#export VERSIONDATE=20210302
+#export VERSION=2.7.3
+#export VERSIONDATE=20210501
+#export VERSION=2.7.4
+#export VERSIONDATE=20210907
+#export VERSION=2.7.5
+#export VERSIONDATE=20211027
+#export VERSION=2.7.6
+#export VERSIONDATE=20211106
+#export VERSION=2.7.7
+#export VERSIONDATE=20211209
+export VERSION=2.7.8
+export VERSIONDATE=20220310
+wl-showstatus --package-version
+export DEPENDANCIES=yder,orcania,libmicrohttpd,libjansson,libcurl,gnutls
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/babelouest/ulfius/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/babelouest/ulfius/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing gmtime_r in src/u_send_request.c (version >= 2.5.3)
+if ! gcc --version | grep -q posix; then
+mv src/u_send_request.c src/u_send_request.c.bak
+echo "#include <pthread.h>" > src/u_send_request.c
+if ! ( gcc --version | grep -q "MinGW-W64" ); then
+cat > src/u_send_request.c << EOF
+#include <pthread.h>
+#define gmtime_r( _clock, _result ) ( *(_result) = *gmtime( (_clock) ), (_result) )
+EOF
+fi
+cat src/u_send_request.c.bak >> src/u_send_request.c
+else
+mv src/u_send_request.c src/u_send_request.c.bak &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > src/u_send_request.c &&
+#echo "#include <time.h>" >> src/u_send_request.c &&
+cat src/u_send_request.c.bak >> src/u_send_request.c
+fi
+# fix missing uint in src/u_request.c and src/u_response.c (version >= 2.6.7)
+sed -i.bak2 -e "s/\buint\b/unsigned int/g" src/u_request.c src/u_response.c
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DWITH_JANSSON:BOOL=ON -DWITH_CURL:BOOL=ON -DWITH_WEBSOCKET:BOOL=OFF -S. -Bbuild_win &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DWITH_JANSSON:BOOL=ON -DWITH_CURL:BOOL=ON -DWITH_WEBSOCKET:BOOL=OFF -DWITH_JOURNALD:BOOL=OFF -S. -Bbuild_win &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DWITH_JANSSON:BOOL=ON -DWITH_CURL:BOOL=ON -DWITH_GNUTLS:BOOL=ON -DWITH_WEBSOCKET:BOOL=OFF -DWITH_JOURNALD:BOOL=OFF -DDOWNLOAD_DEPENDENCIES:BOOL=OFF -DBUILD_ULFIUS_TESTING:BOOL=OFF -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+## fix missing poll.h in include/ulfius.h (version >= 2.7.2)
+#patch -ulbf include/ulfius.h << EOF
+#@@ -47,3 +47,5 @@
+# #ifndef U_DISABLE_WEBSOCKET
+#+  #ifndef _WIN32
+#   #include <poll.h>
+#+  #endif
+#   #include <zlib.h>
+#@@ -57,3 +59,3 @@
+#
+#-#if defined(_WIN32) && !defined(U_DISABLE_WEBSOCKET)
+#+#if defined(_WIN32) && !defined(__MINGW32__) && !defined(U_DISABLE_WEBSOCKET)
+#   #define U_DISABLE_WEBSOCKET
+#EOF
+## fix building with websocket support in CMakeLists.txt (version >= 2.7.2)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -124,3 +124,3 @@
+#
+#-if (WIN32)
+#+if (MSVC)
+#     set(WITH_WEBSOCKET OFF)
+#EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DWITH_JANSSON:BOOL=ON -DWITH_CURL:BOOL=ON -DWITH_GNUTLS:BOOL=ON -DWITH_WEBSOCKET:BOOL=OFF -DWITH_JOURNALD:BOOL=OFF -DDOWNLOAD_DEPENDENCIES:BOOL=OFF -DBUILD_ULFIUS_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DWITH_JANSSON:BOOL=ON -DWITH_CURL:BOOL=ON -DWITH_GNUTLS:BOOL=ON -DWITH_WEBSOCKET:BOOL=ON -DWITH_JOURNALD:BOOL=OFF -DDOWNLOAD_DEPENDENCIES:BOOL=OFF -DBUILD_ULFIUS_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ # add missing linker flag (version >= 2.7.4)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcurl/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

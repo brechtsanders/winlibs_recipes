@@ -1,0 +1,125 @@
+export NAME="ALE (Anti-Lamenessing Engine)"
+export STATUS=
+#export URL=http://auricle.dyndns.org/ALE/
+export URL=https://repo.or.cz/w/Ale.git
+#export URL=https://github.com/Buhrietoe/ale-aur
+export BASENAME=ale
+export DESCRIPTION="ALE is a synthetic capture engine and renderer accepting a sequence of image frames as input and producing rendered images and registration data from scene models as output. "
+export CATEGORY=graphics
+export TYPE=application
+export VERSION=0.9.0.3
+export VERSIONDATE=20200325
+wl-showstatus --package-version
+export DEPENDANCIES=fftw
+#export DEPENDANCIES=fftw,imagemagick
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://repo.or.cz/Ale.git/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://repo.or.cz/Ale.git/snapshot/8328278b8cdd5ba2f69dcdccebfb6be34530fba8.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/Ale-8328278.tar.gz -C$BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/8328278b8cdd5ba2f69dcdccebfb6be34530fba8.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/Ale-*
+# fix missing strndup in ui/input.h
+mv ui/input.h ui/input.h.bak
+cat > ui/input.h << EOF
+#ifndef __input_h__
+#include <malloc.h>
+#include <string.h>
+static inline char* strndup (const char* s, size_t n)
+{
+  char* result;
+  size_t len = strlen(s);
+  if (len > n)
+    len = n;
+  result = (char*)malloc(len + 1);
+  if (!result)
+    return 0;
+  result[len] = 0;
+  return (char*)memcpy(result, s, len);
+}
+#endif
+EOF
+cat ui/input.h.bak >> ui/input.h
+# skip building doc
+cat > doc/Makefile.in << EOF
+all:
+install:
+install-strip:
+clean:
+EOF
+# fix missing files
+mkdir -p lib
+touch NEWS README ChangeLog
+ls -1 lib/Makefile.in &> /dev/null || cat > lib/Makefile.in << EOF
+all:
+install:
+install-strip:
+clean:
+EOF
+# fix configure.in (version >= 0.9.0.3)
+patch -ulbf configure.in << EOF
+
+@@ -37,3 +37,4 @@
+
+-AM_INIT_AUTOMAKE
++#AM_INIT_AUTOMAKE
++AM_INIT_AUTOMAKE([subdir-objects])
+
+@@ -47,3 +48,3 @@
+ #GNULib startup
+-gl_EARLY
++#gl_EARLY
+
+@@ -56,4 +57,4 @@
+ #gl_LIB(lib)
+-gl_MODULES(strndup)
+-gl_INIT
++#gl_MODULES(strndup)
++#gl_INIT
+
+@@ -86,7 +87,7 @@
+
+-if test x\$enable_threads != xno; then
+-
+-       # Check for POSIX threads.
+-       ACX_PTHREAD()
+-fi
++#if test x\$enable_threads != xno; then
++#
++#      # Check for POSIX threads.
++#      ACX_PTHREAD()
++#fi
+
+@@ -143,5 +144,5 @@
+        || test x\$host = x; then
+-               AC_CHECK_TOOL(MAGICK_CONFIG, Magick-config, no)
++               AC_CHECK_TOOL(MAGICK_CONFIG, MagickCore-config, no)
+        else
+-               AC_CHECK_PROG(MAGICK_CONFIG, \${ac_tool_prefix}Magick-config, \${ac_tool_prefix}Magick-config, no)
++               AC_CHECK_PROG(MAGICK_CONFIG, MagickCore-config, MagickCore-config, no)
+        fi
+@@ -157,3 +158,3 @@
+
+-               IMAGEMAGICK_VERSION=\`Magick-config --version\`
++               IMAGEMAGICK_VERSION=\`MagickCore-config --version\`
+                IMAGEMAGICK_VERSION_A=\`echo \$IMAGEMAGICK_VERSION | cut -f 1 -d '.'\`
+EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads --disable-wmx --without-imagemagick --with-fftw3 --with-hashmap=no CXXFLAGS="-fpermissive" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads --disable-wmx --with-imagemagick --with-fftw3 --with-hashmap=gnu CXXFLAGS="-fpermissive" &&
+ wl-showstatus build-install &&
+ make install-strip ale_bin_DEPENDENCIES= ale_bin_LDADD= man_MANS= &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

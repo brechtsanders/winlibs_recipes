@@ -1,0 +1,128 @@
+#export NAME="LibHTTPD"
+#export STATUS=
+#export URL=https://hughestech.com.au/products/libhttpd/
+#export BASENAME=libhttpd
+#export DESCRIPTION="LibHTTPD can be used to add basic web server capabilities to an application or embedded device. The library handles both static and dynamically generated content, has very low overheads, and provides many features to simplify the creation of web based application interfaces."
+#export CATEGORY=communication
+#export TYPE=library
+#export VERSION=1.4
+#export VERSIONDATE=20091103
+##export VERSION=2.0
+##export VERSIONDATE=20170128
+#####make[3]: *** No rule to make target '../src/libhttpd.a', needed by 'test_httpd'.
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=License
+#export LICENSETYPE="Dual: GPL/Commercial"
+##export LICENSEFILE=LICENSE
+##export LICENSETYPE=GPL
+#export DOWNLOADURL="https://hughestech.com.au/downloads/libhttpd/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://hughestech.com.au/downloads/libhttpd/archive/$BASENAME-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=https://hughestech.com.au/downloads/libhttpd/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## configure (version <= 1.4)
+#echo "n"|./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM
+## fix missing includes and definitions
+#mv src/httpd.h src/httpd.h.bak
+#cat > src/httpd.h << EOF
+##include <winsock2.h>
+##include <fcntl.h>
+##define bzero(b,len) memset(b, 0, len)
+#EOF
+#cat src/httpd.h.bak >> src/httpd.h
+## fix install location
+#mv src/Makefile.tmpl src/Makefile.tmpl.bak
+#sed -e "s?/usr/local?$INSTALLPREFIX?g" src/Makefile.tmpl.bak > src/Makefile.tmpl
+#mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include
+## skip tests
+#cat > test/Makefile << EOF
+#all:
+#install:
+#clean:
+#EOF
+### fix detection of Windows (version >= 2.0)
+##mv makegen/makegen makegen/makegen.bak &&
+##sed -e "s/^\(OS_NAME=\).*$/\1WIN32/" makegen/makegen.bak > makegen/makegen
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+#wl-showstatus build-install &&
+# make install &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="LibHTTPD"
+export STATUS=
+export URL=https://hughestech.com.au/products/libhttpd/
+export BASENAME=libhttpd
+export DESCRIPTION="LibHTTPD can be used to add basic web server capabilities to an application or embedded device. The library handles both static and dynamically generated content, has very low overheads, and provides many features to simplify the creation of web based application interfaces."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=2.0
+export VERSIONDATE=20170128
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=License
+export LICENSETYPE="Dual: GPL/Commercial"
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=GPL
+export DOWNLOADURL="https://hughestech.com.au/downloads/libhttpd/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://hughestech.com.au/downloads/libhttpd/archive/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://hughestech.com.au/downloads/libhttpd/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing includes and definitions (version >= 2.0)
+mv src/httpd.h src/httpd.h.bak
+cat > src/httpd.h << EOF
+#include <winsock2.h>
+#include <fcntl.h>
+#ifndef bzero
+#define bzero(b,len) memset(b, 0, len)
+#endif
+EOF
+cat src/httpd.h.bak >> src/httpd.h
+# fix missing index function (version >= 2.0)
+for F in src/api.c src/ip_acl.c src/protocol.c; do
+ mv $F $F.bak &&
+ echo "#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})" > $F &&
+ echo "#define rindex(haystack,needle) strrchr(haystack,needle)" >> $F &&
+ cat $F.bak >> $F
+done
+# fix undefined u_int (version >= 2.0)
+sed -i.bak2 -e "s/u_int/unsigned int/" src/api.c src/ip_acl.c
+# fix detection of Windows (version >= 2.0)
+sed -i.bak -e "s/^\(OS_NAME=\).*$/\1WIN32/" makegen/makegen
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX/share/libhttpd --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #makegen/makegen "$(pwd)" "$INSTALLPREFIX/share/libhttpd" &&
+ #wl-showstatus build-install &&
+ #make install &&
+ wl-showstatus build &&
+ for F in src/*.c; do
+  echo CC $F
+  gcc -O3 -c -o $F.o $F
+ done &&
+ ar cr src/libhttpd.a src/*.o &&
+ gcc -shared -s -mwindows -o src/libhttpd.dll -Wl,--out-implib,src/libhttpd.dll.a -Wl,--output-def,src/libhttpd.def src/*.o -lws2_32 &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/share/libhttpd/include $INSTALLPREFIX/share/libhttpd/lib $INSTALLPREFIX/share/libhttpd/bin &&
+ cp -f src/httpd.h $INSTALLPREFIX/share/libhttpd/include/ &&
+ cp -f src/*.a src/*.def $INSTALLPREFIX/share/libhttpd/lib/ &&
+ cp -f src/*.dll $INSTALLPREFIX/share/libhttpd/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: Conflicts with httpd => moved to separate folder
+
+
+

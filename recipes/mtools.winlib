@@ -1,0 +1,126 @@
+export NAME="Mtools"
+export STATUS=
+export URL=https://www.gnu.org/software/mtools/
+export BASENAME=mtools
+export DESCRIPTION="Mtools is a collection of utilities to access MS-DOS disks from GNU and Unix without mounting them."
+export CATEGORY=hardware
+export TYPE=library
+#export VERSION=4.0.24
+#export VERSIONDATE=20200601
+#export VERSION=4.0.25
+#export VERSIONDATE=20201025
+#export VERSION=4.0.26
+#export VERSIONDATE=20201128
+#export VERSION=4.0.27
+#export VERSIONDATE=20210417
+#export VERSION=4.0.28
+#export VERSIONDATE=20210531
+#export VERSION=4.0.29
+#export VERSIONDATE=20210601
+#export VERSION=4.0.30
+#export VERSIONDATE=20210618
+#export VERSION=4.0.31
+#export VERSIONDATE=20210620
+#export VERSION=4.0.32
+#export VERSIONDATE=20210710
+#export VERSION=4.0.33
+#export VERSIONDATE=20210718
+#export VERSION=4.0.34
+#export VERSIONDATE=20210721
+#export VERSION=4.0.35
+#export VERSIONDATE=20210807
+#export VERSION=4.0.36
+#export VERSIONDATE=20211122
+#export VERSION=4.0.37
+#export VERSIONDATE=20220109
+export VERSION=4.0.38
+export VERSIONDATE=20220304
+wl-showstatus --package-version
+export DEPENDANCIES=libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://www.gnu.org/software/mtools/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://ftp.gnu.org/gnu/mtools/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix charsetConv.c (version >= 4.0.24)
+patch -ulbf charsetConv.c << EOF
+@@ -330,3 +330,7 @@
+
++#ifdef _WIN32
++#define nl_langinfo(i) "UTF-8";
++#else
+ #include <langinfo.h>
++#endif
+
+EOF
+## fix init.c (version = 4.0.30)
+#patch -ulbf init.c << EOF
+#@@ -245,3 +245,7 @@
+#                                   0, lockMode,
+#-                                  maxSize, &geomFailure, NULL);
+#+                                  maxSize, &geomFailure
+#+#ifdef USE_XDF
+#+                                  , NULL
+#+#endif
+#+                                  );
+#                if(Stream == NULL) {
+#EOF
+## fix mformat.c (version = 4.0.30)
+#patch -ulbf mformat.c << EOF
+#@@ -1087,3 +1087,7 @@
+#                                      O_RDWR,
+#-                                     &maxSize, NULL, &info);
+#+                                     &maxSize, NULL
+#+#ifdef USE_XDF
+#+                                     , &info
+#+#endif
+#+                                     );
+#
+#EOF
+## fix mcat.c (version = 4.0.30)
+#patch -ulbf mcat.c << EOF
+#@@ -108,3 +108,7 @@
+#                                   errmsg, 0, mode, NULL,
+#-                                  NULL, NULL);
+#+                                  NULL
+#+#ifdef USE_XDF
+#+                                  , NULL
+#+#endif
+#+                                  );
+#                 if( !Stream)
+#EOF
+## fix mpartition.c (version = 4.0.30)
+#patch -ulbf mpartition.c << EOF
+#@@ -437,3 +437,7 @@
+#                                   open2flags | SKIP_PARTITION | ALWAYS_GET_GEOMETRY,
+#-                                  mode, NULL, NULL, NULL);
+#+                                  mode, NULL, NULL
+#+#ifdef USE_XDF
+#+                                  , NULL
+#+#endif
+#+                                  );
+#
+#EOF
+## fix missing EBADR in remap.c (version >= 4.0.32)
+sed -i.bak -e "s/EBADR/EBADF/" remap.c
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-floppyd --without-x &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install LIBS="-Wl,--as-needed -liconv" &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

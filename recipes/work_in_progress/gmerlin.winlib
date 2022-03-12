@@ -1,0 +1,101 @@
+export NAME="gmerlin"
+export STATUS=
+export URL=http://gmerlin.sourceforge.net/
+export BASENAME=gmerlin
+export DESCRIPTION="The gmerlin application framework. It consists of a toolkit indepentent gmerlin library, which contains the player core, the transcoder core and other utilities. It can be used to build custom multimedia applications."
+export CATEGORY=audio,video
+export TYPE=library
+#export VERSION=0.4.1
+#export VERSION=0.4.3
+#export VERSIONDATE=20100228
+#export VERSION=1.0.0
+#export VERSIONDATE=20110220
+export VERSION=1.2.0
+export VERSIONDATE=20120610
+####lib/socket.c:196: error: 'F_SETFL' undeclared (first use in this function)
+wl-showstatus --package-version
+export DEPENDANCIES=gavl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=texinfo
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="http://sourceforge.net/projects/gmerlin/files/ gmerlin-"
+export DOWNLOADURL="http://sourceforge.net/projects/gmerlin/files/gmerlin/ gmerlin-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://surfnet.dl.sourceforge.net/sourceforge/gmerlin/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing sys/cdefs.h
+mkdir include/sys
+cat > include/sys/cdefs.h << EOF
+#ifndef SEM_FAILED
+#include <gmerlin/bg_sem.h>
+#endif
+#ifndef __BEGIN_DECLS
+#define __BEGIN_DECLS
+#define __END_DECLS
+#define __P(fn) fn
+#endif
+EOF
+# fix missing u_int32_t
+mv lib/uthread_sem.c lib/uthread_sem.c.bak
+sed -e "s/u_\(int[0-9]*_t\)/u\1/g" lib/uthread_sem.c.bak > lib/uthread_sem.c
+# fix missing NAME_MAX
+mv lib/album.c lib/album.c.bak
+echo "#include <gmerlin/bgavdefs.h>" > lib/album.c
+cat lib/album.c.bak >> lib/album.c
+# fix missing socket stuff
+echo "#include <winsock2.h>" > include/sys/socket.h
+mkdir include/netinet include/arpa
+touch include/netinet/in.h
+touch include/netdb.h
+touch include/sys/un.h
+echo "#include <ws2tcpip.h>" > include/arpa/inet.h
+# fix missing NAME_MAX in lib/preset.c
+patch -ulbf lib/preset.c << EOF
+--- lib/preset.c  2011-01-07 16:37:06 +0100
++++ lib/preset.c  2011-09-17 09:48:02 +0200
+@@ -36,2 +36,5 @@
+ #define LOG_DOMAIN "preset"
++#ifndef NAME_MAX
++#define NAME_MAX 255
++#endif
+
+EOF
+# fix missing S_IXOTH and mkdir having only a single parameter and remove link and ownership stuff
+mv lib/searchpath.c lib/searchpath.c.bak
+sed -e "s/\(mkdir *([^),]*\),[^),]*)/\1)/; s/&& (st.st_mode & S_IXOTH)//" lib/searchpath.c.bak > lib/searchpath.c
+# fix missing syslog.h (version >= 1.2.0)
+cat > lib/syslog.h << EOF
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_INFO    6
+#define LOG_DEBUG   7
+#define LOG_USER    (1<<3)
+#define LOG_AUTH    (4<<3)
+#define LOG_PID     0x01
+static void openlog (const char *ident, int option, int facility) {}
+static void syslog (int priority, const char *format, ...) {}
+//static void closelog (void) {}
+EOF
+# avoid building lib/x11
+cat > lib/x11/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+#PKG_CONFIG=`echo $PKG_CONFIG|sed "s/ --.*$//"` ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --without-doxygen --without-texinfo CFLAGS="-I`pwd`/include/gmerlin" &&
+PKG_CONFIG=`echo $PKG_CONFIG|sed "s/ --.*$//"` ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --without-doxygen CFLAGS="-I`pwd`/include/gmerlin" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+####lib/socket.c:256: error: storage size of 'addr' isn't known
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

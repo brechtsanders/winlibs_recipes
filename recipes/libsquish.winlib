@@ -1,0 +1,77 @@
+export NAME="squish"
+export STATUS=
+export URL=http://code.google.com/p/libsquish/
+export BASENAME=libsquish
+export DESCRIPTION="The squish library (abbreviated to libsquish) is an open source DXT compression library written in C++ with the following features: * Supports the DXT1, DXT3 and DXT5 formats * Optimised for both SSE and Altivec SIMD instruction sets * Builds on multiple platforms (x86 and PPC tested) * Very simple interface"
+export CATEGORY=compression
+export TYPE=library
+#export VERSION=1.10
+#export VERSIONDATE=20101021
+#export VERSION=1.11
+#export VERSIONDATE=20110914
+export VERSION=1.15
+export VERSIONDATE=20180115
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="http://code.google.com/p/libsquish/downloads/list squish-"
+export DOWNLOADURL="https://sourceforge.net/projects/libsquish/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://libsquish.googlecode.com/files/squish-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://libsquish.googlecode.com/files/squish-$VERSION.zip
+export DOWNLOADSOURCEURL=https://netix.dl.sourceforge.net/project/libsquish/$BASENAME-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/squish-$VERSION.tar.gz
+#unzip -oq $TARBALLDIR/$BASENAME/squish-$VERSION.zip
+mkdir -p squish-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz -Csquish-$VERSION
+cd squish-$VERSION
+# fix missing INT_MAX in colourblock.cpp
+cp colourblock.cpp colourblock.cpp.bak
+echo "#include <limits.h>" > colourblock.cpp
+cat colourblock.cpp.bak >> colourblock.cpp
+# fix missing INT_MAX in alpha.cpp
+cp alpha.cpp alpha.cpp.bak
+echo "#include <limits.h>" > alpha.cpp
+cat alpha.cpp.bak >> alpha.cpp
+# fix missing INT_MAX in singlecolourfit.cpp
+cp singlecolourfit.cpp singlecolourfit.cpp.bak
+echo "#include <limits.h>" > singlecolourfit.cpp
+cat singlecolourfit.cpp.bak >> singlecolourfit.cpp
+# fix missing FLT_EPSILON in maths.cpp (version >= 1.15)
+sed -i.bak -e "s/\bFLT_EPSILON\b/__&__/" maths.cpp
+# fix C++ issue with missing include of limits
+if echo $CXX|grep -q clang++; then
+ for F in $(find -name '*.cpp'); do
+   mv $F $F.bak1 &&
+   echo "#include <limits>" > $F &&
+   cat $F.bak1 >> $F
+ done
+fi
+# avoid -fPIC (useless on Windows and not supported by clang) in Makefile
+sed -i.bak -e "s/-fPIC//" Makefile
+wl-showstatus build &&
+ make all &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include &&
+ make all install INSTALL_DIR=$INSTALLPREFIX &&
+ # manually create DLL
+ dlltool --export-all-symbols -D libsquish.dll -l libsquish.dll.a -z in.def libsquish.a && 
+ ranlib libsquish.dll.a && 
+ #g++ -shared -s -mwindows -def in.def -o libsquish.dll libsquish.a && 
+ g++ -shared -s -mwindows -static-libgcc -static-libstdc++ -def in.def -o libsquish.dll libsquish.a && 
+ #( echo "EXPORTS" && nm -f posix --defined-only -p libsquish.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > libsquish.def &&
+ #g++ -shared -s -mwindows -def libsquish.def -o libsquish.dll libsquish.a -Wl,--out-implib,libsquish.dll.a &&
+ #g++ -Wl,--export-all-symbols -shared -s -mwindows -o libsquish.dll libsquish.a -Wl,--out-implib,libsquish.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin && 
+ cp libsquish.dll $INSTALLPREFIX/bin/ && 
+ cp libsquish.dll.a $INSTALLPREFIX/lib/ && 
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf squish-$VERSION
+
+
+

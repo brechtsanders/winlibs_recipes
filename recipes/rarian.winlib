@@ -1,0 +1,56 @@
+export NAME="rarian"
+export STATUS=
+#export URL=http://www.gnome.org/projects/rarian
+export URL=http://rarian.freedesktop.org/
+export BASENAME=rarian
+export DESCRIPTION="Rarian is a documentation metadata library based on the proposed Freedesktop.org spec."
+export CATEGORY=documentation
+export TYPE=library
+export VERSION=0.8.1
+export VERSIONDATE=20140823
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="GPL/LGPL"
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/rarian/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing S_IFLNK/pipe/fork in librarian/rarian-man.c
+mv librarian/rarian-man.c librarian/rarian-man.c.bak
+cat > librarian/rarian-man.c << EOF
+#include <fcntl.h>
+#include <io.h>
+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+#define S_IFLNK 0
+#define fork() -1
+EOF
+cat librarian/rarian-man.c.bak >> librarian/rarian-man.c
+# fix mkdir in util/rarian-sk-get-cl.cpp
+mv util/rarian-sk-get-cl.cpp util/rarian-sk-get-cl.cpp.bak
+echo "#include <direct.h>" > util/rarian-sk-get-cl.cpp
+sed -e "s/\(mkdir *([^,]*\),[^,)]*/_\1/" util/rarian-sk-get-cl.cpp.bak >> util/rarian-sk-get-cl.cpp
+# fix path with double leading slashed in util/Makefile
+mv util/Makefile.in util/Makefile.in.bak
+sed -e 's?\($(DESTDIR)\)/\($(localstatedir)\)?\1\2?' util/Makefile.in.bak > util/Makefile.in
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-scrollkeeper-compat &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ make install-strip &&
+ # fix absolute paths in rarian-sk-config
+ sed -i.bak -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/rarian-sk-config &&
+ rm -f $INSTALLPREFIX/bin/rarian-sk-config.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

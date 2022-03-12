@@ -1,0 +1,180 @@
+export NAME="liburcu"
+export STATUS=
+export URL=http://liburcu.org/
+#export URL=https://github.com/urcu/userspace-rcu
+export BASENAME=liburcu
+export DESCRIPTION="liburcu is a LGPLv2.1 userspace RCU (read-copy-update) library. This data synchronization library provides read-side access which scales linearly with the number of cores."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=0.8.10
+#export VERSIONDATE=20170616
+#export VERSION=0.8.11
+#export VERSIONDATE=20180125
+#export VERSION=0.9.4
+#export VERSIONDATE=20170617
+#export VERSION=0.9.5
+#export VERSIONDATE=20180125
+#export VERSION=0.9.6
+#export VERSIONDATE=20190115
+#export VERSION=0.9.7
+#export VERSIONDATE=20200422
+#export VERSION=0.10.0
+#export VERSIONDATE=20170617
+#export VERSION=0.10.1
+#export VERSIONDATE=20180124
+#export VERSION=0.10.2
+#export VERSIONDATE=20190115
+#export VERSION=0.10.3
+#export VERSIONDATE=20200422
+#export VERSION=0.11.0
+#export VERSIONDATE=20190507
+#export VERSION=0.11.1
+#export VERSIONDATE=20190604
+#export VERSION=0.11.2
+#export VERSIONDATE=20200422
+#export VERSION=0.11.3
+#export VERSIONDATE=20210218
+#export VERSION=0.11.4
+#export VERSIONDATE=20220106
+#export VERSION=0.12.0
+#export VERSIONDATE=20200410
+#export VERSION=0.12.1
+#export VERSIONDATE=20200422
+####include/urcu/map/urcu.h:39:2: error: #error "Undefined selection"
+#export VERSION=0.12.2
+#export VERSIONDATE=20210218
+#export VERSION=0.12.3
+#export VERSIONDATE=20220106
+#export VERSION=0.13.0
+#export VERSIONDATE=20210604
+export VERSION=0.13.1
+export VERSIONDATE=20220106
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://lttng.org/files/urcu/ userspace-rcu-"
+#export DOWNLOADURL="https://github.com/urcu/userspace-rcu/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://lttng.org/files/urcu/userspace-rcu-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://github.com/urcu/userspace-rcu/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfj $TARBALLDIR/$BASENAME/userspace-rcu-$VERSION.tar.bz2
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd userspace-rcu-$VERSION
+# fix missing poll.h (poll() is used for sleeping milliseconds anyway)
+mkdir -p winfix
+cat > winfix/poll.h << EOF
+#ifndef poll
+#include <windows.h>
+#define poll(fdarray,nfds,timeout_ms) (Sleep(timeout_ms), 0)
+#endif
+EOF
+## fix missing signals in urcu/static/urcu.h (version <= 0.9.4)
+#patch -ulbf urcu/static/urcu.h << EOF
+#@@ -66,2 +66,3 @@
+#  */
+#+#ifndef _WIN32
+# #ifdef SIGURCU
+#@@ -73,2 +74,3 @@
+# #endif
+#+#endif
+#
+#EOF
+# don't define RCU_SIGNAL
+for F in $(grep -l DRCU_SIGNAL $(find . -name Makefile.am)); do
+ mv $F $F.bak &&
+ sed -e "s/-DRCU_SIGNAL//" $F.bak > $F
+done
+## fix include/urcu/syscall-compat.h (version = 0.9.4)
+#mv urcu/syscall-compat.h urcu/syscall-compat.h.bak &&
+#sed -e "s/defined(__CYGWIN__)/& || defined(_WIN32)/" urcu/syscall-compat.h.bak > urcu/syscall-compat.h
+# fix include/urcu/syscall-compat.h (version >= 0.10.0)
+mv include/urcu/syscall-compat.h include/urcu/syscall-compat.h.bak &&
+sed -e "s/defined(__CYGWIN__)/& || defined(_WIN32)/" include/urcu/syscall-compat.h.bak > include/urcu/syscall-compat.h
+# fix missing sigset_t/sigfillset in src/urcu-bp.c
+mv src/urcu-bp.c src/urcu-bp.c.bak
+cat > src/urcu-bp.c << EOF
+//#define DISTRUST_SIGNALS_EXTREME 1
+#include <signal.h>
+#ifdef SIGABRT_COMPAT
+# define SIGABRT_COMPAT_MASK (1U << SIGABRT_COMPAT)
+#else
+# define SIGABRT_COMPAT_MASK 0
+#endif
+#define sigfillset(pset) (*pset = ((2U << (NSIG - 1)) - 1) & ~ SIGABRT_COMPAT_MASK, 0)
+EOF
+sed -e "s/\bsigset_t/_sigset_t/g" src/urcu-bp.c.bak >> src/urcu-bp.c
+# fix missing sigset_t in src/rculfhash.c
+mv src/rculfhash.c src/rculfhash.c.bak &&
+cat > src/rculfhash.c << EOF
+//#define DISTRUST_SIGNALS_EXTREME 1
+#include <signal.h>
+#ifdef SIGABRT_COMPAT
+# define SIGABRT_COMPAT_MASK (1U << SIGABRT_COMPAT)
+#else
+# define SIGABRT_COMPAT_MASK 0
+#endif
+#define sigfillset(pset) (*pset = ((2U << (NSIG - 1)) - 1) & ~ SIGABRT_COMPAT_MASK, 0)
+#define sigdelset(m, s) 0
+EOF
+sed -e "s/\bsigset_t/_sigset_t/g" src/rculfhash.c.bak >> src/rculfhash.c
+## fix include/urcu/static/urcu-signal-nr.h (version >= 0.10.3 <= 0.12.1)
+#patch -ulbf include/urcu/static/urcu-signal-nr.h << EOF
+#@@ -38,3 +38,7 @@
+# #ifndef SIGRCU
+#+#ifdef SIGUSR1
+# #define SIGRCU SIGUSR1
+#+#else
+#+#define SIGRCU 255
+#+#endif
+# #endif
+#EOF
+## fix multiple includes of include/urcu/map/urcu-memb.h (version >= 0.12.2)
+#mv include/urcu/map/urcu-memb.h include/urcu/map/urcu-memb.h.bak &&
+#echo "#ifndef __INCLUDED_URCU_MEMB_H__" > include/urcu/map/urcu-memb.h &&
+#echo "#define __INCLUDED_URCU_MEMB_H__" >> include/urcu/map/urcu-memb.h &&
+#cat include/urcu/map/urcu-memb.h.bak >> include/urcu/map/urcu-memb.h &&
+#echo "#endif /* __INCLUDED_URCU_MEMB_H__ */" >> include/urcu/map/urcu-memb.h
+# skip building tests (version >= 0.12.2)
+sed -i.bak -e "s/^\(SUBDIRS\s*=.* \)\(tests\|examples\)/\1/" Makefile.am doc/Makefile.am
+wl-showstatus configure &&
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sys-membarrier-fallback CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sys-membarrier-fallback CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sys-membarrier-fallback CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32 -DRCU_MEMBARRIER -DSIGURCU=0xFFFF" LDFLAGS="-Wl,--as-needed -lmman" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # adjust detected setting
+ #echo "#undef RCU_SIGNAL" >> config.h &&
+ #echo "#define DISTRUST_SIGNALS_EXTREME 1" >> config.h &&
+ wl-showstatus build &&
+ #( make || make -Csrc ) &&
+ ( make || ( make -i; make CC="gcc -DRCU_MEMBARRIER" )) &&
+ #wl-showstatus install &&
+ #strip .libs/*.dll &&
+ #mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+ #cp -rf urcu*.h urcu $INSTALLPREFIX/include/ &&
+ #cp -f *.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ #rm -f $INSTALLPREFIX/lib/pkgconfig/liburcu-signal.pc &&
+ #cp -f .libs/*.a $INSTALLPREFIX/lib/ &&
+ #cp -f .libs/*.dll $INSTALLPREFIX/bin/ &&
+ #make -i -Cdoc install &&
+ #wl-showstatus build-install &&
+ #( make install-strip || ( make -Csrc install-strip && make -i install-strip )) &&
+ #( make install-strip CC="gcc -DRCU_MEMBARRIER" || ( make -Csrc install-strip CC="gcc -DRCU_MEMBARRIER" && make -i install-strip CC="gcc -DRCU_MEMBARRIER" )) &&
+ #( make install-strip CC="gcc -DRCU_MEMBARRIER -DSIGURCU=0xFFFF" || (( make -Csrc install-strip CC="gcc -DRCU_MEMBARRIER -DSIGURCU=0xFFFF" || make -j1 -Csrc install-strip CC="gcc -DRCU_MEMBARRIER -DSIGURCU=0xFFFF" ) && make -i install-strip CC="gcc -DRCU_MEMBARRIER -DSIGURCU=0xFFFF" )) &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf userspace-rcu-$VERSION
+####Note: probably not functional because of missing SIGUSR1 on Windows
+
+
+

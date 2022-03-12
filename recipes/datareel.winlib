@@ -1,0 +1,56 @@
+export NAME="DataReel"
+export STATUS=
+export URL=http://datareel.com/
+#export URL=https://github.com/datareel/datareel
+export BASENAME=datareel
+export DESCRIPTION="Datareel is a comprehensive cross-platform C++ development kit used to build multi-threaded database and communication applications."
+export CATEGORY=database
+export TYPE=library
+export VERSION=5.03
+export VERSIONDATE=20191108
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/datareel/datareel/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/datareel/datareel/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix type conversion issues in src/gxssl.cpp
+patch -ulbf src/gxssl.cpp << EOF
+@@ -115,2 +115,2 @@
+-  unsigned long ob_addr = (unsigned long)this;
+-  unsigned long arib_addr = (unsigned long)&bytes;
++  uintptr_t ob_addr = (uintptr_t)this;
++  uintptr_t arib_addr = (uintptr_t)&bytes;
+EOF
+# fix type conversion issues in src/thrapiw.cpp
+patch -ulbf src/thrapiw.cpp << EOF
+@@ -268 +268 @@
+-      (gxThreadExitCode)thread->entry->ThreadEntryRoutine(thread);
++      (gxThreadExitCode)(uintptr_t)thread->entry->ThreadEntryRoutine(thread);
+EOF
+# fix building for Windows
+sed -i.bak -e "s/-D__UNIX__ -D__LINUX__/-D__WIN32__/" env/linux.env
+# avoid -fPIC (useless on Windows and not supported by clang) in env/linux.env
+sed -i.bak2 -e "s/-fPIC//" env/linux.env
+wl-showstatus build &&
+ make -Cbuild -fmakefile CC=g++ SHAREDLIB_EXT=.dll SHAREDLIBUTIL_FLAGS="-s -Wl,--out-implib,\$(PROJECT).dll.a -Wl,--output-def,\$(PROJECT).def" LINKER_FLAGS="-Wl,--as-needed -lws2_32" &&
+ #rm -f build/*.o &&
+ #make -Cbuild -fmakefile_ssl CC=g++ USE_OPEN_SSL=1 SHAREDLIB_EXT=.dll SHAREDLIBUTIL_FLAGS="-s -Wl,--out-implib,\$(PROJECT).dll.a -Wl,--output-def,\$(PROJECT).def" LINKER_FLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/datareel $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f include/*.h $INSTALLPREFIX/include/datareel/ &&
+ cp -f build/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

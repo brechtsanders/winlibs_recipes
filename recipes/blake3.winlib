@@ -1,0 +1,68 @@
+export NAME="BLAKE3"
+export STATUS=
+export URL=https://github.com/BLAKE3-team/BLAKE3
+export BASENAME=blake3
+export DESCRIPTION="BLAKE3 is a cryptographic hash function"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.3.7
+#export VERSIONDATE=20201019
+#export VERSION=0.3.8
+#export VERSIONDATE=20210526
+#export VERSION=1.0.0
+#export VERSIONDATE=20210726
+#export VERSION=1.1.0
+#export VERSIONDATE=20211022
+#export VERSION=1.2.0
+#export VERSIONDATE=20211106
+#export VERSION=1.3.0
+#export VERSIONDATE=20220108
+export VERSION=1.3.1
+export VERSIONDATE=20220214
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=CC0/Apache
+export DOWNLOADURL="https://github.com/BLAKE3-team/BLAKE3/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/BLAKE3-team/BLAKE3/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd BLAKE3-$VERSION
+wl-showstatus build &&
+ touch SUCCESS &&
+ for F in c/blake3.c c/blake3_dispatch.c c/blake3_portable.c; do
+  gcc -c -o $F.o $F || ( rm -f SUCCESS; break )
+ done &&
+ rm SUCCESS &&
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  touch SUCCESS &&
+  #for F in c/*_unix.S; do
+  for F in c/*_windows_gnu.S; do
+   gcc -c -O3 -o $F.o $F || ( rm -f SUCCESS; break )
+  done &&
+  rm SUCCESS
+ else
+  gcc -c -O3 -msse2 c/blake3_sse2.c -o c/blake3_sse2.o &&
+  gcc -c -O3 -msse4.1 c/blake3_sse41.c -o c/blake3_sse41.o &&
+  gcc -c -O3 -mavx2 c/blake3_avx2.c -o c/blake3_avx2.o &&
+  gcc -c -O3 -mavx512f -mavx512vl c/blake3_avx512.c -o c/blake3_avx512.o
+ fi &&
+ ar cr libblake3.a c/*.o &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libblake3.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > blake3.def &&
+ gcc -shared -s -mwindows -def blake3.def -o blake3.dll libblake3.a -Wl,--out-implib,libblake3.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f c/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf BLAKE3-$VERSION
+####Note: replace -O3 with -O0 in case of errors like: undefined reference to LC1
+
+
+

@@ -1,0 +1,97 @@
+export NAME="apr-util"
+export STATUS=
+export URL=http://apr.apache.org/
+export BASENAME=apr-util
+export DESCRIPTION="Part of Apache Portable Runtime (APR)"
+export CATEGORY=portability
+export TYPE=library
+#export VERSION=1.3.12
+#export VERSIONDATE=20110722
+#export VERSION=1.4.1
+#export VERSIONDATE=20111214
+#export VERSION=1.5.1
+#export VERSIONDATE=20121004
+#export VERSION=1.5.2
+#export VERSIONDATE=20130403
+#export VERSION=1.5.3
+#export VERSIONDATE=20131117
+#export VERSION=1.5.4
+#export VERSIONDATE=20140921
+#export VERSION=1.6.0
+#export VERSIONDATE=20170613
+export VERSION=1.6.1
+export VERSIONDATE=20171023
+wl-showstatus --package-version
+#export DEPENDANCIES=apr,expat,libiconv
+#export OPTIONALDEPENDANCIES=apr-iconv,sqlite3
+export DEPENDANCIES=apr,expat,libiconv,openssl,gdbm,sqlite3
+export OPTIONALDEPENDANCIES=apr-iconv
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="http://archive.apache.org/dist/apr/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://archive.apache.org/dist/apr/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing SecureZeroMemory in crypto/apr_crypto.c (version >= 1.6.0)
+if ! gcc --version | grep -q MinGW-W64; then
+ mv crypto/apr_crypto.c crypto/apr_crypto.c.bak &&
+ echo "#define SecureZeroMemory(p,l) memset(p, 0, l)" > crypto/apr_crypto.c &&
+ cat crypto/apr_crypto.c.bak >> crypto/apr_crypto.c
+fi
+# fix invalid exports (version >= 1.6.0)
+#for F in $(grep -lrw APR_DECLARE *); do
+for F in include/apr_crypto.h crypto/apr_crypto.c; do
+ mv $F $F.bak &&
+ sed -e "s/APR_DECLARE/APU_DECLARE/g" $F.bak > $F
+done
+for F in include/apr_siphash.h crypto/apr_siphash.c; do
+ mv $F $F.bak &&
+ echo "#include \"apu.h\"" > $F
+ sed -e "s/APR_DECLARE/APU_DECLARE/g" $F.bak >> $F
+done
+wl-showstatus configure &&
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ #autoreconf -f -i -I $MINGWPREFIX/share/aclocal -I $MINGWPREFIX/share/apr/build
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+fi &&
+#PATH=$PYDIR:$PATH ./buildconf --with-apr=$MINGWPREFIX &&
+#PATH=$PYDIR:$PATH ./buildconf --with-apr=$MINGWPREFIX/share/apr &&
+PATH=$PY2DIR:$PATH ./buildconf --with-apr=$MINGWPREFIX/share/apr &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX --without-berkeley-db --without-pgsql --without-mysql --without-sqlite3 --without-freetds &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX --with-expat=$MINGWPREFIX --with-iconv=$MINGWPREFIX --without-berkeley-db --without-pgsql --without-mysql --without-sqlite3 --without-freetds &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX --with-expat=$MINGWPREFIX --with-iconv=$MINGWPREFIX --with-gdbm=$MINGWPREFIX --without-berkeley-db --without-pgsql --without-mysql --without-sqlite3 --without-freetds &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX --with-expat=$MINGWPREFIX --with-iconv=$MINGWPREFIX --with-gdbm=$MINGWPREFIX --with-berkeley-db=$MINGWPREFIX --without-pgsql --without-mysql --with-sqlite3=$MINGWPREFIX --without-freetds &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX --with-expat=$MINGWPREFIX --with-iconv=$MINGWPREFIX --without-crypto --with-openssl=$MINGWPREFIX --with-dbm=gdbm --with-gdbm=$MINGWPREFIX --without-berkeley-db --without-pgsql --without-mysql --with-sqlite3=$MINGWPREFIX --without-freetds &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX --with-expat=$MINGWPREFIX --with-iconv=$MINGWPREFIX --with-crypto --with-openssl=$MINGWPREFIX --with-dbm=gdbm --with-gdbm=$MINGWPREFIX --without-berkeley-db --without-pgsql --without-mysql --with-sqlite3=$MINGWPREFIX --without-freetds &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX/bin/apr-1-config --with-expat=$MINGWPREFIX --with-iconv=$MINGWPREFIX --with-crypto --with-openssl=$MINGWPREFIX --with-dbm=gdbm --with-gdbm=$MINGWPREFIX --without-berkeley-db --without-pgsql --without-mysql --with-sqlite3=$MINGWPREFIX --without-freetds &&
+ wl-showstatus build-install &&
+ #cp -f $MINGWPREFIX/build/apr_rules.mk build/rules.mk &&
+ #cp -f $MINGWPREFIX/build/make_exports.awk build/ &&
+ #make -j1 install LIBTOOL="$MINGWPREFIX/build/libtool" APR_MKDIR="mkdir -p" &&
+ #make -j1 all install LIBTOOL="$MINGWPREFIX/build/libtool" APR_MKDIR="mkdir -p" APR_MKEXPORT="$(which awk) -f $MINGWPREFIX/build/make_exports.awk" CFLAGS="-DAPU_DECLARE_EXPORT" &&
+ #(
+ # make -j1 all install LIBTOOL="$MINGWPREFIX/build/libtool" apr_builders=$MINGWPREFIX/build CFLAGS="-DAPU_DECLARE_EXPORT" ||
+ # make -j1 all install LIBTOOL="$MINGWPREFIX/build/libtool" apr_builders=$MINGWPREFIX/build CFLAGS="-DAPU_DECLARE_EXPORT" LDFLAGS="-Wl,--as-needed -L$(pwd)/.libs -laprutil-1"
+ #) &&
+ (
+  make -j1 all install LIBTOOL="$MINGWPREFIX/share/apr/build/libtool" apr_builddir=$MINGWPREFIX/share/apr/build apr_builders=$MINGWPREFIX/share/apr/build CFLAGS="-DAPU_DECLARE_EXPORT" ||
+  make -j1 all install LIBTOOL="$MINGWPREFIX/share/apr/build/libtool" apr_builddir=$MINGWPREFIX/share/apr/build apr_builders=$MINGWPREFIX/share/apr/build CFLAGS="-DAPU_DECLARE_EXPORT" LDFLAGS="-Wl,--as-needed -L$(pwd)/.libs -laprutil-1"
+ ) &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ mv $INSTALLPREFIX/bin/apu-1-config $INSTALLPREFIX/bin/apu-1-config.bak &&
+ sed -e "s?$INSTALLPREFIX?\$MINGWPREFIX?g" $INSTALLPREFIX/bin/apu-1-config.bak > $INSTALLPREFIX/bin/apu-1-config &&
+ rm $INSTALLPREFIX/bin/apu-1-config.bak &&
+ # copy build to share/apu/build and add required files
+ mkdir -p $INSTALLPREFIX/share/apu/build &&
+ cp -rf build/* $INSTALLPREFIX/share/apu/build &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#make -j1 install LIBTOOL="$MINGWPREFIX/build/libtool" APR_MKDIR="mkdir -p" APR_MKEXPORT=true APR_MKVAREXPORT=true &&echo OK
+
+
+

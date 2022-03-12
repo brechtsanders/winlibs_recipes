@@ -1,0 +1,53 @@
+export NAME="GL3W"
+export STATUS=
+#export URL=https://www.khronos.org/opengl/wiki/OpenGL_Loading_Library
+export URL=https://github.com/skaslev/gl3w
+export BASENAME=gl3w
+export DESCRIPTION="Simple OpenGL core profile loading. The GL3W library focuses on the core profile of OpenGL 3 and 4. It only loads the core entrypoints for these OpenGL versions. It supports Windows, Mac OS X, Linux, and FreeBSD."
+export CATEGORY=graphics,hardware
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20171028
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=UNLICENSE
+export LICENSETYPE="public domain"
+export DOWNLOADURL="https://github.com/skaslev/gl3w/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/skaslev/gl3w/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix gl3w_gen.py
+####ssl.SSLError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:777)
+patch -ulbf gl3w_gen.py << EOF
+@@ -33,2 +33,3 @@
+ import re
++import ssl
+
+@@ -103,3 +104,4 @@
+     print('Downloading glcorearb.h to {0}...'.format(os.path.join(args.root, 'include/GL/glcorearb.h')))
+-    web = urllib2.urlopen('http://www.opengl.org/registry/api/GL/glcorearb.h')
++    request = urllib2.Request('http://www.opengl.org/registry/api/GL/glcorearb.h')
++    web = urllib2.urlopen(request, context=ssl._create_unverified_context())
+     with open(os.path.join(args.root, 'include/GL/glcorearb.h'), 'wb') as f:
+EOF
+wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+ wl-showstatus build &&
+ ( PATH=$PYDIR:$PATH make -j1 || ( mv -f gl3w_gen.py.orig gl3w_gen.py && PATH=$PYDIR:$PATH make -j1 )) &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX &&
+ cp -rf include $INSTALLPREFIX/ &&
+ cp -rf src $INSTALLPREFIX/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

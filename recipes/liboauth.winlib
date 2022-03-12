@@ -1,0 +1,279 @@
+#export NAME="OAuth2"
+#export STATUS=
+#export URL=https://github.com/slugonamission/OAuth2
+#export BASENAME=oauth2
+#export DESCRIPTION="OAuth 2 C client library"
+#export CATEGORY=security
+#export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20161129
+#wl-showstatus --package-version
+#export DEPENDANCIES=libcurl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+#export LICENSEFILE=
+#export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/slugonamission/OAuth2/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/slugonamission/OAuth2/archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+##mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## also build static library
+#cat >> src/CMakeLists.txt << EOF
+#add_library(oauth_static STATIC \${SOURCE_FILES})
+#set_target_properties(oauth_static PROPERTIES OUTPUT_NAME oauth)
+#EOF
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build &&
+# make &&
+# strip liboauth.dll &&
+# #wl-showstatus build-install &&
+# #make install/strip &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp -f include/oauth2.h $INSTALLPREFIX/include/ &&
+# cp -f src/*.a $INSTALLPREFIX/lib/ &&
+# cp -f liboauth.dll $INSTALLPREFIX/bin/ &&
+# #./oauth_test.exe &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="OAuth"
+export STATUS=
+export URL=http://liboauth.sourceforge.net/
+#export URL=https://github.com/x42/liboauth
+export BASENAME=liboauth
+export DESCRIPTION="liboauth is a collection of POSIX-c functions implementing the OAuth Core RFC 5849 standard. liboauth provides functions to escape and encode parameters according to OAuth specification and offers high-level functionality to sign requests or verify OAuth signatures as well as perform HTTP requests."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.9.4
+#export VERSIONDATE=20110613
+#export VERSION=0.9.5
+#export VERSIONDATE=20111119
+#export VERSION=0.9.6
+#export VERSIONDATE=20120403
+#export VERSION=0.9.7
+#export VERSIONDATE=20120704
+#export DEPENDANCIES=openssl,libcurl
+#export DEPENDANCIES=nss,libcurl
+#export VERSION=1.0.0
+#export VERSIONDATE=20121101
+#export VERSION=1.0.1
+#export VERSIONDATE=20130309
+#export VERSION=1.0.2
+#export VERSIONDATE=20140317
+export VERSION=1.0.3
+export VERSIONDATE=20140418
+wl-showstatus --package-version
+#export DEPENDANCIES=openssl,libcurl
+export DEPENDANCIES=nss,libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="GPL/MIT"
+export DOWNLOADURL="http://sourceforge.net/projects/liboauth/files/"
+#export DOWNLOADURL="https://github.com/x42/liboauth/releases"
+#export DOWNLOADURL="https://github.com/x42/liboauth/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/liboauth/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix for openssl 1.1 (version >= 1.0.3)
+patch -ulbf src/hash.c << EOF
+@@ -31,6 +31,10 @@
+ #include <stdio.h>
+ #include "oauth.h" // oauth_encode_base64
+ #include "xmalloc.h"
++#if OPENSSL_VERSION_NUMBER < 0x10100000
++#define EVP_MD_CTX_new EVP_MD_CTX_create
++#define EVP_MD_CTX_free EVP_MD_CTX_destroy
++#endif
+
+ #include "sha1.c" // TODO: sha1.h ; Makefile.am: add sha1.c
+
+@@ -381,12 +385,20 @@
+ #include <openssl/x509.h>
+ #include <openssl/x509v3.h>
+ #include <openssl/ssl.h>
++#if OPENSSL_VERSION_NUMBER < 0x10100000
++#define EVP_MD_CTX_new EVP_MD_CTX_create
++#define EVP_MD_CTX_free EVP_MD_CTX_destroy
++#endif
+
+ char *oauth_sign_rsa_sha1 (const char *m, const char *k) {
+   unsigned char *sig = NULL;
+   unsigned char *passphrase = NULL;
+   unsigned int len=0;
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_MD_CTX md_ctx;
++#else
++  EVP_MD_CTX *md_ctx;
++#endif
+
+   EVP_PKEY *pkey;
+   BIO *in;
+@@ -399,24 +411,44 @@
+     return xstrdup("liboauth/OpenSSL: can not read private key");
+   }
+
++#if OPENSSL_VERSION_NUMBER >= 0x10100000
++  md_ctx = EVP_MD_CTX_new();
++  if (md_ctx == NULL) {
++    return xstrdup("liboauth/OpenSSL: failed to allocate EVP_MD_CTX");
++  }
++#endif
++
+   len = EVP_PKEY_size(pkey);
+   sig = (unsigned char*)xmalloc((len+1)*sizeof(char));
+
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_SignInit(&md_ctx, EVP_sha1());
+   EVP_SignUpdate(&md_ctx, m, strlen(m));
+   if (EVP_SignFinal (&md_ctx, sig, &len, pkey)) {
++#else
++  EVP_SignInit(md_ctx, EVP_sha1());
++  EVP_SignUpdate(md_ctx, m, strlen(m));
++  if (EVP_SignFinal (md_ctx, sig, &len, pkey)) {
++#endif
+     char *tmp;
+     sig[len] = '\0';
+     tmp = oauth_encode_base64(len,sig);
+     OPENSSL_free(sig);
+     EVP_PKEY_free(pkey);
++#if OPENSSL_VERSION_NUMBER >= 0x10100000
++    EVP_MD_CTX_free(md_ctx);
++#endif
+     return tmp;
+   }
+   return xstrdup("liboauth/OpenSSL: rsa-sha1 signing failed");
+ }
+
+ int oauth_verify_rsa_sha1 (const char *m, const char *c, const char *s) {
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_MD_CTX md_ctx;
++#else
++  EVP_MD_CTX *md_ctx;
++#endif
+   EVP_PKEY *pkey;
+   BIO *in;
+   X509 *cert = NULL;
+@@ -440,10 +472,17 @@
+   b64d= (unsigned char*) xmalloc(sizeof(char)*strlen(s));
+   slen = oauth_decode_base64(b64d, s);
+
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_VerifyInit(&md_ctx, EVP_sha1());
+   EVP_VerifyUpdate(&md_ctx, m, strlen(m));
+   err = EVP_VerifyFinal(&md_ctx, b64d, slen, pkey);
+   EVP_MD_CTX_cleanup(&md_ctx);
++#else
++  EVP_VerifyInit(md_ctx, EVP_sha1());
++  EVP_VerifyUpdate(md_ctx, m, strlen(m));
++  err = EVP_VerifyFinal(md_ctx, b64d, slen, pkey);
++  EVP_MD_CTX_free(md_ctx);
++#endif
+   EVP_PKEY_free(pkey);
+   xfree(b64d);
+   return (err);
+@@ -455,35 +494,71 @@
+  */
+ char *oauth_body_hash_file(char *filename) {
+   unsigned char fb[BUFSIZ];
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_MD_CTX ctx;
++#else
++  EVP_MD_CTX *ctx;
++#endif
+   size_t len=0;
+   unsigned char *md;
+   FILE *F= fopen(filename, "r");
+   if (!F) return NULL;
+
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_MD_CTX_init(&ctx);
+   EVP_DigestInit(&ctx,EVP_sha1());
++#else
++  ctx = EVP_MD_CTX_new();
++  if (ctx == NULL) {
++    return xstrdup("liboauth/OpenSSL: failed to allocate EVP_MD_CTX");
++  }
++  EVP_DigestInit(ctx,EVP_sha1());
++#endif
+   while (!feof(F) && (len=fread(fb,sizeof(char),BUFSIZ, F))>0) {
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+     EVP_DigestUpdate(&ctx, fb, len);
++#else
++    EVP_DigestUpdate(ctx, fb, len);
++#endif
+   }
+   fclose(F);
+   len=0;
+   md=(unsigned char*) xcalloc(EVP_MD_size(EVP_sha1()),sizeof(unsigned char));
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_DigestFinal(&ctx, md,(unsigned int*) &len);
+   EVP_MD_CTX_cleanup(&ctx);
++#else
++  EVP_DigestFinal(ctx, md,(unsigned int*) &len);
++  EVP_MD_CTX_free(ctx);
++#endif
+   return oauth_body_hash_encode(len, md);
+ }
+
+ char *oauth_body_hash_data(size_t length, const char *data) {
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_MD_CTX ctx;
++#else
++  EVP_MD_CTX *ctx;
++#endif
+   size_t len=0;
+   unsigned char *md;
+   md=(unsigned char*) xcalloc(EVP_MD_size(EVP_sha1()),sizeof(unsigned char));
++#if OPENSSL_VERSION_NUMBER < 0x10100000
+   EVP_MD_CTX_init(&ctx);
+   EVP_DigestInit(&ctx,EVP_sha1());
+   EVP_DigestUpdate(&ctx, data, length);
+   EVP_DigestFinal(&ctx, md,(unsigned int*) &len);
+   EVP_MD_CTX_cleanup(&ctx);
++#else
++  ctx = EVP_MD_CTX_new();
++  if (ctx == NULL) {
++    return xstrdup("liboauth/OpenSSL: failed to allocate EVP_MD_CTX");
++  }
++  EVP_DigestInit(ctx,EVP_sha1());
++  EVP_DigestUpdate(ctx, data, length);
++  EVP_DigestFinal(ctx, md,(unsigned int*) &len);
++  EVP_MD_CTX_free(ctx);
++#endif
+   return oauth_body_hash_encode(len, md);
+ }
+EOF
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-nss LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ make install-strip &&
+ mkdir -p $INSTALLPREFIX/include/liboath &&
+ # fix missing liboath/oath.h
+ echo "#include \"../oauth.h\"" > $INSTALLPREFIX/include/liboath/oath.h &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

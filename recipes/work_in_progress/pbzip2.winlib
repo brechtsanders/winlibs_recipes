@@ -1,0 +1,110 @@
+export NAME="Parallel BZIP2 (PBZIP2)"
+export STATUS=
+export URL=http://compression.ca/pbzip2/
+export BASENAME=pbzip2
+export DESCRIPTION="PBZIP2 is a parallel implementation of the bzip2 block-sorting file compressor that uses pthreads and achieves near-linear speedup on SMP machines."
+export CATEGORY=compression
+export TYPE=application
+#export VERSION=1.1.6
+#export VERSIONDATE=20111103
+#export VERSION=1.1.8
+#export VERSIONDATE=20140107
+#export VERSION=1.1.10
+#export VERSIONDATE=20141207
+####pbzip2.cpp:301: error: 'SIGUSR1' was not declared in this scope
+####pbzip2.cpp:1097: error: 'sigemptyset' was not declared in this scope
+#export VERSION=1.1.11
+#export VERSIONDATE=20141213
+#export VERSION=1.1.12
+#export VERSIONDATE=20141221
+export VERSION=1.1.13
+export VERSIONDATE=20151219
+####pbzip2.cpp:94:8: error: 'sigset_t' does not name a type
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="BSD-style"
+#export DOWNLOADURL="http://compression.ca/pbzip2/"
+export DOWNLOADURL="https://launchpad.net/pbzip2/+download"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://compression.ca/pbzip2/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://launchpad.net/pbzip2/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1/")/$VERSION/+download/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+patch -ulbf pbzip2.cpp << EOF
+--- pbzip2.cpp  2014-12-13 07:52:40.000000000 +0100
++++ pbzip2.cpp  2014-12-13 07:54:18.000000000 +0100
+@@ -34,2 +34,6 @@
+ #include <limits.h>
++#ifdef __MINGW32__
++#include <sys/utime.h>
++#define SIGUSR1 30
++#endif
+ }
+@@ -89,3 +93,5 @@
+ static char BWTblockSizeChar = '9';
++#ifndef __MINGW32__
+ static sigset_t SignalMask;
++#endif
+ static pthread_t SignalHandlerThread;
+@@ -102,3 +108,5 @@
+ void cleanupAndQuit(int exitCode);
++#ifndef __MINGW32__
+ int initSignalMask();
++#endif
+ int setupSignalHandling();
+@@ -156,3 +164,5 @@
+ {
++#ifndef __MINGW32__
+ void* signalHandlerProc(void* arg);
++#endif
+ void* terminatorThreadProc(void* arg);
+@@ -906,2 +916,3 @@
+  */
++#ifndef __MINGW32__
+ int initSignalMask()
+@@ -926,2 +937,3 @@
+ }
++#endif
+
+@@ -961,2 +973,5 @@
+ {
++#ifdef __MINGW32__
++       return 0;
++#else
+        int ret = initSignalMask();
+@@ -969,2 +984,3 @@
+        return ret;
++#endif
+ }
+@@ -1085,2 +1101,3 @@
+  */
++#ifndef __MINGW32__
+ void* signalHandlerProc(void* arg)
+@@ -1109,2 +1126,3 @@
+ }
++#endif
+
+@@ -3145,3 +3163,3 @@
+        int ret = 0;
+-       #ifndef WIN32
++       #if !defined WIN32 || defined __MINGW32__
+        struct utimbuf uTimBuf;
+EOF
+wl-showstatus build &&
+make CFLAGS="-O2 -DWIN32" &&
+ strip *.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+    echo OK
+tar cf _.tar * && pbzip2.exe -9 < _.tar >_.tar.bz2 && tar tfj _.tar.bz2 && echo TEST OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

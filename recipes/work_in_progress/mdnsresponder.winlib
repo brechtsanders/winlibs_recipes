@@ -1,0 +1,76 @@
+export NAME="mDNSResponder"
+export STATUS=
+export URL=https://opensource.apple.com/tarballs/mDNSResponder/
+export BASENAME=mdnsresponder
+export DESCRIPTION="MDNSResponder, also known as Bonjour, is Apple's native zero-configuration networking process."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=878.260.1
+#export VERSIONDATE=20191029
+#export VERSION=878.270.2
+#export VERSIONDATE=20200401
+#export VERSION=1096.0.2
+#export VERSIONDATE=20200218
+#export VERSION=1096.40.7
+#export VERSIONDATE=20200430
+#export VERSION=1310.40.42
+#export VERSIONDATE=20210104
+#export VERSION=1310.60.4
+#export VERSIONDATE=20210130
+#export VERSION=1310.80.1
+#export VERSIONDATE=20210202
+#export VERSION=1310.100.10
+#export VERSIONDATE=20210515
+#export VERSION=1310.120.71
+#export VERSIONDATE=20210701
+export VERSION=1310.140.1
+export VERSIONDATE=20210817
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://opensource.apple.com/tarballs/mDNSResponder/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://opensource.apple.com/tarballs/mDNSResponder/mDNSResponder-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/mDNSResponder-$VERSION.tar.gz
+cd mDNSResponder-$VERSION
+patch -ulbf mDNSShared/CommonServices.h << EOF
+@@ -25,2 +25,6 @@
+ #define __COMMON_SERVICES__
++#ifdef __MINGW32__
++#include <stdint.h>
++#define _SSIZE_T
++#endif
+
+EOF
+#patch -ulbf mDNSWindows/PosixCompat.c << EOF
+#@@ -101 +101 @@
+#-#define EPOCHFILETIME (116444736000000000i64)
+#+#define EPOCHFILETIME (116444736000000000LL)
+#EOF
+#mv mDNSWindows/mDNSWin32.c.bak mDNSWindows/mDNSWin32.c; mv mDNSWindows/Secret.c.bak mDNSWindows/Secret.c
+#sed -i.bak -e "s/\(#include\s*<\)lm\.h\(>\)/\1levmar.h\2\n\1lmshare.h\2\n\1lmjoin.h\2\n\1lmerr.h\2/" mDNSWindows/mDNSWin32.c mDNSWindows/Secret.c
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h
+wl-showstatus build &&
+ #for F in mDNSWindows/*.c; do
+ for F in mDNSShared/*.c mDNSPosix/*.c; do
+  #echo CC $F &&
+  #gcc -c -o $F.o $F -O3 -ImDNSShared -ImDNSCore -ImDNSWindows -ImDNSWindows/SystemService || break 1
+  echo CXX $F &&
+  #g++ -fpermissive -c -o $F.o $F -O3 -ImDNSShared -ImDNSCore  || break 1
+  g++ -fpermissive -c -o $F.o $F -O3 -I$(pwd)/winfix -ImDNSShared -ImDNSCore -ImDNSWindows -ImDNSWindows/SystemService || break 1
+ done &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mDNSResponder-$VERSION
+
+
+

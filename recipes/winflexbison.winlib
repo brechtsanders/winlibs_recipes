@@ -1,0 +1,95 @@
+export NAME="WinFlexBison"
+export STATUS=
+export URL=https://github.com/lexxmark/winflexbison
+export BASENAME=winflexbison
+export DESCRIPTION="WinFlexBison is a Windows port of Flex (the fast lexical analyser) and GNU Bison (parser generator). Both win_flex and win_bison are based on upstream sources but depend on system libraries only."
+export CATEGORY=
+export TYPE=library
+export VERSION=2.5.24
+export VERSIONDATE=20210114
+####Visual Studio Build supported only
+#export VERSION=2.5.25
+#export VERSIONDATE=20220111
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/lexxmark/winflexbison/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/lexxmark/winflexbison/releases/download/v$VERSION/win_flex_bison-$VERSION.zip
+export DOWNLOADSOURCEURL=https://github.com/lexxmark/winflexbison/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#unzip -l $TARBALLDIR/$BASENAME/win_flex_bison-$VERSION.zip
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix common/m4/lib/clean-temp.h (version >= 2.5.24)
+patch -ulbf common/m4/lib/clean-temp.h << EOF
+@@ -109,3 +109,5 @@
+
++#ifndef __MINGW32__
+ typedef int mode_t;
++#endif
+
+EOF
+# fix common/misc/gethrxtime.c (version >= 2.5.24)
+patch -ulbf common/misc/gethrxtime.c << EOF
+@@ -20,2 +20,5 @@
+ #include <config.h>
++#ifdef _WIN32
++#include <sysinfoapi.h>
++#endif
+
+@@ -60,2 +63,8 @@
+
++#  elif defined(_WIN32)
++  {
++    SYSTEMTIME ts;
++    GetSystemTime(&ts);
++    return xtime_make (ts.wSecond, 1000 * ts.wMilliseconds);
++  }
+ #  else
+EOF
+# fix common/misc/config.h (version >= 2.5.24)
+echo "#define HAVE_CLOCK_GETTIME 1" >> common/misc/config.h
+# fix bison/src/config.h (version >= 2.5.24)
+patch -ulbf bison/src/config.h << EOF
+@@ -1 +1,3 @@
++#ifndef __INCLUDED_BISON_SRC_CONFIG_H
++#define __INCLUDED_BISON_SRC_CONFIG_H
+ #define PACKAGE_BUGREPORT "https://github.com/lexxmark/winflexbison/issues"
+@@ -22,2 +24,3 @@
+
+-extern int obstack_printf(struct obstack* obs, const char* format, ...);
+\\ No newline at end of file
++extern int obstack_printf(struct obstack* obs, const char* format, ...);
++#endif //__INCLUDED_BISON_SRC_CONFIG_H
+EOF
+# fix CMakeLists.txt (version >= 2.5.24)
+patch -ulbf CMakeLists.txt << EOF
+@@ -4,5 +4,2 @@
+
+-if(NOT MSVC)
+-   message( FATAL_ERROR "Visual Studio Build supported only" )
+-endif()
+
+@@ -14,4 +11,2 @@
+
+-set(CMAKE_CXX_FLAGS_DEBUG "\${CMAKE_CXX_FLAGS_DEBUG} /W3 /MD /Od /Zi /EHsc")
+-set(CMAKE_CXX_FLAGS_RELEASE "\${CMAKE_CXX_FLAGS_RELEASE} /W3 /GL /Od /Oi /Gy /Zi /EHsc")
+
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/winflexbison -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/winflexbison -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-std=gnu99 -D__USE_GNU -I$PWD/common/m4/lib" -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

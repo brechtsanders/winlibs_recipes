@@ -1,0 +1,182 @@
+export NAME="GNU ghostscript"
+export STATUS=
+export URL=http://www.gnu.org/software/ghostscript/
+export BASENAME=gnu-ghostscript
+export DESCRIPTION="Ghostscript is the name of a set of software that provides: an interpreter for the PostScript language and the PDF file format, a set of C procedures (the Ghostscript library) that implement the graphics capabilities that appear as primitive operations in the PostScript language, and a wide variety of output drivers for various file formats and printers."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=8.62.0
+#export VERSION=8.64.0
+#export VERSION=8.71.1
+#export VERSION=9.04.1
+#export VERSIONDATE=20120102
+#export VERSION=9.05.0
+#export VERSIONDATE=20120905
+####make: *** No rule to make target `obj/libtiff_.dev', needed by `obj/libtiff.dev'.  Stop.
+####make: *** No rule to make target `obj/libtiff_.dev', needed by `obj/libtiff.dev'.  Stop.
+#export VERSION=9.06.0
+#export VERSIONDATE=20130101
+#export VERSION=9.14.0
+#export VERSIONDATE=20141205
+export VERSION=9.14.1
+export VERSIONDATE=20161107
+####obj/iapi.o:iapi.c:(.text+0x240): undefined reference to `gp_local_arg_encoding_get_codepoint'
+wl-showstatus --package-version
+export DEPENDANCIES=libjpeg,zlib,libpng,libtiff,pthreads,cairo,fontconfig,libpaper,lcms1,libidn
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/ghostscript/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/ghostscript/gnu-ghostscript-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/ghostscript/gnu-ghostscript-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/gnu-ghostscript-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/gnu-ghostscript-$VERSION.tar.xz
+cd gnu-ghostscript-$VERSION
+# fix pthread_t 0 assignment problem (pthread is a structure on Windows) (version >= 8.71.1)
+patch -ulbf base/gp_psync.c << EOF
+--- base/gp_psync.c  2010-07-28 11:22:50 +0200
++++ base/gp_psync.c  2010-09-20 11:39:04 +0200
+@@ -154,3 +154,8 @@
+     mon = &((gp_pthread_recursive_t *)mona)->mutex;
++#ifdef __MINGW32__
++    ((gp_pthread_recursive_t *)mona)->self_id.p = NULL;        /* Not valid unless mutex is locked */
++    ((gp_pthread_recursive_t *)mona)->self_id.x = 0;   /* Not valid unless mutex is locked */
++#else
+     ((gp_pthread_recursive_t *)mona)->self_id = 0;     /* Not valid unless mutex is locked */
++#endif
+     scode = pthread_mutex_init(mon, NULL);
+@@ -197,3 +202,8 @@
+     scode = pthread_mutex_unlock(mon);
++#ifdef __MINGW32__
++    ((gp_pthread_recursive_t *)mona)->self_id.p = NULL;        /* Not valid unless mutex is locked */
++    ((gp_pthread_recursive_t *)mona)->self_id.x = 0;   /* Not valid unless mutex is locked */
++#else
+     ((gp_pthread_recursive_t *)mona)->self_id = 0;     /* Not valid unless mutex is locked */
++#endif
+     return SEM_ERROR_CODE(scode);
+@@ -274,3 +284,9 @@
+     }
++#ifdef __MINGW32__
++    *thread = (gp_thread_id)malloc(sizeof(pthread_t));
++    ((pthread_t*)thread)->p = new_thread.p;
++    ((pthread_t*)thread)->x = new_thread.x;
++#else
+     *thread = (gp_thread_id)new_thread;
++#endif
+     return 0;
+@@ -282,3 +298,7 @@
+         return;
++#ifdef __MINGW32__
++    pthread_join(*(pthread_t*)&thread, NULL);
++#else
+     pthread_join((pthread_t)thread, NULL);
++#endif
+ }
+EOF
+# fix missing mswin_popen (version >= 8.71.1)
+patch -ulbf base/pipe_.h << EOF
+--- base/pipe_.h  2010-07-11 00:02:22 +0200
++++ base/pipe_.h  2010-09-09 10:36:42 +0200
+@@ -22 +22 @@
+-#ifdef __WIN32__
++#if defined(__WIN32__) && !defined(__MINGW32__)
+EOF
+# fix base/gp_unifs.c
+mv base/gp_unifs.c base/gp_unifs.c.bak
+echo "#define HAVE_DIRENT_H" > base/gp_unifs.c
+cat base/gp_unifs.c.bak >> base/gp_unifs.c
+# don't chmod during install
+mv base/instcopy base/instcopy.bak
+grep -v chmod base/instcopy.bak > base/instcopy
+# fix DLL filename
+patch -ulbf base/unix-dll.mak << EOF
+--- base/unix-dll.mak  2010-07-11 19:04:14 +0200
++++ base/unix-dll.mak  2010-11-01 15:30:10 +0100
+@@ -47,6 +47,6 @@
+ # GNU/Linux
+-GS_SOEXT=so
++GS_SOEXT=dll
+ GS_SONAME=\$(GS_SONAME_BASE).\$(GS_SOEXT)
+-GS_SONAME_MAJOR=\$(GS_SONAME).\$(GS_VERSION_MAJOR)
+-GS_SONAME_MAJOR_MINOR=\$(GS_SONAME).\$(GS_VERSION_MAJOR).\$(GS_VERSION_MINOR)
++GS_SONAME_MAJOR=\$(GS_SONAME_BASE).\$(GS_VERSION_MAJOR).\$(GS_SOEXT)
++GS_SONAME_MAJOR_MINOR=\$(GS_SONAME_BASE).\$(GS_VERSION_MAJOR).\$(GS_VERSION_MINOR).\$(GS_SOEXT)
+ LDFLAGS_SO=-shared -Wl,-soname=\$(GS_SONAME_MAJOR)
+EOF
+# fix base/time_.h for 64-bit
+patch -ulbf base/time_.h << EOF
+--- base/time_.h  2010-07-11 00:02:28 +0200
++++ base/time_.h  2011-08-08 16:04:00 +0200
+@@ -46,12 +46,14 @@
+ #else
+ #  include <time.h>
+-#  if !defined(__DECC) && !defined(__MWERKS__)
++#  if !defined(__DECC) && !defined(__MWERKS__) && !defined(__MINGW64__)
+ struct timeval {
+     long tv_sec, tv_usec;
+ };
+ #  endif
++#  if !defined(__MINGW64__)
+ struct timezone {
+     int tz_minuteswest, tz_dsttime;
+ };
++#  endif
+
+ #endif
+EOF
+# fix base/dirent_.h (version >= 9.06.0)
+patch -ulbf base/dirent_.h << EOF
+--- base/dirent_.h  2012-12-27 01:57:00 +0100
++++ base/dirent_.h  2013-01-01 20:58:10 +0100
+@@ -35,3 +35,3 @@
+  */
+-#if  defined(HAVE_DIRENT_H) && HAVE_DIRENT_H == 1
++#if defined(HAVE_DIRENT_H)
+ #  include <dirent.h>
+EOF
+## fix missing isascii in trio/trio.c (version >= 9.14.0)
+#mv trio/trio.c trio/trio.c.bak
+#echo "#include <ctype.h>" > trio/trio.c
+#echo "#define isascii __isascii" >> trio/trio.c
+#cat trio/trio.c.bak >> trio/trio.c
+# fix missing FT_CALLBACK_DEF in base/fapi_ft.c (version >= 9.14.1)
+mv base/fapi_ft.c base/fapi_ft.c.bak &&
+echo "#define FT_CALLBACK_DEF(...) __VA_ARGS__" > base/fapi_ft.c &&
+cat base/fapi_ft.c.bak >> base/fapi_ft.c
+# fix for MSYS2
+mv configure configure.bak
+sed -e "s/\(MINGW\*)\)/MSYS*|\1/" configure.bak > configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --disable-fontconfig --without-ijs --without-jasper --without-x --with-drivers=FILES && make install
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --without-ijs --without-jasper --without-x --with-drivers=FILES &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --without-ijs --without-jasper --without-x --with-drivers=FILES  LDFLAGS="-Wl,--as-needed -lz" &&
+ wl-showstatus build-install &&
+ #make -j1 install &&
+ #make soinstall GS=gs GS_SOEXT=dll &&
+ ## redefine AUXDIR because aux is a reserved device name in Windows (version <= 9.06.0)
+ #( make -j1 install AUXDIR=`pwd`/obj/auxdir || make -j1 install AUXDIR=`pwd`/obj/auxdir EXTRALIBS="-Wl,--as-needed -lz -lfreetype -lfontconfig -lpaper -lidn" ) &&
+ #( make soinstall GS=gs GS_SOEXT=dll AUXDIR=`pwd`/soobj/auxdir || make soinstall GS=gs GS_SOEXT=dll AUXDIR=`pwd`/soobj/auxdir EXTRALIBS="-Wl,--as-needed -lz -lfreetype -lfontconfig -lpaper -lidn" ) &&
+ ## fix backslashes instead of slashes in obj/gconfigd.h (version >= 9.14.0)
+ #mv obj/gconfigd.h obj/gconfigd.h.bak &&
+ #tr \\\\ / < obj/gconfigd.h.bak > obj/gconfigd.h &&
+ #( make install GS_LIB_DEFAULT=fonts || make install GS_LIB_DEFAULT=fonts EXTRALIBS="-Wl,--as-needed -lz -lfreetype -lfontconfig -lpaper -lidn" ) &&
+ #( make soinstall GS=gs GS_SOEXT= SO_LIB_EXT=.dll GS_LIB_DEFAULT=fonts || make soinstall GS=gs GS_SOEXT= SO_LIB_EXT=.dll GS_LIB_DEFAULT=fonts EXTRALIBS="-Wl,--as-needed -lz -lfreetype -lfontconfig -lpaper -lidn" ) &&
+ ( make install GS=gs.exe GS_LIB_DEFAULT=fonts || make install GS=gs.exe GS_LIB_DEFAULT=fonts EXTRALIBS="-Wl,--as-needed -lz -lfreetype -lfontconfig -lpaper -lidn" ) &&
+ ( make soinstall GS_SOEXT= SO_LIB_EXT=.dll GS_LIB_DEFAULT=fonts || make soinstall GS_SOEXT= SO_LIB_EXT=.dll GS_LIB_DEFAULT=fonts EXTRALIBS="-Wl,--as-needed -lz -lfreetype -lfontconfig -lpaper -lidn" ) &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ echo "LIBRARY libgs.dll" > libgs.def &&
+ echo "EXPORTS" >> libgs.def &&
+ #pexports $INSTALLPREFIX/bin/libgs.dll|grep gsapi| sed -e "s/DATA$//" >> libgs.def &&
+ pexports -o $INSTALLPREFIX/bin/libgs.dll|grep gsapi >> libgs.def &&
+ dlltool -k --input-def libgs.def --dllname $INSTALLPREFIX/bin/libgs.dll --output-lib $INSTALLPREFIX/lib/libgs.dll.a &&
+ #rm -f $INSTALLPREFIX/bin/#inst.*#.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gnu-ghostscript-$VERSION
+####TO DO: build static library
+
+
+

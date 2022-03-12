@@ -1,0 +1,94 @@
+export NAME="FeatherPad"
+export STATUS=
+export URL=https://github.com/tsujan/FeatherPad
+export BASENAME=featherpad
+export DESCRIPTION="Lightweight Qt Plain-Text Editor for Linux"
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.0.1
+#export VERSIONDATE=20211210
+#export VERSION=1.1.0
+#export VERSIONDATE=20211222
+export VERSION=1.1.1
+export VERSIONDATE=20220107
+wl-showstatus --package-version
+export DEPENDANCIES=qt,hunspell
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/tsujan/FeatherPad/releases FeatherPad-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/tsujan/FeatherPad/releases/download/V$VERSION/FeatherPad-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/FeatherPad-$VERSION.tar.xz
+cd FeatherPad-$VERSION
+# fix featherpad/fpwin.cpp (version >= 1.0.1)
+patch -ulbf featherpad/fpwin.cpp << EOF
+@@ -6014,2 +6014,5 @@
+ #else
++#ifndef DATADIR
++#define DATADIR ".."
++#endif
+     QString helpPath (QStringLiteral (DATADIR) + "/featherpad/help_" + lang);
+EOF
+# fix featherpad/encoding.cpp (version >= 1.0.1)
+patch -ulbf featherpad/encoding.cpp << EOF
+@@ -29,3 +29,5 @@
+ #include <stdlib.h> // getenv (not used but, maybe, for *BSD)
++#ifndef _WIN32
+ #include <langinfo.h> // CODESET, nl_langinfo
++#endif
+ #include <stdint.h> // uint8_t, uint32_t
+@@ -499,2 +501,5 @@
+ {
++#ifdef _WIN32
++    return "UTF-8";
++#else
+     if (setlocale (LC_ALL, "") == NULL)
+@@ -503,2 +508,3 @@
+     return charset;
++#endif
+ }
+EOF
+# fix featherpad/main.cpp (version >= 1.0.1)
+patch -ulbf featherpad/main.cpp << EOF
+@@ -91,3 +91,7 @@
+
++#ifdef _WIN32
++    handleQuitSignals ({SIGINT, SIGTERM});
++#else
+     handleQuitSignals ({SIGQUIT, SIGINT, SIGTERM, SIGHUP}); // -> https://en.wikipedia.org/wiki/Unix_signal
++#endif
+
+@@ -117,2 +121,5 @@
+ #else
++#ifndef DATADIR
++#define DATADIR ".."
++#endif
+     FPTranslator.load ("featherpad_" + lang, QStringLiteral (DATADIR) + "/featherpad/translations");
+EOF
+#wl-showstatus configure &&
+# $MINGWPREFIX/qt/bin/qmake -makefile fp.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
+# wl-showstatus build &&
+# mingw32-make &&
+#    echo OK
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #PATH=$MINGWPREFIX/qt/bin:$PATH QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITHOUT_X11:BOOL=ON -S. -Bbuild_win &&
+ PATH=$MINGWPREFIX/qt/bin:$PATH QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITHOUT_X11:BOOL=ON -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
+ strip build_win/featherpad/featherpad.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_win/featherpad/featherpad.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FeatherPad-$VERSION
+####TO DO: fix DATADIR to be relative path to .exe file and copy featherpad/data/translations and featherpad/data/help*
+####PATH=$MINGWPREFIX/qt/bin:$PATH featherpad.exe
+
+
+

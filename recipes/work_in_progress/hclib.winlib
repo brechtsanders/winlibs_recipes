@@ -1,0 +1,94 @@
+export NAME="HCLib"
+export STATUS=
+export URL=http://habanero-rice.github.io/hclib/
+export BASENAME=hclib
+export DESCRIPTION="HClib is a task-based parallel programming model that supports the finish-async, parallel-for, and future-promise parallel programming patterns through both C and C++ APIs. HClib explicitly exposes hardware locality of the hardware, while allowing the programmer to fall back on sane defaults. The HClib runtime is a lightweight, work-stealing, and locality-aware runtime. HClib is not itself an exascale programming system, but is intended to be the intra-node resource management and scheduling component within an exascale programming system, integrating with inter-node communication models such as MPI, UPC++, or OpenSHMEM."
+export CATEGORY=development
+export TYPE=library
+export VERSION=vrvilo2017
+export VERSIONDATE=20191114
+####.libs/libhclib_la-hclib-runtime.o:hclib-runtime.c:(.text+0x6d): undefined reference to `jump_fcontext'
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+#export LICENSETYPE=BSD
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/habanero-rice/hclib/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/habanero-rice/hclib/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing sysconf(_SC_NPROCESSORS_ONLN) in src/hclib-hpt.c
+patch -ulbf src/hclib-hpt.c << EOF
+@@ -25,2 +25,5 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -1008,3 +1011,9 @@
+         } else {
++#ifdef _WIN32
++            SYSTEM_INFO sysinfo;
++           GetSystemInfo(&sysinfo);
++            num_workers = sysinfo.dwNumberOfProcessors ;
++#else
+             num_workers = sysconf(_SC_NPROCESSORS_ONLN);
++#endif
+             fprintf(stderr, "WARNING: HCLIB_WORKERS not provided, running with "
+EOF
+# fix missing xlocale.h in src/hclib-thread-bind.c
+patch -ulbf src/hclib-thread-bind.c << EOF
+@@ -19,3 +19,5 @@
+ #define __USE_GNU
++#ifndef _WIN32
+ #include <xlocale.h>
++#endif
+ #include <unistd.h>
+EOF
+# fix error: Unknown OS
+patch -ulbf src/Makefile.am << EOF
+@@ -38,3 +38,2 @@
+ else
+-if LINUX
+ libhclib_common_SOURCES += \\
+@@ -42,5 +41,2 @@
+ fcontext/make_i386_sysv_elf_gas.S
+-else
+-\$(error Unknown OS)
+-endif # LINUX
+ endif # OSX
+@@ -53,3 +49,2 @@
+ else
+-if LINUX
+ libhclib_common_SOURCES += \\
+@@ -57,5 +52,2 @@
+ fcontext/make_x86_64_sysv_elf_gas.S
+-else
+-\$(error Unknown OS)
+-endif # LINUX
+ endif # OSX
+EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lxml2" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # avoid error: Unknown OS
+ #sed -i.bak -e "s/^\$(error Unknown OS)/#&/" src/Makefile &&
+ wl-showstatus build-install &&
+ make install-strip libhclib_common_LIBADD="-Wl,--as-needed -lxml2" &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Assembler fails
+
+
+

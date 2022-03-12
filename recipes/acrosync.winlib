@@ -1,0 +1,62 @@
+export NAME="Acrosync"
+export STATUS=
+export URL=https://github.com/gilbertchen/acrosync-library
+export BASENAME=acrosync
+export DESCRIPTION="Acrosync is a new cross-platform rsync client for Windows/Max/iOS/Android that we built from scratch, without taking any code from the open source rsync project. This is the library behind Acrosync, which implements a large portion of the client-side of the (undocumented) rsync protocol, including the famous delta sync algorithm."
+export CATEGORY=dataprocessing,communication
+export TYPE=library,application
+export VERSION=master
+export VERSIONDATE=20200503
+wl-showstatus --package-version
+export DEPENDANCIES=libssh2,openssl
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=qi-make
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="Reciprocal Public License (RPL)"
+export DOWNLOADURL="https://github.com/gilbertchen/acrosync-library/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/gilbertchen/acrosync-library/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd acrosync-library-$VERSION
+# fix missing SYMBOLIC_LINK_FLAG_DIRECTORY in rsync/rsync_pathutil.cpp
+mv rsync/rsync_pathutil.cpp rsync/rsync_pathutil.cpp.bak
+cat > rsync/rsync_pathutil.cpp << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat rsync/rsync_pathutil.cpp.bak >> rsync/rsync_pathutil.cpp
+#wl-showstatus build &&
+# #$PY2DIR/python.exe $MINGWPREFIX/bin/qi-make.py &&
+# $PY2DIR/python.exe qi/qi-make.py &&
+#    echo OK
+wl-showstatus build &&
+ rm -f ERROR &&
+ for F in rsync/*.cpp; do
+  echo CXX $F
+  #g++ -c -o $F.o $F -I. || ( touch ERROR; break )
+  g++ -std=c++11 -c -o $F.o $F -I. || ( touch ERROR; break )
+ done &&
+ [ ! -f ERROR ] &&
+ ar cr libacrosync.a rsync/rsync_*.o &&
+ g++ -shared -s -mwindows -o acrosync.dll rsync/rsync_*.o -Wl,--out-implib,libacrosync.dll.a -Wl,--output-def,libacrosync.def -lws2_32 -lssh2 -lcrypto &&
+ g++ -s -mconsole -o t_rsync_client.exe rsync/t_rsync_client.cpp.o libacrosync.dll.a -lssh2 &&
+ g++ -s -mconsole -o t_rsync_entry.exe rsync/t_rsync_entry.cpp.o libacrosync.dll.a &&
+ g++ -s -mconsole -o t_rsync_fileutil.exe rsync/t_rsync_fileutil.cpp.o libacrosync.dll.a -lcrypto &&
+ g++ -s -mconsole -o t_rsync_stream.exe rsync/t_rsync_stream.cpp.o libacrosync.dll.a &&
+ #g++ -mconsole -o t_block_out.exe block/t_block_out.cpp -I. &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/rsync $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f rsync/*.h $INSTALLPREFIX/include/rsync &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf acrosync-library-$VERSION
+
+
+

@@ -1,0 +1,175 @@
+export NAME="CPython for Mingw-w64"
+export STATUS=
+export URL=https://github.com/msys2-contrib/cpython-mingw/wiki
+export BASENAME=cpython-mingw
+export DESCRIPTION="A friendly fork of CPython which adds support for Mingw-w64 + clang/gcc. "
+export CATEGORY=development
+export TYPE=application
+#export VERSION=2.7
+#export VERSIONDATE=20211211
+#export VERSION=3.9.5
+#export VERSIONDATE=20211211
+export VERSION=3.9.7
+export VERSIONDATE=20211212
+wl-showstatus --package-version
+export DEPENDANCIES=expat,libffi,mpdecimal,zlib,libbz2,xz,ncurses,readline,gdbm,sqlite3,openssl,tk
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL-compatible
+export DOWNLOADURL="https://github.com/msys2-contrib/cpython-mingw/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/msys2-contrib/cpython-mingw/archive/refs/tags/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/msys2-contrib/cpython-mingw/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+mkdir -p $BASENAME-$VERSION
+cd $BASENAME-$VERSION
+if [ ! -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz ]; then
+ git clone https://github.com/msys2-contrib/cpython-mingw -b mingw-v$VERSION &&
+ tar cfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz cpython-mingw
+else
+ tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+fi
+cd cpython-mingw
+## fix PC/pyconfig.h (version >= 3.9.5)
+#patch -ulbf PC/pyconfig.h << EOF
+#@@ -189,3 +189,5 @@
+#
+#+#ifndef __MINGW32__
+# typedef int pid_t;
+#+#endif
+#
+#EOF
+## fix Modules/pwdmodule.c
+#patch -ulbf Modules/pwdmodule.c << EOF
+#@@ -5,5 +5,7 @@
+# #include "posixmodule.h"
+#
+#+#ifndef _WIN32
+# #include <pwd.h>
+#+#endif
+#
+# #include "clinic/pwdmodule.c.h"
+#@@ -82,4 +84,7 @@
+# mkpwent(struct passwd *p)
+# {
+#+#ifdef _WIN32
+#+    return NULL;
+#+#else
+#     int setIndex = 0;
+#     PyObject *v = PyStructSequence_New(modulestate_global->StructPwdType);
+#@@ -115,4 +120,5 @@
+#
+#     return v;
+#+#endif
+# }
+#
+#@@ -132,4 +138,7 @@
+# /*[clinic end generated code: output=c4ee1d4d429b86c4 input=ae64d507a1c6d3e8]*/ {
+#+#ifdef _WIN32
+#+    return NULL;
+#+#else
+#     PyObject *retval = NULL;
+#     uid_t uid;
+#@@ -200,4 +209,5 @@
+# #endif
+#     return retval;
+#+#endif
+# }
+#
+#@@ -217,4 +227,7 @@
+# /*[clinic end generated code: output=359ce1ddeb7a824f input=a6aeb5e3447fb9e0]*/ {
+#+#ifdef _WIN32
+#+    return NULL;
+#+#else
+#     char *buf = NULL, *buf2 = NULL, *name_chars;
+#     int nomem = 0;
+#@@ -280,4 +293,5 @@
+#     Py_DECREF(bytes);
+#     return retval;
+#+#endif
+# }
+#
+#EOF
+## use Windows methods for dynamic loading
+#cp -f Python/dynload_win.c Python/dynload_shlib.c
+#echo '#define PY3_DLLNAME L"python3.dll"' > Modules/getpath.c
+#echo '#include "../PC/getpathp.c"' >> Modules/getpath.c
+#cp -f PC/pyconfig.h pyconfig.h
+#mv Modules/pwdmodule.c Modules/pwdmodule.c.bak &&
+#touch Modules/pwdmodule.c
+# fix detection of current module in Python/initconfig.c (version >= 3.9.7)
+patch -ulbf Python/initconfig.c << EOF
+@@ -1120,2 +1120,15 @@
+     const wchar_t *program_name = _Py_path_config.program_name;
++#ifdef __MINGW32__
++    HMODULE hm = NULL;
++    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&config_init_program_name, &hm)) {
++        wchar_t progpath[MAX_PATH];
++        if (GetModuleFileNameW(hm, progpath, MAX_PATH) < MAX_PATH) {
++            config->program_name = _PyMem_RawWcsdup(progpath);
++            if (config->program_name == NULL) {
++                return _PyStatus_NO_MEMORY();
++            }
++            return _PyStatus_OK();
++        }
++    }
++#endif
+     if (program_name != NULL) {
+EOF
+# fix Python/pathconfig.c (version >= 3.9.7)
+patch -ulbf Python/pathconfig.c << EOF
+@@ -423,3 +423,3 @@
+
+-#ifdef MS_WINDOWS
++#if defined(MS_WINDOWS) && !defined(__MINGW32__)
+     if (config->executable != NULL && config->base_executable == NULL) {
+EOF
+# avoid using soft links
+sed -i.bak -e "s/\$(LN)\( -s\)* /cp -f /" Makefile.pre.in
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ autoreconf -vfi &&
+ cd build_win &&
+ #../configure --prefix=$INSTALLPREFIX/share/python --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ #../configure --prefix=$INSTALLPREFIX/share/python --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --enable-loadable-sqlite-extensions --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --without-ensurepip --without-c-locale-coercion --enable-loadable-sqlite-extensions --with-ssl-default-suites=openssl CFLAGS="-D_WIN32_WINNT=0x0601 -D_MSC_VER=1 -DMS_WINDOWS $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DMS_WIN64"; fi) -DNT_THREADS -I$(pwd)/PC -DHAVE_DECLSPEC_DLL -Wno-error=implicit-function-declaration" &&
+ ../configure --prefix=$(cygpath -m $INSTALLPREFIX/share/python) --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --enable-loadable-sqlite-extensions --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --without-ensurepip --without-c-locale-coercion --enable-loadable-sqlite-extensions --with-ssl-default-suites=openssl &&
+ #--with-tzpath=$MINGWPREFIX/share/zoneinfo
+ cd .. &&
+ wl-showstatus build &&
+ #make -Cbuild_win CC="gcc -I$(pwd)/PC" BASEMODLIBS="-Wl,--as-needed -lshlwapi -lversion -lws2_32 -lmincore -Wl,--allow-multiple-definition" &&
+ make -Cbuild_win &&
+ wl-showstatus build-install &&
+ #make -j1 -Cbuild_win install LN="cp -f" &&
+ make -j1 -Cbuild_win install &&
+ cp -u build_win/libpython*.a $INSTALLPREFIX/share/python/lib/ &&
+ strip $INSTALLPREFIX/share/python/bin/*.{dll,exe} &&
+ cp -u $INSTALLPREFIX/share/python/bin/python3.exe $INSTALLPREFIX/share/python/bin/python.exe &&
+ #find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+SEVENZIP="/C/Program Files/7-Zip/7z.exe"
+PKGBASE=Python-$VERSION-win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)
+#mkdir -p $PKGBASE/include $PKGBASE/libs $PKGBASE/Lib &&
+#cp -rf $MINGWPREFIX/share/python/bin/* $PKGBASE/ &&
+#cp -rf $MINGWPREFIX/share/python/include/python*/* $PKGBASE/include/ &&
+#cp -rf $MINGWPREFIX/share/python/lib/*.a $MINGWPREFIX/share/python/lib/pkgconfig $PKGBASE/libs/ &&
+#cp -rf $MINGWPREFIX/share/python/lib/python*/* $PKGBASE/Lib/ &&
+#mkdir -p $PKGBASE/include $PKGBASE/lib &&
+#cp -rf $MINGWPREFIX/share/python/bin/* $PKGBASE/ &&
+#cp -rf $MINGWPREFIX/share/python/include/python*/* $PKGBASE/include/ &&
+#cp -rf $MINGWPREFIX/share/python/lib/*.a $MINGWPREFIX/share/python/lib/pkgconfig $PKGBASE/lib/ &&
+#cp -rf $MINGWPREFIX/share/python/lib/python*/* $PKGBASE/lib/ &&
+mkdir -p $PKGBASE/include $PKGBASE/lib &&
+cp -rf $MINGWPREFIX/share/python/bin/* $PKGBASE/ &&
+cp -rf $MINGWPREFIX/share/python/include/* $PKGBASE/include/ &&
+cp -rf $MINGWPREFIX/share/python/lib/* $PKGBASE/Lib/ &&
+"$SEVENZIP" a -r -mx9 -t7z $PKGBASE.7z $PKGBASE &&
+echo OK

@@ -1,0 +1,221 @@
+export NAME="OpenCT"
+export STATUS=
+#export URL=http://www.opensc-project.org/openct/
+export URL=https://github.com/OpenSC/openct
+export BASENAME=openct
+export DESCRIPTION="OpenCT implements drivers for several smart card readers. It comes as driver in ifdhandler format for PC/SC-Lite, as CT-API driver, or as a small and lean middleware, so applications can use it with minimal overhead. OpenCT also has a primitive mechanism to export smart card readers to remote machines via tcp/ip."
+export CATEGORY=security,hardware
+export TYPE=library
+#export VERSION=0.6.18
+#export VERSIONDATE=20091230
+#export VERSION=0.6.19
+#export VERSIONDATE=20100107
+export VERSION=0.6.20
+export VERSIONDATE=20100216
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LGPL-2.1
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://www.opensc-project.org/files/openct/"
+#export DOWNLOADURL="https://github.com/OpenSC/openct/releases"
+export DOWNLOADURL="https://github.com/OpenSC/openct/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.opensc-project.org/files/openct/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/OpenSC/openct/archive/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/OpenSC/openct/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME*$VERSION
+# fix missing sys/socket.h
+mkdir -p win32fix/sys win32fix/netinet win32fix/arpa
+echo "#include <winsock2.h>" > win32fix/sys/socket.h
+cat > win32fix/sys/socket.h << EOF
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#include <winsock2.h>
+#include <ws2tcpip.h>
+EOF
+#echo "#include <ws2tcpip.h>" > win32fix/netinet/in.h
+#touch win32fix/sys/un.h win32fix/arpa/inet.h win32fix/netdb.h
+cat > win32fix/sys/poll.h << EOF
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#include <winsock2.h>
+EOF
+# create dummy syslog.h
+cat > win32fix/syslog.h << EOF
+//#define LOG_ERR 3
+#define LOG_WARNING 4
+//#define LOG_INFO 6
+#define LOG_DEBUG 7
+//#define LOG_PRIMASK 0x07
+#define LOG_DAEMON (3<<3)
+#define LOG_PID 0x01
+static void syslog (int priority, const char *format, ...) {}
+EOF
+# fix src/ct/socket.c
+patch -ulbf src/ct/socket.c << EOF
+@@ -9,9 +9,13 @@
+ #endif
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <netinet/in.h>
++#endif
+ #include <sys/socket.h>
+ #include <sys/stat.h>
++#ifndef _WIN32
+ #include <sys/poll.h>
+ #include <sys/un.h>
++#endif
+ #include <unistd.h>
+ #include <errno.h>
+@@ -21,6 +25,8 @@
+ #include <stdio.h>
+ #include <fcntl.h>
++#ifndef _WIN32
+ #include <arpa/inet.h>
+ #include <netdb.h>
++#endif
+ #include <limits.h>
+
+@@ -33,8 +39,10 @@
+ static int ifd_reuse_addr = 0;
+
++#ifndef min
+ static inline unsigned int min(unsigned int a, unsigned int b)
+ {
+        return (a < b) ? a : b;
+ }
++#endif
+
+ static int ct_socket_default_recv_cb(ct_socket_t *);
+@@ -100,7 +108,9 @@
+                sock->use_network_byte_order = 1;
+
++#ifndef _WIN32
+        /* set close on exec */
+        if (fcntl(fd, F_SETFD, 1) < 0)
+                goto failed;
++#endif
+
+        switch (op) {
+@@ -111,15 +121,23 @@
+ # endif
+                if (sa->sa_family == AF_INET6) {
++#ifdef _WIN32
++                       DWORD val = 1;
++#else
+                        int val = 1;
++#endif
+
+                        setsockopt(fd, SOL_IPV6, IPV6_V6ONLY,
+-                                  &val, sizeof(val));
++                                  (void*)&val, sizeof(val));
+                }
+ #endif
+                if (ifd_reuse_addr) {
++#ifdef _WIN32
++                       BOOL val = TRUE;
++#else
+                        int val = 1;
++#endif
+
+                        setsockopt(fd, SOL_SOCKET,
+-                                  SO_REUSEADDR, &val, sizeof(val));
++                                  SO_REUSEADDR, (void*)&val, sizeof(val));
+                }
+                if (bind(fd, sa, salen) >= 0) {
+@@ -154,5 +172,7 @@
+                struct sockaddr_in in;
+                struct sockaddr_in6 ix;
++#ifndef _WIN32
+                struct sockaddr_un un;
++#endif
+        } s;
+        struct addrinfo *res, *ai;
+@@ -165,4 +185,7 @@
+        /* Simple stuff first - unix domain sockets */
+        if (addr[0] == '/') {
++#ifdef _WIN32
++               return -1;
++#else
+                s.un.sun_family = AF_UNIX;
+                strncpy(s.un.sun_path, addr, sizeof(s.un.sun_path));
+@@ -172,4 +195,5 @@
+                }
+                return __ct_socket_make(sock, op, &s.a, sizeof(s.un));
++#endif
+        }
+
+@@ -568,12 +592,16 @@
+ int ct_socket_flsbuf(ct_socket_t * sock, int all)
+ {
++#ifndef _WIN32
+        struct sigaction act;
++#endif
+        ct_buf_t *bp = &sock->sbuf;
+        int n, rc = 0;
+
++#ifndef _WIN32
+        /* Ignore SIGPIPE while writing to socket */
+        memset(&act, 0, sizeof(act));
+        act.sa_handler = SIG_IGN;
+        sigaction(SIGPIPE, &act, &act);
++#endif
+
+        do {
+@@ -593,6 +621,8 @@
+        } while (all);
+
++#ifndef _WIN32
+        /* Restore old signal handler */
+        sigaction(SIGPIPE, &act, &act);
++#endif
+
+        if (rc >= 0 && all == 2) {
+@@ -732,5 +762,7 @@
+ int ct_socket_write(ct_socket_t * sock, void *ptr, size_t len)
+ {
++#ifndef _WIN32
+        struct sigaction act;
++#endif
+        unsigned int count = 0;
+        int rc;
+@@ -740,8 +772,10 @@
+                return -1;
+
++#ifndef _WIN32
+        /* Ignore SIGPIPE while writing to socket */
+        memset(&act, 0, sizeof(act));
+        act.sa_handler = SIG_IGN;
+        sigaction(SIGPIPE, &act, &act);
++#endif
+
+        while (count < len) {
+@@ -757,5 +791,7 @@
+
+       done:                    /* Restore old signal handler */
++#ifndef _WIN32
+        sigaction(SIGPIPE, &act, &act);
++#endif
+        return rc;
+ }
+EOF
+wl-showstatus configure &&
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" LDFLAGS="-lws2_32" &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+####mainloop.c:12:22: error: sys/poll.h: No such file or directory
+####mainloop.c: In function 'ct_mainloop':
+####mainloop.c:41: error: array type has incomplete element type
+####mainloop.c:63: error: 'POLLIN' undeclared (first use in this function)
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME*$VERSION
+
+
+

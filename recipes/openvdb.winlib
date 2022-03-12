@@ -1,0 +1,118 @@
+export NAME="OpenVDB"
+export STATUS=
+export URL=http://www.openvdb.org/
+#export URL=https://github.com/AcademySoftwareFoundation/openvdb/
+export BASENAME=openvdb
+export DESCRIPTION="OpenVDB is an Academy Award-winning open-source C++ library comprising a novel hierarchical data structure and a suite of tools for the efficient storage and manipulation of sparse volumetric data discretized on three-dimensional grids. It is developed and maintained by DreamWorks Animation for use in volumetric applications typically encountered in feature film production."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=5.0.0
+#export VERSIONDATE=20180108
+#export VERSION=5.1.0
+#export VERSIONDATE=20180411
+#export VERSION=5.2.0
+#export VERSIONDATE=20180818
+#export VERSION=6.0.0
+#export VERSIONDATE=20181218
+#export VERSION=6.1.0
+#export VERSIONDATE=20190508
+#export VERSION=6.2.0
+#export VERSIONDATE=20190919
+#export VERSION=6.2.1
+#export VERSIONDATE=20191002
+#export VERSION=7.0.0
+#export VERSIONDATE=20191207
+#export VERSION=7.1.0
+#export VERSIONDATE=20200814
+#export VERSION=7.2.0
+#export VERSIONDATE=20201210
+#export VERSION=7.2.1
+#export VERSIONDATE=20201225
+#export VERSION=7.2.2
+#export VERSIONDATE=20210205
+#export VERSION=7.2.3
+#export VERSIONDATE=20210318
+#export VERSION=8.0.0
+#export VERSIONDATE=20201225
+#export VERSION=8.0.1
+#export VERSIONDATE=20210206
+#export VERSION=8.1.0
+#export VERSIONDATE=20210612
+export VERSION=8.2.0
+export VERSIONDATE=20211125
+#export VERSION=9.0.0
+#export VERSIONDATE=20211030
+####Fatal error: openvdb/openvdb/CMakeFiles/openvdb_static.dir/instantiations/GridOperators.cc.obj: file too big
+wl-showstatus --package-version
+#export DEPENDANCIES=boost,ilmbase,openexr,c-blosc
+export DEPENDANCIES=boost,openexr,c-blosc
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=
+export LICENSETYPE=MPL
+#export DOWNLOADURL="http://www.openvdb.org/download/"
+#export DOWNLOADURL="https://github.com/dreamworksanimation/openvdb/releases"
+export DOWNLOADURL="https://github.com/AcademySoftwareFoundation/openvdb/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/dreamworksanimation/openvdb/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/AcademySoftwareFoundation/openvdb/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix too many parameters to mkdir() in openvdb/io/TempFile.cc (version <= 7.1.0)
+#sed -i.bak -e "s/\(mkdir\s*([^,)]*\),[^,)]*\()\)/\1\2/" openvdb/io/TempFile.cc
+# fix too many parameters to mkdir() in openvdb/openvdb/io/TempFile.cc (version >= 7.2.0)
+####pull request: https://github.com/AcademySoftwareFoundation/openvdb/pull/1102
+sed -i.bak -e "s/\(mkdir\s*([^,)]*\),[^,)]*\()\)/\1\2/" openvdb/openvdb/io/TempFile.cc
+## fix detection of ILM Base libraries (version <= 6.0.0)
+#sed -i.bak -e "
+#  s?\(CMAKE_FIND_LIBRARY_SUFFIXES \"\.\)lib\(\"\)?\1a\2?;
+#  s?FIND_LIBRARY.*Ilmbase_HALF_DLL Half ?&$(ls -1 $MINGWPREFIX/bin/libHalf-*.dll|sed -e "s?.*/??; s?\.dll??") ?;
+#  s?FIND_LIBRARY.*Ilmbase_HALF_LIBRARY Half ?&$(ls -1 $MINGWPREFIX/bin/libHalf-*.dll|sed -e "s?.*/??; s?\.dll??") ?;
+#  s?FIND_LIBRARY.*Ilmbase_IEX_LIBRARY Iex ?&$(ls -1 $MINGWPREFIX/bin/libIex-*.dll|sed -e "s?.*/??; s?\.dll??") ?;
+#  s?FIND_LIBRARY.*Ilmbase_IEXIMATH_LIBRARY IexMath ?&$(ls -1 $MINGWPREFIX/bin/libIexMath-*.dll|sed -e "s?.*/??; s?\.dll??") ?;
+#  s?FIND_LIBRARY.*Ilmbase_ILMTHREAD_LIBRARY IlmThread ?&$(ls -1 $MINGWPREFIX/bin/libIlmThread-*.dll|sed -e "s?.*/??; s?\.dll??") ?;
+#  s?FIND_LIBRARY.*Ilmbase_IMATH_LIBRARY Imath ?&$(ls -1 $MINGWPREFIX/bin/libImath-*.dll|sed -e "s?.*/??; s?\.dll??") ?
+#" cmake/FindILMBase.cmake
+## fix detection of OpenEXR library (version <= 6.0.0)
+#sed -i.bak -e "  s?\(CMAKE_FIND_LIBRARY_SUFFIXES \"\.\)lib\(\"\)?\1a\2?;" cmake/FindOpenEXR.cmake
+# fix invalid compiler flags /MD and /MT in openvdb/openvdb/CMakeLists.txt (version >= 8.1.0)
+####pull request: https://github.com/AcademySoftwareFoundation/openvdb/pull/1102
+patch -ulbf openvdb/openvdb/CMakeLists.txt << EOF
+@@ -504,3 +504,3 @@
+
+-  if(WIN32)
++  if(MSVC)
+     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+@@ -555,3 +555,3 @@
+
+-  if(WIN32)
++  if(MSVC)
+     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+EOF
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBoost_INCLUDE_DIR:PATH=$MINGWPREFIX/include/boost -DBoost_LIBRARY_DIR:PATH=$MINGWPREFIX/lib -DOPENVDB_DISABLE_BOOST_IMPLICIT_LINKING:BOOL=OFF -DGLEW_LOCATION:PATH=$MINGWPREFIX -DGLFW_LOCATION:PATH=$MINGWPREFIX -DBLOSC_LOCATION:PATH=$MINGWPREFIX -DTBB_LOCATION:PATH=$MINGWPREFIX -DILMBASE_LOCATION:PATH=$MINGWPREFIX -DILMBASE_NAMESPACE_VERSIONING:BOOL=OFF -DOPENEXR_NAMESPACE_VERSIONING:BOOL=OFF -DOPENEXR_LOCATION:PATH=$MINGWPREFIX -DOPENVDB_BUILD_PYTHON_MODULE:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DOPENVDB_BUILD_UNITTESTS:BOOL=OFF -S. -Bbuild_win &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLEW_LOCATION:PATH=$MINGWPREFIX -DGLFW_LOCATION:PATH=$MINGWPREFIX -DBLOSC_LOCATION:PATH=$MINGWPREFIX -DTBB_LOCATION:PATH=$MINGWPREFIX -DILMBASE_LOCATION:PATH=$MINGWPREFIX -DILMBASE_NAMESPACE_VERSIONING:BOOL=OFF -DOPENEXR_NAMESPACE_VERSIONING:BOOL=OFF -DOPENEXR_LOCATION:PATH=$MINGWPREFIX -DOPENVDB_BUILD_PYTHON_MODULE:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DOPENVDB_BUILD_UNITTESTS:BOOL=OFF -S. -Bbuild_win &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLEW_LOCATION:PATH=$MINGWPREFIX -DGLFW_LOCATION:PATH=$MINGWPREFIX -DBLOSC_LOCATION:PATH=$MINGWPREFIX -DTBB_LOCATION:PATH=$MINGWPREFIX -DILMBASE_LOCATION:PATH=$MINGWPREFIX -DILMBASE_NAMESPACE_VERSIONING:BOOL=OFF -DOPENEXR_NAMESPACE_VERSIONING:BOOL=OFF -DILMBASE_ROOT:PATH=$MINGWPREFIX -DTBB_ROOT:PATH=$MINGWPREFIX -DBLOSC_ROOT:PATH=$MINGWPREFIX -DOPENEXR_LOCATION:PATH=$MINGWPREFIX -DOPENVDB_BUILD_PYTHON_MODULE:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DOPENVDB_BUILD_UNITTESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+# #mv -f $INSTALLPREFIX/lib/liblibopenvdb.a $INSTALLPREFIX/lib/libopenvdb.a &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLEW_LOCATION:PATH=$MINGWPREFIX -DGLFW_LOCATION:PATH=$MINGWPREFIX -DBLOSC_LOCATION:PATH=$MINGWPREFIX -DTBB_LOCATION:PATH=$MINGWPREFIX -DILMBASE_LOCATION:PATH=$MINGWPREFIX -DILMBASE_NAMESPACE_VERSIONING:BOOL=OFF -DOPENEXR_NAMESPACE_VERSIONING:BOOL=OFF -DILMBASE_ROOT:PATH=$MINGWPREFIX -DTBB_ROOT:PATH=$MINGWPREFIX -DBLOSC_ROOT:PATH=$MINGWPREFIX/share/c-blosc -DOPENEXR_LOCATION:PATH=$MINGWPREFIX -DOPENVDB_BUILD_PYTHON_MODULE:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DOPENVDB_BUILD_UNITTESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -S. -Bbuild_win &&
+ #-DUSE_CCACHE:BOOL=OFF 
+ #-Wa,-mbig-obj -g0
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

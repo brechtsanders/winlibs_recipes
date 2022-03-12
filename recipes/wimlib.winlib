@@ -1,0 +1,110 @@
+export NAME="wimlib"
+export STATUS=
+#export URL=http://sourceforge.net/projects/wimlib/
+export URL=https://wimlib.net/
+export BASENAME=wimlib
+export DESCRIPTION="Library to create, extract, and modify Windows Imaging (WIM) files "
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.7.0
+#export VERSIONDATE=20140730
+#export VERSION=1.7.1
+#export VERSIONDATE=20140807
+####src/timestamp.c:47:2: error: implicit declaration of function 'gmtime_r' [-Werror=implicit-function-declaration]
+#export VERSION=1.7.2
+#export VERSIONDATE=20141003
+#export VERSION=1.7.3
+#export VERSIONDATE=20141114
+#export VERSION=1.7.4
+#export VERSIONDATE=20150103
+#export VERSION=1.8.0
+#export VERSIONDATE=20150226
+#export VERSION=1.8.1
+#export VERSIONDATE=20150518
+#export VERSION=1.13.2
+#export VERSIONDATE=20200629
+#export VERSION=1.13.3
+#export VERSIONDATE=20201027
+#export VERSION=1.13.4
+#export VERSIONDATE=20210419
+export VERSION=1.13.5
+export VERSIONDATE=20220122
+####include/wimlib.h:1515:18: error: field 'creation_time' has incomplete type   struct timespec creation_time;
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://sourceforge.net/projects/wimlib/files/"
+#export DOWNLOADURL="https://wimlib.net/downloads/"
+#export DOWNLOADURL="https://github.com/ebiggers/wimlib/releases"
+export DOWNLOADURL="https://github.com/ebiggers/wimlib/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/wimlib/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://wimlib.net/downloads/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/ebiggers/wimlib/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ebiggers/wimlib/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# use cp instead of ln
+sed -i.bak -e "s/ln -s*f/cp -f/" Makefile.in
+## fix missing gmtime_r/struct timespec in include/wimlib.h (version >= 1.7.1)
+#mv include/wimlib.h include/wimlib.h.bak
+#echo "#include <pthread.h>" > include/wimlib.h
+#cat include/wimlib.h.bak >> include/wimlib.h
+## fix missing struct timespec in src/timestamp.c (version >= 1.7.1)
+#mv src/timestamp.c src/timestamp.c.bak
+#echo "#include <pthread.h>" > src/timestamp.c
+#echo "#define gmtime_r(_clock,_result ) (*(_result) = *gmtime((_clock)), (_result))" >> src/timestamp.c
+#cat src/timestamp.c.bak >> src/timestamp.c
+## fix missing gmtime_r in programs/imagex.c (version = 1.8.0)
+#mv programs/imagex.c programs/imagex.c.bak
+#echo "#include <pthread.h>" > programs/imagex.c
+#echo "#define gmtime_r(_clock,_result ) (*(_result) = *gmtime((_clock)), (_result))" >> programs/imagex.c
+#cat programs/imagex.c.bak >> programs/imagex.c
+## fix missing BACKUP_SECURITY_INFORMATION (version >= 1.7.2)
+#mv src/win32_apply.c src/win32_apply.c.bak
+#echo "#define BACKUP_SECURITY_INFORMATION 0" > src/win32_apply.c
+#cat src/win32_apply.c.bak >> src/win32_apply.c
+#mv src/win32_capture.c src/win32_capture.c.bak
+#echo "#define BACKUP_SECURITY_INFORMATION 0" > src/win32_capture.c
+#cat src/win32_capture.c.bak >> src/win32_capture.c
+## fix missing main() in programs/imagex.c (version = 1.8.1)
+#patch -ulbf programs/imagex.c << EOF
+#@@ -4424,3 +4424,3 @@
+# int
+#-#ifdef __WIN32__
+#+#if defined(__WIN32__) && !defined(__MINGW32__)
+# wmain(int argc, wchar_t **argv, wchar_t **envp)
+#EOF
+# fix missing main() in programs/imagex.c (version >= 1.13.2)
+patch -ulbf programs/imagex.c << EOF
+@@ -4684,3 +4684,3 @@
+
+-#ifdef __WIN32__
++#if defined(__WIN32__) && !defined(__MINGW32__)
+ extern int wmain(int argc, wchar_t **argv);
+EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix missing struct timespec (version <= 1.7.0)
+ #echo "#include <pthread.h>" >> config.h &&
+ ## fix missing alloca
+ #echo "#include <malloc.h>" >> config.h &&
+ # fix -municode if it is not supported (version >= 1.7.4)
+ sed -i.bak -e "s/-municode/-DUNICODE/" Makefile &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ ## fix missing ntstatus.h
+ #C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWDIR/include/ddk make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,105 @@
+export NAME="mac dylib bundler"
+export STATUS=
+export URL=https://github.com/auriamg/macdylibbundler/
+export BASENAME=macdylibbundler
+export DESCRIPTION="Mac OS X introduced an innovative and very useful way to package applications: app bundles. dylibbundler is a small command-line programs that aims to make bundling .dylibs as easy as possible. It automatically determines which dylibs are needed by your program, copies these libraries inside the app bundle, and fixes both them and the executable to be ready for distribution... all this with a single command on the teminal! It will also work if your program uses plug-ins that have dependencies too."
+export CATEGORY=development
+export TYPE=application
+export VERSION=0.4.4
+export VERSIONDATE=20150316
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/auriamg/macdylibbundler/releases"
+export DOWNLOADURL="http://sourceforge.net/projects/macdylibbundler/files/macdylibbundler/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/auriamg/macdylibbundler/archive/master.tar.gz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/macdylibbundler/macdylibbundler/$VERSION/dylibbundler-$VERSION.zip
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/macdylibbundler/macdylibbundler/$VERSION/dylibbundler-$VERSION.zip
+wl-showstatus download
+# avoid issue when downloading file that already exists
+mv $TARBALLDIR/$BASENAME/dylibbundler-$VERSION.zip $TARBALLDIR/$BASENAME/dylibbundler-$VERSION.zip.bak
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv -f $TARBALLDIR/$BASENAME/master $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd macdylibbundler-master
+unzip -oq $TARBALLDIR/$BASENAME/dylibbundler-$VERSION.zip
+cd dylibbundler-$VERSION
+# fix missing stdout in src/DylibBundler.cpp (version >= 0.4.4)
+mv src/DylibBundler.cpp src/DylibBundler.cpp.bak
+echo "#include <stdio.h>" > src/DylibBundler.cpp
+cat src/DylibBundler.cpp.bak >> src/DylibBundler.cpp
+# fix missing stdout in src/main.cpp (version >= 0.4.4)
+mv src/main.cpp src/main.cpp.bak
+echo "#include <stdio.h>" > src/main.cpp
+cat src/main.cpp.bak >> src/main.cpp
+# fix missing realpath in src/Dependency.cpp
+mv src/Dependency.cpp src/Dependency.cpp.bak
+cat > src/Dependency.cpp << EOF
+#include <ctype.h>
+#include <direct.h>
+#include <sys/stat.h>
+#include <windows.h>
+#include <stdio.h>
+
+static char* slashify (char* str)
+{
+  char *p = str;
+  while (*p) {
+    if (*p == '\\\\')
+      *p = '/';
+    p++;
+  }
+  return str;
+}
+
+static char* strlower (char* str)
+{
+  char *p = str;
+  while (*p) {
+    *p = (char)tolower(*p);
+    p++;
+  }
+  return str;
+}
+
+static char* mingw_realpath (const char* name, char* resolved)
+{
+  char *rpath = NULL;
+  if (name == NULL || name[0] == '\\0')
+    return NULL;
+  if (resolved == NULL) {
+    rpath = (char*)malloc(MAX_PATH + 1);
+    if (rpath == NULL)
+      return NULL;
+  } else
+    rpath = resolved;
+  GetFullPathName(name, MAX_PATH, rpath, NULL);
+  strlower(slashify (rpath));
+  struct stat st;
+  if (stat (rpath, &st) < 0) {
+    if (resolved == NULL)
+      free (rpath);
+    return NULL;
+  }
+  return rpath;
+}
+
+#define realpath(filename,resolved) mingw_realpath(filename, resolved)
+EOF
+cat src/Dependency.cpp.bak >> src/Dependency.cpp
+wl-showstatus build &&
+ make &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf macdylibbundler-master
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf dylibbundler-$VERSION
+
+
+

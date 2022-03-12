@@ -1,0 +1,156 @@
+export NAME="bison"
+export STATUS=
+export URL=http://www.gnu.org/software/bison/
+export BASENAME=bison
+export DESCRIPTION="Bison is a general-purpose parser generator that converts an annotated context-free grammar into an LALR(1) or GLR parser for that grammar. Once you are proficient with Bison, you can use it to develop a wide range of language parsers, from those used in simple desk calculators to complex programming languages. Bison is upward compatible with Yacc: all properly-written Yacc grammars ought to work with Bison with no change. Anyone familiar with Yacc should be able to use Bison with little trouble. You need to be fluent in C or C++ programming in order to use Bison."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=2.4.2
+#export VERSIONDATE=20100321
+#export VERSION=3.0
+#export VERSIONDATE=20141027
+#export VERSION=3.0.4
+#export VERSIONDATE=20150213
+#export VERSION=3.3.2
+#export VERSIONDATE=20190507
+#export VERSION=3.4.1
+#export VERSIONDATE=20190528
+#export VERSION=3.5.2
+#export VERSIONDATE=20200220
+#export VERSION=3.6.4
+#export VERSIONDATE=20200717
+#export VERSION=3.7.2
+#export VERSIONDATE=20200906
+#export VERSION=3.7.3
+#export VERSIONDATE=20201013
+#export VERSION=3.7.4
+#export VERSIONDATE=20201114
+#export VERSION=3.7.5
+#export VERSIONDATE=20210124
+#export VERSION=3.7.6
+#export VERSIONDATE=20210309
+#export VERSION=3.8
+#export VERSIONDATE=20210908
+#export VERSION=3.8.1
+#export VERSIONDATE=20210911
+export VERSION=3.8.2
+export VERSIONDATE=20210925
+wl-showstatus --package-version
+export DEPENDANCIES=libiconv,gettext,readline
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=texinfo
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL3
+export DOWNLOADURL="http://ftp.gnu.org/gnu/bison/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/bison/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/bison/$BASENAME-$VERSION.tar.xz
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## fix redefinition of accept src/symtab.h (version >= 3.5.2 <= 3.6.4)
+#patch -ulbf src/symtab.h << EOF
+#@@ -249,2 +249,3 @@
+#    \$accept: start-symbol \$end */
+#+#define accept BISON_accept
+# extern symbol *accept;
+#EOF
+# fix missing includes in src/location.c (version >= 3.5.2)
+patch -ulbf src/location.c << EOF
+@@ -27,5 +27,9 @@
+ #include <stdio.h>    /* fileno */
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <sys/stat.h> /* fstat */
++#ifndef _WIN32
+ #include <termios.h>
++#endif
+
+EOF
+## fix redefinition of CHAR/INT in src/parse-gram.h (version >= 3.5.2 <= 3.6.4)
+#patch -ulbf src/parse-gram.h << EOF
+#@@ -124,2 +124,3 @@
+#     BRACKETED_ID = 42,
+#+#define CHAR BISON_CHAR
+#     CHAR = 43,
+#@@ -137,2 +138,3 @@
+#     TAG_NONE = 55,
+#+#define INT BISON_INT
+#     INT = 56,
+#EOF
+# fix src/files.c (version >= 3.7.2)
+patch -ulbf src/files.c << EOF
+@@ -501,3 +501,18 @@
+       char const *cp = getenv ("BISON_PKGDATADIR");
+-      return cp ? cp : relocate2 (PKGDATADIR, &relocate_buffer);
++      if (cp)
++        return cp;
++#ifdef _WIN32
++      else {
++        char buf[MAX_PATH];
++        char* p;
++        if (GetModuleFileNameA(0, buf, MAX_PATH) && (p = strrchr(buf, '\\\\')) != NULL) {
++          *p = 0;
++          if ((p = strrchr(buf, '\\\\')) != NULL) {
++            strcpy(p + 1, "share\\\\bison");
++            return xstrdup(buf);
++          }
++        }
++      }
++#endif
++      return relocate2 (PKGDATADIR, &relocate_buffer);
+     }
+EOF
+# fix location of m4.exe in src/files.c (version >= 3.7.2)
+patch -ulbf src/files.c << EOF
+@@ -527,2 +527,13 @@
+
++#ifdef _WIN32
++  DWORD buflen;
++  if ((buflen = SearchPathA(NULL, "m4.exe", NULL, 0, NULL, NULL)) > 0) {
++    char* buf;
++    if ((buf = xmalloc(buflen)) != NULL) {
++      if (SearchPathA(NULL, "m4.exe", NULL, buflen, buf, NULL) >= buflen - 1) {
++        return buf;
++      }
++    }
++  }
++#else
+   /* We don't use relocate2() to store the temporary buffer and re-use
+@@ -533,2 +544,3 @@
+     return m4_relocated;
++#endif
+
+EOF
+# fix path separator in src/output.c (version >= 3.7.2)
+sed -i.bak -e "s?\(m4sugar\)/?\1\\\\\\\\?" src/output.c
+# fix path separator in lib/concat-filename.c (version >= 3.7.2)
+patch -ulbf lib/concat-filename.c << EOF
+@@ -66,3 +66,7 @@
+       if (need_slash)
++#ifdef _WIN32
++        *p++ = '\\\\';
++#else
+         *p++ = '/';
++#endif
+     }
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX/share/bison --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows &&
+ #./configure --prefix=$INSTALLPREFIX/share/bison --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --enable-yacc --enable-relocatable &&
+ ./configure --prefix=$INSTALLPREFIX/share/bison --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --enable-yacc --enable-relocatable M4=m4.exe &&
+ wl-showstatus build-install &&
+ #make install &&
+ make install-strip MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" &&
+ # make path relocatable
+ sed -i -e "s?$INSTALLPREFIX/share/bison?\$(dirname \$(realpath \$0))?" $INSTALLPREFIX/share/bison/bin/yacc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####BISON_PKGDATADIR=$MINGWPREFIX/share/bison/share/bison
+####$MINGWPREFIX/share/bison/bin/bison.exe --help
+####warning: Could not open file /R/winlibs64-9.2.0/inst_bison-3.5.2/share/bison/bison-default.css
+
+
+

@@ -1,0 +1,340 @@
+export NAME="libtar"
+export STATUS=
+#export URL=http://www.feep.net/libtar/
+export URL=https://github.com/tklauser/libtar
+export BASENAME=libtar
+export DESCRIPTION="libtar is a C library for manipulating POSIX tar files. It handles adding and extracting files to/from a tar archive."
+export CATEGORY=compression
+export TYPE=library
+#export VERSION=1.2.11
+#export VERSIONDATE=
+export VERSION=1.2.20
+export VERSIONDATE=20170906
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE=
+#export DOWNLOADURL="ftp://ftp.feep.net/pub/software/libtar/"
+#export DOWNLOADURL="http://www.feep.net/libtar/"
+#export DOWNLOADURL="https://github.com/tklauser/libtar/releases"
+export DOWNLOADURL="https://github.com/tklauser/libtar/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.feep.net/pub/software/libtar/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://distfiles.macports.org/libtar/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/tklauser/libtar/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/tklauser/libtar/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing tar.h
+cat > tar.h << EOF
+#define REGTYPE         '0'
+#define AREGTYPE        '\0'
+#define LNKTYPE         '1'
+#define SYMTYPE         '2'
+#define CHRTYPE         '3'
+#define BLKTYPE         '4'
+#define DIRTYPE         '5'
+#define FIFOTYPE        '6'
+#define CONTTYPE        '7'
+#define TMAGIC  "ustar"
+#define TMAGLEN 6
+#define TVERSION        "00"
+#define TVERSLEN        2
+EOF
+# fix for missing pwd.h
+cat > pwd.h << EOF
+#define getpwuid(uid) NULL
+#define getpwnam(username) NULL
+struct passwd {
+ int pw_uid;
+ char *pw_name;
+};
+#define S_IFLNK 0120000
+#define S_IFSOCK 0140000
+EOF
+# fix for missing grp.h
+cat > grp.h << EOF
+#define getgrnam(groupname) NULL
+#define getgrgid(gid) NULL
+struct group {
+ int gr_gid;
+ char *gr_name;
+};
+EOF
+# fix mkdir having only a single parameter and remove link and ownership stuff
+patch -ulbf lib/extract.c << EOF
+--- lib/extract.c.bak   Mon Mar  3 00:58:07 2003
++++ lib/extract.c       Mon Oct 13 12:12:33 2008
+@@ -54,2 +54,3 @@
+        /* change owner/group */
++#ifndef _WIN32
+        if (geteuid() == 0)
+@@ -72,5 +73,10 @@
+                }
++#endif
+ 
+        /* change access/modification time */
++#ifndef _WIN32
+        if (!TH_ISSYM(t) && utime(filename, &ut) == -1)
++#else
++       if (utime(filename, &ut) == -1)
++#endif
+        {
+@@ -83,3 +89,7 @@
+        /* change permissions */
++#ifndef _WIN32
+        if (!TH_ISSYM(t) && chmod(filename, mode) == -1)
++#else
++       if (chmod(filename, mode) == -1)
++#endif
+        {
+@@ -106,3 +116,7 @@
+ 
++#ifndef _WIN32
+                if (lstat(realname, &s) == 0 || errno != ENOENT)
++#else
++               if (stat(realname, &s) == 0 || errno != ENOENT)
++#endif
+                {
+@@ -121,4 +135,6 @@
+                i = tar_extract_hardlink(t, realname);
++#ifndef _WIN32
+        else if (TH_ISSYM(t))
+                i = tar_extract_symlink(t, realname);
++#endif
+        else if (TH_ISCHR(t))
+@@ -288,2 +304,6 @@
+ {
++#ifdef _WIN32
++       perror("link()");
++       return -1;
++#else
+        char *filename;
+@@ -324,2 +344,3 @@
+        return 0;
++#endif
+ }
+@@ -331,2 +352,6 @@
+ {
++#ifdef _WIN32
++       perror("symlink()");
++       return -1;
++#else
+        char *filename;
+@@ -359,2 +384,3 @@
+        return 0;
++#endif
+ }
+@@ -366,2 +392,6 @@
+ {
++#ifdef _WIN32
++       perror("mknod()");
++       return -1;
++#else
+        mode_t mode;
+@@ -398,2 +428,3 @@
+        return 0;
++#endif
+ }
+@@ -405,2 +436,6 @@
+ {
++#ifdef _WIN32
++       perror("mknod()");
++       return -1;
++#else
+        mode_t mode;
+@@ -437,2 +472,3 @@
+        return 0;
++#endif
+ }
+@@ -463,3 +499,7 @@
+ #endif
++#ifndef _WIN32
+        if (mkdir(filename, mode) == -1)
++#else
++       if (mkdir(filename) == -1)
++#endif
+        {
+@@ -499,2 +539,6 @@
+ {
++#ifdef _WIN32
++       perror("mkfifo()");
++       return -1;
++#else
+        mode_t mode;
+@@ -526,2 +570,3 @@
+        return 0;
++#endif
+ }
+EOF
+# use fake file permissions
+patch -ulbf compat/strmode.c << EOF
+--- compat/strmode.c  Sat Oct 28 00:52:05 2000
++++ compat/strmode.c  Thu Oct  9 22:56:40 2008
+@@ -60,2 +60,3 @@
+                break;
++#ifndef _WIN32
+        case S_IFLNK:                   /* symbolic link */
+@@ -66,2 +67,3 @@
+                break;
++#endif
+ #ifdef S_IFIFO
+@@ -80,2 +82,3 @@
+        }
++#ifndef _WIN32
+        /* usr */
+@@ -149,2 +152,13 @@
+        }
++#else
++       *p++ = 'r';
++       *p++ = 'w';
++       *p++ = '-';
++       *p++ = 'r';
++       *p++ = 'w';
++       *p++ = '-';
++       *p++ = 'r';
++       *p++ = 'w';
++       *p++ = '-';
++#endif
+        *p++ = ' ';             /* will be a '+' if ACL's implemented */
+EOF
+# don't use fchmod
+patch -ulbf libtar/libtar.c << EOF
+--- libtar/libtar.c  Tue Jan  7 02:41:00 2003
++++ libtar/libtar.c  Mon Oct 13 11:57:53 2008
+@@ -83,4 +83,6 @@
+ 
++#ifndef _WIN32
+        if ((oflags & O_CREAT) && fchmod(fd, mode))
+                return -1;
++#endif
+EOF
+# don't use lstat
+patch -ulbf lib/wrapper.c << EOF
+--- lib/wrapper.c  Tue Jan  7 02:41:00 2003
++++ lib/wrapper.c  Mon Oct 13 12:01:58 2008
+@@ -130,3 +130,7 @@
+ 
++#ifndef _WIN32
+                if (lstat(realpath, &s) != 0)
++#else
++               if (stat(realpath, &s) != 0)
++#endif
+                        return -1;
+EOF
+# avoid hardlink and symlink stuff
+patch -ulbf lib/output.c << EOF
+--- lib/output.c  Tue Jan  7 02:41:00 2003
++++ lib/output.c  Mon Oct 13 12:34:30 2008
+@@ -118,2 +118,3 @@
+ 
++#ifndef _WIN32
+        if (TH_ISSYM(t) || TH_ISLNK(t))
+@@ -129,2 +130,3 @@
+        }
++#endif
+EOF
+# avoid symlink stuff
+patch -ulbf lib/append.c << EOF
+--- lib/append.c  Tue Jan  7 02:40:59 2003
++++ lib/append.c  Mon Oct 13 12:37:30 2008
+@@ -71,3 +71,7 @@
+ 
++#ifndef _WIN32
+        if (lstat(realname, &s) != 0)
++#else
++       if (stat(realname, &s) != 0)
++#endif
+        {
+@@ -143,2 +147,3 @@
+        /* check if it's a symlink */
++#ifndef _WIN32
+        if (TH_ISSYM(t))
+@@ -157,2 +162,3 @@
+        }
++#endif
+EOF
+# avoid symlink stuff
+patch -ulbf lib/encode.c << EOF
+--- lib/encode.c  Tue Jan  7 02:40:59 2003
++++ lib/encode.c  Mon Oct 13 12:41:19 2008
+@@ -51,4 +51,6 @@
+ {
++#ifndef _WIN32
+        if (S_ISLNK(mode))
+                t->th_buf.typeflag = SYMTYPE;
++#endif
+        if (S_ISREG(mode))
+@@ -61,4 +63,6 @@
+                t->th_buf.typeflag = BLKTYPE;
++#ifndef _WIN32
+        if (S_ISFIFO(mode) || S_ISSOCK(mode))
+                t->th_buf.typeflag = FIFOTYPE;
++#endif
+ }
+@@ -148,4 +152,6 @@
+ #endif
++#ifndef _WIN32
+        int_to_oct(major(device), t->th_buf.devmajor, 8);
+        int_to_oct(minor(device), t->th_buf.devminor, 8);
++#endif
+ }
+@@ -185,2 +191,3 @@
+ {
++#ifndef _WIN32
+        if (S_ISSOCK(fmode))
+@@ -190,2 +197,3 @@
+        }
++#endif
+        int_to_oct(fmode, (t)->th_buf.mode, 8);
+EOF
+## fix mkdir in lib/util.c (version >= 1.2.11)
+#sed -i.bak -e "s/\(mkdir([^,)]*\),[^,)]*)/\1)/" lib/util.c
+# fix mkdir in lib/util.c (version >= 1.2.20)
+patch -ulbf lib/util.c << EOF
+--- lib/util.c  2003-01-07 02:41:00 +0100
++++ lib/util.c  2011-08-05 08:57:00 +0200
+@@ -21,2 +21,7 @@
+ #endif
++#ifndef __MINGW64__
++#define __mkdir mkdir
++#else
++#define __mkdir(path,mode) _mkdir(path)
++#endif
+
+@@ -101,3 +106,3 @@
+
+-               if (mkdir(dst, 0777) == -1)
++               if (mkdir(dst) == -1)
+                {
+EOF
+# fix installation of .exe
+sed -i.bak -e "s/\(\${INSTALL_PROGRAM} libtar\)/\1.exe/" libtar/Makefile.in
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-encap --disable-epkg-install &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-encap --disable-epkg-install CFLAGS="-DHAVE_STDARG_H" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-encap --disable-epkg-install CFLAGS="-DHAVE_STDARG_H" LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #echo "#define HAVE_VARARGS_H 1" >> config.h &&
+ ## fix redefinition of uid_t/gid_t in config.h (version >= 1.2.20)
+ #sed -i.bak -e "s?^#define [ug]id_t?//&?g" config.h &&
+ wl-showstatus build-install &&
+ make install &&
+ cp -u tar.h $INSTALLPREFIX/include/ &&
+ echo "typedef int uid_t;" >> $INSTALLPREFIX/include/tar.h &&
+ echo "typedef int gid_t;" >> $INSTALLPREFIX/include/tar.h &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

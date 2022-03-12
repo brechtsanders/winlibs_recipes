@@ -1,0 +1,185 @@
+export NAME="UDT"
+export STATUS=
+export URL=http://udt.sourceforge.net/
+export BASENAME=udt
+export DESCRIPTION="UDT is a reliable UDP based application level data transport protocol for distributed data intensive applications over wide area high-speed networks. UDT uses UDP to transfer bulk data with its own reliability control and congestion control mechanisms. The new protocol can transfer data at a much higher speed than TCP does. UDT is also a highly configurable framework that can accommodate various congestion control algorithms."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=4.10
+#export VERSIONDATE=20121210
+export VERSION=4.11
+export VERSIONDATE=20130223
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=
+export DOWNLOADURL="http://sourceforge.net/projects/udt/files/udt/ udt.sdk."
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/udt/udt/$VERSION/udt.sdk.$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/udt.sdk.$VERSION.tar.gz
+cd udt4
+# fix src/udt.h
+mv src/udt.h src/udt.h.bak
+sed -e "s/__MINGW__/__MINGW32__/g; s/ WIN32/ _WIN32/" src/udt.h.bak > src/udt.h
+#patch -ulbf src/udt.h << EOF
+#@@ -49,3 +49,3 @@
+# #else
+#-   #ifdef __MINGW__
+#+   #ifdef __MINGW32__
+#       #include <stdint.h>
+#@@ -71,3 +71,3 @@
+# #ifdef WIN32
+#-   #ifndef __MINGW__
+#+   #ifndef __MINGW32__
+#       // Explicitly define 32-bit and 64-bit numbers
+#@@ -82,3 +82,3 @@
+#       #endif
+#-
+#+   #endif
+#       #ifdef UDT_EXPORTS
+#@@ -88,5 +88,2 @@
+#       #endif
+#-   #else
+#-      #define UDT_API
+#-   #endif
+# #else
+#@@ -98,3 +95,3 @@
+# #ifdef WIN32
+#-   #ifndef __MINGW__
+#+   #ifndef __MINGW32__
+#       typedef SOCKET SYSSOCKET;
+#EOF
+# fix missing getaddrinfo/freeaddrinfo in src/channel.cpp
+mv src/channel.cpp src/channel.cpp.bak
+cat > src/channel.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <ws2tcpip.h>
+EOF
+cat src/channel.cpp.bak >> src/channel.cpp
+# fix missing getnameinfo in src/core.cpp
+mv src/core.cpp src/core.cpp.bak
+cat > src/core.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <ws2tcpip.h>
+EOF
+cat src/core.cpp.bak >> src/core.cpp
+# fix missing OpenThread in src/api.cpp
+mv src/api.cpp src/api.cpp.bak
+cat > src/api.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+EOF
+cat src/api.cpp.bak >> src/api.cpp
+# fix app/appclient.cpp
+mv app/appclient.cpp app/appclient.cpp.bak
+cat > app/appclient.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <ws2tcpip.h>
+EOF
+cat app/appclient.cpp.bak >> app/appclient.cpp
+# fix app/appserver.cpp
+mv app/appserver.cpp app/appserver.cpp.bak
+cat > app/appserver.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <ws2tcpip.h>
+EOF
+cat app/appserver.cpp.bak >> app/appserver.cpp
+# fix app/recvfile.cpp
+mv app/recvfile.cpp app/recvfile.cpp.bak
+cat > app/recvfile.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <ws2tcpip.h>
+EOF
+cat app/recvfile.cpp.bak >> app/recvfile.cpp
+# fix app/sendfile.cpp
+mv app/sendfile.cpp app/sendfile.cpp.bak
+cat > app/sendfile.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <ws2tcpip.h>
+EOF
+cat app/sendfile.cpp.bak >> app/sendfile.cpp
+# fix app/test.cpp
+mv app/test.cpp app/test.cpp.bak
+cat > app/test.cpp << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <ws2tcpip.h>
+EOF
+sed -e "s/return NULL;/return 0;/; s/, \(start_and_destroy_clients\)/, (void*)\1/" app/test.cpp.bak >> app/test.cpp
+# fix missing wspiapi.h in appserver.cpp
+touch src/wspiapi.h
+# fix missing timespec in src/common.cpp (version >= 4.11)
+patch -ulbf src/common.cpp << EOF
+--- src/common.cpp  2013-02-20 17:35:26 +0100
++++ src/common.cpp  2013-02-23 09:31:18 +0100
+@@ -136,5 +136,5 @@
+    uint64_t frequency = 1;  // 1 tick per microsecond.
+
+-   #if defined(IA32) || defined(IA64) || defined(AMD64)
++   #if (defined(IA32) || defined(IA64) || defined(AMD64)) && !defined(__MINGW32__)
+       uint64_t t1, t2;
+EOF
+# fix conflict with POSIX pthreads
+#for F in $(grep -lr pthread_t */*); do
+# mv $F $F.bak2 &&
+# sed -e "s/pthread/winthread/g" $F.bak2 > $F
+#done
+patch -ulbf src/common.h << EOF
+@@ -56,2 +56,5 @@
+ #ifdef WIN32
++#ifdef __MINGW32__
++#include <pthread.h>
++#else
+    // Windows compability
+@@ -62,2 +65,3 @@
+ #endif
++#endif
+
+EOF
+# fix src/Makefile
+mv src/Makefile src/Makefile.bak
+#sed -e "s/\.so/.dll/g; s/\.dylib/.dll.a/; s/-shared.*/& -lws2_32/" src/Makefile.bak > src/Makefile
+sed -e "s/=\s*g++/& -fpermissive -DUDT_EXPORTS/; s/\.so/.dll/g; s/\.dylib/.dll.a/; s/\(-shared -o \)\([^ ]*\)\( .*\)/\1\2 -lws2_32/" src/Makefile.bak > src/Makefile
+#sed -e "s/=\s*g++/& -fpermissive -DWIN32 -DUDT_EXPORTS/; s/\.so/.dll/g; s/\.dylib/.dll.a/; s/\(-shared -o \)\([^ ]*\)\( .*\)/\1\2 -Wl,--out-implib,\2.a -Wl,--output-def,\2.def -lws2_32/" src/Makefile.bak > src/Makefile
+# fix app/Makefile
+mv app/Makefile app/Makefile.bak
+sed -e "s/-lm/-lws2_32/" app/Makefile.bak > app/Makefile
+# avoid -fPIC (useless on Windows and not supported by clang) in src/Makefile
+sed -i.bak2 -e "s/-fPIC//" src/Makefile
+wl-showstatus build &&
+ #make -j1 os=WIN32 &&
+ make -j1 os=WIN32 arch=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "AMD64"; else echo "IA32"; fi) &&
+ #pexports src/libudt.dll > libudt.def &&
+ ( echo EXPORTS; sed -ne "s/UDT_API[^(]* \([^( ]*\)(.*);$/\1/p" src/udt.h ) > libudt.def &&
+ #g++ -shared -s -mwindows -def libudt.def -o libudt.dll src/libudt.a -Wl,--add-stdcall-alias -Wl,--out-implib,src/libudt.dll.a -lws2_32 &&
+ dlltool -d libudt.def -D src/libudt.dll -l src/libudt.dll.a &&
+ #gcc -shared -s -mwindows -def libudt.def -o libudt.dll src/libudt.a -Wl,--out-implib,src/libudt.dll.a -lws2_32 &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f src/udt.h $INSTALLPREFIX/include/ &&
+ cp -f src/*.a $INSTALLPREFIX/lib/ &&
+ cp -f src/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf udt4
+####TO DO: build proper DLL (that actually exports something)
+
+
+

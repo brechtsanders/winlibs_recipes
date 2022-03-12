@@ -1,0 +1,57 @@
+export NAME="gareth"
+export STATUS=
+export URL=https://github.com/babelouest/gareth
+export BASENAME=gareth
+export DESCRIPTION="Log and alert messages application - part of the Angharad system"
+export CATEGORY=communication
+export TYPE=library,application
+export VERSION=3.2
+export VERSIONDATE=20180307
+wl-showstatus --package-version
+export DEPENDANCIES=ulfius,hoel
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/babelouest/gareth/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/babelouest/gareth/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing uint
+for F in gareth-standalone.c gareth.h message.c; do
+ sed -i.bak -e "s/\buint\b/unsigned int/g" $F
+done
+# fix missing sleep() in gareth-standalone.c
+if ( gcc --version | grep -q MinGW-W64 ); then
+ mv gareth-standalone.c gareth-standalone.c.bak2 &&
+ #echo "#define sleep(t) _sleep((t) * 1000)" > gareth-standalone.c &&
+ echo "#define sleep(s) Sleep((s) * 1000)" > gareth-standalone.c &&
+ cat gareth-standalone.c.bak2 >> gareth-standalone.c
+fi
+# fix missing SIGQUIT/SIGHUP in gareth-standalone.c
+sed -i.bak3 -e "s/^.*\(SIGQUIT\|SIGHUP\).*$/#ifdef \1\n&\n#endif/" gareth-standalone.c
+# fix missing -lc in Makefile
+sed -e "s/ -lc / /" Makefile > Makefile.mingw
+wl-showstatus build &&
+ make -f Makefile.mingw && 
+ #strip *.exe &&
+ ar cru libgareth.a gareth.o &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libgareth.a  | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > gareth.def &&
+ #gcc -shared -s -mwindows -def gareth.def -o gareth.dll libgareth.a -Wl,--out-implib,libgareth.dll.a -ljansson -lyder -lulfius &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/gareth $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/etc $INSTALLPREFIX/share/gareth &&
+ cp -f gareth.h $INSTALLPREFIX/include/gareth/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ #cp -f *.dll $INSTALLPREFIX/bin/ &&
+ #cp -f *.exe $INSTALLPREFIX/bin/ &&
+ cp -f docs/gareth.conf.sample $INSTALLPREFIX/etc/ &&
+ cp -f docs/*.sql docs/*.md $INSTALLPREFIX/share/gareth/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,104 @@
+export NAME="TCP Wrapper"
+export STATUS=
+export URL=http://ftp.porcupine.org/pub/security/
+export BASENAME=tcpwrappers
+export DESCRIPTION="With this package you can monitor and filter incoming requests for the SYSTAT, FINGER, FTP, TELNET, RLOGIN, RSH, EXEC, TFTP, TALK, and other network services."
+export CATEGORY=communication,security
+export TYPE=application
+export VERSION=7.6
+export VERSIONDATE=20190111
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://ftp.porcupine.org/pub/security/index.html tcp_wrappers_"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.porcupine.org/pub/security/tcp_wrappers_$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/tcp_wrappers_$VERSION.tar.gz
+cd tcp_wrappers_$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h winfix/netdb.h winfix/netinet/in_systm.h winfix/netinet/ip.h
+cat > winfix/syslog.h << EOF
+//#ifndef __DUMMY_SYSLOG_H_INCLUDED
+//#define __DUMMY_SYSLOG_H_INCLUDED
+#define LOG_ERR 3
+#define LOG_WARNING 4
+//#define LOG_NOTICE 5
+//#define LOG_INFO 6
+#define LOG_DEBUG 7
+//#define LOG_PRIMASK 0x07
+//#define LOG_DAEMON (3<<3)
+//#define LOG_AUTHPRIV (10<<3)
+#define LOG_PID 0x01
+#define SEVERITY 1
+static void openlog (const char *ident, int option, ...) {}
+static void syslog (int priority, const char *format, ...) {}
+static void closelog (void) {}
+//#endif
+EOF
+cat > winfix/pwd.h << EOF
+struct passwd {
+ int pw_uid;
+};
+#define setuid(uid) 0
+EOF
+cat > winfix/grp.h << EOF
+struct group {
+ int gr_gid;
+};
+#define setgid(gid) -1
+EOF
+# fix redefinition of malloc in scaffold.c
+sed -i.bak -e "s?^extern char \*malloc();?//&?" scaffold.c
+# remove unsupported stuff in shell_cmd.c
+patch -ulbf shell_cmd.c << EOF
+@@ -38,2 +38,5 @@
+ {
++#ifdef _WIN32
++    tcpd_warn("cannot fork (not supported on Windows): %m");
++#else
+     int     child_pid;
+@@ -57,2 +60,3 @@
+     }
++#endif
+ }
+@@ -72,2 +76,5 @@
+
++#ifdef _WIN32
++    error = "Unsupported on Windows";
++#else
+     signal(SIGHUP, SIG_IGN);
+@@ -86,2 +93,3 @@
+     }
++#endif
+
+EOF
+# ignore missing SIGALRM in rfc931.c (version >= 7.6)
+patch -ulbf rfc931.c << EOF
+@@ -102,4 +102,6 @@
+        if (setjmp(timebuf) == 0) {
++#ifdef SIGALRM
+            signal(SIGALRM, timeout);
+            alarm(rfc931_timeout);
++#endif
+
+EOF
+# fix missing sys_nerr
+sed -i.bak -e "s/errno < sys_nerr \&\& //; s/ || errno >= sys_nerr//; s/sys_errlist\[errno\]/\"Unknown error\"/" percent_m.c tli.c tli-sequent.c
+# fix Makefile
+sed -i.bak -e "s/-o \$@ .* \$(LIB) \$(LIBS)$/& -Wl,--as-needed -lws2_32/" Makefile
+wl-showstatus build &&
+ make generic REAL_DAEMON_DIR=$INSTALLPREFIX/bin/ CC="gcc -I$(pwd)/winfix" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tcp_wrappers_$VERSION
+
+
+

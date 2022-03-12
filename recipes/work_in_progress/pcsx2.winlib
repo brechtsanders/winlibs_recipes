@@ -1,0 +1,90 @@
+export NAME="PCSX2"
+export STATUS=
+export URL=https://pcsx2.net/
+#export URL=https://github.com/PCSX2/pcsx2
+export BASENAME=pcsx2
+export DESCRIPTION="PCSX2 - The Playstation 2 Emulator"
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.4.0
+#export VERSIONDATE=20191124
+export VERSION=1.6.0
+export VERSIONDATE=20200507
+wl-showstatus --package-version
+export DEPENDANCIES=wxwidgets,gettext,xz,sdl2,portaudio,soundtouch
+export OPTIONALDEPENDANCIES=pngpp
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING.GPLv2
+#export LICENSEFILE=COPYING.GPLv3
+export LICENSEFILE=COPYING.LGPLv2.1
+export LICENSEFILE=COPYING.LGPLv3
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/PCSX2/pcsx2/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/PCSX2/pcsx2/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# create dummy wx-config which supports --version and uses UNIX-style paths (must be a shell script because CMake invokes it with sh)
+cat > wx-config.sh << EOF
+#!/bin/sh
+if [ "\$1" == "--version" ]; then
+ shift
+ wx-config.exe --release \$* | grep -v "wx-config Error:" | sed -e "s/^\\([0-9]*\\.[0-9]*\\)\$/\\1.0/"
+else
+ wx-config.exe --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?/\\1/?g; s?\\\\\\\\?/?g"
+ #wx-config.exe --debug=no --unicode=yes --static=no --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?/\\1/?g; s?\\\\\\\\?/?g"
+ #wx-config.exe --wxcfg=gcc_dll/mswu \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?/\\1/?g; s?\\\\\\\\?/?g"
+fi
+EOF
+# create custom compiler settings
+touch cmake/mingw-compiler.cmake
+# fix cmake/BuildParameters.cmake (version >= 1.6.0)
+patch -ulbf cmake/BuildParameters.cmake << EOF
+@@ -175,3 +175,3 @@
+        if(\${PCSX2_TARGET_ARCHITECTURES} MATCHES "x86_64" AND (CMAKE_BUILD_TYPE MATCHES "Release" OR PACKAGE_MODE))
+-               message(FATAL_ERROR "
++               message(WARNING "
+         The code for \${PCSX2_TARGET_ARCHITECTURES} support is not ready yet.
+EOF
+#mkdir -p build_test && cd build_test && cmake.exe -G"MSYS Makefiles" .. -LH && echo OK; cd ..; rm -rf build_test
+#rm -rf CMakeCache.txt CMakeFiles; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#export BUILDDEPENDANCIES=cmake
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-compiler.cmake -DCMAKE_BUILD_STRIP:BOOL=ON -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH="$(pwd)/wx-config.sh" -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/gcc_msw/wxrc.exe -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -S. -Bbuild_win &&
+ PKG_CONFIG= WXWIN=$MINGWPREFIX/wx WXCFG=gcc_dll/mswu cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-compiler.cmake -DCMAKE_BUILD_STRIP:BOOL=ON -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH="$(which wx-config.exe)" -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/gcc_msw/wxrc.exe -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #make -Cbuild_win &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDANCIES=cmake
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON .. &&
+# cd .. &&
+# #wl-showstatus build &&
+# #make -Cbuild_static &&
+# #wl-showstatus build &&
+# #make -Cbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+#    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

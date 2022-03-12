@@ -1,0 +1,65 @@
+export NAME="libpqtypes"
+export STATUS=
+export URL=http://libpqtypes.esilo.com/
+export BASENAME=libpqtypes
+export DESCRIPTION="Software extension to the PostgreSQL libpq interface - libpqtypes is a libpq extension that offers a new way of handling parameterized queries and getting result field values."
+export CATEGORY=database
+export TYPE=library
+export VERSION=1.5.1
+export VERSIONDATE=20150723
+####src/getaddrinfo.h:13:24: fatal error: sys/socket.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=postgresql
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="http://pgfoundry.org/frs/?group_id=1000370"
+#export DOWNLOADURL="http://ftp.freebsd.sk/pub/postgresql/projects/pgFoundry/libpqtypes/libpqtypes/"
+export DOWNLOADURL="https://www.postgresql.org/ftp/projects/pgFoundry/libpqtypes/libpqtypes/ libpqtypesv"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://pgfoundry.org/frs/download.php/3484/libpqtypes-1.5.1.tar.gz
+#export DOWNLOADSOURCEURL=http://ftp.freebsd.sk/pub/postgresql/projects/pgFoundry/libpqtypes/libpqtypes/libpqtypesv1.5.1/libpqtypes-1.5.1.tar.gz
+export DOWNLOADSOURCEURL=https://ftp.postgresql.org/pub/projects/pgFoundry/libpqtypes/libpqtypes/libpqtypesv$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netdb.h winfix/netinet/in.h winfix/arpa/inet.h
+mv src/getaddrinfo.h src/getaddrinfo.h.bak
+touch src/getaddrinfo.h
+# fix src/port.c (version >= 1.5.1)
+patch -ulbf src/port.c << EOF
+@@ -463,4 +463,5 @@
+
+
++#ifndef __MINGW32__
+ const char *
+ gai_strerror(int errcode)
+@@ -582,4 +583,5 @@
+        return 0;
+ }
++#endif
+
+ #endif /* HAVE_GETADDRINFO */
+EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-static --disable-shared CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-static --enable-shared CFLAGS="-I$(pwd)/winfix -DHAVE_GETADDRINFO" LDFLAGS="-Wl,--as-needed -lws2_32 -lpq" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-static --enable-shared CC=gcc CFLAGS="-I$(pwd)/winfix -DHAVE_GETADDRINFO" LDFLAGS="-Wl,--as-needed -lws2_32 -lpq" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build DLL
+
+
+

@@ -1,0 +1,166 @@
+export NAME="tesseract-ocr"
+export STATUS=
+#export URL=http://code.google.com/p/tesseract-ocr/
+export URL=https://github.com/tesseract-ocr/tesseract
+export BASENAME=tesseract-ocr
+export DESCRIPTION="Tesseract is an OCR engine"
+export CATEGORY=ocr
+export TYPE=application,library
+#export VERSION=2.03
+#export VERSION=3.00
+#export VERSIONDATE=20101001
+#export DEPENDANCIES=pthreads,libtiff,libjpeg,libpng,zlib
+#export VERSION=3.01
+#export VERSIONDATE=20111022
+#export VERSION=3.02.02
+#export VERSIONDATE=20121026
+####ccutil/svutil.cpp:203:79: error: 'send' was not declared in this scope
+#export VERSION=3.04.00
+#export VERSIONDATE=20151218
+#export VERSION=3.04.01
+#export VERSIONDATE=20160406
+#export VERSION=3.05.00
+#export VERSIONDATE=20170217
+#export VERSION=3.05.01
+#export VERSIONDATE=20170602
+####Checking for module 'lept>=1.71'
+####A required package was not found
+#export VERSION=3.05.02
+#export VERSIONDATE=20180619
+#export VERSION=4.0.0
+#export VERSIONDATE=20181029
+#export VERSION=4.1.0
+#export VERSIONDATE=20190707
+#export VERSION=4.1.1
+#export VERSIONDATE=20191227
+#export VERSION=4.1.2
+#export VERSIONDATE=20211115
+#export VERSION=4.1.3
+#export VERSIONDATE=20211116
+#export VERSION=5.0.0
+#export VERSIONDATE=20211201
+#export VERSION=5.0.1
+#export VERSIONDATE=20220107
+export VERSION=5.1.0
+export VERSIONDATE=20220302
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libtiff,libjpeg,libpng,zlib,leptonlib,libcurl,libarchive,icu,pango,cairo
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=apache
+#export DOWNLOADURL="http://code.google.com/p/tesseract-ocr/downloads/list tesseract-"
+export DOWNLOADURL="https://github.com/tesseract-ocr/tesseract/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://tesseract-ocr.googlecode.com/files/tesseract-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/tesseract-ocr/tesseract/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/tesseract-$VERSION.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/tesseract-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd tesseract-$VERSION
+## workaround PBLOB which is already defined in winsock2.h
+#sed -e "s?*PBLOB,??" $W32APIINCDIR/winsock2.h > winsock2.h
+#sed -e "s?*PBLOB,??" $MINGWDIR/include/wtypes.h > wtypes.h
+# fix for 64-bit constant notation (mingw uses ll instead of x64)
+mv dict/dawg.h dict/dawg.h.bak
+sed -e "s/i64$/ll/" dict/dawg.h.bak > dict/dawg.h
+## fix for missing std::snprintf (version <= 2.04)
+#mv viewer/svutil.cpp viewer/svutil.cpp.bak
+#echo "#include <stdio.h>" > viewer/svutil.cpp
+#cat viewer/svutil.cpp.bak >> viewer/svutil.cpp
+## fix install problems because extension is .exe
+#mv ccmain/Makefile.in ccmain/Makefile.in.bak
+#echo "EXEEXT=.exe" > ccmain/Makefile.in
+#cat ccmain/Makefile.in.bak >> ccmain/Makefile.in
+#mv training/Makefile.in training/Makefile.in.bak
+#echo "EXEEXT=.exe" > training/Makefile.in
+#cat training/Makefile.in.bak >> training/Makefile.in
+## fix missing INT_MAX in viewer/scrollview.cpp (version <= 2.04)
+#mv viewer/scrollview.cpp viewer/scrollview.cpp.bak
+#echo "#include <limits.h>" > viewer/scrollview.cpp
+#cat viewer/scrollview.cpp.bak >> viewer/scrollview.cpp
+## fix missing strlen/strncpy in viewer/svmnode.cpp (version <= 2.04)
+#mv viewer/svmnode.cpp viewer/svmnode.cpp.bak
+#echo "#include <string.h>" > viewer/svmnode.cpp
+#cat viewer/svmnode.cpp.bak >> viewer/svmnode.cpp
+#### warning: no output when executing ./ccmain/tesseract
+## fix redefinition of _BLOB in ccutil/platform.h (version >= 3.01)
+#patch -ulbf ccutil/platform.h << EOF
+#--- ccutil/platform.h  2011-10-22 04:21:50 +0200
+#+++ ccutil/platform.h  2012-04-30 10:32:10 +0200
+#@@ -26,2 +26,3 @@
+# #define ultoa _ultoa
+#+#ifndef __MINGW32__
+# typedef struct _BLOB {
+#@@ -30,2 +31,3 @@
+# } BLOB, *LPBLOB;
+#+#endif
+# #endif  /* __GNUC__ */
+#EOF
+# fix missing strtok_r.h (version >= 3.01)
+echo "#define strtok_r(_s,_sep,_lasts) (*(_lasts) = strtok((_s), (_sep)))" > strtok_r.h
+# skip building doc to avoid asciidoc error
+cat > doc/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+cp -f doc/Makefile.in doc/Makefile.am
+wl-showstatus configure &&
+ # fix missing Makefile.in (version >= 3.01 <= 3.02.02 >= 3.05.02)
+ ./autogen.sh &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-D__MSW32__ -Dultoa=_ultoa" LIBS="-lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-D__MSW32__ -Dultoa=_ultoa" LDFLAGS="-static-libgcc -static-libstdc++ -no-undefined -Wl,-no-undefined" LIBS="-lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-D__MSW32__ -Dultoa=_ultoa" LDFLAGS="-static-libstdc++" LIBS="-lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-D__MSW32__ -Dultoa=_ultoa" LIBLEPT_HEADERSDIR=$MINGWPREFIX/include LDFLAGS="-static-libstdc++" LIBS="-lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-D__MSW32__ -Dultoa=_ultoa -I$(pwd)/include -I$(pwd)/src/ccstruct" LIBLEPT_HEADERSDIR=$MINGWPREFIX/include LDFLAGS="-static-libstdc++" LIBS="-lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-doc CXXFLAGS="-D__MSW32__ -Dultoa=_ultoa -I$(pwd)/include -I$(pwd)/src/ccstruct" LIBLEPT_HEADERSDIR=$MINGWPREFIX/include LDFLAGS="-static-libstdc++" LIBS="-lws2_32" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #make install-strip EXEEXT=.exe &&
+ PATH=$PYDIR:$PATH make install-strip EXEEXT=.exe &&
+#export BUILDDEPENDANCIES=cmake
+## fix missing std::this_thread::sleep_for in ccstruct/imagedata.cpp (version >= 3.05.01)
+#patch -ulbf ccstruct/imagedata.cpp << EOF
+#@@ -457,3 +457,3 @@
+#     // while the caller is using it, so give it a chance to work.
+#-#if __cplusplus > 199711L
+#+#if (__cplusplus > 199711L) && !defined(_WIN32)
+#     std::this_thread::sleep_for(std::chrono::seconds(1));
+#EOF
+## fix export in dict/dict.h (version >= 3.05.01)
+#patch -ulbf dict/dict.h << EOF
+#@@ -297 +297 @@
+#-  static DawgCache *GlobalDawgCache();
+#+  TESS_API static DawgCache *GlobalDawgCache();
+#EOF
+## fix export in cutil/emalloc.h (version >= 3.05.01)
+#patch -ulbf cutil/emalloc.h << EOF
+#@@ -33 +33 @@
+#-TESS_API void *Emalloc(int Size);
+#+void *Emalloc(int Size);
+#@@ -35 +35 @@
+#-TESS_API void *Erealloc(void *ptr, int size);
+#+void *Erealloc(void *ptr, int size);
+#@@ -37 +37 @@
+#-TESS_API void Efree(void *ptr);
+#+void Efree(void *ptr);
+#EOF
+#mkdir -p build &&
+#wl-showstatus configure &&
+# cd build &&
+# PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release .. &&
+# echo "-Wl,--as-needed -ltiff" >> CMakeFiles/tesseract.dir/linklibs.rsp &&
+# cd .. &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tesseract-$VERSION
+
+
+

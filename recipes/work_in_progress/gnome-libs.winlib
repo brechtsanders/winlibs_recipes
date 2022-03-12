@@ -1,0 +1,286 @@
+export NAME="gnome-libs (includes libart_lgpl)"
+export STATUS=
+export URL=http://www.gnome.org/projects/gnome-libs
+export BASENAME=gnome-libs
+export DESCRIPTION=""
+export CATEGORY=gui
+export TYPE=library
+#export VERSION=1.2.13
+#export VERSIONDATE=
+export VERSION=1.4.2
+export VERSIONDATE=20101008
+wl-showstatus --package-version
+export DEPENDANCIES=libgnome,gtk2,libxpm,libsm,imlib,bdb
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=COPYING
+export LICENSETYPE="GPL/LGPL"
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gnome-libs/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fixes for missing gtk-config and glib-config
+#mv configure configure.bak
+#sed -e "s/\(\$GTK_CONFIG.*\)--version/\1--modversion/; s/glib-config --libs gmodule/\$PKG_CONFIG --libs gmodule-2.0/" configure.bak > configure
+# fix for missing gtk-config and glib-config and for detection of gmodule
+patch -ulbf configure << EOF
+--- configure  2002-08-16 00:24:44 +0200
++++ configure  2010-11-16 16:53:38 +0100
+@@ -5710,7 +5710,7 @@
+     GTK_LIBS=\`\$GTK_CONFIG \$gtk_config_args --libs\`
+-    gtk_config_major_version=\`\$GTK_CONFIG \$gtk_config_args --version | \\
++    gtk_config_major_version=\`\$GTK_CONFIG \$gtk_config_args --modversion | \\
+            sed 's/\\([0-9]*\\).\\([0-9]*\\).\\([0-9]*\\)/\\1/'\`
+-    gtk_config_minor_version=\`\$GTK_CONFIG \$gtk_config_args --version | \\
++    gtk_config_minor_version=\`\$GTK_CONFIG \$gtk_config_args --modversion | \\
+            sed 's/\\([0-9]*\\).\\([0-9]*\\).\\([0-9]*\\)/\\2/'\`
+-    gtk_config_micro_version=\`\$GTK_CONFIG \$gtk_config_args --version | \\
++    gtk_config_micro_version=\`\$GTK_CONFIG \$gtk_config_args --modversion | \\
+            sed 's/\\([0-9]*\\).\\([0-9]*\\).\\([0-9]*\\)/\\3/'\`
+@@ -8777,3 +8777,3 @@
+   save_LDFLAGS="\$LDFLAGS"
+-  LDFLAGS="\$LDFLAGS \`glib-config --libs gmodule\`"
++  LDFLAGS="\$LDFLAGS \`\$PKG_CONFIG --libs gmodule-2.0\`"
+   if test "\$cross_compiling" = yes; then
+@@ -8809,4 +8809,3 @@
+ if test \$ac_cv_gmodule = no; then
+-  { echo "configure: error: Dynamic linking is not available on this platform. Some apps,
+-like panel, will not run properly." 1>&2; exit 1; }
++  ac_cv_gmodule=yes
+ fi
+EOF
+# fix support/canonicalize.c
+mv support/canonicalize.c support/canonicalize.c.bak
+cat > support/canonicalize.c << EOF
+#include <malloc.h>
+#define __alloca alloca
+#define __lstat stat
+#define S_ISLNK(m) 0
+#define MAXSYMLINKS 0
+#define readlink(rpath,buf,path_max) -1
+#include <winerror.h>
+#define ELOOP WSAELOOP
+EOF
+cat support/canonicalize.c.bak >> support/canonicalize.c
+# fix missing src/.libs/zlib1.dll-def
+mkdir -p tools/convertrgb/.libs
+pexports.exe `which zlib1.dll` > tools/convertrgb/.libs/zlib1.dll-def
+## fix missing db library with db 1.85 compatibility mode
+#mv configure configure.bak
+#sed -e "s/db-4/db-4.8/g" configure.bak > configure
+# fix missing db library with db 1.85 compatibility mode and detection of newer ORBit libaries
+mv configure configure.bak
+sed -e "s/db-4/db-4.8/g; s/orbit-config/orbit2-config/g; s/orbit-idl/orbit-idl-2/g" configure.bak > configure
+# fix libgnome/gnome-config.c
+mv libgnome/gnome-config.c libgnome/gnome-config.c.bak
+cat > libgnome/gnome-config.c << EOF
+#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))
+#define fchmod(f,p) 0
+EOF
+sed -e "s/\(mkdir([^,]*\),[^)]*)/\1)/; s/mkstemp/g_mkstemp/g" libgnome/gnome-config.c.bak >> libgnome/gnome-config.c
+# fix libgnome/gnome-util.h
+patch -ulbf libgnome/gnome-util.h << EOF
+--- libgnome/gnome-util.h  2002-01-10 08:20:12 +0100
++++ libgnome/gnome-util.h  2010-11-23 23:09:28 +0100
+@@ -27,2 +27,3 @@
+
++#ifndef __MINGW32__
+ enum {
+@@ -35,2 +36,3 @@
+ int g_file_test   (const char *filename, int test);
++#endif
+ int g_file_exists (const char *filename);
+EOF
+# fix missing sys/wait.h (in libgnome/gnome-exec.c)
+mkdir -p sys
+cat > sys/wait.h << EOF
+#define _SC_OPEN_MAX 4
+#define SIGPIPE 3
+EOF
+# remove mmap stuff from libgnome/gnome-magic.c
+patch -ulbf libgnome/gnome-magic.h << EOF
+--- libgnome/gnome-magic.c  2000-03-06 17:37:04 +0100
++++ libgnome/gnome-magic.c  2010-11-25 13:25:52 +0100
+@@ -24,3 +24,5 @@
+ #include <sys/stat.h>
++#ifndef _WIN32
+ #include <sys/mman.h>
++#endif
+ #include "gnome-mime.h"
+@@ -356,2 +358,5 @@
+ {
++#ifdef _WIN32
++  return NULL;
++#else
+   int fd;
+@@ -375,2 +380,3 @@
+   return retval;
++#endif
+ }
+EOF
+# fix libgnome/gnome-metadata.c
+patch -ulbf libgnome/gnome-metadata.c << EOF
+--- libgnome/gnome-metadata.c  2002-01-07 00:12:06 +0100
++++ libgnome/gnome-metadata.c  2010-11-25 13:40:08 +0100
+@@ -53,2 +53,6 @@
+ #include <errno.h>
++#ifdef _WIN32
++# include <winsock2.h>
++# define sleep(s) Sleep((s) * 1000)
++#endif
+
+@@ -198,3 +202,7 @@
+                attempts = 0;
++#ifndef _WIN32
+                while (mkdir (lock_directory, 0)) {
++#else
++               while (mkdir (lock_directory)) {
++#endif
+                        attempts++;
+@@ -1205,3 +1213,3 @@
+ #define COPY   1
+-#define DELETE 2
++#define DEL    2
+
+@@ -1238,3 +1246,3 @@
+                        }
+-                       if (op == RENAME || op == DELETE) {
++                       if (op == RENAME || op == DEL) {
+                                int s = metadata_remove ("file", from,
+EOF
+# fix support/gnomesupport.h
+patch -ulbf support/gnomesupport.h << EOF
+--- support/gnomesupport.h  2010-11-23 16:51:32 +0100
++++ support/gnomesupport.h  2010-11-25 13:38:56 +0100
+@@ -16,4 +16,6 @@
+
++#ifndef _WIN32
+ /* Get name of current host.  */
+ int gethostname(char */*name*/, int /*namelen*/);
++#endif
+EOF
+# fix missing pwd.h
+cat > pwd.h << EOF
+#define getuid() 0
+#define geteuid() 0
+#define getpwuid(uid) NULL
+struct passwd {
+ //int pw_uid;
+ //char *pw_name;
+ //char *pw_dir;
+ char *pw_shell;
+};
+EOF
+# fix libgnome/gnome-util.c
+patch -ulbf libgnome/gnome-util.c << EOF
+--- libgnome/gnome-util.c  2002-08-03 15:22:48 +0200
++++ libgnome/gnome-util.c  2010-11-25 13:45:22 +0100
+@@ -233,2 +233,3 @@
+
++#ifndef g_file_test
+ /**
+@@ -260,2 +261,3 @@
+ }
++#endif
+EOF
+# fix libgnome/gnomelib-init.c
+patch -ulbf libgnome/gnomelib-init.c << EOF
+--- libgnome/gnomelib-init.c  2002-08-03 15:22:48 +0200
++++ libgnome/gnomelib-init.c  2010-11-25 13:52:08 +0100
+@@ -40,4 +40,8 @@
+        if(
++#ifndef _WIN32
+           mkdir(gnome_user_dir, 0700) /* This is per-user info
+                                           - no need for others to see it */
++#else
++          mkdir(gnome_user_dir)
++#endif
+           && errno != EEXIST)
+@@ -47,2 +51,3 @@
+        if(
++#ifndef _WIN32
+           mkdir(gnome_user_private_dir, 0700) /* This is private per-user info
+@@ -51,2 +56,5 @@
+                                                  meassures will be taken */
++#else
++          mkdir(gnome_user_private_dir)
++#endif
+           && errno != EEXIST)
+@@ -55,4 +63,8 @@
+        if(
++#ifndef _WIN32
+           mkdir(gnome_user_accels_dir, 0700) /* This is per-user info
+                                           - no need for others to see it */
++#else
++          mkdir(gnome_user_accels_dir)
++#endif
+           && errno != EEXIST)
+EOF
+# fix missing files
+mkdir -p sys netinet arpa
+touch netdb.h netinet/in.h arpa/inet.h
+echo "#include <winsock2.h>" > sys/socket.h
+# fix missing libgnome/.libs/zlib1.dll-def
+mkdir -p libgnome/.libs
+pexports.exe `which zlib1.dll` > libgnome/.libs/zlib1.dll-def
+# fix missing u_int in db_185.h in libgnome/gnome-dump.c
+mv libgnome/gnome-dump.c libgnome/gnome-dump.c.bak
+echo "#include <winsock2.h>" > libgnome/gnome-dump.c
+cat libgnome/gnome-dump.c.bak >> libgnome/gnome-dump.c
+# fix missing in support/poptconfig.c
+mv support/poptconfig.c support/poptconfig.c.bak
+echo "#include <pwd.h>" > support/poptconfig.c
+cat support/poptconfig.c.bak >> support/poptconfig.c
+
+# fix conflicting definition of malloc in support/vasprintf.c
+patch -ulbf support/vasprintf.c << EOF
+--- support/vasprintf.c  1998-03-29 07:20:44 +0200
++++ support/vasprintf.c  2011-01-01 12:34:42 +0100
+@@ -36,3 +36,3 @@
+ unsigned long strtoul ();
+-char *malloc ();
++//char *malloc ();
+
+EOF
+
+# create gnomeConf.sh
+mkdir -p $INSTALLPREFIX/lib
+sed -e "s?@GNOME_LIBDIR@?-L$MINGWPREFIX/lib/?; s?@GNOME_INCLUDEDIR@?-I\$MINGWPREFIX/include/gnome-1.0?; s?@GTK_CFLAGS@?$(pkg-config --cflags gtk+-2.0|sed -e s/\$'\x01'//g)?; s?@GNOME_LIBS@?-lgnomesupport?; s?@GNOMEUI_LIBS@??; s?@GTKXMHTML_LIBS@??; s?@need_gnome_support@??" gnomeConf.sh.in > $INSTALLPREFIX/lib/gnomeConf.sh
+
+wl-showstatus configure &&
+#GTK_CONFIG="$PKG_CONFIG gtk+-2.0" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-test-gnome LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#GTK_CONFIG="$PKG_CONFIG gtk+-2.0" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --without-x --disable-gtktest --disable-imlibtest -disable-esdtest --disable-audiofiletest --disable-test-gnome CFLAGS="-I$MINGWPREFIX/include/glib-2.0" LDFLAGS="-Wl,--enable-auto-import -static-libgcc -static-libstdc++" --host=$RUNPLATFORM &&
+#   CFLAGS="-I$MINGWPREFIX/include/glib-2.0" LDFLAGS="-Wl,--enable-auto-import -static-libgcc -static-libstdc++"
+#GTK_CONFIG="$PKG_CONFIG gtk+-2.0" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-test-gnome LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+GTK_CONFIG="$PKG_CONFIG gtk+-2.0" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-test-gnome &&
+ echo "#include <malloc.h>" >> config.h &&
+ echo "#define __alloca alloca" >> config.h &&
+ wl-showstatus build-install &&
+ make install LIBS="-lws2_32" && ( make install-strip || true ) &&
+ # fix $INSTALLPREFIX/lib/libartConf.sh
+ mv $INSTALLPREFIX/lib/libartConf.sh $INSTALLPREFIX/lib/libartConf.sh.bak &&
+ sed -e "s?$INSTALLPREFIX?\$MINGWPREFIX?g; s/@VERSION@/$VERSION/" $INSTALLPREFIX/lib/libartConf.sh.bak > $INSTALLPREFIX/lib/libartConf.sh &&
+ rm -f $INSTALLPREFIX/lib/libartConf.sh.bak &&
+    echo OK
+####libgnome/gnome-exec.c:93: undefined reference to `pipe'
+####libgnome/gnome-exec.c:96: undefined reference to `fork'
+####libgnome/gnome-exec.c:106:undefined reference to `pipe'
+####libgnome/gnome-exec.c:156:undefined reference to `sysconf'
+####libgnome/gnome-exec.c:173:undefined reference to `setsid'
+####libgnome/gnome-exec.c:207:undefined reference to `waitpid'
+####libgnome/gnome-exec.c:109:undefined reference to `fork'
+####libgnome/gnome-triggers.c:554: undefined reference to `fork'
+####libgnome/gnome-triggers.c:556: undefined reference to `waitpid'
+
+####../libgnome/gnome-util.h:30: error: redeclaration of enumerator 'G_FILE_TEST_EXISTS'
+####D:/Prog/MinGW-mSys.newer/mingw32/include/glib-2.0/glib/gfileutils.h:74: note: previous definition of 'G_FILE_TEST_EXISTS' was here
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

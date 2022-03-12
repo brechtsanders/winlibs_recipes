@@ -1,0 +1,93 @@
+export NAME="dev86 (as86/ld86)"
+export STATUS=
+#export URL=http://www.debath.co.uk/dev86/
+#export URL=http://v3.sk/~lkundrak/dev86/
+export URL=https://github.com/lkundrak/dev86
+export BASENAME=dev86
+export DESCRIPTION="This is a cross development C compiler, assembler and linker environment for the production of 8086 executables (Optionally MSDOS COM)"
+export CATEGORY=programming
+export TYPE=application
+#export VERSION=0.16.19
+#export VERSIONDATE=20131104
+export VERSION=0.16.21
+export VERSIONDATE=20150208
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://www.debath.co.uk/dev86/ Dev86src-"
+#export DOWNLOADURL="http://v3.sk/~lkundrak/dev86/ Dev86src-"
+#export DOWNLOADURL="https://github.com/lkundrak/dev86/releases"
+export DOWNLOADURL="https://github.com/lkundrak/dev86/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.debath.co.uk/dev86/Dev86src-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://v3.sk/~lkundrak/dev86/Dev86src-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/lkundrak/dev86/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/lkundrak/dev86/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/Dev86src-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing sys/wait.h
+mkdir -p winfix/sys
+touch winfix/sys/wait.h
+# fix ld/io.c
+mv ld/io.c ld/io.c.bak
+echo "#include <stdio.h>" > ld/io.c
+cat ld/io.c.bak >> ld/io.c
+# fix ar/ar.c
+patch -ulbf ar/ar.c << EOF
+--- ar/ar.c  2012-08-13 21:15:48 +0200
++++ ar/ar.c  2013-11-04 22:20:16 +0100
+@@ -35,3 +35,3 @@
+
+-#if defined(__BCC__) || defined(__HP_cc)
++#if defined(__BCC__) || defined(__HP_cc) || defined(__MINGW32__)
+ #define HAVE_RENAME
+@@ -56,3 +56,3 @@
+
+-#ifdef USG
++#if defined(USG) || defined(__MINGW32__)
+ #define        bcopy(source, dest, size)       memcpy((dest), (source), (size))
+@@ -680,3 +680,3 @@
+     {
+-#if defined(USG) || defined(__BCC__)
++#if defined(USG) || defined(__BCC__) || defined(__MINGW32__)
+       long tv[2];
+EOF
+cat > answers << EOF
+4
+5
+7
+9
+10
+12
+17
+18
+19
+quit
+EOF
+wl-showstatus build &&
+PATH=`pwd`/cpp:$PATH make CC=gcc CFLAGS="-O3 -I$(pwd)/winfix -DMSDOS" < answers &&
+ echo OK
+
+#wl-showstatus build-install &&
+#make -j1 install BINDIR=$INSTALLPREFIX/share/dev86/bin LIBDIR=$INSTALLPREFIX/share/dev86/bin PREFIX=$INSTALLPREFIX/share/dev86 CFLAGS="-O3 -I`pwd`/winfix -DMSDOS"
+
+#wl-showstatus build-install &&
+make -Cas install CC=gcc BINDIR=$INSTALLPREFIX/share/dev86/bin LIBDIR=$INSTALLPREFIX/share/dev86/bin &&
+ make -Cld install CC=gcc BINDIR=$INSTALLPREFIX/share/dev86/bin LIBDIR=$INSTALLPREFIX/share/dev86/bin &&
+ make -Cbcc install CC=gcc CFLAGS="-O3 -I`pwd`/winfix -DMSDOS" PREFIX=$INSTALLPREFIX/share/dev86 &&
+ make -Car install CC=gcc BINDIR=$INSTALLPREFIX/share/dev86/bin LIBDIR=$INSTALLPREFIX/share/dev86/bin &&
+ make -Cman install CC=gcc MANDIR=$INSTALLPREFIX/share/dev86/man &&
+ make -Cdis88 install CC=gcc PREFIX=$INSTALLPREFIX/share/dev86 &&
+ #mkdir -p $INSTALLPREFIX/share/dev86/man/man1 &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: contains bcc.exe, which can be detected as a different compiler, solution: move to subdirectory
+
+
+

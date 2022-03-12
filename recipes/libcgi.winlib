@@ -1,0 +1,94 @@
+#export NAME="libcgi"
+#export STATUS=
+#export URL=http://libcgi.sourceforge.net/
+#export BASENAME=libcgi
+#export DESCRIPTION="LibCGI is a library written from scratch to easily make CGI applications in C. There are a lot of functions like string manipulation, session and cookie support, GET and POST methods manipulation etc..., to help you to quickly write powerful CGI programs."
+#export CATEGORY=communication
+#export TYPE=library
+#export VERSION=1.0
+#export VERSIONDATE=
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=
+#export LICENSETYPE=
+##export DOWNLOADURL="http://sourceforge.net/projects/libcgi/files/"
+#export DOWNLOADURL="http://sourceforge.net/projects/libcgi/files/libcgi/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://prdownloads.sourceforge.net/libcgi/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#wl-showstatus configure &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# wl-showstatus build &&
+# make CC=gcc &&
+# wl-showstatus build-install &&
+# mkdir $INSTALLPREFIX $INSTALLPREFIX/lib $INSTALLPREFIX/include &&
+# make install &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# mv -f $INSTALLPREFIX/lib/libcgi.so $INSTALLPREFIX/bin/libcgi.dll &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="libcgi"
+export STATUS=
+export URL=http://libcgi.sourceforge.net/
+export BASENAME=libcgi
+export DESCRIPTION="LibCGI is a library written from scratch to easily make CGI applications in C. There are a lot of functions like string manipulation, session and cookie support, GET and POST methods manipulation etc..., to help you to quickly write powerful CGI programs."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.3.0
+export VERSIONDATE=20211019
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=LICENSES/LGPL-2.1.txt
+export LICENSEFILE=LICENSES/MIT.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/rafaelsteil/libcgi/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rafaelsteil/libcgi/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing strndup in src/cgi.c (version >= 1.3.0)
+mv src/cgi.c src/cgi.c.bak
+cat > src/cgi.c << EOF
+#include <stdlib.h>
+#include <string.h>
+char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+EOF
+cat src/cgi.c.bak >> src/cgi.c
+# skip building tests (version >= 1.3.0)
+sed -i.bak "s/^add_subdirectory(\"test\")/#&/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/src/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_shared/src/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

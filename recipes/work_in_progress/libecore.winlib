@@ -1,0 +1,103 @@
+export NAME="Ecore"
+export STATUS=
+export URL=http://trac.enlightenment.org/e/wiki/Ecore
+export BASENAME=libecore
+export DESCRIPTION="Ecore is a clean and tiny event loop library with many modules to do lots of convenient things for a programmer, to save time and effort."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.7.0
+#export VERSIONDATE=20121020
+####/include/langinfo.h:149:3: error: redeclaration of enumerator '_NL_CTYPE_CODESET'
+####/include/evil-1/evil_langinfo.h:21:3: note: previous definition of '_NL_CTYPE_CODESET' was here
+#export VERSION=1.7.1
+#export VERSIONDATE=20121022
+#export VERSION=1.7.2
+#export VERSIONDATE=20121123
+#export VERSION=1.7.3
+#export VERSIONDATE=20121208
+#export VERSION=1.7.4
+#export VERSIONDATE=20121222
+#export VERSION=1.7.5
+#export VERSIONDATE=20130104
+#export VERSION=1.7.6
+#export VERSIONDATE=20130405
+#export VERSION=1.7.7
+#export VERSIONDATE=20130514
+#export VERSION=1.7.8
+#export VERSIONDATE=20130730
+#export VERSION=1.7.9
+#export VERSIONDATE=20131105
+export VERSION=1.7.10
+export VERSIONDATE=20140107
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libevil,libeina,libevas,gettext
+export OPTIONALDEPENDANCIES=sdl
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.enlightenment.org/p.php?p=download ecore-"
+#export DOWNLOADURL="http://download.enlightenment.org/releases/ ecore-"
+export DOWNLOADURL="https://download.enlightenment.org/att/releases/ ecore-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.enlightenment.org/releases/ecore-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://download.enlightenment.org/att/releases//ecore-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/ecore-$VERSION.tar.bz2
+cd ecore-$VERSION
+# fix redefinition of _argv/_argc in src/lib/ecore/ecore_getopt.c
+patch -ulbf src/lib/ecore/ecore_getopt.c << EOF
+--- src/lib/ecore/ecore_getopt.c  2012-05-20 14:58:32 +0200
++++ src/lib/ecore/ecore_getopt.c  2012-10-20 21:44:00 +0200
+@@ -48,4 +48,9 @@
+ static const char *prog = NULL;
++#ifdef __MINGW32__
++#define _argv __argv
++#define _argc __argc
++#else
+ static char **_argv = NULL;
+ static int _argc = 0;
++#endif
+ static int cols = 80;
+EOF
+# fix missing pthread_mutex_t in src/lib/ecore_con/ecore_con_ssl.c
+mv src/lib/ecore_con/ecore_con_ssl.c src/lib/ecore_con/ecore_con_ssl.c.bak
+echo "#include <pthread.h>" > src/lib/ecore_con/ecore_con_ssl.c
+cat src/lib/ecore_con/ecore_con_ssl.c.bak >> src/lib/ecore_con/ecore_con_ssl.c
+## fix missing inet_pton in src/lib/ecore_con/ecore_con_socks.c (version >= 1.7.9)
+#mv src/lib/ecore_con/ecore_con_socks.c src/lib/ecore_con/ecore_con_socks.c.bak
+#echo "#define _WIN32_WINNT 0x0600" > src/lib/ecore_con/ecore_con_socks.c
+#cat src/lib/ecore_con/ecore_con_socks.c.bak >> src/lib/ecore_con/ecore_con_socks.c
+## fix missing inet_pton in src/lib/ecore_con/ecore_con.c (version >= 1.7.9)
+#mv src/lib/ecore_con/ecore_con.c src/lib/ecore_con/ecore_con.c.bak
+#echo "#define _WIN32_WINNT 0x0600" > src/lib/ecore_con/ecore_con.c
+##echo "typedef void* CONDITION_VARIABLE;" >> src/lib/ecore_con/ecore_con.c
+#cat src/lib/ecore_con/ecore_con.c.bak >> src/lib/ecore_con/ecore_con.c
+## fix missing inet_pton in src/lib/ecore_con/ecore_con_ares.c (version >= 1.7.9)
+#mv src/lib/ecore_con/ecore_con_ares.c src/lib/ecore_con/ecore_con_ares.c.bak
+#echo "#define _WIN32_WINNT 0x0600" > src/lib/ecore_con/ecore_con_ares.c
+#cat src/lib/ecore_con/ecore_con_ares.c.bak >> src/lib/ecore_con/ecore_con_ares.c
+## fix missing mkstemp in src/lib/ecore_file/ecore_file.c (version >= 1.7.10)
+#mv src/lib/ecore_file/ecore_file.c src/lib/ecore_file/ecore_file.c.bak
+#sed -e "s/mkstemp(/__mingw_mkstemp(_MKSTEMP_DEFAULT, /" src/lib/ecore_file/ecore_file.c.bak > src/lib/ecore_file/ecore_file.c
+## fix building DLLs on 64-bit (version <= 1.7.7)
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+#PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-posix-threads --enable-win32-threads --enable-notify-win32 --enable-ecore-win32 --disable-ecore-x --with-x=no --enable-cares -disable-gnutls --disable-openssl --disable-xim --disable-ecore-imf-xim LDFLAGS="-Wl,--as-needed -lpthread -lgdi32" &&
+#PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-posix-threads --enable-win32-threads --enable-notify-win32 --enable-ecore-win32 --disable-ecore-x --with-x=no --enable-cares -disable-gnutls --disable-openssl --disable-xim --disable-ecore-imf-xim --disable-ecore-imf-ibus LDFLAGS="-Wl,--as-needed -lpthread -lgdi32" &&
+PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-posix-threads --enable-win32-threads --enable-notify-win32 --enable-ecore-win32 --disable-ecore-x --with-x=no --enable-cares -disable-gnutls --disable-openssl --disable-xim --disable-ecore-imf-xim --disable-ecore-imf-ibus --disable-ecore-con LDFLAGS="-Wl,--as-needed -lpthread -lgdi32" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ecore-$VERSION
+####Now part of EFL (efl)
+
+
+

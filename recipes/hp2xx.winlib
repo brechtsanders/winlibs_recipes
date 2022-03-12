@@ -1,0 +1,64 @@
+export NAME="hp2xx"
+export STATUS=
+export URL=http://www.gnu.org/software/hp2xx/
+export BASENAME=hp2xx
+export DESCRIPTION="The hp2xx program is a versatile tool to convert vector-oriented graphics data given in Hewlett-Packard's HP-GL plotter language into a variety of popular graphics formats, both vector- and raster-oriented."
+export CATEGORY=graphics
+export TYPE=application
+export VERSION=3.4.4
+export VERSIONDATE=20101208
+wl-showstatus --package-version
+#export DEPENDANCIES=libx11,libjpeg,libpng,libtiff,plibc
+export DEPENDANCIES=libx11,libjpeg,libpng,libtiff
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=copying
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://ftp.gnu.org/gnu/hp2xx/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/hp2xx/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing mkstemp
+#mv sources/to_tif.c sources/to_tif.c.bak
+#echo "#include <plibc.h>" > sources/to_tif.c
+#cat sources/to_tif.c.bak >> sources/to_tif.c
+# fix missing mkstemp in sources/to_tif.c
+(
+gcc -c -xc - &> /dev/null << EOF
+#include <stdlib.h> 
+#include <fcntl.h> 
+int main ()
+{
+  mkstemp(NULL); 
+}
+EOF
+) || (
+mv sources/to_tif.c sources/to_tif.c.bak
+cat > sources/to_tif.c << EOF
+#include <fcntl.h> 
+#define mkstemp(p) _open(_mktemp(p), _O_CREAT | _O_SHORT_LIVED | _O_EXCL) 
+EOF
+cat sources/to_tif.c.bak >> sources/to_tif.c
+)
+# fix sources/png.c for newer libpng
+mv sources/png.c sources/png.c.bak
+sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/" sources/png.c.bak > sources/png.c
+# fix missing Z_BEST_COMPRESSION/Z_DEFAULT_STRATEGY in sources/png.c
+mv sources/png.c sources/png.c.bak
+echo "#include <zlib.h>" > sources/png.c
+cat sources/png.c.bak >> sources/png.c
+wl-showstatus build &&
+#make -C sources ALL_LIBS="-Wl,--as-needed -lX11 -lplibc" &&
+make -C sources ALL_LIBS="-Wl,--as-needed -lX11" &&
+ strip sources/hp2xx.exe &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f sources/hp2xx.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,52 @@
+export NAME="smjpeg"
+export STATUS=
+export URL=http://ftp.lokigames.com/smjpeg/
+export BASENAME=smjpeg
+export DESCRIPTION="smjpeg is an implementation of the smjpeg decoding library, which runs on just about any platform. It comes with one sample decoder, smjpeg_decode (console, no UI)."
+export CATEGORY=video,codec
+export TYPE=library
+export VERSION=0.2.1
+export VERSIONDATE=20180116
+wl-showstatus --package-version
+export DEPENDANCIES=sdl,libjpeg
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://mirrors.dotsrc.org/lokigames/open-source/smjpeg/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://mirrors.dotsrc.org/lokigames/open-source/smjpeg/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## change libjpeg dependancy to use installed library
+#sed -i.bak -e "s?\(DEPENDENCIES *=.*\)jpeg-6b/libjpeg.la?\1?; s?jpeg-6b/libjpeg.la?-ljpeg?; s?\(SUBDIRS *=.*\)jpeg-6b?\1?; s?\(smjpeg_decode_LDADD *=.*\)?\1 -ljpeg?; s?-I\$(top_srcdir)/jpeg-6b??" Makefile.in &&
+wl-showstatus configure &&
+touch NEWS AUTHORS ChangeLog &&
+mkdir -p m4 &&
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sdltest LDFLAGS="-Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sdltest &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix calling dlltool
+ mv libtool libtool.bak2 &&
+ sed -e 's/^\(DLLTOOL="\)\("\)/\1dlltool.exe\2/; s/^\(OBJDUMP="\)\("\)/\1objdump.exe\2/; s/^\(AS="\)\("\)/\1as.exe\2/' libtool.bak2 > libtool &&
+ wl-showstatus build &&
+ ( make || (
+  # fix SDL linking issue
+  cp -f $MINGWPREFIX/lib/libSDL.dll.a .libs/libimp-SDL.dll.a.a &&
+  #cp -f $MINGWPREFIX/lib/libSDL.dll.a jpeg-6b/.libs/libimp-SDL.dll.a.a &&
+  #cp -f $MINGWPREFIX/lib/libSDL.dll.a adpcm/.libs/libimp-SDL.dll.a.a &&
+  make
+ )) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

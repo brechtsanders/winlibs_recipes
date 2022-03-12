@@ -1,0 +1,316 @@
+#export NAME="Eclipse Mosquitto (TM)"
+#export STATUS=
+#export URL=https://mosquitto.org/
+#export BASENAME=mosquitto
+#export DESCRIPTION="Eclipse Mosquitto is an open source (EPL/EDL licensed) message broker that implements the MQTT protocol versions 3.1 and 3.1.1. Mosquitto is lightweight and is suitable for use on all devices from low power single board computers to full servers."
+#export CATEGORY=
+#export TYPE=library,application
+##export VERSION=1.5.1
+##export VERSIONDATE=20180914
+##export VERSION=1.5.2
+##export VERSIONDATE=20180920
+##export VERSION=1.5.3
+##export VERSIONDATE=20180928
+##export VERSION=1.5.4
+##export VERSIONDATE=20181109
+##export VERSION=1.5.5
+##export VERSIONDATE=20181212
+##export VERSION=1.5.6
+##export VERSIONDATE=20190208
+##export VERSION=1.5.7
+##export VERSIONDATE=20190214
+##export VERSION=1.5.8
+##export VERSIONDATE=20190301
+##export VERSION=1.6.0
+##export VERSIONDATE=20190418
+##export VERSION=1.6.1
+##export VERSIONDATE=20190427
+##export VERSION=1.6.2
+##export VERSIONDATE=20190501
+##export VERSION=1.6.3
+##export VERSIONDATE=20190619
+##export VERSION=1.6.4
+##export VERSIONDATE=20190802
+#####lib/packet_mosq.c:70:78: error: 'LWS_SEND_BUFFER_PRE_PADDING' undeclared (first use in this function)
+##export VERSION=1.6.5
+##export VERSIONDATE=20190913
+##export VERSION=1.6.6
+##export VERSIONDATE=20190918
+##export VERSION=1.6.7
+##export VERSIONDATE=20190925
+##export VERSION=1.6.8
+##export VERSIONDATE=20191203
+##export VERSION=1.6.9
+##export VERSIONDATE=20200228
+##export VERSION=1.6.10
+##export VERSIONDATE=20200609
+##export VERSION=1.6.11
+##export VERSIONDATE=20200811
+#export VERSION=1.6.12
+#export VERSIONDATE=20200820
+#wl-showstatus --package-version
+#export DEPENDANCIES=libuuid,pthreads,openssl,mbedtls,libwebsockets
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+#export LICENSEFILE=edl-v10
+##export LICENSEFILE=epl-v10
+#export LICENSETYPE=EPL/EDL
+#export DOWNLOADURL="https://mosquitto.org/download/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://www.eclipse.org/downloads/download.php?file=/mosquitto/source/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://mosquitto.org/files/source/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix missing poll functionality in src/loop.c
+#mv src/loop.c src/loop.c.bak
+#cat > src/loop.c << EOF
+##define _WIN32_WINNT 0x0600
+##include <winsock2.h>
+#EOF
+#cat src/loop.c.bak >> src/loop.c
+## fix missing poll functionality in src/websockets.c
+#mv src/websockets.c src/websockets.c.bak
+#cat > src/websockets.c << EOF
+##define _WIN32_WINNT 0x0600
+##include <winsock2.h>
+#EOF
+#cat src/websockets.c.bak >> src/websockets.c
+## fix undefined inet_ntop in src/net.c
+#mv src/net.c src/net.c.bak
+#cat > src/net.c << EOF
+##define _WIN32_WINNT 0x0600
+##include <winsock2.h>
+#EOF
+#cat src/net.c.bak >> src/net.c
+## fix missing InetPton in lib/tls_mosq.c
+#mv lib/tls_mosq.c lib/tls_mosq.c.bak
+#cat > lib/tls_mosq.c << EOF
+##define _WIN32_WINNT 0x0600
+##include <winsock2.h>
+##include <ws2tcpip.h>
+#EOF
+#cat lib/tls_mosq.c.bak >> lib/tls_mosq.c
+## fix missing GetTickCount64 in lib/mosquitto.c
+#mv lib/mosquitto.c lib/mosquitto.c.bak
+#cat > lib/mosquitto.c << EOF
+##define _WIN32_WINNT 0x0600
+#EOF
+#cat lib/mosquitto.c.bak >> lib/mosquitto.c
+## fix lib/net_mosq.h
+#sed -i.bak -e "s/^typedef SSIZE_T ssize_t;/#include <io.h>/" lib/net_mosq.h
+## fix missing struct in6_addr and inet_pton in lib/util_mosq.c (version >= 1.5.2)
+#sed -i.bak -e "s/int\( ulen\)\b/DWORD\1/" lib/util_mosq.c
+### fix lib/socks_mosq.c (version = 1.5.2)
+##patch -ulbf lib/socks_mosq.c << EOF
+##@@ -21,3 +21,12 @@
+## #include <limits.h>
+##+#ifdef _WIN32
+##+#if _WIN32_WINNT < 0x600
+##+#undef _WIN32_WINNT
+##+#define _WIN32_WINNT 0x0600
+##+#endif
+##+#include <winsock2.h>
+##+#include <ws2tcpip.h>
+##+#else
+## #include <arpa/inet.h>
+##+#endif
+##
+##EOF
+## fix lib/socks_mosq.c (version >= 1.5.3)
+#patch -ulbf lib/socks_mosq.c << EOF
+#@@ -22,2 +22,6 @@
+# #ifdef WIN32
+#+#  if _WIN32_WINNT < 0x600
+#+#    undef _WIN32_WINNT
+#+#    define _WIN32_WINNT 0x0600
+#+#  endif
+# #  include <ws2tcpip.h>
+#EOF
+### fix lib/packet_mosq.c (version >= 1.5.4)
+##patch -ulbf lib/packet_mosq.c << EOF
+##@@ -69,2 +69,8 @@
+## #ifdef WITH_WEBSOCKETS
+##+#ifndef LWS_SEND_BUFFER_PRE_PADDING
+##+#define LWS_SEND_BUFFER_PRE_PADDING LWS_PRE
+##+#endif
+##+#ifndef LWS_SEND_BUFFER_POST_PADDING
+##+#define LWS_SEND_BUFFER_POST_PADDING 0
+##+#endif
+##        packet->payload = mosquitto__malloc(sizeof(uint8_t)*packet->packet_length + LWS_SEND_BUFFER_PRE_PADDING + LWS_SEND_BUFFER_POST_PADDING);
+##EOF
+## fix missing int8_t in lib/mosquitto_internal.h (version >= 1.5.4)
+#mv lib/mosquitto_internal.h lib/mosquitto_internal.h.bak &&
+#echo "#include <stdint.h>" > lib/mosquitto_internal.h &&
+#cat lib/mosquitto_internal.h.bak >> lib/mosquitto_internal.h
+## fix missing GetTickCount64 in client/pub_client.c (version >= 1.6.5)
+#mv client/pub_client.c client/pub_client.c.bak
+#cat > client/pub_client.c << EOF
+##if _WIN32_WINNT < 0x600
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0600
+##endif
+#EOF
+#cat client/pub_client.c.bak >> client/pub_client.c
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_STATIC_LIBRARIES:BOOL=ON -DSTATIC_WEBSOCKETS:BOOL=ON -DUUID_HEADER:PATH=$MINGWPREFIX/include/portable-uuid/uuid/uuid.h -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DDOCUMENTATION:BOOL=ON -S. -Bbuild_static &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_STATIC_LIBRARIES:BOOL=ON -DSTATIC_WEBSOCKETS:BOOL=ON -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_STATIC_LIBRARIES:BOOL=ON -DSTATIC_WEBSOCKETS:BOOL=ON -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_static &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_STATIC_LIBRARIES:BOOL=ON -DSTATIC_WEBSOCKETS:BOOL=ON -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DWITH_UNIX_SOCKETS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_static &&
+# # fix missing libraries
+# echo "-Wl,--as-needed -lws2_32" >> build_static/lib/CMakeFiles/libmosquitto.dir/linklibs.rsp &&
+# echo "-Wl,--as-needed -lportable-uuid" >> build_static/src/CMakeFiles/mosquitto.dir/linklibs.rsp &&
+# #echo "-Wl,--as-needed -lws2_32 -lssl -lcrypto" >> build_static/src/CMakeFiles/mosquitto.dir/linklibs.rsp &&
+# echo "-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32 -lws2_32 -lmbedtls -lmbedcrypto -lmbedx509" >> build_static/src/CMakeFiles/mosquitto.dir/linklibs.rsp &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_STATIC_LIBRARIES:BOOL=OFF -DSTATIC_WEBSOCKETS:BOOL=OFF -DUUID_HEADER:PATH=$MINGWPREFIX/include/portable-uuid/uuid/uuid.h -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DDOCUMENTATION:BOOL=ON -S. -Bbuild_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_STATIC_LIBRARIES:BOOL=OFF -DSTATIC_WEBSOCKETS:BOOL=OFF -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_STATIC_LIBRARIES:BOOL=OFF -DSTATIC_WEBSOCKETS:BOOL=OFF -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_STATIC_LIBRARIES:BOOL=OFF -DSTATIC_WEBSOCKETS:BOOL=OFF -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DWITH_UNIX_SOCKETS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_shared &&
+# # fix missing libraries
+# echo "-Wl,--as-needed -lportable-uuid" >> build_shared/src/CMakeFiles/mosquitto.dir/linklibs.rsp &&
+# echo "-Wl,--as-needed -lws2_32" >> build_shared/lib/CMakeFiles/libmosquitto.dir/linklibs.rsp &&
+# # fix missing C:\pthreads\Pre-built.2\lib\x86\pthreadVC2.lib
+# sed -i.bak -e "s/[^ ]*pthreadVC2\.lib//" $(grep -l "pthreadVC2\.lib" $(find -name build.make)) &&
+# sed -i.bak -e "s/\"[^ \"]*pthreadVC2\.lib\"/-lpthread/" $(grep -l "pthreadVC2\.lib" $(find -name linklibs.rsp)) &&
+# #wl-showstatus build &&
+# #C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWPREFIX/include/portable-uuid make -Cbuild_static/lib libmosquitto_static &&
+# #C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWPREFIX/include/portable-uuid make -Cbuild_static/lib/cpp mosquittopp_static &&
+# wl-showstatus build-install &&
+# C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWPREFIX/include/portable-uuid make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWPREFIX/include/portable-uuid make -Cbuild_shared install/strip &&
+# mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/etc/mosquitto &&
+# cp -f build_shared/lib/cpp/*.a build_shared/lib/*.a $INSTALLPREFIX/lib/ &&
+# #mv -f $INSTALLPREFIX/*.exe $INSTALLPREFIX/*.dll $INSTALLPREFIX/bin/ &&
+# #mv -f $INSTALLPREFIX/*.conf $INSTALLPREFIX/*.example $INSTALLPREFIX/etc/mosquitto/ &&
+# #cp -f build_static/lib/libmosquitto.a build_static/lib/cpp/libmosquittopp.a $INSTALLPREFIX/lib/ &&
+# cp -f build_shared/src/mosquitto.exe $INSTALLPREFIX/bin/ &&
+# for F in $INSTALLPREFIX/lib/*_static.a; do
+#  cp -u $F $(echo $F|sed -e "s/_static\(\.a\)$/\1/")
+# done &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="Eclipse Mosquitto (TM)"
+export STATUS=
+export URL=https://mosquitto.org/
+export BASENAME=mosquitto
+export DESCRIPTION="Eclipse Mosquitto is an open source (EPL/EDL licensed) message broker that implements the MQTT protocol versions 5.0, 3.1.1 and 3.1. Mosquitto is lightweight and is suitable for use on all devices from low power single board computers to full servers."
+export CATEGORY=development
+export TYPE=library,application
+#export VERSION=2.0.0
+#export VERSIONDATE=20201204
+#export VERSION=2.0.2
+#export VERSIONDATE=20201211
+#export VERSION=2.0.3
+#export VERSIONDATE=20201218
+#export VERSION=2.0.4
+#export VERSIONDATE=20201223
+#export VERSION=2.0.5
+#export VERSIONDATE=20210112
+#export VERSION=2.0.6
+#export VERSIONDATE=20210129
+#export VERSION=2.0.7
+#export VERSIONDATE=20210204
+#export VERSION=2.0.8
+#export VERSIONDATE=20210226
+#export VERSION=2.0.9
+#export VERSIONDATE=20210312
+#export VERSION=2.0.10
+#export VERSIONDATE=20210413
+#export VERSION=2.0.11
+#export VERSIONDATE=20210610
+#export VERSION=2.0.12
+#export VERSIONDATE=20210902
+#export VERSION=2.0.13
+#export VERSIONDATE=20211104
+export VERSION=2.0.14
+export VERSIONDATE=20211122
+wl-showstatus --package-version
+export DEPENDANCIES=libuuid,pthreads,openssl,mbedtls,libwebsockets
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+#export LICENSEFILE=edl-v10
+#export LICENSEFILE=epl-v20
+export LICENSETYPE=EPL/EDL
+export DOWNLOADURL="https://mosquitto.org/download/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.eclipse.org/downloads/download.php?file=/mosquitto/source/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://mosquitto.org/files/source/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing InetPton in lib/tls_mosq.c
+mv lib/tls_mosq.c lib/tls_mosq.c.bak
+cat > lib/tls_mosq.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+EOF
+cat lib/tls_mosq.c.bak >> lib/tls_mosq.c
+# fix missing struct pollfd in src/mux_poll.c (version >= 2.0.2)
+mv src/mux_poll.c src/mux_poll.c.bak
+cat > src/mux_poll.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat src/mux_poll.c.bak >> src/mux_poll.c
+# fix missing poll functionality in src/websockets.c
+mv src/websockets.c src/websockets.c.bak
+cat > src/websockets.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat src/websockets.c.bak >> src/websockets.c
+## fix missing inet_ntop in src/net.c (version >= 2.0.13)
+#mv src/net.c src/net.c.bak &&
+#echo "#define _WIN32_WINNT 0x0600" > src/net.c &&
+##echo "#include <winsock2.h>" >> src/net.c
+##echo "#include <ws2tcpip.h>" >> src/net.c
+#cat src/net.c.bak >> src/net.c
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_STATIC_LIBRARIES:BOOL=ON -DSTATIC_WEBSOCKETS:BOOL=ON -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DWITH_THREADING:BOOL=ON -DWITH_UNIX_SOCKETS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_STATIC_LIBRARIES:BOOL=ON -DSTATIC_WEBSOCKETS:BOOL=ON -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DWITH_THREADING:BOOL=ON -DWITH_UNIX_SOCKETS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCMAKE_C_FLAGS="-I$(pwd)/deps -I$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_STATIC_LIBRARIES:BOOL=OFF -DSTATIC_WEBSOCKETS:BOOL=OFF -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DWITH_THREADING:BOOL=ON -DWITH_UNIX_SOCKETS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCFLAGS="-I$(pwd)/$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_STATIC_LIBRARIES:BOOL=OFF -DSTATIC_WEBSOCKETS:BOOL=OFF -DWITH_WEBSOCKETS:BOOL=ON -DWITH_SOCKS:BOOL=ON -DWITH_SRV:BOOL=OFF -DWITH_BUNDLED_DEPS:BOOL=OFF -DWITH_THREADING:BOOL=ON -DWITH_UNIX_SOCKETS:BOOL=OFF -DDOCUMENTATION:BOOL=ON -DCMAKE_C_FLAGS="-I$(pwd)/deps -I$MINGWPREFIX/include/portable-uuid" -S. -Bbuild_shared &&
+ # fix missing libraries
+ #sed -i.bak1 -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32 -lportable-uuid/" build_shared/build.ninja &&
+ sed -i.bak1 -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ # fix missing C:\pthreads\Pre-built.2\lib\x86\pthreadVC2.lib
+ sed -i.bak2 -e "s/[^ ]*pthreadVC2\.lib/-lpthread/" build_shared/build.ninja &&
+ touch build_shared/-lpthread &&
+ wl-showstatus build &&
+ C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWPREFIX/include/portable-uuid ninja -Cbuild_static libmosquitto_static.a libmosquittopp_static.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib &&
+ for F in build_static/lib/*.a build_static/lib/cpp/*.a; do
+  cp -f $F $INSTALLPREFIX/lib/ &&
+  cp -f $F $INSTALLPREFIX/lib/$(basename $F|sed -e "s/_static//")
+ done &&
+ wl-showstatus build-install &&
+ C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWPREFIX/include/portable-uuid ninja -Cbuild_shared install/strip &&
+ cp -f build_shared/lib/*.dll.a build_shared/lib/cpp/*.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/src/mosquitto.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

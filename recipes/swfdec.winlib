@@ -1,0 +1,72 @@
+export NAME="Swfdec"
+export STATUS=
+#export URL=https://sourceforge.net/projects/swfdec/
+#export URL=http://swfdec.freedesktop.org/
+export URL=https://swfdec.freedesktop.org/wiki/
+export BASENAME=swfdec
+export DESCRIPTION="Swfdec (pronounced \"swiff deck\") is a decoder/renderer for Macromedia Flash animations."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=0.8.4
+#export VERSIONDATE=20130108
+export VERSION=0.9.2
+export VERSIONDATE=20130108
+####No package 'alsa' found
+####checking whether your compiler passes the ACC conformance test... FAILED
+####swfdec/swfdec_video_decoder_gst.c:182:28: error: 'GstBuffer {aka struct _GstBuffer}' has no member named 'data'
+wl-showstatus --package-version
+#export DEPENDANCIES=glib2,gtk2,pango,cairo,gstreamer,gst-plugins-base,liboil,libsoup-2.4,zlib,libjpeg,libffi
+export DEPENDANCIES=glib2,gtk2,pango,cairo,gstreamer,gst-plugins-base,liboil,libsoup-2.4,zlib,libjpeg,libffi,pulseaudio
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://swfdec.freedesktop.org/download/swfdec/"
+#export DOWNLOADURL="https://gitlab.freedesktop.org/archived-projects/swfdec/swfdec/-/tags"
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://swfdec.freedesktop.org/download/swfdec/`echo $VERSION|sed -e "s/^\([0-9][0-9]*\.[0-9][0-9]*\)\..*/\1/"`/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://gitlab.freedesktop.org/archived-projects/swfdec/swfdec/-/archive/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing LC_MESSAGES in swfdec-gtk/swfdec_gtk_system.c
+mv swfdec-gtk/swfdec_gtk_system.c swfdec-gtk/swfdec_gtk_system.c.bak
+echo "#include <libintl.h>" > swfdec-gtk/swfdec_gtk_system.c
+cat swfdec-gtk/swfdec_gtk_system.c.bak >> swfdec-gtk/swfdec_gtk_system.c
+# fix globbing issues with glib-mkenums
+mv swfdec/Makefile.am swfdec/Makefile.am.bak &&
+sed -e "s/\(--fprod \"\)\(\/\*\)/\1\\\\n\2/g" swfdec/Makefile.am.bak > swfdec/Makefile.am
+## workaround for problems linking with pulseaudio/libpulsecommon-3.0.la which is in $MINGWPREFIX/lib/pulseaudio (DLL is in $MINGWPREFIX/lib/bin)
+#####../libtool: line 7509: cd: pulseaudio: No such file or directory
+#####libtool: link: warning: cannot determine absolute directory name of `pulseaudio'
+#####/bin/grep: pulseaudio/libpulsecommon-3.0.la: No such file or directory
+#####/bin/sed: can't read pulseaudio/libpulsecommon-3.0.la: No such file or directory
+#####libtool: link: `pulseaudio/libpulsecommon-3.0.la' is not a valid libtool archive
+#mkdir -p swfdec-gtk/pulseaudio
+#cp -f $MINGWPREFIX/lib/pulseaudio/libpulsecommon-* swfdec-gtk/pulseaudio/
+#mkdir -p player/pulseaudio
+#cp -f $MINGWPREFIX/lib/pulseaudio/libpulsecommon-* player/pulseaudio/
+# fix globbing issues with glib-mkenums
+sed -i.bak -e "s/\(--fprod \"\)\(\\\\n\)\(\/\*\)/\1 \\\\n\3/g" swfdec/Makefile.am
+# fix building DLLs
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# fix detection of gstreamer 1.0
+mv configure configure.bak &&
+sed -e "s/\(gstreamer[-a-z]*\)-0.10/\1-1.0/g" configure.bak > configure &&
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-audio=none &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-audio=pulse &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-audio=pulse --disable-gstreamer &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #make install-strip &&
+ PATH=$PYDIR:$PATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####development on this package stopped
+
+
+

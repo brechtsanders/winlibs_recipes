@@ -1,0 +1,93 @@
+export NAME="popt"
+export STATUS=
+export URL=http://freshmeat.net/projects/popt
+#export URL=https://github.com/devzero2000/POPT
+export BASENAME=popt
+export DESCRIPTION="Popt is a C library for parsing command line parameters. Popt was heavily influenced by the getopt() and getopt_long() functions, but it improves on them by allowing more powerful argument expansion. Popt can parse arbitrary argv[] style arrays and automatically set variables based on command line arguments. Popt allows command line arguments to be aliased via configuration files and includes utility functions for parsing arbitrary strings into argv[] arrays using shell-like rules."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=1.14
+#export VERSION=1.15
+#export VERSION=1.16
+####poptconfig.c:144: error: `uid_t' undeclared (first use in this function)
+####poptconfig.c:144: error: (Each undeclared identifier is reported only once
+####poptconfig.c:144: error: for each function it appears in.)
+####poptconfig.c:144: error: syntax error before "uid"
+####poptconfig.c:148: error: syntax error before "sb"
+####poptconfig.c:153: error: `S_IWGRP' undeclared (first use in this function)
+####poptconfig.c:153: error: `S_IWOTH' undeclared (first use in this function)
+export VERSIONDATE=
+export VERSION=1.16
+export VERSIONDATE=20200407
+wl-showstatus --package-version
+export DEPENDANCIES=libiconv,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://rpm5.org/files/popt/"
+#export DOWNLOADURL="https://src.fedoraproject.org/repo/pkgs/popt/ popt- .tar.gz/"
+export DOWNLOADURL="http://anduin.linuxfromscratch.org/BLFS/popt/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://rpm5.org/files/popt/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://fossies.org/linux/misc/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=http://anduin.linuxfromscratch.org/BLFS/popt/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfJv $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing file
+mkdir sys
+touch sys/ioctl.h
+## fix missing S_ISLNK in poptconfig.c (version <= 1.16)
+#patch -ulbf poptconfig.c << EOF
+#--- poptconfig.c  2008-03-10 07:22:52 +0100
+#+++ poptconfig.c  2013-11-20 10:48:28 +0100
+#@@ -212,3 +212,7 @@
+#                if (!stat(f, &s)) {
+#+#ifdef S_ISLNK
+#                    if (!S_ISREG(s.st_mode) && !S_ISLNK(s.st_mode))
+#+#else
+#+                   if (!S_ISREG(s.st_mode))
+#+#endif
+#                        continue;
+#EOF
+# fix poptconfig.c (version >= 1.16)
+patch -ulbf poptconfig.c << EOF
+@@ -143,3 +143,5 @@
+     struct stat sb;
++#ifndef _WIN32
+     uid_t uid = getuid();
++#endif
+
+@@ -147,4 +149,6 @@
+        return 1;
++#ifndef _WIN32
+     if ((uid_t)sb.st_uid != uid)
+        return 0;
++#endif
+     if (!S_ISREG(sb.st_mode))
+EOF
+#wl-showstatus configure &&
+# # fix building DLLs on 64-bit
+# if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+# fi &&
+# #make check
+# # build with libintl only if it is available
+# if [ -f $MINGWPREFIX/lib/libintl.dll.a ]; then
+#  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-Drandom=rand -Dsrandom=srand" LDFLAGS="-Wl,--as-needed -lintl"
+# else
+#  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-nls --without-libintl-prefix CFLAGS="-Drandom=rand -Dsrandom=srand"
+# fi &&
+# echo "#undef HAVE_LANGINFO_H" >> config.h &&
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,131 @@
+export NAME="CDPD"
+export STATUS=
+export URL=http://snar.spb.ru/prog/cdpd/
+export BASENAME=cdpd
+export DESCRIPTION="A simple program designed to send CDP (Cisco Discovery Protocol) and LLDP (Link Layer Discovery) packets on network."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.0.4.1
+#export VERSIONDATE=20130615
+export VERSION=1.0.5
+export VERSIONDATE=20130615
+wl-showstatus --package-version
+#export DEPENDANCIES=winpcap
+export DEPENDANCIES=libpcap
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE=
+export DOWNLOADURL="http://snar.spb.ru/prog/cdpd/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://snar.spb.ru/prog/cdpd/$BASENAME-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+cd $BASENAME-$VERSION
+## fix missing files (version <= 1.0.4.1)
+#mkdir -p winfix/sys winfix/netinet winfix/arpa winfix/net
+#echo "#include <winsock2.h>" > winfix/sys/socket.h
+#touch winfix/netinet/in.h winfix/arpa/inet.h winfix/net/if.h winfix/sys/ioctl.h
+## fix cdpd.c (version <= 1.0.4.1)
+#patch -ulbf cdpd.c << EOF
+#--- cdpd.c  2010-04-02 17:12:32 +0200
+#+++ cdpd.c  2013-06-15 13:50:56 +0200
+#@@ -32,2 +32,11 @@
+#
+#+#ifdef __MINGW32__
+#+#undef AF_INET6
+#+#define sleep(t) _sleep((t) * 1000)
+#+//#include <stdint.h>
+#+#define HAVE_U_INT8_T
+#+#define HAVE_U_INT16_T
+#+#define HAVE_U_INT32_T
+#+#endif
+#+
+# #include <ctype.h>
+#@@ -69,3 +78,5 @@
+#
+#+#ifndef __MINGW32__
+# static struct utsname myuname;
+#+#endif
+# static char mysysname[512];
+#@@ -381,12 +392,12 @@
+# int
+#-cdp_add_interface(unsigned char* buffer, int len, char* interface)
+#+cdp_add_interface(unsigned char* buffer, int len, char* iface)
+# {
+#-       if(!interface) return 0;
+#-       if(len<(strlen(interface)+4)) return 0;
+#+       if(!iface) return 0;
+#+       if(len<(strlen(iface)+4)) return 0;
+#
+#        sx_write_short(buffer,htons(0x0003)); /* type=PortId */
+#-       sx_write_short(buffer+2,htons(strlen(interface)+4)); /* totallength*/
+#-       memcpy(buffer+4,interface,strlen(interface));
+#+       sx_write_short(buffer+2,htons(strlen(iface)+4)); /* totallength*/
+#+       memcpy(buffer+4,iface,strlen(iface));
+#
+#-       return strlen(interface)+4;
+#+       return strlen(iface)+4;
+# };
+#@@ -421,2 +432,5 @@
+# {
+#+#ifdef __MINGW32__
+#+       return 0;
+#+#else
+#        if((strlen(myuname.machine)+4)>len) return 0;
+#@@ -427,2 +441,3 @@
+#        return strlen(myuname.machine)+4;
+#+#endif
+# };
+#@@ -795,3 +810,3 @@
+# #else
+#-#error "Don't known how to detect mac address"
+#+#warning "Don't known how to detect mac address"
+# #endif
+#@@ -810,2 +825,3 @@
+#
+#+#ifndef __MINGW32__
+#        uname(&myuname);
+#@@ -813,2 +829,3 @@
+#                myuname.sysname, myuname.release, myuname.version);
+#+#endif
+#
+#EOF
+## fix daemon.c (version <= 1.0.4.1)
+#patch -ulbf daemon.c << EOF
+#--- daemon.c  2001-09-24 18:00:16 +0200
+#+++ daemon.c  2013-06-15 13:57:16 +0200
+#@@ -59,2 +59,5 @@
+# {
+#+#ifdef __MINGW32__
+#+       return (-1);
+#+#else
+#        int fd;
+#@@ -84,2 +87,3 @@
+#        return (0);
+#+#endif
+# }
+#EOF
+# fix missing GetAdaptersAddresses in cdpd.c (version >= 1.0.5)
+mv cdpd.c cdpd.c.bak
+#echo "#define _WIN32_WINNT 0x0501" > cdpd.c
+cat > cdpd.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+EOF
+cat cdpd.c.bak >> cdpd.c
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/winfix -I$MINGWPREFIX/include/pcap" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build &&
+ make -j1 LDADD="-Wl,--as-needed -lws2_32 -liphlpapi -lpcap" &&
+ wl-showstatus build-install &&
+ make install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#$MINGWPREFIX/libexec/cdpd.exe -d -o -i "\Device\NPF_{E5C8FFA8-B123-4021-A85A-0A3DFB3591EE}"
+
+
+

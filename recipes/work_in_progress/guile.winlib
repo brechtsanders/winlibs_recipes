@@ -1,0 +1,497 @@
+export NAME="guile"
+export STATUS=
+export URL=http://www.gnu.org/software/guile/
+export BASENAME=guile
+export DESCRIPTION="Guile is a library designed to help programmers create flexible applications. Using Guile in an application allows programmers to write plug-ins, or modules (there are many names, but the concept is essentially the same) and users to use them to have an application fit their needs."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=1.8.5
+#export VERSION=1.8.6
+#export VERSION=1.8.7
+export VERSION=1.8.8
+export VERSIONDATE=20101214
+export DEPENDANCIES=gmp,libcrypt,gettext,libltdl,pcre,pthreads,libunistring
+#export VERSION=2.0.0
+#export VERSIONDATE=20110216
+####objcodes.c:75: warning: implicit declaration of function 'mmap'
+#export VERSION=2.0.1
+#export VERSIONDATE=20110428
+####libguile/filesys.c:476: error: '_S_IFSOCK' undeclared (first use in this function)
+#export VERSION=2.0.2
+#export VERSIONDATE=20110711
+####cp: cannot stat `guild.exe': No such file or directory
+#export VERSION=2.0.3
+#export VERSIONDATE=20111023
+#export VERSION=2.0.5
+#export VERSIONDATE=20120131
+#export VERSION=2.0.6
+#export VERSIONDATE=20120707
+#export VERSION=2.0.7
+#export VERSIONDATE=20121130
+#export VERSION=2.0.9
+#export VERSIONDATE=20130410
+#export VERSION=2.0.10
+#export VERSIONDATE=20140318
+#export VERSION=2.0.11
+#export VERSIONDATE=20140321
+#export VERSION=2.0.12
+#export VERSIONDATE=20160715
+#export VERSION=2.0.13
+#export VERSIONDATE=20161012
+#export VERSION=2.0.14
+#export VERSIONDATE=20170214
+#export VERSION=2.2.0
+#export VERSIONDATE=20170316
+#export VERSION=2.2.1
+#export VERSIONDATE=20170420
+#export VERSION=2.2.2
+#export VERSIONDATE=20170422
+#export VERSION=2.2.3
+#export VERSIONDATE=20171202
+####libguile/threads.c:237: error: dereferencing pointer to incomplete type
+wl-showstatus --package-version
+#export DEPENDANCIES=gmp,libcrypt,gettext,libltdl,pcre,pthreads,libunistring,libffi,bdwgc
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL2
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/guile/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/guile/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/guile/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## workaround for error: storage size of 'waittime' isn't known
+#mv libguile/threads.c libguile/threads.c.bak
+#cat > libguile/threads.c << EOF
+#struct timespec {
+#  long tv_sec;
+#  long tv_nsec;
+#};
+#EOF
+#cat libguile/threads.c.bak >> libguile/threads.c
+# workaround for link errors (version <= 1.8.7)
+mv libguile/guile.c libguile/guile.c.bak
+sed -e "s?\(# *define SCM_IMPORT 1\)?//\1?" libguile/guile.c.bak >> libguile/guile.c
+# fix redefinition of tzname in libguile/stime.c (version <= 1.8.8)
+patch -ulbf libguile/stime.c << EOF
+--- libguile/stime.c  Mon Dec  8 18:42:56 2008
++++ libguile/stime.c  Sat Jul  4 21:57:06 2009
+@@ -82,7 +82,6 @@
+ 
+-#ifndef tzname /* For SGI.  */
+-extern char *tzname[]; /* RS6000 and others reject char **tzname.  */
+-#endif
+ #if defined (__MINGW32__)
+ # define tzname _tzname
++#elif !defined (tzname) /* For SGI.  */
++extern char *tzname[]; /* RS6000 and others reject char **tzname.  */
+ #endif
+EOF
+## fix missing crypt
+#echo "#define HAVE_CRYPT_H 1" >> config.h
+# fix documentation build problem on newer gcc versions (see also: http://old.nabble.com/build-failure-just-trying-to-build-guile-1.8.7-natively-td26411839.html) (version <= 1.8.8)
+patch -ulbf libguile/guile-snarf-docs.in << EOF
+--- libguile/guile-snarf-docs.in 2009-07-03 18:19:00.000000000 -0400
++++ libguile/guile-snarf-docs.in 2009-11-19 12:55:32.487266268 -0500
+@@ -23,4 +23,4 @@
+ ## Let the user override the preprocessor autoconf found.
+ test -n "\${CPP+set}" || CPP="@CPP@"
+
+-\${CPP} -DSCM_MAGIC_SNARF_DOCS "\$@"
++\${CPP} -P -DSCM_MAGIC_SNARF_DOCS "\$@"
+EOF
+# fix scripts/snarf-check-and-output-texi (to avoid the ERROR: In procedure scm_i_lreadparen: ERROR: #<unknown port>:1:7: end of file) (version <= 1.8.8)
+patch -ulbf scripts/snarf-check-and-output-texi << EOF
+--- scripts/snarf-check-and-output-texi  2010-11-10 11:22:40 +0100
++++ scripts/snarf-check-and-output-texi  2010-11-10 11:28:50 +0100
+@@ -3,3 +3,3 @@
+ main="(module-ref (resolve-module '(scripts snarf-check-and-output-texi)) 'main)"
+-exec \${GUILE-guile} -l \$0 -c "(apply \$main (cdr (command-line)))" "\$@"
++GUILE_LOAD_PATH=`pwd` exec `pwd`/libguile/.libs/guile.exe -l \$0 -c "(apply \$main (cdr (command-line)))" "\$@"
+ !#
+EOF
+## fix redefinition of mkdir in libguile/filesys.c (version >= 2.0.0)
+#patch -ulbf libguile/filesys.c << EOF
+#--- libguile/filesys.c  2011-01-29 22:29:06 +0100
+#+++ libguile/filesys.c  2011-02-16 23:59:40 +0100
+#@@ -118,3 +118,3 @@
+# #ifdef __MINGW32__
+#-# define mkdir(path, mode) mkdir (path)
+#+inline int mkdir(const char* path, int mode) { return mkdir(path); }
+# # define fsync(fd) _commit (fd)
+#EOF
+## fix includsion of missing sys/mman.h in libguile/objcodes.c (version >= 2.0.0)
+#patch -ulbf libguile/objcodes.c << EOF
+#--- libguile/objcodes.c  2011-02-14 11:13:06 +0100
+#+++ libguile/objcodes.c  2011-02-17 00:02:42 +0100
+#@@ -25,3 +25,5 @@
+# #include <unistd.h>
+#+#ifndef __MINGW32__
+# #include <sys/mman.h>
+#+#endif
+# #include <sys/stat.h>
+#EOF
+## fix missing GC_pthread functions in libguile/pthread-threads.h (version >= 2.0.9)
+#mv libguile/pthread-threads.h libguile/pthread-threads.h.bak
+#sed -e "s/GC_\(pthread_\)/\1/g" libguile/pthread-threads.h.bak > libguile/pthread-threads.h
+## fix invalid cdecl in lib/msvc-inval.c (version >= 2.0.9)
+#mv lib/msvc-inval.c lib/msvc-inval.c.bak
+#sed -e "s/\(cdecl\)/__\1/" lib/msvc-inval.c.bak > lib/msvc-inval.c
+## ignore 64-bit error in libguile/numbers.c (version >= 2.0.9)
+#patch -ulbf libguile/numbers.c << EOF
+#--- libguile/numbers.c  2013-03-28 22:19:12 +0100
+#+++ libguile/numbers.c  2013-12-22 21:38:58 +0100
+#@@ -282,3 +282,4 @@
+#      mpz_*_si invocations in Guile. */
+#-#error creation of mpz not implemented for this inum size
+#+#warning creation of mpz not implemented for this inum size
+#+  mpz_init_set_si (SCM_I_BIG_MPZ (z), x);
+# #endif
+#EOF
+##mv libguile/numbers.c libguile/numbers.c.bak
+##sed -e "s/\(SIZEOF_VOID_P \)==\( SIZEOF_LONG\)/\1>=\2/" libguile/numbers.c.bak > libguile/numbers.c
+## fix missing hostname in libguile/posix.c (version >= 2.0.9)
+#patch -ulbf libguile/posix.c << EOF
+#--- libguile/posix.c  2013-03-29 19:20:02 +0100
+#+++ libguile/posix.c  2013-12-23 07:47:04 +0100
+#@@ -1,2 +1,3 @@
+#+//#include <unistd.h>
+# /* Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
+#  *   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013 Free Software Foundation, Inc.
+#@@ -50,4 +51,8 @@
+# #include <unistd.h>
+# #endif
+#+#if defined(__MINGW32__) && defined(gethostname)
+#+#undef gethostname
+#+#include <winsock2.h>
+#+#endif
+#
+# #ifdef LIBC_H_WITH_UNISTD_H
+#EOF
+## fix #if without condition (version >= 2.2.1)
+#for F in $(grep -l "^#\s*if\s*$" lib/*.h); do
+# mv $F $F.bak &&
+# sed -e "s/^#\s*if\s*$/& 0/" $F.bak > $F
+#done
+## fix missing AM_PROG_AR in configure.ac
+#sed -i.orig "s/^AM_PROG_AR$/m4_ifdef([AM_PROG_AR], [AM_PROG_AR])/" configure.ac
+wl-showstatus configure &&
+# fix for building DLL (version <= 2.0.7)
+autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--allow-multiple-definition" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared LDFLAGS="-Wl,--allow-multiple-definition" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared LDFLAGS="-Wl,--allow-multiple-definition" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads LDFLAGS="-Wl,--allow-multiple-definition" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads LDFLAGS="-Wl,--enable-auto-import" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --disable-error-on-warning LDFLAGS="-Wl,--enable-auto-import" &&
+ wl-showstatus build-install &&
+ ## fix libtool issues on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # mv libtool libtool.bak &&
+ # sed -e "s/-march=i386 -mtune=i686//" `which libtool` > libtool
+ #fi &&
+ #make libguile/scmconfig.h &&
+ make install-strip &&
+ sed -i -e "s?^\#\!$INSTALLPREFIX/bin/guile?\#\!guile.exe?" $INSTALLPREFIX/bin/guile-config &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####touch $INSTALLPREFIX/bin/guile-tools.exe; make -j1 install-strip && echo OK
+####64-bit: libguile/numbers.c:225:2: error: #error creation of mpz not implemented for this inum size
+####64-bit: configure: error: sizes of long and void* are not identical
+####To do: build 64-bit
+
+
+
+#export NAME="guile"
+#export STATUS=
+#export URL=http://www.gnu.org/software/guile/
+#export BASENAME=guile
+#export DESCRIPTION="Guile is a library designed to help programmers create flexible applications. Using Guile in an application allows programmers to write plug-ins, or modules (there are many names, but the concept is essentially the same) and users to use them to have an application fit their needs."
+#export CATEGORY=development
+#export TYPE=library
+##export VERSION=2.0.9
+##export VERSIONDATE=20131215
+##export VERSION=2.0.10
+##export VERSIONDATE=20140318
+##export VERSION=2.0.11
+##export VERSIONDATE=20140321
+##export VERSION=2.0.12
+##export VERSIONDATE=20160715
+##export VERSION=2.0.13
+##export VERSIONDATE=20161012
+#export VERSION=2.0.14
+#export VERSIONDATE=20170214
+##export VERSION=2.2.0
+##export VERSIONDATE=20170316
+##export VERSION=2.2.1
+##export VERSIONDATE=20170420
+##export VERSION=2.2.2
+##export VERSIONDATE=20170422
+##export VERSION=2.2.3
+##export VERSIONDATE=20171202
+##export VERSION=2.2.4
+##export VERSIONDATE=20180702
+#####libguile/socket.c:43:25: fatal error: netinet/tcp.h: No such file or directory
+#####libguile/stime.c:702: undefined reference to `scm_pthread_mutex_lock'
+#wl-showstatus --package-version
+#export DEPENDANCIES=gmp,libcrypt,gettext,libltdl,pcre,pthreads,libunistring,libffi,bdwgc
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING.LESSER
+#export LICENSETYPE=LGPL2
+#export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/guile/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/guile/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## fix missing GC_pthread functions in libguile/pthread-threads.h (version = 2.0.9)
+#mv libguile/pthread-threads.h libguile/pthread-threads.h.bak
+#sed -e "s/GC_\(pthread_\)/\1/g" libguile/pthread-threads.h.bak > libguile/pthread-threads.h
+### fix invalid cdecl in lib/msvc-inval.c (version >= 2.0.9)
+##mv lib/msvc-inval.c lib/msvc-inval.c.bak
+##sed -e "s/\(cdecl\)/__\1/" lib/msvc-inval.c.bak > lib/msvc-inval.c
+## ignore 64-bit error in libguile/numbers.c (version >= 2.0.9)
+#patch -ulbf libguile/numbers.c << EOF
+#--- libguile/numbers.c  2013-03-28 22:19:12 +0100
+#+++ libguile/numbers.c  2013-12-22 21:38:58 +0100
+#@@ -282,3 +282,4 @@
+#      mpz_*_si invocations in Guile. */
+#-#error creation of mpz not implemented for this inum size
+#+#warning creation of mpz not implemented for this inum size
+#+  mpz_init_set_si (SCM_I_BIG_MPZ (z), x);
+# #endif
+#EOF
+## fix missing hostname in libguile/posix.c (version >= 2.0.9)
+#patch -ulbf libguile/posix.c << EOF
+#--- libguile/posix.c  2013-03-29 19:20:02 +0100
+#+++ libguile/posix.c  2013-12-23 07:47:04 +0100
+#@@ -1,2 +1,3 @@
+#+//#include <unistd.h>
+# /* Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
+#  *   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013 Free Software Foundation, Inc.
+#@@ -50,4 +51,8 @@
+# #include <unistd.h>
+# #endif
+#+#if defined(__MINGW32__) && defined(gethostname)
+#+#undef gethostname
+#+#include <winsock2.h>
+#+#endif
+#
+# #ifdef LIBC_H_WITH_UNISTD_H
+#EOF
+## fix missing guild.exe (version >= 2.0.9)
+#patch -ulbf meta/Makefile.in << EOF
+#--- meta/Makefile.in  2013-04-10 01:32:00 +0200
+#+++ meta/Makefile.in  2013-12-15 16:44:02 +0100
+#@@ -1800,3 +1800,3 @@
+#        guild="\`echo \$(ECHO_N) guild                            \\
+#-          | \$(SED) -e '\$(program_transform_name)'\`\$(EXEEXT)" ; \\
+#+          | \$(SED) -e '\$(program_transform_name)'\`" ;  \\
+#        guile_tools="\`echo \$(ECHO_N) guile-tools                \\
+#EOF
+### fix missing netinet/tcp.h in libguile/socket.c (version = 2.2.0)
+##patch -ulbf libguile/socket.c << EOF
+##--- libguile/socket.c  2017-02-21 22:00:30.000000000 +0100
+##+++ libguile/socket.c  2017-03-16 07:38:50.921550100 +0100
+##@@ -41,2 +41,5 @@
+## #endif
+##+#ifdef _WIN32
+##+#include <winsock2.h>
+##+#else
+## #include <netinet/in.h>
+##@@ -45,2 +48,3 @@
+## #include <arpa/inet.h>
+##+#endif
+##
+##EOF
+## fix missing netinet/tcp.h in libguile/socket.c (version >= 2.2.1)
+#mv libguile/socket.c libguile/socket.c.bak &&
+#sed -e "s?netinet/in\.h\|netinet/tcp\.h\|netdb\.h\|arpa/inet.h?winsock2.h?" libguile/socket.c.bak > libguile/socket.c
+## fix redefinition of mkstemp in libguile/mkstemp.c (version >= 2.0.11)
+#mv libguile/mkstemp.c libguile/mkstemp.c.bak
+#touch libguile/mkstemp.c
+## fix missing clock_getcpuclockid in libguile/stime.c (version >= 2.0.14)
+#patch -ulbf libguile/stime.c << EOF
+#@@ -125 +125 @@
+#-#if defined _POSIX_CPUTIME && defined CLOCK_PROCESS_CPUTIME_ID
+#+#if defined _POSIX_CPUTIME && defined CLOCK_PROCESS_CPUTIME_ID && !defined __MINGW32__
+#EOF
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --disable-posix --disable-error-on-warning LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --disable-posix --without-included-regex LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -lregex" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --disable-posix --with-included-regex LDFLAGS="-Wl,--enable-auto-import" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-threads --enable-posix --enable-regex --with-included-regex LDFLAGS="-Wl,--as-needed -lpthread" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-threads --enable-posix --enable-regex --without-included-regex LDFLAGS="-Wl,--as-needed -lpthread -lregex" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --enable-posix --enable-regex --without-included-regex LDFLAGS="-Wl,--as-needed -lpthread -lregex -lws2_32" &&
+# # fix use of pthreads
+# #make libguile/scmconfig.h &&
+# #mv -f libguile/scmconfig.h libguile/scmconfig.h.bak &&
+# #cat libguile/scmconfig.h.bak > libguile/scmconfig.h &&
+# echo "#undef SCM_USE_PTHREAD_THREADS" >> libguile/scmconfig.h &&
+# echo "#define SCM_USE_PTHREAD_THREADS 1" >> libguile/scmconfig.h &&
+# echo "#undef SCM_USE_NULL_THREADS" >> libguile/scmconfig.h &&
+# echo "#define SCM_USE_NULL_THREADS 0" >> libguile/scmconfig.h &&
+# wl-showstatus build-install &&
+# GUILE_LOAD_PATH=$(pwd)/module:$(pwd)/guile-readline PATH=$(pwd)/am:$(pwd)/meta:$PATH make install-strip &&
+# sed -i -e "s?^\#\!$INSTALLPREFIX/bin/guile?\#\!guile.exe?" $INSTALLPREFIX/bin/guile-config &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export NAME="guile"
+#export STATUS=
+#export URL=http://www.gnu.org/software/guile/
+#export BASENAME=guile
+#export DESCRIPTION="Guile is a library designed to help programmers create flexible applications. Using Guile in an application allows programmers to write plug-ins, or modules (there are many names, but the concept is essentially the same) and users to use them to have an application fit their needs."
+#export CATEGORY=development
+#export TYPE=library
+##export VERSION=2.2.4
+##export VERSIONDATE=20180702
+##export VERSION=2.2.5
+##export VERSIONDATE=20190620
+##export VERSION=2.2.6
+##export VERSIONDATE=20190701
+#export VERSION=2.2.7
+#export VERSIONDATE=20200308
+##export VERSION=3.0.0
+##export VERSIONDATE=20200116
+##export VERSION=3.0.1
+##export VERSIONDATE=20200309
+##export VERSION=3.0.2
+##export VERSIONDATE=20200328
+##export VERSION=3.0.3
+##export VERSIONDATE=20200622
+##export VERSION=3.0.4
+##export VERSIONDATE=20200625
+##export VERSION=3.0.5
+##export VERSIONDATE=20210407
+##export VERSION=3.0.6
+##export VERSIONDATE=20210428
+##export VERSION=3.0.7
+##export VERSIONDATE=20210510
+##export VERSION=3.0.8
+##export VERSIONDATE=20220211
+#wl-showstatus --package-version
+#export DEPENDANCIES=gmp,libcrypt,gettext,libltdl,pcre,pthreads,libunistring,libffi,bdwgc
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING.LESSER
+#export LICENSETYPE=LGPL2
+#export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/guile/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/guile/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## fix definition of start_child() in libguile/posix-w32.h and libguile/posix-w32.c (version >= 2.2.4)
+#patch -ulbf libguile/posix-w32.h << EOF
+#@@ -78,3 +78,3 @@
+#-SCM_INTERNAL int start_child (const char *exec_file, char **argv,
+#-                              int reading, int c2p[2], int writing, int p2c[2],
+#-                              int infd, int outfd, int errfd);
+#+SCM_INTERNAL intptr_t start_child (const char *exec_file, char **argv,
+#+                                   int reading, int c2p[2], int writing,
+#+                                   int p2c[2], int infd, int outfd, int errfd);
+#EOF
+#patch -ulbf libguile/posix-w32.c << EOF
+#@@ -604,3 +604,3 @@
+#    process.  */
+#-pid_t
+#+intptr_t
+# start_child (const char *exec_file, char **argv,
+#EOF
+## fix missing netinet/tcp.h in libguile/socket.c (version >= 2.2.4)
+#sed -i.bak -e "s?netinet/in\.h\|netinet/tcp\.h\|netdb\.h\|arpa/inet.h?winsock2.h?" libguile/socket.c
+## fix missing hostname in libguile/posix.c (version >= 2.2.4)
+#patch -ulbf libguile/posix.c << EOF
+#@@ -50,2 +50,6 @@
+# #include <unistd.h>
+#+#if defined(__MINGW32__) && defined(gethostname)
+#+#undef gethostname
+#+#include <winsock2.h>
+#+#endif
+#
+#EOF
+## fix missing SCM_INTERNAL in libguile/posix-w32.h (version >= 3.0.0)
+#mv libguile/posix-w32.h libguile/posix-w32.h.bak
+#cat > libguile/posix-w32.h << EOF
+##ifndef SCM_INTERNAL
+##define SCM_INTERNAL extern
+##endif
+#EOF
+#cat libguile/posix-w32.h.bak >> libguile/posix-w32.h
+## fix missing __mktime_internal in lib/timegm.c (version >= 2.2.7)
+#patch -ulbf lib/timegm.c << EOF
+#@@ -35,6 +35,10 @@
+# timegm (struct tm *tmp)
+# {
+#+#ifdef __MINGW32__
+#+  return _mkgmtime(tmp);
+#+#else
+#   static mktime_offset_t gmtime_offset;
+#   tmp->tm_isdst = 0;
+#   return __mktime_internal (tmp, __gmtime_r, &gmtime_offset);
+#+#endif
+# }
+#
+#EOF
+## fix lib/mktime-internal.h (version >= 3.0.6)
+#patch -ulbf lib/mktime-internal.h << EOF
+#@@ -48,4 +48,6 @@
+# # define __localtime64_r __localtime_r
+#+# ifndef __MINGW32__
+# # define __mktime64 mktime
+# # define __timegm64 timegm
+#+# endif
+# #endif
+#EOF
+## fix libguile/socket.c (version >= 3.0.6)
+#mv libguile/socket.c libguile/socket.c.bak &&
+#echo "#define _POSIX_SOURCE" > libguile/socket.c &&
+#echo "#include <ws2tcpip.h>" >> libguile/socket.c &&
+#cat libguile/socket.c.bak >> libguile/socket.c
+## fix missing timegm in lib/time_rz.c (version >= 3.0.6)
+#mv lib/time_rz.c lib/time_rz.c.bak
+#cat > lib/time_rz.c << EOF
+##include <config.h>
+##include <stdlib.h>
+##include <time.h>
+#inline time_t timegm (struct tm* tm) {
+#  time_t ret;
+#  putenv("TZ=");
+#  tzset();
+#  ret = mktime(tm);
+#  //to do: reset time zone to previous value
+#  return ret;
+#}
+#EOF
+#cat lib/time_rz.c.bak >> lib/time_rz.c
+### fix meta/guild.in
+##sed -i.bak -e "s?\${GUILE:-@installed_guile@}?$(pwd)/libguile/guile.exe?" meta/guild.in
+#sed -i.bak -e "s?\(\${GUILE:-@installed_guile@\)\(}.*\)\$0?\1.exe\2../meta/guild?" meta/guild.in
+## fix replacing mktime
+#sed -i.bak -e "s/\(gl_cv_func_working_mktime\)=no/\1=yes/; s/\(GNULIB_MKTIME\)=0/\1=1/g; s/\(REPLACE_MKTIME\)=1/\1=0/g" configure
+#wl-showstatus configure &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --enable-posix --enable-networking --enable-regex --without-included-regex --without-64-calls LDFLAGS="-Wl,--as-needed -lpthread -lregex -lws2_32" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --enable-posix --enable-networking --disable-jit --enable-regex --with-included-regex --without-64-calls LDFLAGS="-Wl,--as-needed -lpthread -lws2_32" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-guile-debug --with-threads --enable-posix --enable-networking --disable-jit --enable-regex --with-included-regex --without-64-calls LDFLAGS="-Wl,--as-needed -lpthread -lws2_32" &&
+# # fix missing getpagesize
+# echo "#define getpagesize() 4096" >> config.h &&
+# wl-showstatus build-install &&
+# GUILE_LOAD_PATH=$(pwd)/module:$(pwd)/guile-readline PATH=$(pwd)/am:$(pwd)/meta:$PATH make install-strip &&
+# sed -i -e "s?^\#\!$INSTALLPREFIX/bin/guile?\#\!guile.exe?" $INSTALLPREFIX/bin/guile-config &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####cp libguile/guile.exe $INSTALLPREFIX/bin/ &&
+
+
+

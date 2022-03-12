@@ -1,0 +1,787 @@
+#export NAME="dmidecode"
+#export STATUS=
+#export URL=http://www.nongnu.org/dmidecode/
+##export URL=https://github.com/mirror/dmidecode
+#export BASENAME=dmidecode
+#export DESCRIPTION="Dmidecode reports information about your system's hardware as described in your system BIOS according to the SMBIOS/DMI standard."
+#export CATEGORY=hardware
+#export TYPE=library,application
+##export VERSION=3.0
+##export VERSIONDATE=20160301
+##export VERSION=3.1
+##export VERSIONDATE=20170524
+##export VERSION=3.2
+##export VERSIONDATE=20180915
+#export VERSION=3.3
+#export VERSIONDATE=20201015
+#wl-showstatus --package-version
+#export DEPENDANCIES=mman-win32
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="http://download.savannah.gnu.org/releases/dmidecode/"
+##export DOWNLOADURL="https://github.com/mirror/dmidecode/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/dmidecode/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## fix missing mman.h
+##echo "#undef USE_MMAP" >> config.h
+#mv Makefile Makefile.bak &&
+#sed -e "s?CFLAGS\s*=\s*?&-I$MINGWPREFIX/include/mman-win32 ?; s?LDFLAGS\s*=?& -lmman --static?; s/\(\$(CC)\)\( \$(LDFLAGS)\)\(.*\)$/\1\3\2/" Makefile.bak > Makefile
+## fix invalid DEFAULT_MEM_DEV
+#echo '#undef DEFAULT_MEM_DEV' >> config.h
+##echo '#define DEFAULT_MEM_DEV "\\Device\\PhysicalMemory"' >> config.h
+#echo '#define DEFAULT_MEM_DEV "\\\\.\\PhysicalMemory"' >> config.h
+## fix missing setlinebuf in dmidecode.c
+#patch -ulbf dmidecode.c << EOF
+#@@ -4990,4 +4990,6 @@
+#         */
+#+#ifndef _WIN32
+#        setlinebuf(stdout);
+#        setlinebuf(stderr);
+#+#endif
+#
+#EOF
+#wl-showstatus build &&
+# make &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####See also: https://msdn.microsoft.com/en-us/library/windows/desktop/ms724379%28v=vs.85%29.aspx
+#####See also: https://lists.gnu.org/archive/html/dmidecode-devel/2006-10/txtQldzu3pdae.txt
+#####See also: http://elgenieben.blogspot.fr/2013/10/dmidecode-212-windows-port.html
+#
+#
+#
+#cat > native.h << EOF
+#//========================================================
+#//
+#// Native.h
+#//
+#// Mark Russinovich
+#// Systems Internals
+#// http://www.sysinternals.com
+#//
+#// This file contains tyepdefs and defines from NTDDK.H.
+#// They are included here so that we don't have to
+#// include NTDDK.H and get all the other stuff that
+#// we don't really need or want.
+#//
+#//========================================================
+##ifndef NATIVE_H
+##define NATIVE_H
+#
+##ifdef __WIN32__
+#/*
+##define PAGE_NOACCESS          0x01     // winnt
+##define PAGE_READONLY          0x02     // winnt
+##define PAGE_READWRITE         0x04     // winnt
+##define PAGE_WRITECOPY         0x08     // winnt
+##define PAGE_EXECUTE           0x10     // winnt
+##define PAGE_EXECUTE_READ      0x20     // winnt
+##define PAGE_EXECUTE_READWRITE 0x40     // winnt
+##define PAGE_EXECUTE_WRITECOPY 0x80     // winnt
+##define PAGE_GUARD            0x100     // winnt
+##define PAGE_NOCACHE          0x200     // winnt
+#*/
+#typedef LARGE_INTEGER PHYSICAL_ADDRESS, *PPHYSICAL_ADDRESS; // windbgkd
+#
+#
+#typedef LONG NTSTATUS;
+##define NT_SUCCESS(Status) ((NTSTATUS)(Status) >= 0)
+#
+#typedef struct _UNICODE_STRING {
+#    USHORT Length;
+#    USHORT MaximumLength;
+##ifdef MIDL_PASS
+#    [size_is(MaximumLength / 2), length_is((Length) / 2) ] USHORT * Buffer;
+##else // MIDL_PASS
+#    PWSTR  Buffer;
+##endif // MIDL_PASS
+#} UNICODE_STRING;
+#typedef UNICODE_STRING *PUNICODE_STRING;
+#
+#typedef enum _SECTION_INHERIT {
+#    ViewShare = 1,
+#    ViewUnmap = 2
+#} SECTION_INHERIT;
+#
+##define OBJ_INHERIT             0x00000002L
+##define OBJ_PERMANENT           0x00000010L
+##define OBJ_EXCLUSIVE           0x00000020L
+##define OBJ_CASE_INSENSITIVE    0x00000040L
+##define OBJ_OPENIF              0x00000080L
+##define OBJ_OPENLINK            0x00000100L
+##define OBJ_VALID_ATTRIBUTES    0x000001F2L
+#
+#
+#typedef struct _OBJECT_ATTRIBUTES {
+#    ULONG Length;
+#    HANDLE RootDirectory;
+#    PUNICODE_STRING ObjectName;
+#    ULONG Attributes;
+#    PVOID SecurityDescriptor;        // Points to type SECURITY_DESCRIPTOR
+#    PVOID SecurityQualityOfService;  // Points to type SECURITY_QUALITY_OF_SERVICE
+#} OBJECT_ATTRIBUTES;
+#typedef OBJECT_ATTRIBUTES *POBJECT_ATTRIBUTES;
+#
+#
+##define InitializeObjectAttributes( p, n, a, r, s ) { \
+#    (p)->Length = sizeof( OBJECT_ATTRIBUTES );          \
+#    (p)->RootDirectory = r;                             \
+#    (p)->Attributes = a;                                \
+#    (p)->ObjectName = n;                                \
+#    (p)->SecurityDescriptor = s;                        \
+#    (p)->SecurityQualityOfService = NULL;               \
+#    }
+##endif /* __WIN32__ */
+#
+##endif /*NATIVE_H*/
+#EOF
+#
+#cat > winsmbios.c << EOF
+#/*
+# * Functions to allow to read SMBIOS from physical memory on windows
+# * or to get the SMBIOS table on windows 2003 SP1 and above.
+# *
+# * This file is part of the dmidecode project.
+# *
+# *   (C) 2002-2006 Hugo Weber <address@hidden>
+# *
+# *   This program is free software; you can redistribute it and/or modify
+# *   it under the terms of the GNU General Public License as published by
+# *   the Free Software Foundation; either version 2 of the License, or
+# *   (at your option) any later version.
+# *
+# *   This program is distributed in the hope that it will be useful,
+# *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+# *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# *   GNU General Public License for more details.
+# *
+# *   You should have received a copy of the GNU General Public License
+# *   along with this program; if not, write to the Free Software
+# *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+# *
+# *   For the avoidance of doubt the "preferred form" of this code is one which
+# *   is in an open unpatent encumbered format. Where cryptographic key signing
+# *   forms part of the process of creating an executable the information 
+# *   including keys needed to generate an equivalently functional executable
+# *   are deemed to be part of the source code.
+# */
+#
+##ifdef __WIN32__
+##include <windows.h>
+##include "winsmbios.h"
+##include "native.h"
+#
+#
+#
+#/*
+# * Functions in NTDLL that allows access to physical memory
+# * from Windows NT to Windows XP.
+# * 
+# * Made by Mark Russinovich
+# * Systems Internals
+# *
+# * see more on:
+# * http://www.sysinternals.com/Information/TipsAndTrivia.html#PhysMem
+# */
+#NTSTATUS (__stdcall *NtUnmapViewOfSection)(
+#                IN HANDLE  ProcessHandle,
+#                IN PVOID  BaseAddress
+#                );
+#
+#NTSTATUS (__stdcall *NtOpenSection)(
+#                OUT PHANDLE  SectionHandle,
+#                IN ACCESS_MASK  DesiredAccess,
+#                IN POBJECT_ATTRIBUTES  ObjectAttributes
+#                );
+#
+#NTSTATUS (__stdcall *NtMapViewOfSection)(
+#                IN HANDLE  SectionHandle,
+#                IN HANDLE  ProcessHandle,
+#                IN OUT PVOID  *BaseAddress,
+#                IN ULONG  ZeroBits,
+#                IN ULONG  CommitSize,
+#                IN OUT PLARGE_INTEGER  SectionOffset,        /* optional */
+#                IN OUT PULONG  ViewSize,
+#                IN SECTION_INHERIT  InheritDisposition,
+#                IN ULONG  AllocationType,
+#                IN ULONG  Protect
+#                );
+#
+#VOID (__stdcall *RtlInitUnicodeString)(
+#                IN OUT PUNICODE_STRING  DestinationString,
+#                IN PCWSTR  SourceString
+#                );
+#
+#ULONG (__stdcall *RtlNtStatusToDosError) (
+#                IN NTSTATUS Status
+#                );
+#
+#
+#/*
+# * API found on Windows 2003 or newer. From Windows 2003 SP1
+# * Microsoft only allows access to physical memory by kernel
+# * mode. The other way to get the SMBIOS, without to access
+# * physical memory is GetSystemFirmwareTable API.
+# *
+# * see more on:
+# * http://download.microsoft.com/download/5/D/6/5D6EAF2B-7DDF-476B-93DC-7CF0072878E6/SMBIOS.doc
+# */
+#
+#u32 (__stdcall *GetSystemFirmwareTable)(
+#     u32 FirmwareTableProviderSignature,
+#     u32 FirmwareTableID,
+#     void *pFirmwareTableBuffer,
+#     u32 BufferSize
+#);
+#
+#                
+#//--------------------------------------------------------
+#//
+#// LocateNtdllEntryPoints
+#//
+#// Finds the entry points for all the functions we 
+#// need within NTDLL.DLL.
+#//
+#// Mark Russinovich
+#// Systems Internals
+#// http://www.sysinternals.com
+#//--------------------------------------------------------
+#BOOLEAN LocateNtdllEntryPoints()
+#{
+#        
+#    switch(get_windows_platform()){
+#        case WIN_2003_VISTA:
+#                if( !(GetSystemFirmwareTable = (void *) GetProcAddress( GetModuleHandle("kernel32.dll"),
+#                                "GetSystemFirmwareTable" )) ) {
+#    
+#                    return FALSE;
+#                }        
+#        break;
+#        
+#        default:     
+#                if( !(RtlInitUnicodeString = (void *) GetProcAddress( GetModuleHandle("ntdll.dll"),
+#                                "RtlInitUnicodeString" )) ) {
+#        
+#                        return FALSE;
+#                }
+#                if( !(NtUnmapViewOfSection = (void *) GetProcAddress( GetModuleHandle("ntdll.dll"),
+#                                "NtUnmapViewOfSection" )) ) {
+#        
+#                        return FALSE;
+#                }
+#                if( !(NtOpenSection = (void *) GetProcAddress( GetModuleHandle("ntdll.dll"),
+#                                "NtOpenSection" )) ) {
+#        
+#                        return FALSE;
+#                }
+#                if( !(NtMapViewOfSection = (void *) GetProcAddress( GetModuleHandle("ntdll.dll"),
+#                                "NtMapViewOfSection" )) ) {
+#        
+#                        return FALSE;
+#                }
+#                if( !(RtlNtStatusToDosError = (void *) GetProcAddress( GetModuleHandle("ntdll.dll"),
+#                                "RtlNtStatusToDosError" )) ) {
+#        
+#                        return FALSE;
+#                }
+#        
+#        break;
+#    }
+#    
+#        return TRUE;
+#}
+#
+#//----------------------------------------------------------------------
+#//
+#// PrintError
+#//
+#// Formats an error message for the last error
+#//
+#// Mark Russinovich
+#// Systems Internals
+#// http://www.sysinternals.com
+#//----------------------------------------------------------------------
+#void PrintError( char *message, NTSTATUS status )
+#{
+#        char *errMsg;
+#
+#        FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+#                        NULL, RtlNtStatusToDosError( status ), 
+#                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
+#                        (LPTSTR) &errMsg, 0, NULL );
+#        printf("%s: %s\n", message, errMsg );
+#        LocalFree( errMsg );
+#}
+#
+#//--------------------------------------------------------
+#//
+#// UnmapPhysicalMemory
+#//
+#// Maps a view of a section.
+#//
+#// Mark Russinovich
+#// Systems Internals
+#// http://www.sysinternals.com
+#//--------------------------------------------------------
+#static VOID UnmapPhysicalMemory( DWORD Address )
+#{
+#        NTSTATUS                status;
+#
+#        status = NtUnmapViewOfSection( (HANDLE) -1, (PVOID) Address );
+#        if( !NT_SUCCESS(status)) {
+#
+#                PrintError("Unable to unmap view", status );
+#        }
+#}
+#
+#
+#//--------------------------------------------------------
+#//
+#// MapPhysicalMemory
+#//
+#// Maps a view of a section.
+#//
+#// Mark Russinovich
+#// Systems Internals
+#// http://www.sysinternals.com
+#//--------------------------------------------------------
+#static BOOLEAN MapPhysicalMemory( HANDLE PhysicalMemory,
+#                                                        PDWORD Address, PDWORD Length,
+#                                                        PDWORD VirtualAddress )
+#{
+#        NTSTATUS                        ntStatus;
+#        PHYSICAL_ADDRESS        viewBase;
+#        char                                error[256];
+#
+#        *VirtualAddress = 0;
+#        viewBase.QuadPart = (ULONGLONG) (*Address);
+#        ntStatus = NtMapViewOfSection (PhysicalMemory,
+#                               (HANDLE) -1,
+#                               (PVOID) VirtualAddress,
+#                               0L,
+#                               *Length,
+#                               &viewBase,
+#                               Length,
+#                               ViewShare,
+#                               0,
+#                               PAGE_READONLY );
+#
+#        if( !NT_SUCCESS( ntStatus )) {
+#
+#                sprintf( error, "Could not map view of %X length %X",
+#                                *Address, *Length );
+#                PrintError( error, ntStatus );
+#                return FALSE;                                        
+#        }
+#
+#        *Address = viewBase.LowPart;
+#        return TRUE;
+#}
+#
+#
+#//--------------------------------------------------------
+#//
+#// OpensPhysicalMemory
+#//
+#// This function opens the physical memory device. It
+#// uses the native API since 
+#//
+#// Mark Russinovich
+#// Systems Internals
+#// http://www.sysinternals.com
+#//--------------------------------------------------------
+#static HANDLE OpenPhysicalMemory()
+#{
+#        NTSTATUS                status;
+#        HANDLE                        physmem;
+#        UNICODE_STRING        physmemString;
+#        OBJECT_ATTRIBUTES attributes;
+#        WCHAR                        physmemName[] = L"\\device\\physicalmemory";
+#
+#        RtlInitUnicodeString( &physmemString, physmemName );        
+#
+#        InitializeObjectAttributes( &attributes, &physmemString,
+#                                                                OBJ_CASE_INSENSITIVE, NULL, NULL );                        
+#        status = NtOpenSection( &physmem, SECTION_MAP_READ, &attributes );
+#
+#        if( !NT_SUCCESS( status )) {
+#
+#                PrintError( "Could not open \\device\\physicalmemory", status );
+#                return NULL;
+#        }
+#
+#        return physmem;
+#}
+#
+#/*
+# * Copy a physical memory chunk into a memory buffer.
+# * This function allocates memory.
+# *
+# * base - The physical address start point
+# * 
+# * len - Length from the base address
+# *
+# * return - pointer to the buffer which the physical memory was mapped to
+# *
+# * Hugo Weber address@hidden
+# */
+#void *mem_chunk_win(size_t base, size_t len){
+#        void *p;
+#        size_t mmoffset;
+#        SYSTEM_INFO sysinfo;
+#        HANDLE        physmem;
+#        DWORD paddress, vaddress, length;
+#
+#        //
+#        // Load NTDLL entry points
+#        //
+#        if( !LocateNtdllEntryPoints() ) {
+#
+#                printf("Unable to locate NTDLL entry points.\n\n");
+#                return NULL;
+#        }
+#            
+#        //
+#        // Open physical memory
+#        //
+#        if( !(physmem = OpenPhysicalMemory())) {
+#                return NULL;
+#        }
+#
+#        GetSystemInfo(&sysinfo);
+#        mmoffset = base%sysinfo.dwPageSize;
+#        len += mmoffset;
+#    
+#        paddress = (DWORD)base;
+#        length = (DWORD)len;
+#        if(!MapPhysicalMemory( physmem, &paddress, &length, &vaddress )){
+#            free(p);
+#            return NULL;
+#        }
+#    
+#        if((p=malloc(length))==NULL){
+#                return NULL;
+#        }
+#        
+#        memcpy(p, (u8 *)vaddress + mmoffset, length - mmoffset); 
+#    
+#        //
+#        // Unmap the view
+#        //
+#        UnmapPhysicalMemory( vaddress );  
+#        
+#        //
+#        // Close physical memory section
+#        //
+#        CloseHandle( physmem );        
+#        
+#        return p;
+#}
+#
+#
+#/*
+# * Counts the number of SMBIOS structures present in 
+# * the SMBIOS table.
+# *
+# * buff - Pointer that receives the SMBIOS Table address.
+# *        This will be the address of the BYTE array from
+# *        the RawSMBIOSData struct.
+# *
+# * len - The length of the SMBIOS Table pointed by buff.
+# *
+# * return - The number of SMBIOS strutctures.
+# *
+# * Remarks:
+# * The SMBIOS Table Entry Point has this information,
+# * however the GetSystemFirmwareTable API doesn't 
+# * return all fields from the Entry Point, and 
+# * DMIDECODE uses this value as a parameter for
+# * dmi_table function. This is the reason why
+# * this function was make.
+# *
+# * Hugo Weber address@hidden
+# */
+#int count_smbios_structures(const void *buff, u32 len){
+#
+#    int icount = 0;//counts the strutures
+#    void *offset = (void *)buff;//points to the actual address in the buff that's been checked
+#    struct dmi_header *header = NULL;//header of the struct been read to get the length to increase the offset
+#    
+#    //searches structures on the whole SMBIOS Table
+#    while(offset  < (buff + len)){
+#        //get the header to read te length and to increase the offset
+#        header = (struct dmi_header *)offset;                        
+#        offset += header->length;
+#        
+#        icount++;
+#        
+#        /*
+#         * increses the offset to point to the next header that's
+#         * after the strings at the end of the structure.
+#         */
+#        while( (*(WORD *)offset != 0)  &&  (offset < (buff + len))  ){
+#            offset++;
+#        }
+#        
+#        /*
+#         * Points to the next stucture thas after two null BYTEs
+#         * at the end of the strings.
+#         */
+#        offset += 2;
+#    }
+#    
+#    return icount;
+#}
+#
+#/*
+# * Checks what platform its running.
+# * This code doesn't run on windows 9x/Me, only windows NT or newer
+# *
+# * return - WIN_UNSUPORTED if its running on windows 9x/Me
+# *        - WIN_NT_2K_XP if its running on windows NT 2k or XP
+# *        - WIN_2003_VISTA if its running on windows 2003 or Vista
+# *
+# * Remarks:
+# * Windows 2003 and Vista blocked access to physical memory and 
+# * requires the use of GetSystemFirmwareTable API in order to 
+# * get the SMBIOS table.
+# *
+# * Windows NT 2k and XP have to map physical memory and search
+# * for the SMBIOS table entry point, as its done on the other 
+# * systems.
+# */
+#int get_windows_platform(){
+#
+#    OSVERSIONINFO version;
+#    version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+#    GetVersionEx(&version);
+#   
+#    switch(version.dwPlatformId){        
+#        case VER_PLATFORM_WIN32_NT:
+#
+#            if(version.dwMajorVersion >= 5 && version.dwMinorVersion >= 2){
+#                return WIN_2003_VISTA;
+#            }else{
+#                return WIN_NT_2K_XP;
+#            }
+#            
+#        break;
+#        
+#        default:
+#            return WIN_UNSUPORTED;
+#        break;
+#    }
+#}
+#
+#/*
+# * Gets the raw SMBIOS table. This function only works
+# * on Windows 2003 and above. Since Windows 2003 SP1
+# * Microsoft blocks access to physical memory.
+# *
+# * return - pointer to the SMBIOS table returned
+# * by GetSystemFirmwareTable.
+# *
+# * see RawSMBIOSData on winsmbios.h
+# *
+# * Hugo Weber address@hidden
+# */
+#PRawSMBIOSData get_raw_smbios_table(void){
+#
+#    void *buf = NULL;
+#    u32 size = 0;
+#    
+#    if(get_windows_platform() == WIN_2003_VISTA){
+#        size = GetSystemFirmwareTable('RSMB', 0, buf, size);
+#        buf = (void *)malloc(size);
+#        GetSystemFirmwareTable('RSMB', 0, buf, size);        
+#    }
+#
+#    return buf;
+#}            
+#
+##endif /*__WIN32__*/
+#EOF
+#cat > winsmbios.h << EOF
+#/*
+# * Functions to allow to read SMBIOS from physical memory on windows
+# * or to get the SMBIOS table on windows 2003 SP1 and above.
+# *
+# * This file is part of the dmidecode project.
+# *
+# *   (C) 2002-2006 Hugo Weber <address@hidden>
+# *
+# *   This program is free software; you can redistribute it and/or modify
+# *   it under the terms of the GNU General Public License as published by
+# *   the Free Software Foundation; either version 2 of the License, or
+# *   (at your option) any later version.
+# *
+# *   This program is distributed in the hope that it will be useful,
+# *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+# *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# *   GNU General Public License for more details.
+# *
+# *   You should have received a copy of the GNU General Public License
+# *   along with this program; if not, write to the Free Software
+# *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+# *
+# *   For the avoidance of doubt the "preferred form" of this code is one which
+# *   is in an open unpatent encumbered format. Where cryptographic key signing
+# *   forms part of the process of creating an executable the information 
+# *   including keys needed to generate an equivalently functional executable
+# *   are deemed to be part of the source code.
+# */
+#
+##ifdef __WIN32__   
+#
+##ifndef WINSMBIOS_H
+##define WINSMBIOS_H
+# 
+##include "types.h"
+#
+##define WIN_UNSUPORTED 1
+##define WIN_NT_2K_XP 2
+##define WIN_2003_VISTA 3
+#
+#/*
+# * Struct needed to get the SMBIOS table using GetSystemFirmwareTable API.
+# */
+#typedef struct _RawSMBIOSData{
+#    u8        Used20CallingMethod;
+#    u8        SMBIOSMajorVersion;
+#    u8        SMBIOSMinorVersion;
+#    u8        DmiRevision;
+#    u32        Length;
+#    u8        SMBIOSTableData[];
+#} RawSMBIOSData, *PRawSMBIOSData;
+#
+#int get_windows_platform(void);
+#RawSMBIOSData *get_raw_smbios_table(void);
+#int count_smbios_structures(const void *buff, u32 len);
+#void *mem_chunk_win(size_t base, size_t len);
+#
+##endif /*WINSMBIOS_H*/
+#
+##endif /*__WIN32__*/
+#EOF
+#
+#cp Makefile Makefile.bak &&
+#sed -e "s/ dmidecode\.o /&winsmbios.o /" Makefile.bak > Makefile
+#cat >> Makefile << EOF
+#winsmbios.o : winsmbios.c winsmbios.h
+#`printf "\\t"`\$(CC) \$(CFLAGS) -c $< -o $@
+#EOF
+#
+## see also: http://www.techian.com/windows/dmidecode-for-windows/
+## see also: http://lists.gnu.org/archive/html/dmidecode-devel/2006-10/txtQldzu3pdae.txt
+
+
+
+#export NAME="dmidecode"
+#export STATUS=
+##export URL=http://www.nongnu.org/dmidecode/
+##export URL=https://github.com/mirror/dmidecode
+##export URL=http://gnuwin32.sourceforge.net/packages/dmidecode.htm
+#export URL=http://pleasedonttouchthescreen.blogspot.be/2012/05/dmidecode-211-for-windows.html
+#export BASENAME=dmidecode
+#export DESCRIPTION="Dmidecode reports information about your system's hardware as described in your system BIOS according to the SMBIOS/DMI standard."
+#export CATEGORY=hardware
+#export TYPE=library
+#export VERSION=2.11
+#export VERSIONDATE=20180402
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=GPL
+##export DOWNLOADURL="http://pleasedonttouchthescreen.blogspot.be/2012/05/dmidecode-211-for-windows.html"
+#export DOWNLOADURL="http://download.savannah.gnu.org/releases/dmidecode/"
+##export DOWNLOADURL="https://github.com/mirror/dmidecode/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://docs.google.com/open?id=0B8xG59QDgvQ3RmR2ajJYa0tNMjg
+#wl-showstatus download
+##wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#unzip -oq $TARBALLDIR/$BASENAME/$BASENAME-$VERSION\win.zip
+#cd $BASENAME-$VERSION\win
+## fix redefinition of GetSystemFirmwareTable and missing printf in winsmbios.c (version >= 2.11)
+#patch -ulbf winsmbios.c << EOF
+#@@ -31,2 +31,3 @@
+# #include <windows.h>
+#+#include <stdio.h>
+# #include "winsmbios.h"
+#@@ -91,2 +92,3 @@
+#
+#+#define GetSystemFirmwareTable MY_GetSystemFirmwareTable
+# u32 (__stdcall *GetSystemFirmwareTable)(
+#EOF
+#wl-showstatus build &&
+# make -fMakefile.win &&
+# strip *.exe &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# cp -f *.exe $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="dmidecode"
+export STATUS=
+export URL=http://www.nongnu.org/dmidecode/
+#export URL=https://github.com/mirror/dmidecode
+export BASENAME=dmidecode
+export DESCRIPTION="Dmidecode reports information about your system's hardware as described in your system BIOS according to the SMBIOS/DMI standard."
+export CATEGORY=hardware
+export TYPE=application
+export VERSION=3.3
+export VERSIONDATE=20201015
+####util.c:218:20: warning: implicit declaration of function 'getpagesize' [-Wimplicit-function-declaration]
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://download.savannah.gnu.org/releases/dmidecode/"
+#export DOWNLOADURL="https://github.com/mirror/dmidecode/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/dmidecode/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+cat > winfix/sys/socket.h << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define setlinebuf(f)
+EOF
+touch winfix/arpa/inet.h
+# fix already defined interface in dmidecode.c
+sed -i.bak -e "s/\binterface\b/iface/g" dmidecode.c
+# fix position of LDFLAGS in Makefile
+sed -i.bak -e "s/\(\$(CC)\)\( \$(LDFLAGS)\)\( .*\)/\1\3\2/" Makefile
+wl-showstatus build-install &&
+ make install prefix=$INSTALLPREFIX CC=gcc CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -lmman" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

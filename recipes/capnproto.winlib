@@ -1,0 +1,77 @@
+export NAME="Cap'n Proto"
+export STATUS=
+export URL=https://capnproto.org/
+export BASENAME=capnproto
+export DESCRIPTION="Cap'n Proto is an insanely fast data interchange format and capability-based RPC system."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.5.3
+#export VERSIONDATE=20160709
+#export VERSION=0.5.3.1
+#export VERSIONDATE=20170418
+#export VERSION=0.6.0
+#export VERSIONDATE=20170501
+#export VERSION=0.6.1
+#export VERSIONDATE=20170609
+#export VERSION=0.7.0
+#export VERSIONDATE=20180829
+#export VERSION=0.8.0
+#export VERSIONDATE=20200424
+#export VERSION=0.9.0
+#export VERSIONDATE=20210815
+export VERSION=0.9.1
+export VERSIONDATE=20210923
+####c++/src/kj/async-unix.c++:39:18: fatal error: poll.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/sandstorm-io/capnproto/releases v"
+export DOWNLOADURL="https://github.com/sandstorm-io/capnproto/tags v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/sandstorm-io/capnproto/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/sandstorm-io/capnproto/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing HCRYPTPROV in c++/src/capnp/compiler/parser.c++
+#mv c++/src/capnp/compiler/parser.c++ c++/src/capnp/compiler/parser.c++.bak
+#cat > c++/src/capnp/compiler/parser.c++ << EOF
+##include <windows.h>
+##include <wincrypt.h>
+##undef ERROR
+##undef VOID
+##undef CONST
+#EOF
+#cat c++/src/capnp/compiler/parser.c++.bak >> c++/src/capnp/compiler/parser.c++
+## fix c++/src/kj/exception.c++ (not working yet)
+#mv c++/src/kj/exception.c++ c++/src/kj/exception.c++.bak
+#cat > c++/src/kj/exception.c++ << EOF
+##include <windows.h>
+##define _INC_WINDOWS
+##undef ERROR
+#EOF
+#cat c++/src/kj/exception.c++.bak >> c++/src/kj/exception.c++
+wl-showstatus configure &&
+ cd c++ &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ cd .. &&
+ echo "#include <stdio.h>" >> c++/config.h &&
+ wl-showstatus build &&
+ #( make -Cc++ || ( make -i -Cc++ && make -j1 -Cc++ )) &&
+ ( make -Cc++ CXXFLAGS="-std=c++14" || ( make -i -Cc++ CXXFLAGS="-std=c++14" && make -Cc++ -j1 CXXFLAGS="-std=c++14" )) &&
+ wl-showstatus build-install &&
+ make -Cc++ install-strip &&
+ rm -f $INSTALLPREFIX/bin/capnpc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

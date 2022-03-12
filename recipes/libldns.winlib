@@ -1,0 +1,138 @@
+export NAME="libldns"
+export STATUS=
+export URL=http://www.nlnetlabs.nl/projects/ldns/
+export BASENAME=libldns
+export DESCRIPTION="The goal of ldns is to simplify DNS programming, it supports recent RFCs like the DNSSEC documents, and allows developers to easily create software conforming to current RFCs, and experimental software for current Internet Drafts."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.4.0
+#export VERSION=1.5.1
+#export VERSION=1.6.0
+#export VERSION=1.6.1
+#export VERSION=1.6.2
+#export VERSIONDATE=20091112
+#export VERSION=1.6.3
+#export VERSIONDATE=20091204
+#export VERSION=1.6.4
+#export VERSIONDATE=20100122
+#export VERSION=1.6.5
+#export VERSIONDATE=20100615
+#export VERSION=1.6.6
+#export VERSIONDATE=20100809
+#export VERSION=1.6.7
+#export VERSIONDATE=20101108
+#export VERSION=1.6.8
+#export VERSIONDATE=20110124
+#export VERSION=1.6.9
+#export VERSIONDATE=20110316
+#export VERSION=1.6.10
+#export VERSIONDATE=20110531
+#export VERSION=1.6.11
+#export VERSIONDATE=20110930
+#export VERSION=1.6.12
+#export VERSIONDATE=20120111
+#export VERSION=1.6.13
+#export VERSIONDATE=20120521
+#export VERSION=1.6.14
+#export VERSIONDATE=20121023
+#export VERSION=1.6.15
+#export VERSIONDATE=20121026
+#export VERSION=1.6.16
+#export VERSIONDATE=20121113
+#export VERSION=1.6.17
+#export VERSIONDATE=20140111
+#export VERSION=1.7.0
+#export VERSIONDATE=20161220
+#export VERSION=1.7.1
+#export VERSIONDATE=20190727
+#export VERSION=1.8.0
+#export VERSIONDATE=20211126
+export VERSION=1.8.1
+export VERSIONDATE=20211203
+####configure: error: OpenSSL does not support offline DANE verification (Needed for the DANE-TA usage type).  Please upgrade OpenSSL to version >= 1.1.0 or rerun with --disable-dane-verify or --disable-dane-ta-usage
+wl-showstatus --package-version
+export DEPENDANCIES=openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="http://www.nlnetlabs.nl/projects/ldns/ ldns-"
+export DOWNLOADURL="http://www.nlnetlabs.nl/downloads/ldns/ ldns-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.nlnetlabs.nl/downloads/ldns/ldns-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/ldns-$VERSION.tar.gz
+cd ldns-$VERSION
+# create missing files (version <= 1.6.1 >= 1.6.14)
+mkdir sys
+echo "#include <winsock2.h>" > sys/socket.h
+touch netdb.h
+## fix redefinition of socklen_t and error: two or more data types in declaration specifiers (version <= 1.6.1)
+#mv ldns/config.h ldns/config.h.bak
+#cat > ldns/config.h << EOF
+##define HAVE_STRUCT_ADDRINFO
+##define HAVE_STRUCT_IN6_ADDR
+##define HAVE_STRUCT_SOCKADDR_IN6
+##define HAVE_GAI_STRERROR
+#EOF
+#sed "s?^#define socklen_t int?#include <winsock2.h>?" ldns/config.h.bak >> ldns/config.h
+# fix missing inet_pton in drill/drill.c (version >= 1.7.0)
+mv drill/drill.c drill/drill.c.bak
+cat > drill/drill.c << EOF
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#include <ws2tcpip.h>
+EOF
+cat drill/drill.c.bak >> drill/drill.c
+# fix missing inet_pton in host2str.c (version >= 1.7.0)
+mv host2str.c host2str.c.bak
+cat > host2str.c << EOF
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#include <ws2tcpip.h>
+EOF
+cat host2str.c.bak >> host2str.c
+# fix redefinition of inet_pton (version >= 1.7.1)
+mv compat/inet_pton.c compat/inet_pton.c.bak &&
+touch compat/inet_pton.c
+# fix missing inet_pton/inet_ntop in str2host.c (version >= 1.7.1)
+mv str2host.c str2host.c.bak
+cat > str2host.c << EOF
+#if _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat str2host.c.bak >> str2host.c
+# fix missing socklen_t in ldns/ldns.h (version >= 1.7.1)
+mv ldns/ldns.h ldns/ldns.h.bak &&
+echo "#include <ws2tcpip.h>" > ldns/ldns.h &&
+cat ldns/ldns.h.bak >> ldns/ldns.h
+# fix ln -s issues (version >= 1.6.12)
+mv Makefile.in Makefile.in.bak
+sed -e "s/ln -s /cp -rf /g" Makefile.in.bak > Makefile.in
+wl-showstatus configure &&
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+ #fi &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-sha2 --with-ssl=$MINGWPREFIX LDFLAGS="-lws2_32 -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --enable-sha2 --with-ssl=$MINGWPREFIX --with-drill LDFLAGS="-lws2_32 -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --enable-sha2 --with-ssl=$MINGWPREFIX --disable-dane-verify --with-drill LDFLAGS="-lws2_32 -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --enable-sha2 --with-ssl=$MINGWPREFIX --disable-dane-verify --with-drill CFLAGS="-DHAVE_INET_NTOP=1 -DHAVE_INET_PTON=1" LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ # fix for OpenSSL 3
+ echo "#define HAVE_EVP_PKEY_BASE_ID 1" >> ldns/config.h &&
+ wl-showstatus build-install &&
+ mkdir -p .libs &&
+ ( make all install || make -j1 all install || ( mkdir -p doc/man/man3 && touch doc/man/man3/DELETEME && make -j1 all install && rm -f $INSTALLPREFIX/share/man/man3/DELETEME )) &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ # fix absolute paths in ldns-config
+ #sed -i.bak -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/ldns-config &&
+ sed -i.bak -e "s?$INSTALLPREFIX\|\${prefix}\|\${exec_prefix}?\$(realpath \$(dirname \$0)/..)?g" $INSTALLPREFIX/bin/ldns-config &&
+ rm -f $INSTALLPREFIX/bin/ldns-config.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ldns-$VERSION
+
+
+

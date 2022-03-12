@@ -1,0 +1,174 @@
+export NAME="GNU Parted"
+export STATUS=
+export URL=http://www.gnu.org/software/parted/
+export BASENAME=parted
+export DESCRIPTION="GNU Parted manipulates partition tables. This is useful for creating space for new operating systems, reorganizing disk usage, copying data on hard disks and disk imaging. The package contains a library, libparted, as well as well as a command-line frontend, parted, which can also be used in scripts."
+export CATEGORY=disk
+export TYPE=library,application
+#export VERSION=2.3
+#export VERSIONDATE=20110516
+#export VERSION=2.4
+#export VERSIONDATE=20110519
+#export VERSION=3.0
+#export VERSIONDATE=20110530
+#export VERSION=3.1
+#export VERSIONDATE=20120303
+####gpt.c:397: error: invalid operands to binary != (have 'UUID' and 'void *')
+#export VERSION=3.2
+#export VERSIONDATE=20140729
+#export VERSION=3.3
+#export VERSIONDATE=20191011
+####libparted/labels/misc.h:35:8: error: cannot convert to a pointer type
+export VERSION=3.4
+export VERSIONDATE=20210128
+####libparted/arch/linux.c:22:10: fatal error: linux/blkpg.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=libuuid
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/parted/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/parted/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/parted/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fake uuid/uuid.h
+mkdir -p uuid
+cat > uuid/uuid.h << EOF
+#include <windows.h>
+#define uuid_generate(uuid) UuidCreate((UUID*)uuid)
+#define uuid_generate_random(uuid) UuidCreate(&uuid)
+#define uuid_unparse(uuid,uuid_string) { UCHAR* buf = NULL; UuidToString(&uuid, &buf); strcpy(uuid_string, (char*)buf); RpcStringFree(&buf); }
+EOF
+# fix missing files
+mkdir -p sys
+touch sys/ioctl.h
+patch -ulbf libparted/labels/gpt.c << EOF
+--- libparted/labels/gpt.c  2012-02-07 11:49:36 +0100
++++ libparted/labels/gpt.c  2012-03-03 10:18:52 +0100
+@@ -392,3 +392,3 @@
+ static void
+-swap_uuid_and_efi_guid (uuid_t uuid)
++swap_uuid_and_efi_guid (uuid_t* uuid)
+ {
+@@ -396,3 +396,3 @@
+
+-  PED_ASSERT (uuid != NULL);
++  PED_ASSERT (uuid != 0);
+   guid->time_low = PED_SWAP32 (guid->time_low);
+EOF
+# fix configure
+#mv configure configure.bak
+#sed -e "s/-luuid//g" configure.bak > configure
+#patch -ulbf configure << EOF
+#--- configure  2011-05-30 13:44:50 +0200
+#+++ configure  2011-05-30 20:15:10 +0200
+#@@ -3945,2 +3945,3 @@
+#        beos*)  OS=beos ;;
+#+       mingw*) OS=gnu ;;
+#        *)      as_fn_error \$? "Unknown or unsupported OS \\"\$host_os\\".  Only \\"linux\\", \\"gnu\\" and \\"beos\\" are supported in this version of GNU Parted." "\$LINENO" 5 ;;
+#@@ -35913,8 +35914,3 @@
+# else
+#-  as_fn_error \$? "GNU Parted requires libuuid - a part of the util-linux-ng package (but
+#-usually distributed separately in libuuid-devel, uuid-dev or similar)
+#-This can probably be found on your distribution's CD or FTP site or at:
+#-    http://userweb.kernel.org/~kzak/util-linux-ng/
+#-Note: originally, libuuid was part of the e2fsprogs package.  Later, it
+#-moved to util-linux-ng-2.16, and that package is now the preferred source." "\$LINENO" 5
+#+  UUID_LIBS=""
+# fi
+#@@ -36367,6 +36363,2 @@
+#   OS_LIBS="\$OS_LIBS -lshouldbeinlibc"
+#-else
+#-  as_fn_error \$? "GNU Parted requires libshouldbeinlibc when running on
+#-GNU/Hurd systems.  It is a standard part of a GNU/Hurd system.
+#-               " "\$LINENO" 5
+#
+#@@ -36463,6 +36455,2 @@
+#   OS_LIBS="\$OS_LIBS -lstore"
+#-else
+#-  as_fn_error \$? "GNU Parted requires libstore when running on GNU/Hurd
+#-systems.  It is a standard part of a GNU/Hurd system.
+#-               " "\$LINENO" 5
+#
+#@@ -36486,8 +36474,2 @@
+#
+#-else
+#-  as_fn_error \$? "GNU Parted requires libuuid - a part of the e2fsprogs package
+#.
+#-You seem to have the library installed but not the headers.  These are usually
+#-found in a corresponding development package (usually called e2fsprogs-devel).
+#-If you can't find one try:
+#-        http://web.mit.edu/tytso/www/linux/e2fsprogs.html" "\$LINENO" 5
+#
+#EOF
+# fix missing u_short in libparted/labels/bsd.c
+mv libparted/labels/bsd.c libparted/labels/bsd.c.bak &&
+echo "typedef unsigned short u_short;" > libparted/labels/bsd.c &&
+cat libparted/labels/bsd.c.bak >> libparted/labels/bsd.c
+# fix missing u_int8_t/u_int16_t/u_int32_t in libparted/labels/sun.c
+mv libparted/labels/sun.c libparted/labels/sun.c.bak
+cat > libparted/labels/sun.c << EOF
+#define u_int8_t uint8_t
+#define u_int16_t uint16_t
+#define u_int32_t uint32_t
+EOF
+cat libparted/labels/sun.c.bak >> libparted/labels/sun.c
+## fix detection of OS (version <= 3.2)
+#patch -ulbf configure << EOF
+#@@ -4036,2 +4036,3 @@
+#        beos*)  OS=beos ;;
+#+       mingw32*)       OS=linux ;;
+#        *)      as_fn_error \$? "Unknown or unsupported OS \\"\$host_os\\".  Only \\"linux\\", \\"gnu\\" and \\"beos\\" are supported in this version of GNU Parted." "\$LINENO" 5 ;;
+#@@ -36066,3 +36067,3 @@
+# else
+#-  as_fn_error \$? "GNU Parted requires libuuid - a part of the util-linux-ng package (but
+#+  as_fn_warning \$? "GNU Parted requires libuuid - a part of the util-linux-ng package (but
+# usually distributed separately in libuuid-devel, uuid-dev or similar)
+#@@ -36640,3 +36641,3 @@
+# else
+#-  as_fn_error \$? "GNU Parted requires libuuid - a part of the e2fsprogs package.
+#+  as_fn_warning \$? "GNU Parted requires libuuid - a part of the e2fsprogs package.
+# You seem to have the library installed but not the headers.  These are usually
+#EOF
+# fix detection of OS (version >= 3.3)
+patch -ulbf configure << EOF
+@@ -4485,2 +4485,3 @@
+        linux*|uclinux*) OS=linux ;;
++        mingw32*)       OS=linux ;;
+        gnu*)   OS=gnu ;;
+@@ -43989,3 +43990,3 @@
+ else
+-  as_fn_error \$? "GNU Parted requires libuuid - a part of the util-linux-ng package (but
++  as_fn_warning \$? "GNU Parted requires libuuid - a part of the util-linux-ng package (but
+ usually distributed separately in libuuid-devel, uuid-dev or similar)
+@@ -44428,3 +44429,3 @@
+ else
+-  as_fn_error \$? "GNU Parted requires libuuid - a part of the e2fsprogs package.
++  as_fn_warning \$? "GNU Parted requires libuuid - a part of the e2fsprogs package.
+ You seem to have the library installed but not the headers.  These are usually
+EOF
+# fix detection of portable-uuid
+sed -i.bak "s/-luuid/-lportable-uuid/" configure
+#PYTHON=$PYDIR/python.exe 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=win32 --disable-device-mapper &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --disable-device-mapper CFLAGS="-I$(pwd) -I$MINGWPREFIX/include/portable-uuid" &&
+ make install-strip &&
+ #make install-strip CC="gcc -I$(pwd) -I$MINGWPREFIX/include/portable-uuid -Du_int32_t=uint32_t" &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+####lib/langinfo.h:466: error: expected ')' before 'item'
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

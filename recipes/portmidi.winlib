@@ -1,0 +1,52 @@
+export NAME="PortMidi"
+export STATUS=
+export URL=http://portmedia.sourceforge.net/portmidi/
+export BASENAME=portmidi
+export DESCRIPTION="Platform Independent Library for MIDI I/O"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=217
+export VERSIONDATE=20140621
+####-- Could NOT find JNI (missing:  JAVA_AWT_LIBRARY JAVA_JVM_LIBRARY JAVA_INCLUDE_PATH JAVA_INCLUDE_PATH2 JAVA_AWT_INCLUDE_PATH)
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=license.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="http://sourceforge.net/projects/portmedia/files/portmidi/ portmidi-src-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/portmedia/portmidi/$VERSION/portmidi-src-$VERSION.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+unzip -oq $TARBALLDIR/$BASENAME/portmidi-src-$VERSION.zip -d $BASENAME-$VERSION
+cd $BASENAME-$VERSION/portmidi
+# remove everything related to Java
+sed -i.bak -e "s/^add_subdirectory(pm_java)/#&/" CMakeLists.txt
+sed -i.bak -e "s/^.*\(java\|jni\|\/usr\/local\/lib\)/#&/i" pm_common/CMakeLists.txt
+wl-showstatus configure
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CONFIGURATION_TYPES:STRING=Release . &&
+ wl-showstatus build &&
+ make &&
+ gcc -c -D_WINDLL -Iporttime -o porttime/porttime.o porttime/porttime.c &&
+ gcc -c -D_WINDLL -Iporttime -o porttime/ptwinmm.o porttime/ptwinmm.c &&
+ ar cru libporttime.a porttime/porttime.o porttime/ptwinmm.o &&
+ ( echo EXPORTS; gcc -E porttime/porttime.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(Pt_[^ *]*\).*/\1/p" ) > porttime.def &&
+ gcc -shared -s -mwindows -def porttime.def -o libporttime.dll libporttime.a -Wl,--out-implib,libporttime.dll.a -lwinmm &&
+ #wl-showstatus build-install &&
+ #make install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f pm_common/portmidi.h porttime/porttime.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f libportmidi_s.a $INSTALLPREFIX/lib/libportmidi.a &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: put Java support back in
+
+
+

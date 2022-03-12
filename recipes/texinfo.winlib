@@ -1,0 +1,109 @@
+export NAME="texinfo"
+export STATUS=
+export URL=http://www.gnu.org/software/texinfo/
+export BASENAME=texinfo
+export DESCRIPTION="Texinfo is the official documentation format of the GNU project."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=4.9
+#export VERSION=4.13
+#export VERSIONDATE=20110220
+#export VERSION=4.13a
+#export VERSIONDATE=20121121
+#export VERSION=5.0
+#export VERSIONDATE=20130217
+####configure: error: perl >= 5.7.3 with Encode required by Texinfo.
+#export VERSION=5.1
+#export VERSIONDATE=20130313
+#export VERSION=5.2
+#export VERSIONDATE=20130927
+####slib no longer compiles with this version (stick to 4.13a), see: https://bugs.gentoo.org/show_bug.cgi?id=465348
+#export VERSION=6.0
+#export VERSIONDATE=20150626
+#export VERSION=6.1
+#export VERSIONDATE=20160406
+#export VERSION=6.2
+#export VERSIONDATE=20160910
+#export VERSION=6.3
+#export VERSIONDATE=20160911
+#export VERSION=6.4
+#export VERSIONDATE=20170624
+#export VERSION=6.5
+#export VERSIONDATE=20170913
+#export VERSION=6.6
+#export VERSIONDATE=20190217
+#export VERSION=6.7
+#export VERSIONDATE=20190958
+export VERSION=6.8
+export VERSIONDATE=20210703
+wl-showstatus --package-version
+#export DEPENDANCIES=pthreads
+export DEPENDANCIES=pthreads,gettext,pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=help2man
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL3
+export DOWNLOADURL="http://ftp.gnu.org/gnu/texinfo/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/texinfo/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/texinfo/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$(echo $VERSION|sed -e "s/[a-z]*$//")
+# fix mkdir in lib/tempname.c (version <= 4.13a)
+patch -ulbf lib/tempname.c << EOF
+--- lib/tempname.c  2003-09-15 15:25:46 +0200
++++ lib/tempname.c  2010-02-28 19:50:04 +0100
+@@ -100,3 +100,7 @@
+ # define __gettimeofday gettimeofday
+-# define __mkdir mkdir
++# ifdef __MINGW32__
++#  define __mkdir(d,p) mkdir(d)
++# else
++#  define __mkdir mkdir
++# endif
+ # define __open open
+EOF
+# fix missing sys/ioctl.h (version >= 4.13 <= 4.13a)
+mkdir -p sys
+touch sys/ioctl.h
+## fix missing cdedcl in gnulib/lib/msvc-inval.c
+#mv gnulib/lib/msvc-inval.c gnulib/lib/msvc-inval.c.bak
+#sed -e "s/\(cdecl\)/__\1/" gnulib/lib/msvc-inval.c.bak > gnulib/lib/msvc-inval.c
+# fix tp/Texinfo/XS/parsetexi/input.c (version >= 6.8)
+patch -ulbf tp/Texinfo/XS/parsetexi/input.c << EOF
+@@ -536,2 +536,6 @@
+   if (!memcmp (filename, "/", 1)
++#ifdef _WIN32
++      || filename[0] == '\\\\'
++      || (filename[0] && filename[1] == ':')
++#endif
+       || !memcmp (filename, "../", 3)
+EOF
+# fix hardcoded absolute paths
+sed -i.bak -e "s?#\(use Cwd;\)?\1?; s?'@datadir@'?dirname(dirname(Cwd::abs_path(__FILE__))) . '/share'?; s?'@pkglibdir@'?dirname(dirname(Cwd::abs_path(__FILE__))) . '/lib/texinfo'?; s?'@prefix@'?dirname(dirname(Cwd::abs_path(__FILE__)))?" tp/texi2any.pl
+sed -i.bak -e "s?@pkgdatadir@?\$(dirname \$(dirname \$0\)\)/share/texinfo?" texindex/texindex.in
+## skip making info which won't work because of heavy use of TTY stuff (verson >= 4.13)
+#cat > info/Makefile.in << EOF
+#clean:
+#all:
+#install:
+#install-strip:
+#EOF
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LIBS="-Wl,--as-needed -lregex" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LIBS="-Wl,--as-needed -lregex" &&
+PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LIBS="-Wl,--as-needed -lregex -lpthread" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath LIBS="-Wl,--as-needed -lregex -lpthread" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --disable-rpath --with-external-libintl-perl --enable-perl-api-texi-build --disable-tp-tests --disable-pod-simple-texinfo-tests LIBS="-Wl,--as-needed -lregex -lpthread" &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || ( which makeinfo &>/dev/null && make install-strip MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" )) &&
+ cp -u install-info/ginstall-info.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$(echo $VERSION|sed -e "s/[a-z]*$//")
+
+
+

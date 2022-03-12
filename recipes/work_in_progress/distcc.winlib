@@ -1,0 +1,100 @@
+export NAME="distcc"
+export STATUS=
+#export URL=http://code.google.com/p/distcc/
+#export URL=https://github.com/distcc/distcc
+export URL=https://distcc.github.io/
+export BASENAME=distcc
+export DESCRIPTION="distcc is a program to distribute builds of C, C++, Objective C or Objective C++ code across several machines on a network. distcc should always generate the same results as a local build, is simple to install and use, and is usually much faster than a local compile."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=3.1
+#export VERSIONDATE=20110829
+####src/clinet.c:40:22: fatal error: sys/poll.h: No such file or directory
+####src/clirpc.c:35:22: fatal error: sys/wait.h: No such file or directory
+#export VERSION=3.3.2
+#export VERSIONDATE=20180922
+#export VERSION=3.3.3
+#export VERSIONDATE=20190815
+#export VERSION=3.3.4
+#export VERSIONDATE=20210104
+#export VERSION=3.3.5
+#export VERSIONDATE=20210104
+export VERSION=3.4
+export VERSIONDATE=20210826
+wl-showstatus --package-version
+export DEPENDANCIES=sys_wait_h,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://code.google.com/p/distcc/downloads/list"
+export DOWNLOADURL="https://github.com/distcc/distcc/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://distcc.googlecode.com/files/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/distcc/distcc/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/distcc/distcc/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz -C$BASENAME-$VERSION
+#cd $BASENAME-$VERSION
+cd $BASENAME-$VERSION/distcc*
+# fix missing files
+mkdir -p win32fix/sys win32fix/netinet win32fix/arpa
+cat > win32fix/sys/socket.h << EOF
+//#include <rpcnsi.h>
+//#include "$(cygpath -w $(find $MINGWDIR -name rpc.h))"
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+EOF
+touch win32fix/poll.h win32fix/sys/poll.h win32fix/netinet/in.h win32fix/netinet/tcp.h win32fix/netdb.h win32fix/arpa/inet.h
+# fix conflicting rpc.h
+mv src/rpc.h src/rpc.h.bak &&
+echo "#include_next <rpc.h>" > src/rpc.h &&
+cat src/rpc.h.bak >> src/rpc.h
+# fix src/clinet.c (version >= 3.3.4)
+patch -ulbf src/clinet.c << EOF
+@@ -37,3 +37,8 @@
+ #include <errno.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <windows.h>
++#else
+ #include <poll.h>
++#endif
+ #include <signal.h>
+@@ -111,3 +116,7 @@
+            (errno == EINTR ||
++#ifdef _WIN32
++            (errno == EAGAIN && tries-- && SleepEx(500, TRUE) == 0)));
++#else
+             (errno == EAGAIN && tries-- && poll(NULL, 0, 500) == 0)));
++#endif
+
+EOF
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-gnome CFLAGS="-I$(pwd)/win32fix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-gnome CFLAGS="-I$(pwd)/win32fix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-gtk --without-gnome --disable-Werror CFLAGS="-I$(pwd)/win32fix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -lmman" &&
+ #--with-gtk --with-auth --disable-pump-mode --disable-Werror
+ wl-showstatus build-install &&
+ make install &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm CMakeCache.txt &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && rm -rf $BASENAME-$VERSION
+
+
+

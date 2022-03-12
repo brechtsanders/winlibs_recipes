@@ -1,0 +1,129 @@
+#export NAME="pth"
+#export STATUS=
+#export URL=http://www.gnu.org/software/pth/
+#export BASENAME=pth
+#export DESCRIPTION="Pth is a very portable POSIX/ANSI-C based library for Unix platforms which provides non-preemptive priority-based scheduling for multiple threads of execution (aka \"multithreading\") inside event-driven applications. All threads run in the same address space of the server application, but each thread has it's own individual program-counter, run-time stack, signal mask and errno variable."
+#export CATEGORY=system
+#export TYPE=library
+#export VERSION=2.0.7
+#export VERSIONDATE=
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/pth/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/pth/$BASENAME-$VERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM && make install
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I/include/w32api" &&
+# wl-showstatus build-install &&
+# make install RC="windres -I/include/w32api"
+####./configure:Error: decision on mandatory system headers and functions failed.
+#### use w32pth instead
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="w32pth"
+export STATUS=
+export URL=http://www.ohloh.net/p/w32pth
+export BASENAME=pth
+export DESCRIPTION="This is an emulation of GNU PTH for MS Windows (W32). It works by blocking all threads when outside of one of the pth functions and using standard W32 threads and suncronization mechanisms to emulate the behaviour of PTH. It is currently limited to what GnuPG 2.0 requires."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=2.0.2
+#export VERSION=2.0.4
+#export VERSIONDATE=20100803
+export VERSION=2.0.5
+export VERSIONDATE=20130424
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+export DOWNLOADURL="ftp://ftp.g10code.com/g10code/w32pth/ w32pth-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://ftp.g10code.com/g10code/w32pth/w32pth-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/w32pth-$VERSION.tar.bz2
+cd w32pth-$VERSION
+## fix for 64-bit (version <= 2.0.4)
+#patch -ulbf << EOF
+#--- pth.h  2010-07-21 17:15:06.000000000 +0200
+#+++ pth.h  2010-08-23 16:25:07.000000000 +0200
+#@@ -30,7 +30,7 @@
+# #error w32pth conflict.  A vanilla pth.h has already been included.
+# #endif
+#  
+#-
+#+#include <winsock2.h>
+#  
+# #include <windows.h>  /* We need this for sockaddr et al.  FIXME: too
+#                          heavyweight - may be we should factor such
+#@@ -38,6 +38,10 @@
+#                          user files to include it only if required. */
+# #include <sys/types.h> /* For sigset_t. */
+#  
+#+#ifdef __MINGW64_VERSION_MAJOR
+#+typedef uintptr_t sigset_t;
+#+#endif
+#+
+# #ifndef W32_PTH_HANDLE_INTERNAL
+# #define W32_PTH_HANDLE_INTERNAL  int
+# #endif
+#--- w32-pth.c  2010-07-21 17:17:20.000000000 +0200
+#+++ w32-pth.c  2010-08-23 16:25:07.000000000 +0200
+#@@ -26,6 +26,7 @@
+#  
+# #include <config.h>
+#  
+#+#include <winsock2.h>
+# #include <windows.h>
+# #include <stdio.h>
+# #include <stdlib.h>
+#EOF
+# fix for 64-bit (version >= 2.0.5)
+patch -ulbf pth.h << EOF
+--- pth.h  2013-04-23 18:28:24 +0200
++++ pth.h  2013-04-24 07:30:20 +0200
+@@ -44,3 +44,3 @@
+ #include <sys/types.h>
+-#if __MINGW64_VERSION_MAJOR >= 2 && !defined(_POSIX)
++#ifdef __MINGW64_VERSION_MAJOR >= 2
+ typedef _sigset_t      sigset_t;
+EOF
+# fix for building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ libtoolize --copy --force &&
+ autoconf &&
+ automake -f -a -c
+fi
+# remove unsupported comment lines from libw32pth.def
+mv libw32pth.def libw32pth.def.bak
+grep -v "^$\|^;;" libw32pth.def.bak > libw32pth.def
+# build and make compatible with libpth
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ mkdir -p /home/win32/inst_pth-$VERSION/lib/ &&
+ ( make install-strip || make -j1 install-strip ) &&
+ cp $INSTALLPREFIX/lib/libw32pth.a $INSTALLPREFIX/lib/libpth.a &&
+ cp $INSTALLPREFIX/lib/libw32pth.dll.a $INSTALLPREFIX/lib/libpth.dll.a &&
+ cp $INSTALLPREFIX/lib/libw32pth.la $INSTALLPREFIX/lib/libpth.la &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf w32pth-$VERSION
+#mv .libs/libw32pth.def .libs/libw32pth.def.bak
+#sed -e "s/  *@/@/" .libs/libw32pth.def.bak > .libs/libw32pth.def
+
+
+

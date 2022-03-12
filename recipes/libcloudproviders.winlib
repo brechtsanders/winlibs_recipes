@@ -1,0 +1,52 @@
+export NAME="libcloudproviders"
+export STATUS=
+export URL=https://wiki.gnome.org/Design/Whiteboards/CloudProviders
+#export URL=https://gitlab.gnome.org/World/libcloudproviders
+export BASENAME=libcloudproviders
+export DESCRIPTION="libcloudproviders is a DBus API that allows cloud storage sync clients to expose their services. Clients such as file managers and desktop environments can then provide integrated access to the cloud providers services."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=0.3.0
+export VERSIONDATE=20200218
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gobject-introspection
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://gitlab.gnome.org/World/libcloudproviders/-/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.gnome.org/World/libcloudproviders/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+# fix missing gio-unix
+sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+sed -i.bak -e "s/, gio_unix//" src/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dvapigen=false -Dintrospection=true . build_both &&
+ # fix slash/backslash path issue when calling Python from Ninja
+ sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ # fix Python path issues in meson_exe
+ sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ wl-showstatus build-install &&
+ PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH ninja -C build_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build static library
+
+
+

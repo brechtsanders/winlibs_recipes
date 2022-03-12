@@ -1,0 +1,144 @@
+export NAME="GConf"
+export STATUS=
+export URL=http://www.gnome.org/projects/gconf/
+export BASENAME=gconf
+export DESCRIPTION="GConf is a system for storing application preferences. It is intended for user preferences; not configuration of something like Apache, or arbitrary data storage."
+export CATEGORY=configuration
+export TYPE=library
+#export VERSION=2.21.90
+#export VERSION=2.26.0
+#export VERSION=2.28.0
+#export VERSION=2.31.1
+#export VERSION=2.31.3
+#export VERSION=2.31.7
+#export VERSION=2.32.0
+#export VERSIONDATE=20100928
+#export VERSION=2.32.4
+#export VERSIONDATE=20111230
+#export DEPENDANCIES=glib2,gtk2,orbit2,dbus,dbus-glib,libxml2,gettext,pthreads
+#export VERSION=3.1.3
+#export VERSIONDATE=20110711
+####Processing file ./GConfX.idl
+####Error: Empty file
+####** (orbit-idl-2.exe:4868): WARNING **: ./GConfX.idl compilation failed
+#export VERSION=3.2.0
+#export VERSIONDATE=20110927
+####gconf/gconfd.c:675: error: expected ';' before '_gconf_win32_get_etcdir'
+#export VERSION=3.2.3
+#export VERSIONDATE=20111230
+#export VERSION=3.2.4
+#export VERSIONDATE=20120309
+#export VERSION=3.2.5
+#export VERSIONDATE=20120311
+export VERSION=3.2.6
+export VERSIONDATE=20130122
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,orbit2,dbus,dbus-glib,libxml2,gettext,pthreads,polkit
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pkg-config
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://ftp.gnome.org/pub/gnome/sources/GConf/ GConf-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/GConf/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/GConf-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/GConf/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/GConf-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/GConf-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/GConf-$VERSION.tar.xz
+cd GConf-$VERSION
+# fix missing reference to gethostname in backends/evoldap-backend.c
+mv backends/evoldap-backend.c backends/evoldap-backend.c.bak
+echo "#include <winsock2.h>" > backends/evoldap-backend.c
+cat backends/evoldap-backend.c.bak >> backends/evoldap-backend.c
+## fix missing ATTACH_PARENT_PROCESS
+#mv gconf/gconfd.c gconf/gconfd.c.bak
+#sed -e "s/^\(#define _WIN32_WINNT \)0x0500/\10x0501/" gconf/gconfd.c.bak > gconf/gconfd.c
+# fix gconf/gconfd.c
+patch -ulbf gconf/gconfd.c << EOF
+--- gconf/gconfd.c  2011-10-26 21:37:44 +0200
++++ gconf/gconfd.c  2011-10-26 22:18:54 +0200
+@@ -70,3 +70,3 @@
+ #include <conio.h>
+-#define _WIN32_WINNT 0x0500
++#define _WIN32_WINNT 0x0501
+ #include <windows.h>
+@@ -679,2 +679,7 @@
+          GSList addresses;
++         char* cfg = strdup(GCONF_ETCDIR);
++         cfg = (char*)realloc(cfg, strlen(cfg) + 29);
++         memmove(cfg, cfg + 11, strlen(cfg));
++         memcpy(cfg, "xml:merged:", 11);
++         strcat(cfg, "/gconf.xml.system");
+
+@@ -682,3 +687,3 @@
+
+-         addresses.data = "xml:merged:" GCONF_ETCDIR "/gconf.xml.system";
++         addresses.data = cfg;
+          addresses.next = NULL;
+@@ -692,2 +697,3 @@
+          gconf_sources_free (system_sources);
++         free(cfg);
+
+EOF
+## fix problem detecting GNU gettext tools on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# mv configure configure.bak
+# sed -e "s/\(-z[ \t]\"\$\(XGETTEXT\|MSGMERGE\|MSGFMT\)\)\(\"\)/\1.exe\3/g" configure.bak > configure
+#fi
+## fix missing ATTACH_PARENT_PROCESS in gconf/gconfd.c (version >= 2.28.0)
+#mv gconf/gconfd.c gconf/gconfd.c.bak
+#echo "#include <wincon.h>" > gconf/gconfd.c
+#cat gconf/gconfd.c.bak >> gconf/gconfd.c
+# fix missing files
+mkdir -p defaults/sys
+touch defaults/sys/wait.h
+cat > defaults/pwd.h << EOF
+typedef int uid_t;
+#define getpwuid(uid) NULL
+struct passwd {
+  char *pw_dir;
+  //char *pw_name;
+};
+EOF
+# skip building examples
+cat > examples/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+## fix problem detecting GNU gettext tools on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# mv configure configure.bak
+# sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-gtk
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtk LDFLAGS="-lws2_32 -lldap.dll"
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-gtk CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -lldap.dll"
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-gtk CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -Wl,--enable-auto-import" &&
+####You must have XML::Parser installed to run /bin/intltool-merge
+#$PERLDIR/bin/perl.exe $PERLDIR/bin/cpan install XML::Parser
+## fix missing fsync (version >= 2.28.0 <= 2.31.3)
+# echo "#define fsync(fd) _commit(fd)" >> config.h &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-gtk --without-openldap CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -Wl,--enable-auto-import" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-gtk --without-openldap --enable-introspection=no --disable-defaults-service CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -Wl,--enable-auto-import" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-gtk --without-openldap --enable-introspection=no CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -Wl,--enable-auto-import" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-gtk --with-gtk=2.0 --without-openldap --enable-introspection=no CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -Wl,--enable-auto-import" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-gtk --with-gtk=2.0 --without-openldap --enable-introspection=no CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -Wl,--enable-auto-import" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-gtk --with-gtk=2.0 --without-openldap --enable-introspection=no CFLAGS="-D_WIN32_WINNT=0x0501" LDFLAGS="-lws2_32 -Wl,--enable-auto-import" &&
+ # fix missing command in libtool
+ ####libtool: eval: line 1115: syntax error near unexpected token `|'
+ sed -i.bak -e "s/\(global_symbol_pipe=\"\)\(\"\)/\1cat\2/" libtool &&
+ wl-showstatus build-install &&
+ #make -j1 all install-strip &&
+ #make -j1 all install-strip INTLTOOL_MERGE="$PERLDIR/bin/perl.exe `which intltool-merge`" &&
+ #PATH=$PATH:$PERLDIR/../c/bin make -j1 all install-strip INTLTOOL_MERGE="$PERLDIR/bin/perl.exe `which intltool-merge`" &&
+ PATH=$PYDIR:$PATH:$PERLDIR/../c/bin make -j1 all install-strip INTLTOOL_MERGE="$PERLDIR/bin/perl.exe $(which intltool-merge)" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf GConf-$VERSION
+####/mingw32/include/orbit-2.0/orbit/orb-core/orbit-object.h:43: error: expected identifier or '(' before 'struct'
+
+
+

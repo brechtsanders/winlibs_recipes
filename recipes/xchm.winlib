@@ -1,0 +1,67 @@
+export NAME="xCHM"
+export STATUS=
+export URL=http://xchm.sourceforge.net/
+export BASENAME=xchm
+export DESCRIPTION="xCHM is a cross-platform GUI front-end to chmlib, with borrowed bits from Pabs' chmdeco project. Originally written for UNIX systems (Linux, *BSD, Solaris), xCHM has been since ported to Mac OS X and Windows."
+export CATEGORY=fileformat
+export TYPE=application
+export VERSION=1.23
+export VERSIONDATE=20170321
+wl-showstatus --package-version
+export DEPENDANCIES=chmlib,wxwidgets
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=wx-config-win
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/xchm/files/xCHM/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/xchm/xCHM/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/chmframe.cpp
+patch -ulbf src/chmframe.cpp << EOF
+@@ -267,7 +267,3 @@
+
+-#if wxMAJOR_VERSION == 2 && wxMINOR_VERSION >= 7
+                *_normalFonts = enu.GetFacenames();
+-#else
+-               *_normalFonts = *enu.GetFacenames();
+-#endif
+                _normalFonts->Sort();
+@@ -280,7 +276,3 @@
+
+-#if wxMAJOR_VERSION == 2 && wxMINOR_VERSION >= 7
+                *_fixedFonts = enu.GetFacenames();
+-#else
+-               *_fixedFonts = *enu.GetFacenames();
+-#endif
+                _fixedFonts->Sort();
+EOF
+# create dummy wx-config which supports --version and uses UNIX-style paths
+cat > wx-config.sh << EOF
+#!/bin/sh
+if echo " \$* "|grep -q " --version "; then
+ shift
+ wx-config.exe --release \$* | grep -v "wx-config Error:" | sed -e "s/^\\([0-9]*\\.[0-9]*\\)\$/\\1.0/"
+else
+ wx-config.exe --static=yes --unicode=yes --debug=no --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?/\\1/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+fi
+EOF
+# fix invalid libraries
+#sed -i.bak -e "s/\(-lwxjpeg\|-lwxpng\|-lwxtiff\|-lwxzlib\)-[0-9.]*\b/\1/g" configure
+sed -i.bak -e "s/\(-lwxjpeg\|-lwxpng\|-lwxtiff\|-lwxzlib\)-[0-9.]*\b//g" configure
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --with-wx-config=./wx-config.sh &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --with-wx-config=$(which wx-config.exe) --with-wxdir=$MINGWPREFIX/wx &&
+ wl-showstatus build-install &&
+ #PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH make install-strip &&
+ windres -I$MINGWPREFIX/wx/include $(pwd)/rc/xchm.rc -O coff -o $(pwd)/rc/xchm.o &&
+ PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH make LIBS="-Wl,--as-needed -lchm -lws2_32 -lversion -loleacc -luxtheme $(pwd)/rc/xchm.o" install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

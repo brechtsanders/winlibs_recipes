@@ -1,0 +1,261 @@
+export NAME="FreeRADIUS"
+export STATUS=
+export URL=http://www.freeradius.org/
+export BASENAME=freeradius
+export DESCRIPTION="FreeRADIUS includes a RADIUS server, a BSD licensed client library, a PAM library, and an Apache module. In most cases, the word FreeRADIUS refers to the RADIUS server."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=2.1.3
+#export VERSION=2.1.4
+#export VERSION=2.1.6
+#export VERSION=2.1.7
+#export VERSION=2.1.8
+#export VERSION=2.1.9
+#export VERSIONDATE=20100524
+#export VERSION=2.1.10
+#export VERSIONDATE=20100928
+#export VERSION=2.1.11
+#export VERSIONDATE=20110620
+#export VERSION=2.1.12
+#export VERSIONDATE=20110930
+#export VERSION=2.2.0
+#export VERSIONDATE=20120910
+#export VERSION=2.2.1
+#export VERSIONDATE=20130918
+#export VERSION=2.2.2
+#export VERSIONDATE=20131030
+#export VERSION=2.2.3
+#export VERSIONDATE=20131212
+#export VERSION=2.2.4
+#export VERSIONDATE=20140320
+#export VERSION=2.2.5
+#export VERSIONDATE=20140429
+#export VERSION=2.2.6
+#export VERSIONDATE=20141119
+#export VERSION=2.2.7
+#export VERSIONDATE=20150423
+#export VERSION=2.2.8
+#export VERSIONDATE=20150710
+#export VERSION=2.2.9
+#export VERSIONDATE=20151001
+export VERSION=2.2.10
+export VERSIONDATE=20170718
+####src/lib/.libs/debug.o:debug.c:(.text+0x57): undefined reference to `strsignal'
+export DEPENDANCIES=openssl
+#export VERSION=3.0.0
+#export VERSIONDATE=20131010
+#export VERSION=3.0.1
+#export VERSIONDATE=20140114
+#export DEPENDANCIES=ykclient
+#export VERSION=3.0.2
+#export VERSIONDATE=20140321
+#export VERSION=3.0.3
+#export VERSIONDATE=20140513
+#export VERSION=3.0.4
+#export VERSIONDATE=20140911
+#export VERSION=3.0.5
+#export VERSIONDATE=20141122
+#export VERSION=3.0.6
+#export VERSIONDATE=20141218
+#export VERSION=3.0.7
+#export VERSIONDATE=20150220
+#export VERSION=3.0.8
+#export VERSIONDATE=20150423
+#export VERSION=3.0.9
+#export VERSIONDATE=20150709
+#export VERSION=3.0.10
+#export VERSIONDATE=20151006
+#export VERSION=3.0.11
+#export VERSIONDATE=20160126
+#export VERSION=3.0.12
+#export VERSIONDATE=20160930
+#export VERSION=3.0.13
+#export VERSIONDATE=20170307
+#export VERSION=3.0.14
+#export VERSIONDATE=20170527
+#export VERSION=3.0.15
+#export VERSIONDATE=20170718
+wl-showstatus --package-version
+#export DEPENDANCIES=openssl,ykclient,libyubikey
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://freeradius.org/download.html freeradius-server-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://ftp.freeradius.org/pub/freeradius/freeradius-server-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://freeradius.portal-to-web.de/freeradius-server-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/freeradius-server-$VERSION.tar.bz2
+cd freeradius-server-$VERSION
+# fix missing files (version >= 2.2.0)
+mkdir -p sys net netinet arpa
+echo "#include <winsock2.h>" > sys/socket.h
+touch sys/ioctl.h net/if_arp.h netinet/in.h netinet/tcp.h netdb.h arpa/inet.h
+## fix strncasecmp/strcasecmp in src/freeradius-devel/missing.h (version >= 2.2.3 <= 2.2.5)
+#patch -ulbf src/freeradius-devel/missing.h << EOF
+#--- src/freeradius-devel/missing.h  2013-12-12 14:12:24 +0100
+#+++ src/freeradius-devel/missing.h  2013-12-12 14:28:54 +0100
+#@@ -110,3 +110,4 @@
+# #ifndef HAVE_STRNCASECMP
+#-extern int strncasecmp(char *s1, char *s2, int n);
+#+#define HAVE_STRNCASECMP 1
+#+#define strncasecmp _strnicmp
+# #endif
+#@@ -114,3 +115,4 @@
+# #ifndef HAVE_STRCASECMP
+#-extern int strcasecmp(char *s1, char *s2);
+#+#define HAVE_STRCASECMP 1
+#+#define strcasecmp _stricmp
+# #endif
+#EOF
+# fix strncasecmp/strcasecmp in src/freeradius-devel/missing.h (version >= 2.2.6)
+patch -ulbf src/freeradius-devel/missing.h << EOF
+@@ -108,9 +108,15 @@
+  */
+
+-#ifndef HAVE_STRNCASECMP
++#ifdef __MINGW32__
++#define strncasecmp _strnicmp
++#define HAVE_STRNCASECMP 1
++#elif defined(HAVE_STRNCASECMP)
+ extern int strncasecmp(char *s1, char *s2, int n);
+ #endif
+
+-#ifndef HAVE_STRCASECMP
++#ifdef __MINGW32__
++#define strcasecmp _stricmp
++#define HAVE_STRCASECMP 1
++#elif defined(HAVE_STRCASECMP)
+ extern int strcasecmp(char *s1, char *s2);
+ #endif
+EOF
+## fix missing sig_t in src/freeradius-devel/libradius.h (version >= 2.2.4)
+#mv src/freeradius-devel/libradius.h src/freeradius-devel/libradius.h.bak
+#cat > src/freeradius-devel/libradius.h << EOF
+##ifndef LIBRADIUS_H
+#typedef void* sig_t;
+##endif
+#EOF
+#cat src/freeradius-devel/libradius.h.bak >> src/freeradius-devel/libradius.h
+# fix missing strsignal in src/lib/debug.c (version >= 2.2.4)
+mv src/lib/debug.c src/lib/debug.c.bak
+cat > src/lib/debug.c << EOF
+#define strsignal(sig) "(signals not supported on Windows)"
+EOF
+cat src/lib/debug.c.bak >> src/lib/debug.c
+## fix missing LD_LIBRARY_PATH_LOCAL in scripts/jlibtool.c (version >= 3.0.2)
+#patch -ulbf scripts/jlibtool.c << EOF
+#--- scripts/jlibtool.c  2014-03-21 20:51:12 +0100
+#+++ scripts/jlibtool.c  2014-03-21 20:54:02 +0100
+#@@ -2240,4 +2240,6 @@
+#
+#+#ifdef LD_LIBRARY_PATH_LOCAL
+#        l = "./build/lib/.libs";
+#        setenv(LD_LIBRARY_PATH_LOCAL, l, 1);
+#+#endif
+#        rv = run_command(cmd, cmd->arglist);
+#EOF
+## fix missing LD_LIBRARY_PATH_LOCAL in scripts/jlibtool.c (version >= 3.0.15)
+#patch -ulbf scripts/jlibtool.c << EOF
+#@@ -2243,4 +2243,6 @@
+#
+#+#ifdef LD_LIBRARY_PATH_LOCAL
+#                l = "./build/lib/.libs";
+#                setenv(LD_LIBRARY_PATH_LOCAL, l, 1);
+#+#endif
+# #ifdef __APPLE__
+#@@ -2248,3 +2250,5 @@
+# #endif
+#+#ifdef FR_LIBRARY_PATH
+#                setenv("FR_LIBRARY_PATH", "./build/lib/local/.libs", 1);
+#+#endif
+#                rv = run_command(cmd, cmd->arglist);
+#EOF
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+# fix issue detecting header openssl/ocsp.h (version >= 3.0.15)
+sed -i.bak -e "s/openssl\/ocsp\.h//" configure
+wl-showstatus configure &&
+# fix missing src/freeradius-devel
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`" --disable-developer &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`" LDFLAGS="-Wl,--as-needed -lws2_32 -lpthread -lregex" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd) -I$(pwd)/src/include" LDFLAGS="-Wl,--as-needed -lws2_32 -lpthread -lregex" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libltdl/libtool &&
+ ( make -j1 -C src/lib install || PATH=$PATH:$PERLDIR/../c/bin make:`pwd` -j1 -C src/lib install MAKE=gmake.exe LIBTOOL="sh $(pwd)/libtool" || (
+    mkdir -p src/freeradius-devel &&
+    cp src/include/*.h src/freeradius-devel/ &&
+    make -j1 -C src/lib install
+   )
+ ) &&
+ make -j1 -C src/include install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# to do: build DLL on 64-bit
+# to do: install .pc file (if possible)
+
+
+
+make -j1 MAKE=gmake LIBTOOL="sh $(pwd)/libtool"
+
+make -j1 -C src/modules install && 
+
+cat >> src/include/autoconf.h << EOF
+#define LOCK_EX 1
+#define WINDOWS
+//#include <winsock2.h>
+//#include <plibc.h>
+#define HAVE_GETNAMEINFO
+#define HAVE_GETADDRINFO
+#define HAVE_STRUCT_SOCKADDR_STORAGE
+#define HAVE_STRUCT_IN6_ADDR
+#define HAVE_GETTIMEOFDAY
+EOF
+
+mkdir freeradius-devel
+cp src/include/*.h freeradius-devel/
+
+# fix missing sockaddr_storage in freeradius-devel/libradius.h (version >= 2.1.8)
+mv freeradius-devel/libradius.h freeradius-devel/libradius.h.bak
+echo "#include <winsock2.h>" > freeradius-devel/libradius.h
+cat freeradius-devel/libradius.h.bak >> freeradius-devel/libradius.h
+####freeradius-devel/libradius.h:144: error: field 'ipv6addr' has incomplete type
+####freeradius-devel/libradius.h:196: error: field 'ip6addr' has incomplete type
+
+## fix missing LD_LIBRARY_PATH_LOCAL in scripts/jlibtool.c
+#patch -ulbf scripts/jlibtool.c << EOF
+#--- scripts/jlibtool.c  2017-05-26 20:11:20.000000000 +0200
+#+++ scripts/jlibtool.c  2017-05-27 17:22:20.117363100 +0200
+#@@ -2244,3 +2244,5 @@
+#                l = "./build/lib/.libs";
+#+#ifdef LD_LIBRARY_PATH_LOCAL
+#                setenv(LD_LIBRARY_PATH_LOCAL, l, 1);
+#+#endif
+# #ifdef __APPLE__
+#EOF
+# avoid setenv in scripts/jlibtool.c
+mv scripts/jlibtool.c scripts/jlibtool.c.bak &&
+sed -e "s?\bsetenv(?//&?" scripts/jlibtool.c.bak > scripts/jlibtool.c
+
+
+make -C src/lib install &&
+make -C src/include/ install &&
+    echo OK
+
+make install &&
+    echo OK
+####D:/Prog/MinGW-mSys/home/win32/freeradius-server-2.1.8/freeradius-devel/libradius.h:399: warning: 'struct sockaddr_storage' declared inside parameter list
+#to do: src/modules/rlm_sql/drivers/rlm_sql_mysql/config.log @LDFLAGS@
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf freeradius-server-$VERSION
+
+
+

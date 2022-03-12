@@ -1,0 +1,169 @@
+export NAME="OATH Toolkit"
+export STATUS=
+export URL=http://www.nongnu.org/oath-toolkit/
+export BASENAME=oath-toolkit
+export DESCRIPTION="The OATH Toolkit provide components for building one-time password authentication systems. It contains shared libraries, command line tools and a PAM module. Supported technologies include the event-based HOTP algorithm (RFC4226) and the time-based TOTP algorithm (RFC6238). OATH stands for Open AuTHentication, which is the organization that specify the algorithms. For managing secret key files, the Portable Symmetric Key Container (PSKC) format described in RFC6030 is supported."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=2.6.2
+#export VERSIONDATE=20170411
+#export VERSION=2.6.3
+#export VERSIONDATE=20201108
+#export VERSION=2.6.4
+#export VERSIONDATE=20201112
+#export VERSION=2.6.5
+#export VERSIONDATE=20201229
+#export VERSION=2.6.6
+#export VERSIONDATE=20210121
+export VERSION=2.6.7
+export VERSIONDATE=20210502
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libxml2,xmlsec1
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="LGPL/GPL"
+#export DOWNLOADURL="http://download.savannah.nongnu.org/releases/oath-toolkit/"
+export DOWNLOADURL="https://download-mirror.savannah.gnu.org/releases/oath-toolkit/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.savannah.nongnu.org/releases/oath-toolkit/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://download-mirror.savannah.gnu.org/releases/oath-toolkit/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing strptime in libpskc/parser.c
+####TO DO: fix properly
+mv libpskc/parser.c libpskc/parser.c.bak &&
+echo "#define strptime(s,dmt,tm) NULL" > libpskc/parser.c &&
+cat libpskc/parser.c.bak >> libpskc/parser.c
+# fix liboath/usersfile.c
+patch -ulbf liboath/usersfile.c << EOF
+--- liboath/usersfile.c  2016-08-27 13:15:06.000000000 +0200
++++ liboath/usersfile.c  2017-04-11 19:04:29.921931400 +0200
+@@ -31,4 +31,9 @@
+ #include <errno.h>             /* For errno. */
+ #include <sys/stat.h>          /* For S_IRUSR, S_IWUSR. */
++#ifdef _WIN32
++#define strptime(s,f,t) NULL
++#define fsync(fd) _commit(fd)
++#define localtime_r(clock,result) (*(result) = *localtime(clock),result)
++#endif
+
+ static int
+@@ -306,5 +311,10 @@
+                  size_t skipped_users)
+ {
+-  FILE *outfh, *lockfh;
++#ifdef _WIN32
++  int lockfh;
++#else
++  FILE *lockfh;
++#endif
++  FILE *outfh;
+   int rc;
+   char *newfilename, *lockfile;
+@@ -328,4 +338,9 @@
+       return OATH_PRINTF_ERROR;
+
++#ifdef _WIN32
++    if ((lockfh = open(lockfile, O_RDWR|O_CREAT|O_EXCL, 0444)) == -1)
++      return OATH_FILE_LOCK_ERROR;
++  }
++#else
+     lockfh = fopen (lockfile, "w");
+     if (!lockfh)
+@@ -377,4 +392,5 @@
+       }
+   }
++#endif
+
+   /* Create the new usersfile content. */
+@@ -405,5 +421,9 @@
+
+   /* Complete, close the lockfile */
++#ifdef _WIN32
++  if (close (lockfh) != 0)
++#else
+   if (fclose (lockfh) != 0)
++#endif
+     rc = OATH_FILE_CLOSE_ERROR;
+   if (unlink (lockfile) != 0)
+EOF
+# fix missing getline and asprintf in oathtool/oathtool.c (version >= 2.6.5)
+####oathtool/oathtool.c:160: undefined reference to `getline'
+mv oathtool/oathtool.c oathtool/oathtool.c.bak
+cat > oathtool/oathtool.c << EOF
+#define _GNU_SOURCE	//needed for asprintf
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat oathtool/oathtool.c.bak >> oathtool/oathtool.c
+# fix missing fchown() in liboath/usersfile.c (version >= 2.6.7)
+patch -ulbf liboath/usersfile.c << EOF
+@@ -406,4 +406,6 @@
+
++#ifndef _WIN32
+     if(rc == OATH_OK && fchown(fileno(outfh), insb.st_uid, insb.st_gid) != 0)
+       rc = OATH_FILE_CHOWN_ERROR;
++#endif
+   }
+EOF
+# fix aux.* issues
+cp liboath/aux.h liboath/_aux.h
+cp liboath/aux.c liboath/_aux.c
+for F in $(grep -l "aux\.h" liboath/*.c); do
+ mv $F $F.bak &&
+ sed -e "s/aux\.h/_&/" $F.bak > $F
+done
+#sed -i.bak -e "s/\baux\.[hc]/_&/g" liboath/Makefile.in
+sed -i.bak -e "s/\baux\.[hc]/_&/g" liboath/Makefile.am
+#make -j1 check
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-pam --enable-pskc --disable-xmltest &&
+ wl-showstatus build-install &&
+ ( make install-strip || make -j1 install-strip ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

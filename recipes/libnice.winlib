@@ -1,0 +1,329 @@
+export NAME="libnice"
+export STATUS=
+#export URL=http://nice.freedesktop.org/wiki/
+export URL=https://libnice.freedesktop.org/
+export BASENAME=libnice
+export DESCRIPTION="Libnice is an implementation of the IETF's Interactice Connectivity Establishment (ICE) standard (RFC 5245) and the Session Traversal Utilities for NAT (STUN) standard (RFC 5389)."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.0.13
+#export VERSIONDATE=20101021
+#export VERSION=0.1.0
+#export VERSIONDATE=20110122
+#export VERSION=0.1.1
+#export VERSIONDATE=20110908
+#export VERSION=0.1.2
+#export VERSIONDATE=20120409
+#export VERSION=0.1.3
+#export VERSIONDATE=20120915
+#export VERSION=0.1.4
+#export VERSIONDATE=20130223
+#export VERSION=0.1.5
+#export VERSIONDATE=20140307
+#export VERSION=0.1.6
+#export VERSIONDATE=20140429
+#export VERSION=0.1.7
+#export VERSIONDATE=20140506
+#export VERSION=0.1.8
+#export VERSIONDATE=20141010
+#export VERSION=0.1.9
+#export VERSIONDATE=20150129
+#export VERSION=0.1.10
+#export VERSIONDATE=20150129
+#export VERSION=0.1.11
+#export VERSIONDATE=20150421
+#export VERSION=0.1.12
+#export VERSIONDATE=20150423
+#export VERSION=0.1.13
+#export VERSIONDATE=20150429
+####examples/simple-example.c:(.text+0x13f): undefined reference to `g_io_channel_win32_new'
+#export VERSION=0.1.14
+#export VERSIONDATE=20170404
+####stun/tools/stunhmac.c:(.text+0x373): undefined reference to `nice_RAND_nonce'
+#export VERSION=0.1.15
+#export VERSIONDATE=20181228
+#export VERSION=0.1.16
+#export VERSIONDATE=20190510
+#export VERSION=0.1.17
+#export VERSIONDATE=20200523
+export VERSION=0.1.18
+export VERSIONDATE=20201021
+#export DEPENDANCIES=glib2,gettext,gstreamer,gnutls
+#export OPTIONALDEPENDANCIES=gupnp-igd
+#export BUILDDEPENDANCIES=
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gettext,gstreamer,gnutls,gupnp-igd
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE="MPL/LGPL"
+#export DOWNLOADURL="http://nice.freedesktop.org/releases/"
+#export DOWNLOADURL="https://libnice.freedesktop.org/"
+export DOWNLOADURL="https://gitlab.freedesktop.org/libnice/libnice/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://nice.freedesktop.org/releases/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://libnice.freedesktop.org/releases/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://gitlab.freedesktop.org/libnice/libnice/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix redefinition of size_t/ssize_t in stun/win32_common.h
+mv stun/win32_common.h stun/win32_common.h.bak
+#sed -e "s?typedef unsigned int size_t;?#include <sys/types.h>?; s?typedef unsigned long ssize_t;??" stun/win32_common.h.bak > stun/win32_common.h
+sed -e "s?typedef .* s*size_t;?#include <sys/types.h>?" stun/win32_common.h.bak > stun/win32_common.h
+cat >> stun/win32_common.h << EOF
+#include <winsock2.h>
+#include <windows.h>
+#include <wincrypt.h>
+EOF
+# fix conflicting redefinition of closesocket
+mv stun/usages/bind.c stun/usages/bind.c.bak
+echo "#include <io.h>" > stun/usages/bind.c
+cat stun/usages/bind.c.bak >> stun/usages/bind.c
+# fix for missing wspiapi.h
+patch -ulbf agent/address.h << EOF
+--- agent/address.h  2010-10-21 16:22:36 +0200
++++ agent/address.h  2010-10-21 16:23:06 +0200
+@@ -57,3 +57,5 @@
+ #include <ws2tcpip.h>
++#ifndef __MINGW32__
+ #include <wspiapi.h>
++#endif
+ #else
+EOF
+# fix redefinition of ssize_t in socket/udp-bsd.c
+patch -ulbf socket/udp-bsd.c << EOF
+--- socket/udp-bsd.c  2010-07-20 23:54:42 +0200
++++ socket/udp-bsd.c  2010-10-21 16:26:46 +0200
+@@ -53,3 +53,3 @@
+
+-#ifdef G_OS_WIN32
++#if defined(G_OS_WIN32) && !defined(__MINGW32__)
+ typedef unsigned long ssize_t;
+EOF
+# fix missing EWOULDBLOCK
+mv agent/agent.c agent/agent.c.bak
+echo "#define EWOULDBLOCK WSAEWOULDBLOCK" > agent/agent.c
+cat agent/agent.c.bak >> agent/agent.c
+## fix missing MIB_IPADDR_DISCONNECTED and MIB_IPADDR_DELETED in agent/interfaces.c (version <= 0.1.5)
+#mv agent/interfaces.c agent/interfaces.c.bak
+#echo "#define MIB_IPADDR_DISCONNECTED 0" > agent/interfaces.c
+#echo "#define MIB_IPADDR_DELETED 0" >> agent/interfaces.c
+#echo "#define IF_INDEX DWORD" >> agent/interfaces.c
+#cat agent/interfaces.c.bak >> agent/interfaces.c
+# fix  agent/interfaces.c (version >= 0.1.6)
+patch -ulbf agent/interfaces.c << EOF
+--- agent/interfaces.c  2014-03-07 03:14:00 +0100
++++ agent/interfaces.c  2014-03-07 11:08:08 +0100
+@@ -412,3 +412,3 @@
+
+-GList * nice_interfaces_get_local_interfaces ()
++GList * nice_interfaces_get_local_interfaces (void)
+ {
+EOF
+## fix agent/pseudotcp.c (version <= 0.1.1)
+#patch -ulbf agent/pseudotcp.c << EOF
+#--- agent/pseudotcp.c  2010-07-20 23:54:42 +0200
+#+++ agent/pseudotcp.c  2010-10-21 17:22:52 +0200
+#@@ -66,3 +66,13 @@
+# #include <stdlib.h>
+#+#ifdef __MINGW32__
+#+#include <stdint.h>
+#+#include <winsock2.h>
+#+#define ECONNABORTED WSAECONNABORTED
+#+#define ENOTCONN WSAENOTCONN
+#+#define EWOULDBLOCK WSAEWOULDBLOCK
+#+#define ECONNRESET WSAECONNRESET
+#+#define ECONNABORTED WSAECONNABORTED
+#+#else
+# #include <arpa/inet.h>
+#+#endif
+# #include <errno.h>
+#@@ -179,2 +189,3 @@
+#
+#+#ifndef __MINGW32__
+# static guint32
+#@@ -189,2 +200,3 @@
+# }
+#+#endif
+#
+#EOF
+## fix agent/pseudotcp.c (version >= 0.1.2 <= 0.1.4)
+#patch -ulbf agent/pseudotcp.c << EOF
+#--- agent/pseudotcp.c  2012-02-18 00:45:34 +0100
+#+++ agent/pseudotcp.c  2012-04-09 21:39:58 +0200
+#@@ -72,4 +72,12 @@
+# #ifndef G_OS_WIN32
+# #  include <arpa/inet.h>
+#+#else
+#+#  include <stdint.h>
+#+#  include <winsock2.h>
+#+#  define ECONNABORTED WSAECONNABORTED
+#+#  define ENOTCONN WSAENOTCONN
+#+#  define EWOULDBLOCK WSAEWOULDBLOCK
+#+#  define ECONNRESET WSAECONNRESET
+#+#  define ECONNABORTED WSAECONNABORTED
+# #endif
+#
+#@@ -185,4 +193,5 @@
+# #endif
+#
+#+//#ifndef __MINGW32__
+# static guint32
+# bound(guint32 lower, guint32 middle, guint32 upper)
+#@@ -198,4 +207,5 @@
+#   return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+# }
+#+//#endif
+#
+# static gboolean
+#EOF
+# fix agent/pseudotcp.c (version >= 0.1.5)
+patch -ulbf agent/pseudotcp.c << EOF
+--- agent/pseudotcp.c  2014-03-07 11:18:26 +0100
++++ agent/pseudotcp.c  2014-03-07 11:18:28 +0100
+@@ -948,3 +948,3 @@
+
+-  if (*timeout == 0 || *timeout < now)
++  if (*timeout == 0 || (guint32)*timeout < now)
+     *timeout = now + CLOSED_TIMEOUT;
+EOF
+# fix missing getnameinfo/getaddrinfo/freeaddrinfo function in agent/address.c
+mv agent/address.c agent/address.c.bak
+cat > agent/address.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+#ifndef IN6_ARE_ADDR_EQUAL
+#define IN6_ARE_ADDR_EQUAL(a, b) (memcmp ((void*)(a), (void*)(b), sizeof (struct in6_addr)) == 0)
+#endif
+EOF
+cat agent/address.c.bak >> agent/address.c
+# fix redefinition of ECONNRESET in agent/pseudotcp.h (version >= 0.1.5)
+patch -ulbf agent/pseudotcp.h << EOF
+--- agent/pseudotcp.h  2014-03-07 03:14:00 +0100
++++ agent/pseudotcp.h  2014-03-07 10:08:30 +0100
+@@ -62,6 +62,14 @@
+ #  include <winsock2.h>
++# ifndef ECONNABORTED
+ #  define ECONNABORTED WSAECONNABORTED
++# endif
++# ifndef ENOTCONN
+ #  define ENOTCONN WSAENOTCONN
++# endif
++# ifndef EWOULDBLOCK
+ #  define EWOULDBLOCK WSAEWOULDBLOCK
++# endif
++# ifndef ECONNRESET
+ #  define ECONNRESET WSAECONNRESET
++# endif
+ #endif
+EOF
+# fix agent/conncheck.c (version >= 0.15)
+patch -ulbf agent/conncheck.c << EOF
+--- agent/conncheck.c  2014-03-07 10:49:06 +0100
++++ agent/conncheck.c  2014-03-07 11:03:40 +0100
+@@ -1673,14 +1673,14 @@
+     gchar tmpbuf[INET6_ADDRSTRLEN];
+     nice_address_to_string (&pair->remote->addr, tmpbuf);
+     nice_debug ("Agent %p : STUN-CC REQ to '%s:%u', socket=%u, "
+-        "pair=%s (c-id:%u), tie=%llu, username='%s' (%" G_GSIZE_FORMAT "), "
++        "pair=%s (c-id:%u), tie=%I64u, username='%s' (%" G_GSIZE_FORMAT "), "
+         "password='%s' (%" G_GSIZE_FORMAT "), priority=%u.", agent,
+             tmpbuf,
+              nice_address_get_port (&pair->remote->addr),
+              g_socket_get_fd(((NiceSocket *)pair->local->sockptr)->fileno),
+             pair->foundation, pair->component_id,
+             (unsigned long long)agent->tie_breaker,
+-        uname, uname_len, password, password_len, priority);
++        (char*)uname, uname_len, (char*)password, password_len, (unsigned int)priority);
+
+   }
+
+EOF
+# fix shadowed global declaration of byte socket/http.c (version >= 0.1.5)
+patch -ulbf socket/http.c << EOF
+--- socket/http.c  2014-03-07 02:21:06 +0100
++++ socket/http.c  2014-04-01 14:26:52 +0200
+@@ -465,6 +465,6 @@
+           while (TRUE) {
+-            guint8 byte = GET_BYTE (pos);
+-            gint val = g_ascii_digit_value (byte);
++            guint8 mybyte = GET_BYTE (pos);
++            gint val = g_ascii_digit_value (mybyte);
+
+-            if (byte == '\r') {
++            if (mybyte == '\r') {
+               /* Reached the end of the value; fall out to the code below which
+EOF
+# fix shadowed global declaration of socket in socket/tcp-turn.c (version >= 0.1.5)
+patch -ulbf socket/tcp-turn.c << EOF
+--- socket/tcp-turn.c  2014-03-07 02:21:06 +0100
++++ socket/tcp-turn.c  2014-04-01 14:35:04 +0200
+@@ -198,3 +198,3 @@
+ static gint
+-socket_recv_messages (NiceSocket *socket,
++socket_recv_messages (NiceSocket *mysocket,
+     NiceInputMessage *recv_messages, guint n_recv_messages)
+@@ -207,3 +207,3 @@
+
+-    len = socket_recv_message (socket, &recv_messages[i]);
++    len = socket_recv_message (mysocket, &recv_messages[i]);
+     recv_messages[i].length = MAX (len, 0);
+EOF
+## fix docs/reference/libnice/Makefile.am (version >= 0.1.16)
+#patch -ulbf docs/reference/libnice/Makefile.am << EOF
+#@@ -96,3 +96,3 @@
+# # e.g. EXTRA_DIST += version.xml.in
+#-EXTRA_DIST += states.gv
+#+EXTRA_DIST = states.gv
+#
+#EOF
+## skip making examples (version >= 0.1.12)
+#cat > examples/Makefile.am << EOF
+#clean:
+#all:
+#install:
+#install-strip:
+#EOF
+#touch gtk-doc.make
+#wl-showstatus configure &&
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+# automake -f -c -a &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf CFLAGS="-I`pwd`/stun" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf CFLAGS="-I`pwd`/stun" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf CFLAGS="-I`pwd`/stun" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -no-undefined -Wl,-no-undefined" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf CFLAGS="-I`pwd`/stun" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -Wl,-no-undefined" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gupnp --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf CFLAGS="-I`pwd`/stun" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -Wl,-no-undefined" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gupnp --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf --without-gstreamer-0.10 --with-gstreamer --enable-compile-warnings=minimum CFLAGS="-I`pwd`/stun" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -Wl,-no-undefined" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gupnp --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf --without-gstreamer-0.10 --with-gstreamer --enable-compile-warnings=minimum --enable-introspection=no CFLAGS="-I`pwd`/stun" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -Wl,-no-undefined" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-gupnp --disable-gtk-doc --disable-gtk-doc-html --disable-gtk-doc-pdf --without-gstreamer-0.10 --with-gstreamer --enable-compile-warnings=minimum --enable-introspection=no CFLAGS="-I`pwd`/stun" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -Wl,-no-undefined" &&
+# wl-showstatus build-install &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# ## fix error: declaration of 'socket' shadows a global declaration
+# #mv agent/Makefile agent/Makefile.bak &&
+# #sed -e "s/-Wshadow//; s/-Wsign-compare//; s/-Wall//" agent/Makefile.bak > agent/Makefile &&
+# # fix agent/agent-enum-types.h (version >= 0.1.15)
+# make -Cagent agent-enum-types.h &&
+# sed -i.bak -e "s?^.*\(/\* enumerations from.*\*/\).*\$?\1?" agent/agent-enum-types.h &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+## fix detection of recent gupnp-igd (version >= 0.1.16)
+#sed -i.bak -e "s/gupnp-igd-[0-9]*\.[0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gupnp-igd-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\(gupnp-igd-.*\)\.pc$/\1/")/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgupnp=enabled -Dgstreamer=enabled -Dcrypto-library=gnutls -Dintrospection=disabled -Dgtk_doc=disabled -Dexamples=disabled -Dtests=disabled . build_both &&
+ # fix slash/backslash path issue when calling Python from Ninja
+ sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ # fix Python path issues in meson_exe
+ sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -C build_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

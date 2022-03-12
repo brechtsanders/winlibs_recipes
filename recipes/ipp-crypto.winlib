@@ -1,0 +1,83 @@
+export NAME="ipp-crypto"
+export STATUS=
+export URL=https://github.com/intel/ipp-crypto
+export BASENAME=ipp-crypto
+export DESCRIPTION="Intel(R) Integrated Performance Primitives (Intel(R) IPP) Cryptography is a secure, fast and lightweight library of building blocks for cryptography, highly-optimized for various Intel(R) CPUs."
+export CATEGORY=security,hardware
+export TYPE=library
+export VERSION=2020u3
+export VERSIONDATE=20201203
+####dispatcher/jmp_ippsDESPack_a5aa9349.asm:1: error: COFF format does not support any special symbol types
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/intel/ipp-crypto/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/intel/ipp-crypto/archive/ippcp_$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfzv $TARBALLDIR/$BASENAME/ippcp_$VERSION.tar.gz
+cd ipp-crypto-ippcp_$VERSION
+# fix sources/include/owndefs.h (version >= 2020u3)
+patch -ulbf sources/include/owndefs.h << EOF
+@@ -222,3 +222,3 @@
+ #if defined( IPP_W32DLL )
+-  #if defined( _MSC_VER ) || defined( __INTEL_COMPILER )
++  #if defined( _WIN32 ) || defined( _MSC_VER ) || defined( __INTEL_COMPILER )
+     #define IPPFUN(type,name,arg) __declspec(dllexport) type IPP_CALL name arg
+EOF
+# fix missing __int64 in include/ippcpdefs.h
+mv include/ippcpdefs.h include/ippcpdefs.h.bak &&
+echo "#include <sys/types.h>" > include/ippcpdefs.h &&
+cat include/ippcpdefs.h.bak >> include/ippcpdefs.h
+# fix missing winres.h in sources/include/ippres.gen
+patch -ulbf sources/include/ippres.gen << EOF
+@@ -17,3 +17,7 @@
+
++#ifdef __MINGW32__
++#include <winver.h>
++#else
+ #include "winres.h"
++#endif
+
+@@ -44,3 +48,3 @@
+             VALUE "CompanyName", "Intel Corporation.\\0"
+-            VALUE "FileVersion", STR( VERSION() ) "\\0"
++            VALUE "FileVersion", STR_VERSION() "\\0"
+             VALUE "ProductName", IPP_LIB_SHORTNAME() ". Intel(R) Integrated Performance Primitives. " IPP_LIB_LONGNAME() ".\\0"
+EOF
+# fix invalid __asm in sources/dispatcher/gen_disp_win32.py
+#sed -i.bak -e "s/__asm {{\(.*\)}}/__asm__ (\\\\\"\1\\\\\\\\n\\\\\");/" sources/dispatcher/gen_disp_win32.py
+#mv sources/dispatcher/gen_disp_win32.py sources/dispatcher/gen_disp_win32.py.bak &&
+#grep -v "global " sources/dispatcher/gen_disp_lin32.py > sources/dispatcher/gen_disp_win32.py
+#cat sources/dispatcher/gen_disp_lin32.py > sources/dispatcher/gen_disp_win32.py
+cat sources/dispatcher/gen_disp_lin32.nonpic.py > sources/dispatcher/gen_disp_win32.py
+# fix missing file
+cp -f sources/cmake/linux/GNU8.2.0.cmake sources/cmake/windows/GNU8.2.0.cmake &&
+grep "^set(.*_opt" sources/cmake/linux/GNU8.2.0.cmake >> sources/cmake/windows/GNU8.2.0.cmake &&
+cat >> sources/cmake/windows/GNU8.2.0.cmake << EOF
+set(LINK_FLAG_STATIC_WINDOWS " ")
+set(LINK_FLAG_DYNAMIC_WINDOWS " ")
+set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} -DIPP_W32DLL")
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DARCH:STRING=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "intel64"; else echo "ia32"; fi) -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
+ sed -i.bak -e "s?/MT /O3 /DNDEBUG?-O3 -pthread?; s?/Qfnalign:?-falign-functions=?; s?/Qalign-loops:?-falign-loops=?; s?-ffreestanding?& -fno-asynchronous-unwind-tables?; s?-wd10120??; s?-QxCORE-AVX512 -Qopt-zmm-usage:high?-march=skylake-avx512?; s?-Werror?& -Wno-error=stringop-overflow?" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ cp -u build_win/.build/RELEASE/lib/*.dll.a $INSTALLPREFIX/lib/ &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/intel64/*.dll $INSTALLPREFIX/bin/ &&
+ mv -f $INSTALLPREFIX/lib/intel64/*.a $INSTALLPREFIX/lib/ &&
+ rmdir $INSTALLPREFIX/lib/intel64 &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ipp-crypto-ippcp_$VERSION
+####TO DO: build fails on Windows 32-bit
+
+
+

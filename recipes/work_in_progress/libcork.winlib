@@ -1,0 +1,151 @@
+export NAME="libcork"
+export STATUS=
+export URL=https://github.com/redjack/libcork
+export BASENAME=libcork
+export DESCRIPTION="A simple, easily embeddable cross-platform C library"
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.15.0
+#export VERSIONDATE=20170401
+export VERSION=1.0.0--rc3
+export VERSIONDATE=20200501
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/redjack/libcork/releases"
+export DOWNLOADURL="https://github.com/redjack/libcork/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/redjack/libcork/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/redjack/libcork/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix version detection in version.sh
+#mv version.sh version.sh.bak &&
+#sed -e "s/git describe/echo $VERSION/" version.sh.bak > version.sh
+## fix version detection in CMakeLists.txt
+#mv CMakeLists.txt CMakeLists.txt.bak &&
+#sed -e "s?[^ ]*version\.sh?sh &?" CMakeLists.txt.bak > CMakeLists.txt
+## fix CMakeLists.txt (version <= 0.15.0)
+#patch -ulbf CMakeLists.txt << EOF
+#--- CMakeLists.txt  2017-04-01 14:13:35.860496000 +0200
+#+++ CMakeLists.txt  2017-04-01 14:20:04.346940000 +0200
+#@@ -22,11 +22,3 @@
+#
+#-execute_process(COMMAND \${CMAKE_CURRENT_SOURCE_DIR}/version.sh
+#-    WORKING_DIRECTORY \${CMAKE_CURRENT_SOURCE_DIR}
+#-    RESULT_VARIABLE VERSION_RESULT
+#-    OUTPUT_VARIABLE VERSION
+#-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+#-if(VERSION_RESULT)
+#-    message(FATAL_ERROR
+#-            "Cannot determine version number: " \${VERSION_RESULT})
+#-endif(VERSION_RESULT)
+#+set(VERSION "0.15.0")
+# # This causes an annoying extra prompt in ccmake.
+#@@ -44,13 +36,2 @@
+#
+#-execute_process(
+#-    COMMAND git rev-parse HEAD
+#-    WORKING_DIRECTORY \${CMAKE_CURRENT_SOURCE_DIR}
+#-    RESULT_VARIABLE GIT_SHA1_RESULT
+#-    OUTPUT_VARIABLE GIT_SHA1
+#-    OUTPUT_STRIP_TRAILING_WHITESPACE
+#-)
+#-if(GIT_SHA1_RESULT)
+#-    message(FATAL_ERROR
+#-            "Cannot determine git commit: " \${GIT_SHA1_RESULT})
+#-endif(GIT_SHA1_RESULT)
+#
+#EOF
+## fix cmake/FindCTargets.cmake (version <= 0.15.0)
+#patch -ulbf cmake/FindCTargets.cmake << EOF
+#--- cmake/FindCTargets.cmake  2015-09-03 17:25:39.000000000 +0200
+#+++ cmake/FindCTargets.cmake  2017-04-01 14:27:54.298216600 +0200
+#@@ -102,3 +102,3 @@
+#         # the user asked us to link our programs with the shared library.
+#-        install(TARGETS \${__TARGET_NAME}-shared
+#+        install(TARGETS #\${__TARGET_NAME}-shared
+#                 LIBRARY DESTINATION \${CMAKE_INSTALL_LIBDIR})
+#EOF
+## remove -Wall -Werror from CMakeLists.txt (version <= 0.15.0)
+#mv CMakeLists.txt CMakeLists.txt.bak &&
+#sed -e "s/-Wall\|-Werror//g" CMakeLists.txt.bak > CMakeLists.txt
+# fix src/libcork/posix/files.c (version >= 1.0.0)
+patch -ulbf src/libcork/posix/files.c << EOF
+@@ -450,4 +450,6 @@
+             file->type = CORK_FILE_DIRECTORY;
++#ifdef S_ISLNK
+         } else if (S_ISLNK(file->stat.st_mode)) {
+             file->type = CORK_FILE_SYMLINK;
++#endif
+         } else {
+@@ -620,3 +622,7 @@
+     DEBUG("  Creating %s\\n", cork_path_get(file->path));
++#ifdef _WIN32
++    rii_check_posix(mkdir(cork_path_get(file->path)));
++#else
+     rii_check_posix(mkdir(cork_path_get(file->path), mode));
++#endif
+     return 0;
+EOF
+# fix CMakeLists.txt (version >= 1.0.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -20,14 +20,3 @@
+
+-execute_process(
+-    COMMAND
+-      \${CMAKE_CURRENT_SOURCE_DIR}/build-aux/calculate version .version-stamp
+-    WORKING_DIRECTORY \${CMAKE_CURRENT_SOURCE_DIR}
+-    RESULT_VARIABLE VERSION_RESULT
+-    OUTPUT_VARIABLE VERSION
+-    OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
+-if(VERSION_RESULT)
+-    message(FATAL_ERROR
+-            "Cannot determine version number: " \${VERSION_RESULT})
+-endif(VERSION_RESULT)
++set(VERSION "$VERSION")
+ message(STATUS "Current version: " \${VERSION})
+@@ -44,15 +33,2 @@
+
+-execute_process(
+-    COMMAND
+-      \${CMAKE_CURRENT_SOURCE_DIR}/build-aux/calculate commit .commit-stamp
+-    WORKING_DIRECTORY \${CMAKE_CURRENT_SOURCE_DIR}
+-    RESULT_VARIABLE GIT_SHA1_RESULT
+-    OUTPUT_VARIABLE GIT_SHA1
+-    OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
+-if(GIT_SHA1_RESULT)
+-    message(FATAL_ERROR
+-            "Cannot determine git commit: " \${GIT_SHA1_RESULT})
+-endif(GIT_SHA1_RESULT)
+-message(STATUS "Current revision: " \${GIT_SHA1})
+
+@@ -87,3 +63,4 @@
+
+-if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
++if(MINGW)
++elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+     add_definitions(-Wall -Werror)
+EOF
+wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=YES -DENABLE_SHARED:BOOL=YES -DENABLE_SHARED_EXECUTABLES:BOOL=YES -DUSE_CUSTOM_CHECK:BOOL=YES -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe . &&
+ PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=YES -DENABLE_SHARED:BOOL=YES -DENABLE_SHARED_EXECUTABLES:BOOL=YES -DUSE_CUSTOM_CHECK:BOOL=YES -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe . &&
+ echo "#define CORK_CONFIG_IS_LITTLE_ENDIAN 1" >> include/libcork/config/config.h &&
+ wl-showstatus build-install &&
+ make install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,93 @@
+export NAME="Braa"
+export STATUS=
+export URL=http://s-tech.elsat.net.pl/braa/
+export BASENAME=braa
+export DESCRIPTION="Braa is a mass snmp scanner. The intended usage of such a tool is of course making SNMP queries - but unlike snmpget or snmpwalk from net-snmp, it is able to query dozens or hundreds of hosts simultaneously, and in a single process. Thus, it consumes very few system resources and does the scanning VERY fast."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=0.82
+export VERSIONDATE=20190201
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://s-tech.elsat.net.pl/braa/"
+#export DOWNLOADURL="https://github.com/mteg/braa/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://s-tech.elsat.net.pl/braa/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing u_int64_t
+#sed -i.bak -e "s/u_\(int[0-9]*_t\)/u\1/g" $(grep -l "u_int[0-9]*_t" *.c *.h)
+for F in $(grep -l "u_int[0-9]*_t" *.c *.h); do
+ mv -f $F $F.bak &&
+ echo "#include <stdint.h>" > $F &&
+ sed -e "s/u_\(int[0-9]*_t\)/u\1/g" $F.bak >> $F
+done
+# fix missing inet_aton
+for F in $(grep -l "inet_aton" *.c); do
+ mv -f $F $F.bak2 &&
+ echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > $F &&
+ cat $F.bak2 >> $F
+done
+# fix missing index function in queries.c
+mv queries.c queries.c.bak3 &&
+echo "#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})" > queries.c &&
+cat queries.c.bak3 >> queries.c
+# fix braa.c
+patch -ulbf braa.c << EOF
+@@ -20,2 +20,5 @@
+ #define ERRORBUFFER_SIZE 200
++#ifdef _WIN32
++#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})
++#endif
+
+@@ -73,2 +76,8 @@
+        char error[ERRORBUFFER_SIZE];
++#ifdef _WIN32
++       static WSADATA wsaData;
++       int wsaerr = WSAStartup(MAKEWORD(2, 0), &wsaData);
++       if (wsaerr) exit(1);
++       atexit((void(*)())WSACleanup);
++#endif
+
+@@ -103,4 +112,6 @@
+                                }
++#ifdef SIGALRM
+                                signal(SIGALRM, doquit);
+                                alarm(t);
++#endif
+                                break;
+@@ -169,4 +180,9 @@
+                }
+-
++
++#ifdef _WIN32
++               u_long blockmode = 1;
++               if(ioctlsocket(s, FIONBIO, &blockmode) == SOCKET_ERROR)
++#else
+                if(fcntl(s, F_SETFL, O_NONBLOCK) < 0)
++#endif
+                {
+EOF
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h
+# fix Makefile
+sed -i.bak -e "s/cc /gcc /" Makefile
+wl-showstatus build &&
+ make CC="gcc -I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" OUT=braa.exe &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Doesn't work
+
+
+

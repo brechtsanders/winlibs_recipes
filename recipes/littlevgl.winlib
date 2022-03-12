@@ -1,0 +1,138 @@
+export NAME="LittlevGL"
+export STATUS=
+export URL=https://littlevgl.com/
+#export URL=https://github.com/littlevgl/lvgl
+#export URL=https://github.com/lvgl/lvgl
+export BASENAME=littlevgl
+export DESCRIPTION="LittlevGL is a free and open-source graphics library providing everything you need to create embedded GUI with easy-to-use graphical elements, beautiful visual effects and low memory footprint."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=5.1
+#export VERSIONDATE=20180425
+#export VERSION=5.1.1
+#export VERSIONDATE=20180521
+#export VERSION=5.2
+#export VERSIONDATE=20181006
+#export VERSION=5.3
+#export VERSIONDATE=20190201
+#export VERSION=6.0
+#export VERSIONDATE=20190630
+#export VERSION=6.0.1
+#export VERSIONDATE=20190801
+#export VERSION=6.0.2
+#export VERSIONDATE=20190807
+#export VERSION=6.1
+#export VERSIONDATE=20191125
+#export VERSION=6.1.1
+#export VERSIONDATE=20191206
+#export VERSION=6.1.2
+#export VERSIONDATE=20200227
+#export VERSION=7.0.0
+#export VERSIONDATE=20200519
+#export VERSION=7.0.1
+#export VERSIONDATE=20200602
+#export VERSION=7.0.2
+#export VERSIONDATE=20200616
+#export VERSION=7.1.0
+#export VERSIONDATE=20200707
+#export VERSION=7.2.0
+#export VERSIONDATE=20200721
+#export VERSION=7.3.0
+#export VERSIONDATE=20200804
+#export VERSION=7.3.1
+#export VERSIONDATE=20200818
+#export VERSION=7.4.0
+#export VERSIONDATE=20200901
+#export VERSION=7.5.0
+#export VERSIONDATE=20200915
+#export VERSION=7.6.0
+#export VERSIONDATE=20200922
+#export VERSION=7.6.1
+#export VERSIONDATE=20201006
+#export VERSION=7.7.0
+#export VERSIONDATE=20201020
+#export VERSION=7.7.1
+#export VERSIONDATE=20201103
+#export VERSION=7.7.2
+#export VERSIONDATE=20201117
+#export VERSION=7.8.0
+#export VERSIONDATE=20201201
+#export VERSION=7.8.1
+#export VERSIONDATE=20201216
+#export VERSION=7.9.0
+#export VERSIONDATE=20210116
+#export VERSION=7.9.1
+#export VERSIONDATE=20210119
+#export VERSION=7.10.0
+#export VERSIONDATE=20210203
+#export VERSION=7.10.1
+#export VERSIONDATE=20210217
+#export VERSION=7.11.0
+#export VERSIONDATE=20210317
+#export VERSION=8.0.0
+#export VERSIONDATE=20210601
+#export VERSION=8.0.1
+#export VERSIONDATE=20210614
+#export VERSION=8.0.2
+#export VERSIONDATE=20210717
+#export VERSION=8.1.0
+#export VERSIONDATE=20211110
+export VERSION=8.2.0
+export VERSIONDATE=20220201
+wl-showstatus --package-version
+export DEPENDANCIES=sdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=lvgl-$VERSION/licence.txt
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/littlevgl/lvgl/releases"
+export DOWNLOADURL="https://github.com/lvgl/lvgl/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/littlevgl/lvgl/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/lvgl/lvgl/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION
+# fix missing lvgl include folder
+mkdir lvgl &&
+cp -rf lvgl-$VERSION/*.h lvgl/
+wl-showstatus configure &&
+ ## generate missing lv_conf.h (version = 5.3)
+ #sed -e "s/#if 0/#if 1/" lvgl-$VERSION/lv_conf_templ.h > lv_conf.h &&
+ # generate missing lv_conf.h (ersion >= 6.0)
+ sed -e "s/#if 0/#if 1/" lvgl-$VERSION/lv_conf_template.h > lv_conf.h &&
+ mkdir -p lvgl/src &&
+ ## fix missing lv_conf_checker.h (version <= 6.1.2)
+ #cp -f lvgl-$VERSION/src/lv_conf_checker.h lvgl/src &&
+ wl-showstatus build &&
+ for F in $(find -name '*.c'); do
+  if [ ! -f $F.o ]; then
+   echo CC $F
+   #gcc -c -o $F.o $F -I$(dirname $F)
+   #gcc -c -o $F.o $F -I. -I$(dirname $F) || break 1
+   gcc -c -o $F.o $F -I. -Ilvgl-$VERSION -I$(dirname $F) -DLV_CONF_INCLUDE_SIMPLE || break 1
+  fi
+ done &&
+ ar cru liblvgl.a $(find -name '*.o') &&
+ #( echo EXPORTS; nm -f posix --defined-only -p liblvgl.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" | grep "^lv_" ) > liblvgl.def &&
+ ( echo EXPORTS; nm -f posix --defined-only -p liblvgl.a | sed -n -e "s/^\(lv_[^ ]*\) T .*$/\1/p" ) > liblvgl.def &&
+ gcc -shared -s -mwindows -def liblvgl.def -o liblvgl.dll liblvgl.a -Wl,--out-implib,liblvgl.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/lvgl $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f lv_conf.h $INSTALLPREFIX/include/ &&
+ for F in $(find lvgl-$VERSION -name '*.h'); do
+  if echo $F | grep -q "/.*/.*"; then
+   mkdir -p $INSTALLPREFIX/include/lvgl/$(echo $F|sed -e "s?^lvgl-$VERSION/??; s/\/[^/]*\.h$//")
+  fi &&
+  cp -f $F $INSTALLPREFIX/include/lvgl/$(echo $F|sed -e "s?^lvgl-$VERSION/??")
+ done &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,391 @@
+export NAME="libMemcached"
+export STATUS=
+export URL=http://libmemcached.org/
+export BASENAME=libmemcached
+export DESCRIPTION="libMemcached was designed to provide the greatest number of options to use Memcached."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=0.49
+#export VERSIONDATE=20110519
+#export VERSION=0.50
+#export VERSIONDATE=20110621
+####libmemcached/behavior.cc:359: error: cannot convert 'int*' to 'char*' for argument '4' to 'int getsockopt(SOCKET, int, int, char*, int*)'
+####libmemcached/behavior.cc:395: error: cannot convert 'int*' to 'char*' for argument '4' to 'int getsockopt(SOCKET, int, int, char*, int*)'
+#export VERSION=0.51
+#export VERSIONDATE=20110725
+#export VERSION=0.52
+#export VERSIONDATE=20110913
+####libmemcached/error.cc:106: error: 'ECONNREFUSED' was not declared in this scope
+####libmemcached/error.cc:130: error: 'strerror_r' was not declared in this scope
+#export VERSION=0.53
+#export VERSIONDATE=20110929
+#export VERSION=1.0.2
+#export VERSIONDATE=20111027
+####libmemcached/csl/scanner.l:98: error: expected primary-expression before ';' token
+####libmemcached/csl/scanner.l:118: error: 'SOCKET_RECV_SIZE' was not declared in this scope
+#export VERSION=1.0.3
+#export VERSIONDATE=20120110
+####libmemcached/csl/scanner.l:98: error: expected primary-expression before ';' token
+####libmemcached/csl/scanner.l:139: error: invalid conversion from 'int' to 'yytokentype'
+#export VERSION=1.0.4
+#export VERSIONDATE=20120127
+#export VERSION=1.0.5
+#export VERSIONDATE=20120315
+#export VERSION=1.0.6
+#export VERSIONDATE=20120411
+#export VERSION=1.0.7
+#export VERSIONDATE=20120429
+#export VERSION=1.0.8
+#export VERSIONDATE=20120523
+#export VERSION=1.0.9
+#export VERSIONDATE=20120706
+#export VERSION=1.0.10
+#export VERSIONDATE=20120801
+####libmemcached/behavior.cc:259:36: error: 'srandom' was not declared in this scope
+####libtest/wait.cc:22:20: fatal error: config.h: No such file or directory
+#export VERSION=1.0.11
+#export VERSIONDATE=20120819
+####libhashkit/has.cc:45:5: error: "__WORDSIZE" is not defined [-Werror=undef]
+#export VERSION=1.0.12
+#export VERSIONDATE=20121011
+#export VERSION=1.0.13
+#export VERSIONDATE=20121020
+#export VERSION=1.0.14
+#export VERSIONDATE=20121116
+#export VERSION=1.0.15
+#export VERSIONDATE=20121218
+#export VERSION=1.0.16
+#export VERSIONDATE=20130201
+#export VERSION=1.0.17
+#export VERSIONDATE=20130403
+export VERSION=1.0.18
+export VERSIONDATE=20140209
+####libmemcached/common.h:111:37: fatal error: libmemcached/windows.hpp: No such file or directory
+wl-showstatus --package-version
+#export DEPENDANCIES=plibc
+export DEPENDANCIES=cyrus-sasl
+export OPTIONALDEPENDANCIES=memcached
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://launchpad.net/libmemcached/+download"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://launchpad.net/libmemcached/$(echo $VERSION|sed -e "s/^\([0-9][0-9]*\.[0-9][0-9]*\).*$/\1/")/$VERSION/+download/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing config/top.h (version <= 1.0.11)
+touch config/top.h
+# fix missing files
+mkdir -p arpa sys netinet
+touch arpa/inet.h sys/mman.h netinet/in.h netinet/tcp.h netdb.h sys/un.h
+echo "#include <winsock2.h>" > sys/socket.h
+# fix redefinitions in libmemcached/options/parser.h (version <= 0.52)
+mv libmemcached/options/parser.h libmemcached/options/parser.h.bak
+#sed -e "s/\([^ ]* *= *[0-9]\)/yy\1/" libmemcached/options/parser.h.bak > libmemcached/options/parser.h
+sed -e "s/\( \)\(ERROR\|TRUE\|FALSE\|FLOAT\)/\1yy\2/" libmemcached/options/parser.h.bak > libmemcached/options/parser.h
+# fix redefinitions in libmemcached/csl/parser.h (version >= 0.53)
+mv libmemcached/csl/parser.h libmemcached/csl/parser.h.bak
+sed -e "s/\( \)\(ERROR\|SOCKET\|TRUE\|FALSE\|FLOAT\) /\1yy\2 /" libmemcached/csl/parser.h.bak > libmemcached/csl/parser.h
+## fix redefinitions in libmemcached/csl/scanner.h (version >= 0.53 <= 1.0.17)
+#mv libmemcached/csl/scanner.cc libmemcached/csl/scanner.cc.bak
+#sed -e "s/\(ERROR\|SOCKET\|TRUE\|FALSE\|FLOAT\);/yy\1;/" libmemcached/csl/scanner.cc.bak > libmemcached/csl/scanner.cc
+# fix redefinition of srandom in win32/wrappers.h
+mv win32/wrappers.h win32/wrappers.h.bak
+sed -e "s/^\(#define srandom\)/\/\/\1/; s/^\(#define kill(a, b) *\).*$/\1(-1)/" win32/wrappers.h.bak > win32/wrappers.h
+# workaround for missing struct timespec and missing mkstemp in libtest/server.c (version <= 1.0.11)
+mv libtest/server.c libtest/server.c.bak
+cat > libtest/server.c << EOF
+struct timespec {
+  long tv_sec;
+  long tv_nsec;
+};
+//#include <plibc.h>
+#undef SOCKET
+EOF
+cat libtest/server.c.bak >> libtest/server.c
+# fix undefined R_OK in tests/parser.cc
+mv tests/parser.cc tests/parser.cc.bak
+cat > tests/parser.cc << EOF
+#define R_OK 4
+#define access(f,s) (-1)
+EOF
+cat tests/parser.cc.bak >> tests/parser.cc
+## fix missing ECONNREFUSED in libmemcached/error.cc (version >= 0.50)
+#mv libmemcached/error.cc libmemcached/error.cc.bak
+#cat > libmemcached/error.cc << EOF
+##include <winsock2.h>
+##define ECONNREFUSED WSAECONNREFUSED
+#EOF
+#cat libmemcached/error.cc.bak >> libmemcached/error.cc
+# fix libmemcached/behavior.cc (version >= 1.0.4)
+#patch -ulbf libmemcached/behavior.cc << EOF
+#--- libmemcached/behavior.cc  2012-01-09 00:11:56 +0100
+#+++ libmemcached/behavior.cc  2012-01-27 21:19:08 +0100
+#@@ -258,3 +258,3 @@
+#   case MEMCACHED_BEHAVIOR_RANDOMIZE_REPLICA_READ:
+#-      srandom((uint32_t) time(NULL));
+#+      srand((uint32_t) time(NULL));
+#       ptr->flags.randomize_replica_read= bool(data);
+#@@ -401,3 +401,3 @@
+#
+#-        if (getsockopt(instance->fd, SOL_SOCKET, SO_SNDBUF, &sock_size, &sock_length) < 0)
+#+        if (getsockopt(instance->fd, SOL_SOCKET, SO_SNDBUF, (char*)&sock_size, &sock_length) < 0)
+#         {
+#@@ -437,3 +437,3 @@
+#
+#-        if (getsockopt(instance->fd, SOL_SOCKET, SO_RCVBUF, &sock_size, &sock_length) < 0)
+#+        if (getsockopt(instance->fd, SOL_SOCKET, SO_RCVBUF, (char*)&sock_size, &sock_length) < 0)
+#         {
+#
+#EOF
+## fix libmemcached/connect.cc (version >= 1.0.4)
+#patch -ulbf libmemcached/connect.cc << EOF
+#--- libmemcached/connect.cc  2012-01-26 20:57:34 +0100
+#+++ libmemcached/connect.cc  2012-01-27 21:23:44 +0100
+#@@ -66,3 +66,3 @@
+#         socklen_t len= sizeof (err);
+#-        if (getsockopt(server->fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
+#+        if (getsockopt(server->fd, SOL_SOCKET, SO_ERROR, (char*)&err, &len) == 0)
+#         {
+#@@ -104,3 +104,3 @@
+#           socklen_t len= sizeof(err);
+#-          if (getsockopt(server->fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
+#+          if (getsockopt(server->fd, SOL_SOCKET, SO_ERROR, (char*)&err, &len) == 0)
+#           {
+#@@ -294,3 +294,3 @@
+#     error= setsockopt(server->fd, SOL_SOCKET, SO_LINGER,
+#-                      &linger, (socklen_t)sizeof(struct linger));
+#+                      (char*)&linger, (socklen_t)sizeof(struct linger));
+#     WATCHPOINT_ASSERT(error == 0);
+#@@ -304,3 +304,3 @@
+#     error= setsockopt(server->fd, IPPROTO_TCP, TCP_NODELAY,
+#-                      &flag, (socklen_t)sizeof(int));
+#+                      (char*)&flag, (socklen_t)sizeof(int));
+#     WATCHPOINT_ASSERT(error == 0);
+#@@ -314,3 +314,3 @@
+#     error= setsockopt(server->fd, SOL_SOCKET, SO_KEEPALIVE,
+#-                      &flag, (socklen_t)sizeof(int));
+#+                      (char*)&flag, (socklen_t)sizeof(int));
+#     WATCHPOINT_ASSERT(error == 0);
+#@@ -334,3 +334,3 @@
+#     error= setsockopt(server->fd, SOL_SOCKET, SO_SNDBUF,
+#-                      &server->root->send_size, (socklen_t)sizeof(int));
+#+                      (char*)&server->root->send_size, (socklen_t)sizeof(int));
+#     WATCHPOINT_ASSERT(error == 0);
+#@@ -343,3 +343,3 @@
+#     error= setsockopt(server->fd, SOL_SOCKET, SO_RCVBUF,
+#-                      &server->root->recv_size, (socklen_t)sizeof(int));
+#+                      (char*)&server->root->recv_size, (socklen_t)sizeof(int));
+#     WATCHPOINT_ASSERT(error == 0);
+#@@ -477,3 +477,7 @@
+#     {
+#+#ifndef __MINGW32__
+#     case ETIMEDOUT:
+#+#else
+#+    case WSAETIMEDOUT:
+#+#endif
+#       timeout_error_occured= true;
+#EOF
+# fix missing __WORDSIZE in libhashkit/fnv_64.cc (version >= 1.0.11)
+mv libhashkit/fnv_64.cc libhashkit/fnv_64.cc.bak
+cat > libhashkit/fnv_64.cc << EOF
+#ifdef __MINGW64__
+#define __WORDSIZE 64
+#else
+#define __WORDSIZE 32
+#endif
+EOF
+cat libhashkit/fnv_64.cc.bak >> libhashkit/fnv_64.cc
+## fix missing in_port_t in libmemcached-1.0/struct/server.h (version >= 1.0.12)
+#mv libmemcached-1.0/struct/server.h libmemcached-1.0/struct/server.h.bak
+##echo "#include <libmemcached-1.0/platform.h>" > libmemcached-1.0/struct/server.h
+#echo "typedef short in_port_t;" > libmemcached-1.0/struct/server.h
+#cat libmemcached-1.0/struct/server.h.bak >> libmemcached-1.0/struct/server.h
+## fix missing in_port_t in libmemcached-1.0/server.h (version >= 1.0.12)
+#mv libmemcached-1.0/server.h libmemcached-1.0/server.h.bak
+##echo "#include <libmemcached-1.0/platform.h>" > libmemcached-1.0/server.h
+#echo "typedef short in_port_t;" > libmemcached-1.0/server.h
+#cat libmemcached-1.0/server.h.bak >> libmemcached-1.0/server.h
+## fix libmemcached/behavior.cc (version >= 1.0.12 <= 1.0.17)
+#patch -ulbf libmemcached/behavior.cc << EOF
+#--- libmemcached/behavior.cc  2012-10-11 01:27:58 +0200
+#+++ libmemcached/behavior.cc  2012-10-11 23:02:02 +0200
+#@@ -43,2 +43,5 @@
+# #include <sys/types.h>
+#+#ifdef __MINGW32__
+#+#define srandom srand
+#+#endif
+#
+#@@ -429,3 +432,3 @@
+#
+#-        if (getsockopt(instance->fd, SOL_SOCKET, SO_SNDBUF, &sock_size, &sock_length) < 0)
+#+        if (getsockopt(instance->fd, SOL_SOCKET, SO_SNDBUF, (char*)&sock_size, &sock_length) < 0)
+#         {
+#@@ -465,3 +468,3 @@
+#
+#-        if (getsockopt(instance->fd, SOL_SOCKET, SO_RCVBUF, &sock_size, &sock_length) < 0)
+#+        if (getsockopt(instance->fd, SOL_SOCKET, SO_RCVBUF, (char*)&sock_size, &sock_length) < 0)
+#         {
+#EOF
+# fix libmemcached/behavior.cc (version >= 1.0.18)
+patch -ulbf libmemcached/behavior.cc << EOF
+--- libmemcached/behavior.cc  2014-02-09 12:52:42 +0100
++++ libmemcached/behavior.cc  2014-02-09 21:13:50 +0100
+@@ -43,2 +43,5 @@
+ #include <sys/types.h>
++#ifdef __MINGW32__
++#define srandom srand
++#endif
+
+EOF
+## fix libmemcached/connect.cc (version >= 1.0.12)
+#patch -ulbf libmemcached/connect.cc << EOF
+#--- libmemcached/connect.cc  2012-10-11 01:27:58 +0200
+#+++ libmemcached/connect.cc  2012-10-11 23:13:30 +0200
+#@@ -47,2 +47,13 @@
+# #endif
+#+#ifdef __MINGW32__
+#+#ifndef ETIMEDOUT
+#+#define ETIMEDOUT WSAETIMEDOUT
+#+#endif
+#+#ifndef POLLHUP
+#+#define POLLHUP 0
+#+#endif
+#+#ifndef POLLNVAL
+#+#define POLLNVAL 0
+#+#endif
+#+#endif
+#
+#@@ -89,3 +100,3 @@
+#             socklen_t len= sizeof(err);
+#-            if (getsockopt(server->fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
+#+            if (getsockopt(server->fd, SOL_SOCKET, SO_ERROR, (char*)&err, &len) == 0)
+#             {
+#@@ -120,3 +131,3 @@
+#       socklen_t len= sizeof (err);
+#-      if (getsockopt(fds[0].fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0)
+#+      if (getsockopt(fds[0].fd, SOL_SOCKET, SO_ERROR, (char*)&err, &len) == 0)
+#       {
+#@@ -291,3 +302,3 @@
+#     int error= setsockopt(server->fd, SOL_SOCKET, SO_SNDTIMEO,
+#-                          &waittime, (socklen_t)sizeof(struct timeval));
+#+                          (const char*)&waittime, (socklen_t)sizeof(struct timeval));
+#     (void)error;
+#@@ -306,3 +317,3 @@
+#     int error= setsockopt(server->fd, SOL_SOCKET, SO_RCVTIMEO,
+#-                          &waittime, (socklen_t)sizeof(struct timeval));
+#+                          (const char*)&waittime, (socklen_t)sizeof(struct timeval));
+#     (void)(error);
+#@@ -337,3 +348,3 @@
+#     int error= setsockopt(server->fd, SOL_SOCKET, SO_LINGER,
+#-                          &linger, (socklen_t)sizeof(struct linger));
+#+                          (const char*)&linger, (socklen_t)sizeof(struct linger));
+#     (void)(error);
+#@@ -347,3 +358,3 @@
+#     int error= setsockopt(server->fd, IPPROTO_TCP, TCP_NODELAY,
+#-                          &flag, (socklen_t)sizeof(int));
+#+                          (const char*)&flag, (socklen_t)sizeof(int));
+#     (void)(error);
+#@@ -357,3 +368,3 @@
+#     int error= setsockopt(server->fd, SOL_SOCKET, SO_KEEPALIVE,
+#-                      &flag, (socklen_t)sizeof(int));
+#+                      (const char*)&flag, (socklen_t)sizeof(int));
+#     (void)(error);
+#@@ -366,3 +377,3 @@
+#     int error= setsockopt(server->fd, IPPROTO_TCP, TCP_KEEPIDLE,
+#-                          &server->root->tcp_keepidle, (socklen_t)sizeof(int));
+#+                          (const char*)&server->root->tcp_keepidle, (socklen_t)sizeof(int));
+#     (void)(error);
+#@@ -375,3 +386,3 @@
+#     int error= setsockopt(server->fd, SOL_SOCKET, SO_SNDBUF,
+#-                          &server->root->send_size, (socklen_t)sizeof(int));
+#+                          (const char*)&server->root->send_size, (socklen_t)sizeof(int));
+#     (void)(error);
+#@@ -383,3 +394,3 @@
+#     int error= setsockopt(server->fd, SOL_SOCKET, SO_RCVBUF,
+#-                          &server->root->recv_size, (socklen_t)sizeof(int));
+#+                          (const char*)&server->root->recv_size, (socklen_t)sizeof(int));
+#     (void)(error);
+#EOF
+## fix libmemcached/do.cc (version >= 1.0.12)
+#patch -ulbf libmemcached/do.cc << EOF
+#--- libmemcached/do.cc  2012-10-11 01:27:58 +0200
+#+++ libmemcached/do.cc  2012-10-11 23:33:12 +0200
+#@@ -12,2 +12,23 @@
+# #include <libmemcached/common.h>
+#+#ifdef __MINGW32__
+#+#ifndef EMSGSIZE
+#+#define EMSGSIZE WSAEMSGSIZE
+#+#endif
+#+struct msghdr {
+#+ void*         msg_name;
+#+ socklen_t     msg_namelen;
+#+ struct iovec* msg_iov;
+#+ int           msg_iovlen;
+#+ void*         msg_control;
+#+ socklen_t     msg_controllen;
+#+ int           msg_flags;
+#+};
+#+int sendmsg(int s, const struct msghdr *msg, int flags)
+#+{
+#+  DWORD dwBufferCount;
+#+  if (WSASendTo((SOCKET)s, (LPWSABUF)msg->msg_iov, (DWORD)msg->msg_iovlen, &dwBufferCount, flags, (const sockaddr*)msg->msg_name, msg->msg_namelen, NULL, NULL) == 0)
+#+    return dwBufferCount;
+#+  return (WSAGetLastError() == WSAECONNRESET ? 0 : -1);
+#+}
+#+#endif
+#
+#@@ -59,3 +80,3 @@
+#     {
+#-      ssize_t sendmsg_length= ::sendmsg(instance->fd, &msg, 0);
+#+      ssize_t sendmsg_length= sendmsg(instance->fd, &msg, 0);
+#       if (sendmsg_length > 0)
+#EOF
+## fix libmemcached/error.cc (version >= 1.0.12)
+#patch -ulbf libmemcached/error.cc << EOF
+#--- libmemcached/error.cc  2012-10-11 01:27:58 +0200
+#+++ libmemcached/error.cc  2012-10-11 23:34:58 +0200
+#@@ -39,2 +39,7 @@
+# #include <cstdarg>
+#+#ifdef __MINGW32__
+#+#define strerror_r(errno,buf,buflen) strncpy(buf,strerror(errno),buflen-1);buf[buflen-1]=0;
+#+#define ECONNRESET WSAECONNRESET
+#+#define ECONNREFUSED WSAECONNREFUSED
+#+#endif
+#
+#EOF
+# fix missing srandom in libmemcached/hosts.cc (version >= 1.0.12)
+mv libmemcached/hosts.cc libmemcached/hosts.cc.bak
+echo "#define srandom srand" > libmemcached/hosts.cc
+cat libmemcached/hosts.cc.bak >> libmemcached/hosts.cc
+wl-showstatus configure &&
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# fix configure (version >= 1.0.11)
+mv configure configure.bak &&
+sed -e "s/-Wall//" configure.bak > configure &&
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+#make -j1 check
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-memcached CFLAGS="-DWIN32" CXXFLAGS="-DWIN32" LDFLAGS="-Wl,--as-needed -lplibc" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-memcached --disable-jobserver CFLAGS="-DWIN32" CXXFLAGS="-DWIN32" LDFLAGS="-Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-memcached --disable-jobserver CFLAGS="-DWIN32" CXXFLAGS="-DWIN32" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-memcached --disable-jobserver --disable-sasl CFLAGS="-DWIN32" CXXFLAGS="-DWIN32" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ echo "typedef short int in_port_t;" >> config.h &&
+ echo "#define srandom srand" >> config.h &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lstdc++" ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####To do: fix many format errors
+####To do: testapp.exe craches during make check
+####To do: build DLL
+
+
+

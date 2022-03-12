@@ -1,0 +1,141 @@
+export NAME="GMime 3"
+export STATUS=
+export URL=http://spruce.sourceforge.net/gmime/
+export BASENAME=libgmime3
+export DESCRIPTION="GMime is a C/C++ library which may be used for the creation and parsing of messages using the Multipurpose Internet Mail Extension (MIME)"
+export CATEGORY=fileformat,dataprocessing
+export TYPE=library
+#export VERSION=3.0.0
+#export VERSIONDATE=20170424
+#export VERSION=3.0.1
+#export VERSIONDATE=20170522
+#export VERSION=3.0.2
+#export VERSIONDATE=20170903
+#export VERSION=3.0.3
+#export VERSIONDATE=20171030
+#export VERSION=3.0.4
+#export VERSIONDATE=20171121
+#export VERSION=3.0.5
+#export VERSIONDATE=20171204
+#export VERSION=3.2.0
+#export VERSIONDATE=20171221
+#export VERSION=3.2.1
+#export VERSIONDATE=20181028
+#export VERSION=3.2.2
+#export VERSIONDATE=20181101
+#export VERSION=3.2.3
+#export VERSIONDATE=20181127
+#export VERSION=3.2.4
+#export VERSIONDATE=20191004
+#export VERSION=3.2.5
+#export VERSIONDATE=20191114
+#export VERSION=3.2.6
+#export VERSIONDATE=20200216
+export VERSION=3.2.7
+export VERSIONDATE=20200321
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gpgme,zlib,libiconv,gettext,libgpg-error,libidn
+#export DEPENDANCIES=glib2,gpgme,zlib,libiconv,gettext,libgpg-error,libidn,gobject-introspection
+export OPTIONALDEPENDANCIES=vala
+export BUILDDEPENDANCIES=gtk-doc
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2.1
+export DOWNLOADURL="http://download.gnome.org/sources/gmime/ gmime-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.gnome.org/sources/gmime/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/gmime-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/gmime-$VERSION.tar.xz
+cd gmime-$VERSION
+## fix gmime/gmime-gpg-context.c (version >= 2.4.21 <= 2.4.21)
+#patch -ulbf gmime/gmime-gpg-context.c << EOF
+#--- gmime/gmime-gpg-context.c  2010-11-23 17:02:10 +0100
+#+++ gmime/gmime-gpg-context.c  2010-12-07 11:03:04 +0100
+#@@ -29,8 +29,17 @@
+# #include <sys/time.h>
+# #include <sys/types.h>
+#-#include <sys/ioctl.h>
+# #include <sys/stat.h>
+#+#ifndef __MINGW32__
+#+#include <sys/ioctl.h>
+# #include <sys/wait.h>
+# #include <termios.h>
+#+#else
+#+#define ECANCELED -1
+#+#define WNOHANG 0
+#+#define SIGKILL 9
+#+#define SIGALRM 14
+#+#define SIG_BLOCK 0
+#+#define SIG_SETMASK 2
+#+#endif
+# #include <signal.h>
+# #include <unistd.h>
+#@@ -708,4 +717,5 @@
+# gpg_ctx_op_start (struct _GpgCtx *gpg)
+# {
+#+#ifndef __MINGW32__
+#        int i, maxfd, errnosave, fds[10];
+#        char **argv, **strv = NULL;
+#@@ -798,5 +808,5 @@
+#
+#        errno = errnosave;
+#-
+#+#endif
+#        return -1;
+# }
+#EOF
+## fix gmime/gmime-pkcs7-context.c
+#mv gmime/gmime-pkcs7-context.c gmime/gmime-pkcs7-context.c.bak
+#echo "#include <gpgme.h>" > gmime/gmime-pkcs7-context.c
+#cat gmime/gmime-pkcs7-context.c.bak >> gmime/gmime-pkcs7-context.c
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+## fix missing GStaticRecMutex
+#mv gmime/Makefile.am gmime/Makefile.am.bak
+#sed -e "s/-DG_DISABLE_DEPRECATED//" gmime/Makefile.am.bak > gmime/Makefile.am
+#mv gmime/Makefile.in gmime/Makefile.in.bak
+#sed -e "s/-DG_DISABLE_DEPRECATED//" gmime/Makefile.in.bak > gmime/Makefile.in
+## skip building test
+#cat > tests/Makefile.in << EOF
+#all:
+#depend:
+#links:
+#generate:
+#install:
+#install-strip:
+#EOF
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# aclocal --force -I $MINGWPREFIX/share/aclocal &&
+# libtoolize --force -i &&
+# autoconf --force
+#fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-crypto --enable-introspection=no &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-crypto --disable-introspection &&
+ #PKG_CONFIG=$(which pkg-config.exe) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-crypto --enable-introspection &&
+ ## fix missing linkage with libgpgme (version >= 2.5.0)
+ #mv gmime/Makefile gmime/Makefile.bak
+ #sed -e "s/^\(LIBS =.*\)$/\1 -lgpgme -lgpg-error -lws2_32/" gmime/Makefile.bak > gmime/Makefile
+ wl-showstatus build-install &&
+ #PYTHONPATH=$MINGWPREFIX/lib/gobject-introspection make install-strip INTROSPECTION_SCANNER="$PYDIR/python $MINGWPREFIX/bin/g-ir-scanner" &&
+ make install-strip &&
+ #PATH=$PYDIR:$PATH PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gmime-$VERSION
+####TO DO: build with gobject-introspection
+
+
+
+sed -i.bak -e 's/\(-D[^ =]*=\)\\"\([^"]*\)\\"/\1"\\"\2\\""/' gmime/Makefile

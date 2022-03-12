@@ -1,0 +1,70 @@
+export NAME="OpenPACE"
+export STATUS=
+export URL=https://frankmorgner.github.io/openpace/
+#export URL=https://github.com/frankmorgner/openpace
+export BASENAME=openpace
+export DESCRIPTION="Cryptographic library for EAC version 2. OpenPACE implements Extended Access Control (EAC) version 2 as specified in BSI TR-03110."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.1.1
+#export VERSIONDATE=20210520
+export VERSION=1.1.2
+export VERSIONDATE=20210708
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,gengetopt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=help2man
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/frankmorgner/openpace/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+@export DOWNLOADSOURCEURL=https://github.com/frankmorgner/openpace/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/frankmorgner/openpace/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix issue with OpenSSL 3 in  src/eac/cv_cert.h (version >= 1.1.2)
+patch -ulbf src/eac/cv_cert.h << EOF
+@@ -343,3 +343,3 @@
+  */
+-int i2d_CVC_CERT(CVC_CERT *a, unsigned char **out);
++int i2d_CVC_CERT(const CVC_CERT *a, unsigned char **out);
+
+EOF
+# fix issue with OpenSSL 3 in src/eac.c (version >= 1.1.2)
+patch -ulbf src/eac.c << EOF
+@@ -107,3 +107,4 @@
+
+-    return BN_zero(ctx->ssc);
++    BN_zero(ctx->ssc);
++    return 1;
+ }
+EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python --disable-java --disable-ruby --disable-go --disable-openssl-install &&
+ echo "#define HAVE_DH_SET0_KEY 1" >> config.h &&
+ echo "#define HAVE_DH_GET0_KEY 1" >> config.h &&
+ echo "#define HAVE_DH_SET0_PQG 1" >> config.h &&
+ echo "#define HAVE_DH_GET0_PQG 1" >> config.h &&
+ echo "#define HAVE_RSA_SET0_KEY 1" >> config.h &&
+ echo "#define HAVE_RSA_GET0_KEY 1" >> config.h &&
+ echo "#define HAVE_ECDSA_SIG_SET0 1" >> config.h &&
+ echo "#define HAVE_ECDSA_SIG_GET0 1" >> config.h &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ wl-showstatus build &&
+ ( make || make -j1 ) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

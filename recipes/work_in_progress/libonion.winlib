@@ -1,0 +1,54 @@
+export NAME="libonion"
+export STATUS=
+export URL=http://coralbits.com/libonion/
+export BASENAME=libonion
+export DESCRIPTION="Lightweight C library to add web server functionality to your program"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.7
+#export VERSIONDATE=20160202
+export VERSION=0.8
+export VERSIONDATE=20160430
+####CMake Error at src/onion/extras/CMakeLists.txt:31 (SET_TARGET_PROPERTIES): set_target_properties called with incorrect number of arguments.
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libxml2,libpng,cairo,libcurl,libev,zlib,gnutls
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE="GPL/Apache"
+export DOWNLOADURL="https://github.com/davidmoreno/onion/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/davidmoreno/onion/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd onion-$VERSION
+# fix missing sys/socket.h
+mkdir -p winfix/sys
+cat > winfix/sys/socket.h << EOF
+#include <winsock2.h>
+#include <wspiapi.h>
+#include <stdint.h>
+EOF
+cat > winfix/syslog.h << EOF
+EOF
+touch winfix/netdb.h
+touch winfix/sys/syscall.h
+# fix invalid -fPIC
+mv CMakeLists.txt CMakeLists.txt.bak
+sed -e "s/-Wall//; s/-Werror//; s/-fPIC//" CMakeLists.txt.bak > CMakeLists.txt
+wl-showstatus configure &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DONION_POLLER:STRING=libev -DONION_USE_PAM:BOOL=FALSE -DONION_USE_SYSTEMD:BOOL=FALSE -DONION_USE_TESTS:BOOL=FALSE -DCMAKE_C_FLAGS:STRING="-I$(pwd)/winfix" . &&
+ wl-showstatus build &&
+ C_INCLUDE_PATH=$C_INCLUDE_PATH:$(pwd)/winfix make -j1 &&
+ wl-showstatus build-install &&
+ make install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf onion-$VERSION
+
+
+

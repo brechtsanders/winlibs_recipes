@@ -1,0 +1,81 @@
+export NAME="wxScintilla"
+export STATUS=
+#export URL=https://wxscintilla.sourceforge.io/
+#export URL=https://sourceforge.net/projects/wxscintilla/
+export URL=https://github.com/tony/wxscintilla
+export BASENAME=wxscintilla
+export DESCRIPTION="wxScintilla is a wrapper around the Scintilla edit control (see http://www.scintilla.org) for the wxWidgets framework. It's derived from wxStyledTextCtrl, further enhanced and follows closely the release cycle of Scintilla."
+export CATEGORY=gui
+export TYPE=library
+export VERSION=1.69.2
+export VERSIONDATE=20161205
+wl-showstatus --package-version
+export DEPENDANCIES=wxwidgets,scintilla,lexilla
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="https://sourceforge.net/projects/wxcode/files/Components/wxscintilla/"
+export DOWNLOADURL="https://github.com/tony/wxscintilla/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/wxcode/Components/wxscintilla/wxscintilla_$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/tony/wxscintilla/archive/master.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/master.tar.gz $TARBALLDIR/$BASENAME/wxscintilla-$VERSION-master.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/wxscintilla_$VERSION.tar.gz
+#cd wxscintilla_$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/wxscintilla-$VERSION-master.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/master.tar.gz
+cd wxscintilla-master
+# fix missing WXK_PRIOR/WXK_NEXT in src/ScintillaWX.cpp
+patch -ulbf src/ScintillaWX.cpp << EOF
+--- src/ScintillaWX.cpp  2006-06-24 09:37:29.000000000 +0200
++++ src/ScintillaWX.cpp  2016-12-05 21:02:03.487092900 +0100
+@@ -992,3 +992,5 @@
+ #endif
++#ifdef WXK_PRIOR
+     case WXK_PRIOR:             key = SCK_PRIOR;    break;
++#endif
+ #if !wxCHECK_VERSION(2, 7, 0)
+@@ -996,3 +998,5 @@
+ #endif
++#ifdef WXK_NEXT
+     case WXK_NEXT:              key = SCK_NEXT;     break;
++#endif
+     case WXK_DELETE:            key = SCK_DELETE;   break;
+EOF
+# fix src/wxscintilla.cpp for 64-bit
+mv src/wxscintilla.cpp src/wxscintilla.cpp.bak &&
+sed -e "s/(long)/(intptr_t)/g" src/wxscintilla.cpp.bak > src/wxscintilla.cpp
+# fix src/PlatWX.cpp for Windows and 64-bit
+mv src/PlatWX.cpp src/PlatWX.cpp.bak &&
+sed -e "s/#ifdef __WXMOTIF__/#if defined(__WXMOTIF__) || defined (__WXMSW__)/g; s/(long)/(intptr_t)/g" src/PlatWX.cpp.bak > src/PlatWX.cpp
+# fix missing SetNoAntiAliasing in src/PlatWX.cpp
+mv src/PlatWX.cpp src/PlatWX.cpp.bak2 &&
+sed -e "s?[^ ]*SetNoAntiAliasing?//&?" src/PlatWX.cpp.bak2 > src/PlatWX.cpp
+# fix src/scintilla/src/Editor.cxx for 64-bit
+mv src/scintilla/src/Editor.cxx src/scintilla/src/Editor.cxx.bak &&
+echo "#include <stdint.h>" > src/scintilla/src/Editor.cxx
+sed -e "s/\(reinterpret_cast<sptr_t>(\)\([^(]\)/\1(sptr_t)(intptr_t)\2/" src/scintilla/src/Editor.cxx.bak >> src/scintilla/src/Editor.cxx
+# avoid missing SetBestFittingSize
+sed -i.bak2 -e "s/^\s*SetBestFittingSize.*$/#ifndef _WIN32\n&\n#endif/" src/wxscintilla.cpp
+# fix building for Windows
+mv build/Makefile build/Makefile.bak &&
+sed -e "s/clang++/\$(CXX)/g; s/\.so/.dll/g; s/-fpic \(-shared -o \)\([^ ]*\)/\1\2 -Wl,--out-implib,\2.a/" build/Makefile.bak > build/Makefile
+wl-showstatus build-install &&
+ #make -Cbuild CXX="g++ -std=gnu++11 -DWXMAKINGDLL_SCI" WXCONFIG="$(which wx-config.exe) --debug=no --unicode=yes --static=no" MAKECMDGOALS=release all release &&
+ make -Cbuild CXX="g++ -DWXMAKINGDLL_SCI" WXCONFIG="$(which wx-config.exe) --debug=no --unicode=yes --static=no" MAKECMDGOALS=release all release &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/include &&
+ cp -f lib/*.a $INSTALLPREFIX/lib/ &&
+ cp -f lib/*.dll $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf wxscintilla_$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf wxscintilla-master
+
+
+

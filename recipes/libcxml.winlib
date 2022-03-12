@@ -1,0 +1,68 @@
+export NAME="libcxml"
+export STATUS=
+export URL=https://carlh.net/libcxml
+export BASENAME=libcxml
+export DESCRIPTION="libcxml is a small C++ library which makes it marginally neater to parse XML using libxml++."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=0.16.1
+#export VERSIONDATE=20190709
+####Checking for 'libxml++-2.6': not found
+export VERSION=0.17.2
+export VERSIONDATE=20211004
+wl-showstatus --package-version
+export DEPENDANCIES=libxmlpp2,locked_sstream,boost
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=waf
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://carlh.net/libcxml"
+#export DOWNLOADURL="https://github.com/cth103/libcxml/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://carlh.net/downloads/libcxml/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix src/cxml.cc
+#sed -i.bak -e "s/^\(\s*xmlpp::Attribute\)\(\* \)/\1 const \2/" src/cxml.cc
+# fix src/cxml.h (version >= 0.17.2)
+patch -ulbf src/cxml.h << EOF
+@@ -27,2 +27,3 @@
+ #include <stdint.h>
++#include <memory>
+ #include <string>
+EOF
+## fix libxml++ version
+##sed -i.bak -e "s/\(libxml++-\)2\.6/\13.0/; s/CXXFLAGS.*'-std=c++11'/&, '-fpermissive'/" wscript
+#sed -i.bak -e "s/\(libxml++-\)2\.6/\13.0/" wscript *.pc.in
+## fix C++ errors
+#sed -i.bak -e "s/\(CXXFLAGS.*\)'-std=c++11'/\1 '-std=c++17', '-fpermissive'/; s/'-Wall', '-Wextra',//" wscript
+#sed -i.bak -e "s/\(CXXFLAGS.*\)'-std=c++11'/&, '-fpermissive'/; s/'-Wall', '-Wextra',//" wscript
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #CXX=$(which g++.exe) CXXFLAGS="-DLIBXMLXX_STATIC=1" $PYDIR/python.exe waf configure --prefix=$INSTALLPREFIX --static --target-windows --disable-tests --out=build_static &&
+ #CXX=$(which g++.exe) CXXFLAGS="-DLIBXMLXX_STATIC=1" $PYDIR/python.exe waf configure --prefix=$INSTALLPREFIX --static --target-windows --disable-tests --out=build_static --force-cpp11 &&
+ CXXFLAGS="-std=c++11 -DLIBXMLXX_STATIC=1" $PYDIR/python.exe waf configure --prefix=$INSTALLPREFIX --static --target-windows --disable-tests --out=build_static --check-cxx-compiler=g++ &&
+ wl-showstatus build &&
+ $PYDIR/python.exe waf build --out=build_static &&
+ wl-showstatus install &&
+ $PYDIR/python.exe waf install --out=build_static &&
+ wl-showstatus configure &&
+ #CXX=$(which g++.exe) $PYDIR/python.exe waf configure --prefix=$INSTALLPREFIX --target-windows --disable-tests --out=build_shared &&
+ #CXX=$(which g++.exe) $PYDIR/python.exe waf configure --prefix=$INSTALLPREFIX --target-windows --disable-tests --out=build_shared --force-cpp11 &&
+ CXXFLAGS="-std=c++11" $PYDIR/python.exe waf configure --prefix=$INSTALLPREFIX --target-windows --disable-tests --out=build_shared --check-cxx-compiler=g++ &&
+ wl-showstatus build &&
+ $PYDIR/python.exe waf build --out=build_shared &&
+ wl-showstatus install &&
+ $PYDIR/python.exe waf install --out=build_shared &&
+ mv -f $INSTALLPREFIX/lib/cxml.dll.a $INSTALLPREFIX/lib/libcxml.dll.a &&
+ mv -f $INSTALLPREFIX/bin/pkgconfig $INSTALLPREFIX/lib/ &&
+ # fix missing version in .pc file
+ sed -i -e "s/^Version: $/&$VERSION/" $INSTALLPREFIX/lib/pkgconfig/libcxml.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,60 @@
+export NAME="libdazzle"
+export STATUS=
+export URL=https://gitlab.gnome.org/GNOME/libdazzle
+export BASENAME=libdazzle
+export DESCRIPTION="The libdazzle library is a companion library to GObject and Gtk+. It provides various features that we wish were in the underlying library but cannot for various reasons. In most cases, they are wildly out of scope for those libraries. In other cases, our design isn't quite generic enough to work for everyone."
+export CATEGORY=
+export TYPE=library
+#export VERSION=3.35.3
+#export VERSIONDATE=20200214
+#export VERSION=3.36.0
+#export VERSIONDATE=20200307
+#export VERSION=3.37.1
+#export VERSIONDATE=20200708
+#export VERSION=3.38.0
+#export VERSIONDATE=20200913
+#export VERSION=3.40.0
+#export VERSIONDATE=20210320
+export VERSION=3.42.0
+export VERSIONDATE=20210904
+####/include/glib-2.0/glib/gmacros.h:740:31: error: static assertion failed: "Expression evaluates to false"
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk3,gdk-pixbuf,cairo,gettext,vala
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/libdazzle/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/libdazzle/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/libdazzle-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing realpath in src/files/dzl-recursive-file-monitor.c
+mv src/files/dzl-recursive-file-monitor.c src/files/dzl-recursive-file-monitor.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > src/files/dzl-recursive-file-monitor.c &&
+cat src/files/dzl-recursive-file-monitor.c.bak >> src/files/dzl-recursive-file-monitor.c
+# don't abort on missing include directory
+mv meson.build meson.build.bak &&
+grep -v "Werror=missing-include-dirs" meson.build.bak > meson.build
+# don't enable stack protector
+sed -i.bak2 -e "s/-fstack-protector-strong//" meson.build
+# also allow building static library
+sed -i.bak -e "s/shared_library/library/" src/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwith_vapi=true -Dwith_introspection=false -Denable_tests=false . build_both &&
+ # fix slash/backslash path issue when calling Python from Ninja
+ sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ ## move .dll from lib to bin folder (version <= 3.40.0)
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

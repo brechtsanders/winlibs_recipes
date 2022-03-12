@@ -1,0 +1,277 @@
+export NAME="gdbm"
+export STATUS=
+export URL=http://www.gnu.org/software/gdbm/
+export BASENAME=gdbm
+export DESCRIPTION="GNU dbm is a set of database routines that use extensible hashing. It works similar to the standard Unix dbm routines."
+export CATEGORY=db
+export TYPE=library
+#export VERSION=1.8.3
+#export VERSION=1.9
+#export VERSIONDATE=20110813
+#export VERSION=1.9.1
+#export VERSIONDATE=20110814
+####64-bit:
+####CCLD   testgdbm.exe
+####e:/prog/mingw-msys64/mingw64/bin/../lib/gcc/x86_64-w64-mingw32/4.6.2/../../../../x86_64-w64-mingw32/lib/../lib/libmingw32.a(lib64_libmingw32_a-crt0_c.o):crt0_c.c:(.text.startup+0x25): undefined reference to `WinMain'
+#export DEPENDANCIES=plibc
+#export VERSION=1.10
+#export VERSIONDATE=20111113
+#export VERSION=1.11
+#export VERSIONDATE=20131226
+#export VERSION=1.12
+#export VERSIONDATE=20160517
+#export VERSION=1.13
+#export VERSIONDATE=20170311
+#export VERSION=1.14
+#export VERSIONDATE=20180102
+#export VERSION=1.14.1
+#export VERSIONDATE=20180104
+#export VERSION=1.15
+#export VERSIONDATE=20180617
+#export VERSION=1.16
+#export VERSIONDATE=20180628
+#export VERSION=1.17
+#export VERSIONDATE=20180731
+#export VERSION=1.18
+#export VERSIONDATE=20180821
+#export VERSION=1.18.1
+#export VERSIONDATE=20180827
+#export VERSION=1.19
+#export VERSIONDATE=20201223
+####src/gdbmopen.c:35:40: error: unknown type name 'blksize_t'
+#export VERSION=1.20
+#export VERSIONDATE=20210617
+export VERSION=1.21
+export VERSIONDATE=20210903
+#export VERSION=1.22
+#export VERSIONDATE=20211019
+#export VERSION=1.23
+#export VERSIONDATE=20220205
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=gettext,readline
+#export BUILDDEPENDANCIES=gettext,readline,libtinymail
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/gdbm/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/gdbm/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files (version >= 1.9)
+mkdir -p arpa sys
+touch arpa/inet.h sys/ioctl.h
+# fix src/lock.c (version >= 1.9)
+mv src/lock.c src/lock.c.bak
+cat > src/lock.c << EOF
+#include <winsock2.h>
+#define EWOULDBLOCK WSAEWOULDBLOCK
+EOF
+cat src/lock.c.bak >> src/lock.c
+# fix missing files (version >= 1.11)
+cat > pwd.h << EOF
+typedef int uid_t;
+#define getuid() 0
+#define getpwuid(uid) NULL
+#define getpwnam(username) NULL
+struct passwd {
+ int pw_uid;
+ int pw_gid;
+ char *pw_name;
+ //char* pw_passwd;
+ char *pw_dir;
+ //char *pw_gecos;
+ //char *pw_shell;
+};
+EOF
+cat > grp.h << EOF
+typedef int gid_t;
+#define getgrgid(gid) NULL
+#define getgrnam(groupname) NULL
+struct group {
+ int gr_gid;
+ char *gr_name;
+};
+EOF
+## fix empty #elif in src/gdbmopen.c (version = 1.12)
+#patch -ulbf src/gdbmopen.c << EOF
+#--- src/gdbmopen.c  2011-08-11 00:52:24 +0200
+#+++ src/gdbmopen.c  2011-08-13 12:07:28 +0200
+#@@ -29,3 +29,3 @@
+# #define GDBM_MAGIC     GDBM_MAGIC64
+#-#elif
+#+#else
+# #error "Unsupported off_t size, contact GDBM maintainer.  What crazy system is this?!?"
+#EOF
+# fix missing blksize_t in src/gdbmopen.c (version >= 1.13)
+mv src/gdbmopen.c src/gdbmopen.c.bak &&
+sed -e "s/blksize_t/ssize_t/g" src/gdbmopen.c.bak > src/gdbmopen.c
+# fix missing SIGPIPE in src/testgdbm.c (version >= 1.9)
+mv src/testgdbm.c src/testgdbm.c.bak
+echo "#define SIGPIPE 3" > src/testgdbm.c
+cat src/testgdbm.c.bak >> src/testgdbm.c
+# fix src/flatfile.c
+mv src/flatfile.c src/flatfile.c.bak
+echo "#include <winsock2.h>" > src/flatfile.c
+cat src/flatfile.c.bak >> src/flatfile.c
+# fix missing htonl in src/gdbmimp.c (version >= 1.11)
+mv src/gdbmimp.c src/gdbmimp.c.bak
+echo "#include <winsock2.h>" > src/gdbmimp.c
+cat src/gdbmimp.c.bak >> src/gdbmimp.c
+# fix missing htonl in src/gdbmexp.c (version >= 1.11)
+mv src/gdbmexp.c src/gdbmexp.c.bak
+echo "#include <winsock2.h>" > src/gdbmexp.c
+cat src/gdbmexp.c.bak >> src/gdbmexp.c
+# fix missing _SC_PAGESIZE in src/fullio.c (version >= 1.15)
+patch -ulbf src/fullio.c << EOF
+@@ -18,2 +18,5 @@
+ #include "gdbmdefs.h"
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -83,3 +86,9 @@
+ {
++#ifdef _WIN32
++  SYSTEM_INFO sysinfo;
++  GetSystemInfo(&sysinfo);
++  #define page_size sysinfo.dwPageSize
++#else
+   size_t page_size = sysconf (_SC_PAGESIZE);
++#endif
+   char *buf;
+EOF
+## fix missing signal/SIGPIPE/SIG_IGN in src/gdbmtool.c (version >= 1.11 <= 1.18.1)
+#mv src/gdbmtool.c src/gdbmtool.c.bak
+#sed -e "s?\(signal *(\)?//\1?" src/gdbmtool.c.bak > src/gdbmtool.c
+## fix missing termios.h and missing signal/SIGPIPE/SIG_IGN in src/gdbmtool.c (version >= 1.19 <= 1.20)
+#patch -ulbf src/gdbmtool.c << EOF
+#@@ -26,3 +26,5 @@
+# #include <sys/ioctl.h>
+#+#ifndef _WIN32
+# #include <termios.h>
+#+#endif
+# #include <stdarg.h>
+#@@ -2178,3 +2180,5 @@
+#
+#+#ifndef _WIN32
+#   signal (SIGPIPE, SIG_IGN);
+#+#endif
+#
+#EOF
+# fix src/gdbmtool.c (version >= 1.21)
+patch -ulbf src/gdbmtool.c << EOF
+@@ -22,4 +22,6 @@
+ #include <sys/ioctl.h>
++#ifndef _WIN32
+ #include <sys/wait.h>
+ #include <termios.h>
++#endif
+ #include <stdarg.h>
+EOF
+## fix tools/gdbmtool.c (version >= 1.23)
+#patch -ulbf tools/gdbmtool.c << EOF
+#@@ -22,4 +22,6 @@
+# #include <sys/ioctl.h>
+#+#ifndef _WIN32
+# #include <sys/wait.h>
+# #include <termios.h>
+#+#endif
+# #include <stdarg.h>
+#EOF
+# fix src/gdbmshell.c (version >= 1.21)
+patch -ulbf src/gdbmshell.c << EOF
+@@ -25,4 +25,6 @@
+ #include <sys/ioctl.h>
++#ifndef _WIN32
+ #include <sys/wait.h>
+ #include <termios.h>
++#endif
+ #include <stdarg.h>
+@@ -945,2 +947,5 @@
+ {
++#ifdef _WIN32
++  strcpy(buf, "---------");
++#else
+   char *s = buf;
+@@ -962,2 +967,3 @@
+   *s = '\\0';
++#endif
+   return buf;
+@@ -1012,3 +1018,7 @@
+               decode_mode (st.st_mode, buf));
++#ifdef _WIN32
++      fprintf (fp, "%ld", st.st_mtime);
++#else
+       fprintf (fp, "%ld.%09ld", st.st_mtim.tv_sec, st.st_mtim.tv_nsec);
++#endif
+       if (S_ISREG (st.st_mode))
+@@ -1456,2 +1466,5 @@
+ {
++#ifdef _WIN32
++  terror (_("fork() not implemented on Windows"));
++#else
+   char *argv[4];
+@@ -1499,2 +1512,3 @@
+     }
++#endif
+ }
+@@ -2491,2 +2505,3 @@
+        {
++#ifdef SIGPIPE
+          struct sigaction act, old_act;
+@@ -2497,2 +2512,3 @@
+          sigaction (SIGPIPE, &act, &old_act);
++#endif
+          /* Welcome message. */
+@@ -2503,3 +2519,5 @@
+          closedb ();
++#ifdef SIGPIPE
+          sigaction (SIGPIPE, &old_act, NULL);
++#endif
+        }
+EOF
+# remove -ldbm configure (not needed and takes the one from NSS if installed) (version >= 1.13)
+sed -i.bak -e "s/LIBS=\"-ldbm \$LIBS\"/#&/" configure
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DF_RDLCK=LOCK_SH -DF_WRLCK=LOCK_EX" LDFLAGS="-lplibc"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-lplibc -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LIBS="-Wl,--as-needed -lplibc" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32 -lplibc -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32 -lplibc -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-fcommon" LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-memory-mapped-io --disable-libgdbm-compat --disable-gdbm-export --with-readline LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix missing fsync
+ #echo "#include <plibc.h>" >> autoconf.h &&
+ #echo "#define fsync(fd) _commit(fd)" > libtinymail/tny-fs-stream.c &&
+ # fix missing fsync
+ echo "#ifndef fsync" >> autoconf.h &&
+ echo "#define fsync(fd) _commit(fd)" >> autoconf.h &&
+ echo "#endif" >> autoconf.h &&
+ echo "#define HAVE_FSYNC 1" >> autoconf.h &&
+ ## fix failure to detect flock
+ #echo "#define HAVE_FLOCK 1" >> autoconf.h &&
+ # fix missing fchmod/fchown (version >= 1.11)
+ echo "#define fchmod(f,p) 0" >> autoconf.h &&
+ echo "#define fchown(tofd,uid,gid) 0" >> autoconf.h &&
+ echo "#define HAVE_RENAME 1" >> autoconf.h &&
+ sed -i.bak -e "s/-o \$(BINOWN) -g \$(BINGRP)//g" Makefile &&
+ ( make all install || make -j1 all install LIBS="-Wl,--as-needed -lws2_32 -luuid" ) &&
+ #( make install-strip || ( make -Csrc install-strip LIBS="-Wl,--as-needed -lws2_32 -luuid" && make -i install-strip LIBS="-Wl,--as-needed -lws2_32 -luuid" )) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

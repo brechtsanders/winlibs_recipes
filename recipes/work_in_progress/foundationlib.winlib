@@ -1,0 +1,53 @@
+export NAME="Foundation Library"
+export STATUS=
+export URL=http://www.rampantpixels.com/
+#export URL=https://github.com/rampantpixels/foundation_lib
+export BASENAME=foundationlib
+export DESCRIPTION="Cross-platform public domain foundation library in C providing basic support data types and functions to write applications and games in a platform-independent fashion."
+export CATEGORY=portability,framework,graphics
+export TYPE=library
+#export VERSION=1.6.0
+#export VERSIONDATE=20180514
+#export VERSION=1.6.1
+#export VERSIONDATE=20190110
+export VERSION=1.6.2
+export VERSIONDATE=20210727
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE="Public Domain"
+export DOWNLOADURL="https://github.com/rampantpixels/foundation_lib/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rampantpixels/foundation_lib/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd foundation_lib-$VERSION
+# fix build/ninja/generator.py (version >= 1.6.1)
+sed -i.bak -e "s/\(\s\)\(writer\.variable\)/\1self.\2/" build/ninja/generator.py
+wl-showstatus configure &&
+ $PYDIR/python.exe configure.py --toolchain gcc -t windows --host windows -c release -a $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86-64; else echo x86; fi) &&
+ wl-showstatus build &&
+ #ninja &&
+ (
+  echo "#!/bin/sh" > build_commands &&
+  echo "set -e" >> build_commands &&
+  ninja -t commands | sed -e "s?\\\\?/?g" | sed -e "s/\(-Wall\|-Werror\)//g; s?/SUBSYSTEM:CONSOLE??g" | sed -e "s?^gcc .*-MT \([^ ]*\).*?mkdir -p \$(dirname \1)\n&?" | sed -e "s?^cmd /C (IF exist [^ ]* (del /F /Q [^ ]*)) \& copy /Y \([^ ]*\) \([^ ]*\)?cp -f \1 \2?; s?^cmd /C (IF exist [^ ]* (del /F /Q \([^ ]*\)))?rm -f \1?; s?^cmd /C (IF NOT exist [^ ]* (mkdir \([^ ]*\)))?mkdir -p \1?; s?^gcc.*-o \(build/ninja/windows/release/[^ ]*\.exe\)?touch \1; &?; s/\([^/ ]*\)\.lib/lib\1.a/g" >> build_commands &&
+  sh -v build_commands
+ ) &&
+ #gcc -shared -s -mwindows -o foundation.dll lib/windows/release/*/foundation.lib -Wl,--out-implib,libfoundation.dll.a &&
+ ls -1 bin/windows/release/*/*.exe &&
+ ls -1 lib/windows/release/*/*.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/foundation $INSTALLPREFIX/lib &&
+ cp -f foundation/*.h $INSTALLPREFIX/include/foundation/ &&
+ cp -f lib/windows/release/*/libfoundation.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf foundation_lib-$VERSION
+####TO DO: build DLL
+
+
+

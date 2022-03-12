@@ -1,0 +1,243 @@
+export NAME="TrouSerS"
+export STATUS=
+export URL=http://trousers.sourceforge.net/
+export BASENAME=trousers
+export DESCRIPTION="The open-source TCG Software Stack"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.3.13
+#export VERSIONDATE=20140826
+#export VERSION=0.3.14
+#export VERSIONDATE=20161118
+export VERSION=0.3.15
+export VERSIONDATE=20201103
+####nclude/spi_utils.h:16:47: fatal error: netinet/in.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,gmp,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="CPL \(Common Public License\)"
+export DOWNLOADURL="https://github.com/srajiv/trousers/tags"
+export DOWNLOADURL="http://sourceforge.net/projects/trousers/files/trousers/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/trousers/trousers/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/arpa winfix/netinet
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+cat > winfix/netdb.h << EOF
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define in_addr_t u_long
+EOF
+touch winfix/arpa/inet.h winfix/netinet/in.h
+cat > winfix/syslog.h << EOF
+EOF
+# fix missing netinet/in.h in src/include/spi_utils.h
+patch -ulbf src/include/spi_utils.h << EOF
+--- src/include/spi_utils.h  2014-07-23 21:42:44.000000000 +0200
++++ src/include/spi_utils.h  2016-12-23 16:51:13.818486600 +0100
+@@ -15,3 +15,5 @@
+ #include "threads.h"
++#ifndef _WIN32
+ #include <netinet/in.h> // for endian routines
++#endif
+
+EOF
+# fix syslog.h in src/include/tsplog.h
+patch -ulbf src/include/tsplog.h << EOF
+--- src/include/tsplog.h  2014-07-23 21:42:44.000000000 +0200
++++ src/include/tsplog.h  2016-12-23 18:02:07.015585700 +0100
+@@ -13,11 +13,10 @@
+ #define _TSPLOG_H_
+
+-#include <stdio.h>
+-#include <syslog.h>
+-#include <stdlib.h>
+-
+ /* Debug logging */
+ #ifdef TSS_DEBUG
+ /* log to stdout */
++#include <stdio.h>
++#include <syslog.h>
++#include <stdlib.h>
+ #define LogMessage(dest, priority, layer, fmt, ...) \\
+        do { \\
+EOF
+# fix syslog.h in src/include/tcslog.h
+patch -ulbf src/include/tcslog.h << EOF
+--- src/include/tcslog.h  2014-07-23 21:42:44.000000000 +0200
++++ src/include/tcslog.h  2016-12-23 21:51:03.547206300 +0100
+@@ -15,3 +15,5 @@
+ #include <stdio.h>
++#ifndef _WIN32
+ #include <syslog.h>
++#endif
+
+@@ -24,2 +26,5 @@
+
++#ifdef _WIN32
++#define LogMessage(dest, priority, layer, fmt, ...)
++#else
+ #define LogMessage(dest, priority, layer, fmt, ...) \\
+@@ -33,2 +38,3 @@
+         } while (0)
++#endif
+
+EOF
+# fix missing nl_langinfo/BSD_CONST in src/trspi/trousers.c
+patch -ulbf src/trspi/trousers.c << EOF
+--- src/trspi/trousers.c  2014-07-23 21:42:44.000000000 +0200
++++ src/trspi/trousers.c  2016-12-23 21:46:24.925628000 +0100
+@@ -17,3 +17,10 @@
+ #include <sys/mman.h>
++#ifdef _WIN32
++#define CODESET 0
++//#define nl_langinfo(codeset) "ANSI_X3.4-1968"
++#define nl_langinfo(codeset) "UTF-8"
++#define BSD_CONST
++#else
+ #include <langinfo.h>
++#endif
+ #include <iconv.h>
+EOF
+# fix src/tddl/tddl.c (version >= 0.3.15)
+patch -ulbf src/tddl/tddl.c << EOF
+@@ -16,3 +16,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+
+@@ -37,2 +39,5 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+@@ -42,2 +47,3 @@
+ #include <netdb.h>
++#endif
+ #include <fcntl.h>
+@@ -87,2 +93,3 @@
+
++#ifndef _WIN32
+                if (fd < 0) {
+@@ -101,2 +108,3 @@
+                }
++#endif
+        }
+EOF
+# fix file locking in src/tcs/ps/tcsps.c (version >= 0.3.15)
+patch -ulbf src/tcs/ps/tcsps.c << EOF
+@@ -40,2 +40,5 @@
+ #include <limits.h>
++#ifdef WIN32
++#include <windows.h>
++#endif
+
+@@ -54,3 +57,5 @@
+
++#ifndef _WIN32
+ static struct flock fl;
++#endif
+
+@@ -62,2 +67,3 @@
+        if (system_ps_fd != -1) {
++#ifndef _WIN32
+                int rc = 0;
+@@ -69,2 +75,10 @@
+                }
++#else
++               OVERLAPPED ovlp;
++               memset(&ovlp, 0, sizeof(ovlp));
++               if (!LockFileEx(_get_osfhandle(system_ps_fd), LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, MAXDWORD, MAXDWORD, &ovlp)) {
++                       LogError("failed to get system PS lock");
++                       return -1;
++               }
++#endif
+
+@@ -74,3 +88,7 @@
+        /* open and lock the file */
++#ifdef O_NOFOLLOW
+        system_ps_fd = open(tcsd_options.system_ps_file, O_CREAT|O_RDWR|O_NOFOLLOW, 0600);
++#else
++       system_ps_fd = open(tcsd_options.system_ps_file, O_CREAT|O_RDWR, 0600);
++#endif
+        if (system_ps_fd < 0) {
+@@ -81,2 +99,3 @@
+
++#ifndef WIN32
+        fl.l_type = F_WRLCK;
+@@ -87,2 +106,10 @@
+        }
++#else
++       OVERLAPPED ovlp;
++       memset(&ovlp, 0, sizeof(ovlp));
++       if (!LockFileEx(_get_osfhandle(system_ps_fd), LOCKFILE_EXCLUSIVE_LOCK |
+LOCKFILE_FAIL_IMMEDIATELY, 0, MAXDWORD, MAXDWORD, &ovlp)) {
++               LogError("failed to get system PS lock of file %s", tcsd_options.system_ps_file);
++               return -1;
++       }
++#endif
+
+@@ -94,2 +121,3 @@
+ {
++#ifndef WIN32
+        int rc = 0;
+@@ -105,2 +133,9 @@
+        return rc;
++#else
++       if (!UnlockFile(fd, 0, 0, MAXDWORD, MAXDWORD)) {
++               LogError("failed to unlock system PS file");
++               return -1;
++       }
++       return 0;
++#endif
+ }
+EOF
+# fix missing uint in src/tcs/tcs_evlog_imaem.c
+sed -i.bak -e "s/\buint\b/unsigned int/" src/tcs/tcs_evlog_imaem.c
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-gmp --with-gui=none CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #--disable-usercheck 
+ wl-showstatus build &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm -f CMakeCache.txt
+#wl-showstatus configure
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####See also: https://security.polito.it/trusted-computing/trousers-for-windows/
+
+
+

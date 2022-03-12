@@ -1,0 +1,122 @@
+export NAME="rkcommon"
+export STATUS=
+export URL=https://github.com/ospray/rkcommon
+export BASENAME=rkcommon
+export DESCRIPTION="rkcommon - C++/CMake infrastructure: This project represents a common set of C++ infrastructure and CMake utilities used by various components of Intel(R) oneAPI Rendering Toolkit."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.5.1
+#export VERSIONDATE=20201026
+#export VERSION=1.6.0
+#export VERSIONDATE=20210129
+#export VERSION=1.6.1
+#export VERSIONDATE=20210513
+#export VERSION=1.7.0
+#export VERSIONDATE=20210812
+#export VERSION=1.8.0
+#export VERSIONDATE=20220122
+export VERSION=1.9.0
+export VERSIONDATE=20220212
+wl-showstatus --package-version
+export DEPENDANCIES=tbb
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=Apache
+#export DOWNLOADURL="https://github.com/ospray/rkcommon/releases"
+export DOWNLOADURL="https://github.com/ospray/rkcommon/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/ospray/rkcommon/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ospray/rkcommon/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix rkcommon/math/rkmath.h (version >= 1.5.1 <= 1.8.0)
+#patch -ulbf rkcommon/math/rkmath.h << EOF
+#@@ -13,3 +13,3 @@
+# #include <intrin.h>
+#-#if (__MSV_VER <= 1700)
+#+#if (__MSV_VER <= 1700) && !defined(__MINGW32__)
+# namespace std {
+#EOF
+# fix rkcommon/math/rkmath.h (version >= 1.9.0)
+patch -ulbf rkcommon/math/rkmath.h << EOF
+@@ -23,3 +23,3 @@
+
+-#if defined(_WIN32) && (__MSV_VER <= 1700)
++#if defined(_WIN32) && (__MSV_VER <= 1700) && !defined(__MINGW32__)
+ namespace std {
+EOF
+## fix rkcommon/networking/Socket.h (version >= 1.5.1 <= 1.8.0)
+#patch -ulbf rkcommon/networking/Socket.h << EOF
+#@@ -18,3 +18,3 @@
+#   {
+#-#ifdef _WIN32
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+#     virtual const char *what() const override
+#EOF
+## fix rkcommon/networking/Socket.cpp (version >= 1.5.1 <= 1.8.0)
+#patch -ulbf rkcommon/networking/Socket.cpp << EOF
+#@@ -11,2 +11,6 @@
+# #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#+#undef _WIN32_WINNT
+#+#define _WIN32_WINNT 0x0600
+#+#endif
+# #include <winsock2.h>
+#@@ -50,3 +54,3 @@
+#
+#-  static std::unique_ptr<WinSockContext> winsock = nullptr;
+#+  static WinSockContext* winsock = nullptr;
+#
+#@@ -54,3 +58,3 @@
+#   {
+#-    static std::atomic<bool> initialized = false;
+#+    static bool initialized = false;
+#     static std::mutex initMutex;
+#@@ -59,3 +63,3 @@
+#       if (!winsock) {
+#-        winsock = std::make_unique<WinSockContext>();
+#+        winsock = new WinSockContext();
+#       }
+#EOF
+# fix rkcommon/os/library.cpp (version >= 1.5.1)
+patch -ulbf rkcommon/os/library.cpp << EOF
+@@ -38,3 +38,3 @@
+     MEMORY_BASIC_INFORMATION mbi;
+-    VirtualQuery(&_rkcommon_anchor, &mbi, sizeof(mbi));
++    VirtualQuery((void*)&_rkcommon_anchor, &mbi, sizeof(mbi));
+     char pathBuf[16384];
+@@ -138,3 +138,3 @@
+ #ifdef _WIN32
+-    return GetProcAddress((HMODULE)lib, sym.c_str());
++    return (void*)GetProcAddress((HMODULE)lib, sym.c_str());
+ #else
+EOF
+# fix rkcommon/common.h (version >= 1.6.0)
+patch -ulbf rkcommon/common.h << EOF
+@@ -27,3 +27,3 @@
+
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(STATIC) && !defined(STATIC_RKCOMMON)
+ #ifdef rkcommon_EXPORTS
+EOF
+# fix issue with UTF-16 rkcommon/rkcommon.rc
+mv rkcommon/rkcommon.rc rkcommon/rkcommon.rc.bak &&
+iconv -f UTF-16 -t UTF-8 < rkcommon/rkcommon.rc.bak > rkcommon/rkcommon.rc
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DRKCOMMON_TASKING_SYSTEM:STRING=TBB -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DSTATIC_RKCOMMON" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DRKCOMMON_TASKING_SYSTEM:STRING=TBB -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

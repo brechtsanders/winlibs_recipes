@@ -1,0 +1,52 @@
+export NAME="NAT-PMP"
+export STATUS=
+export URL=http://miniupnp.free.fr/libnatpmp.html
+export BASENAME=libnatpmp
+export DESCRIPTION="The NAT Port Mapping Protocol (NAT-PMP) - NAT-PMP is the direct concurrent to the UPnP IGD specification. It is providing a way to do NAT traversal. It is part of the Bonjour protocol specifications."
+export CATEGORY=
+export TYPE=library
+export VERSION=20150609
+export VERSIONDATE=20160223
+####natpmp.o:natpmp.c:(.text+0x230): undefined reference to `natpmp_gettimeofday'
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="http://miniupnp.free.fr/files/ download.php?file=libnatpmp-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://miniupnp.free.fr/files/download.php?file=libnatpmp-20150609.tar.gz
+export DOWNLOADSOURCEURL=http://miniupnp.free.fr/files/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing declspec.h in natpmp.h
+sed -i.bak -e 's?"declspec.h"?<natpmp_declspec.h>?' natpmp.h
+cp -f declspec.h natpmp_declspec.h
+# fix missing VERSION
+echo "$VERSION" > VERSION
+# create custom .def file
+grep -v "^LIBRARY" natpmp.def > libnatpmp.def
+# build for Windows
+sed -e "s/^LIBOBJS\s*=.*$/& wingettimeofday.o/; s/\bln -s/#&/" Makefile > Makefile.mingw
+wl-showstatus build &&
+ #make -fMakefile.mingw OS=WINDOWS make -fMakefile.mingw OS=WINDOWS CFLAGS="-DWIN32 -DSTATICLIB" CC=gcc -j1 libnatpmp.a &&
+ #make -fMakefile.mingw OS=WINDOWS CFLAGS="-DWIN32 -DNATPMP_EXPORTS" EXTRA_LD="-lws2_32 -liphlpapi -s -Wl,--no-undefined -def libnatpmp.def -Wl,--out-implib,libnatpmp.dll.a" CC=gcc -j1 &&
+ make -fMakefile.mingw OS=WINDOWS CFLAGS="-DWIN32 -DENABLE_STRNATPMPERR -DNATPMP_EXPORTS -I$(pwd)" EXTRA_LD="-lws2_32 -liphlpapi -shared -s -Wl,--no-undefined -Wl,--out-implib,libnatpmp.dll.a" CC=gcc -j1 &&
+ # recreate libnatpmp.dll.a to fix dependancy on natpmpc-static.exe which is not a DLL
+ pexports.exe natpmp.dll > natpmp.def &&
+ dlltool -D natpmp.dll -d natpmp.def -l libnatpmp.dll.a &&
+ wl-showstatus build-install &&
+ make -fMakefile.mingw install OS=WINDOWS INSTALLPREFIX=$INSTALLPREFIX &&
+ cp -f libnatpmp.dll.a $INSTALLPREFIX/lib/ &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*.dll $INSTALLPREFIX/bin/*.exe &&
+ cp -f natpmp_declspec.h $INSTALLPREFIX/include/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

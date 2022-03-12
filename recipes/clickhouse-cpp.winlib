@@ -1,0 +1,63 @@
+export NAME="ClickHouse C++ client"
+export STATUS=
+export URL=https://github.com/ClickHouse/clickhouse-cpp
+export BASENAME=clickhouse-cpp
+export DESCRIPTION="C++ client library for ClickHouse"
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.5.0
+#export VERSIONDATE=20210903
+#export VERSION=2.0.0
+#export VERSIONDATE=20211123
+export VERSION=2.1.0
+export VERSIONDATE=20220309
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/ClickHouse/clickhouse-cpp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/ClickHouse/clickhouse-cpp/archive/refs/tags/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ClickHouse/clickhouse-cpp/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing inet_pton in clickhouse/columns/ip6.cpp
+mv clickhouse/columns/ip6.cpp clickhouse/columns/ip6.cpp.bak
+cat > clickhouse/columns/ip6.cpp << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat clickhouse/columns/ip6.cpp.bak >> clickhouse/columns/ip6.cpp
+# fix missing AI_ADDRCONFIG in clickhouse/base/socket.cpp
+mv clickhouse/base/socket.cpp clickhouse/base/socket.cpp.bak
+cat > clickhouse/base/socket.cpp << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat clickhouse/base/socket.cpp.bak >> clickhouse/base/socket.cpp
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_BENCHMARK:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ # fix missing link library
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ strip build_win/clickhouse/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_win/clickhouse/*.dll $INSTALLPREFIX/bin/ &&
+ cp -u $INSTALLPREFIX/lib/libclickhouse-cpp-lib-static.a $INSTALLPREFIX/lib/libclickhouse-cpp-lib.a &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

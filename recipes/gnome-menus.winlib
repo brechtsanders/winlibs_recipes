@@ -1,0 +1,145 @@
+export NAME="gnome-menus"
+export STATUS=
+export URL=http://www.gnome.org/projects/gnome-menus
+export BASENAME=gnome-menus
+export DESCRIPTION=""
+export CATEGORY=gui
+export TYPE=library
+#export VERSION=2.30.5
+#export VERSIONDATE=20101017
+#export VERSION=3.0.0
+#export VERSIONDATE=20110405
+#export VERSION=3.0.1
+#export VERSIONDATE=20110426
+#export VERSION=3.1.5
+#export VERSIONDATE=20110813
+#export VERSION=3.2.0
+#export VERSIONDATE=20110926
+#export VERSION=3.2.0.1
+#export VERSIONDATE=20110928
+#export VERSION=3.3.1
+#export VERSIONDATE=20111024
+#export VERSION=3.3.5
+#export VERSIONDATE=20120206
+####libmenu/desktop-entries.h:23:33: error: gio/gdesktopappinfo.h: No such file or directory
+#export VERSION=3.4.0
+#export VERSIONDATE=20120323
+#export VERSION=3.4.2
+#export VERSIONDATE=20120514
+#export VERSION=3.5.2
+#export VERSIONDATE=20120606
+#export VERSION=3.5.3
+#export VERSIONDATE=20120626
+#export VERSION=3.5.4
+#export VERSIONDATE=20120717
+#export VERSION=3.5.5
+#export VERSIONDATE=20120807
+#export VERSION=3.5.92
+#export VERSIONDATE=20120917
+#export VERSION=3.6.0
+#export VERSIONDATE=20120927
+#export VERSION=3.6.1
+#export VERSIONDATE=20121114
+#export VERSION=3.6.2
+#export VERSIONDATE=20130115
+#export VERSION=3.8.0
+#export VERSIONDATE=20130326
+#export VERSION=3.8.1
+#export VERSIONDATE=20131025
+#export VERSION=3.10.0
+#export VERSIONDATE=20131003
+#export VERSION=3.10.1
+#export VERSIONDATE=20131016
+#export VERSION=3.13.3
+#export VERSIONDATE=20140806
+#export VERSION=3.31.3
+#export VERSIONDATE=20181211
+#export VERSION=3.31.4
+#export VERSIONDATE=20190122
+####libmenu/gmenu-tree.c:333:26: error: implicit declaration of function 'realpath'
+#export VERSION=3.32.0
+#export VERSIONDATE=20190312
+#export VERSION=3.35.3
+#export VERSIONDATE=20200105
+export VERSION=3.36.0
+export VERSIONDATE=20200311
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gnome-menus/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# remove symlink stuff from libmenu/canonicalize.c
+patch -ulbf libmenu/canonicalize.c << EOF
+--- libmenu/canonicalize.c  2010-11-17 16:17:28 +0100
++++ libmenu/canonicalize.c  2010-11-17 16:17:50 +0100
+@@ -1 +1,3 @@
++//#include <winerror.h>
++//#define ELOOP WSAELOOP
+ /* Return the canonical absolute name of a given file.
+@@ -166,2 +168,3 @@
+
++#ifndef _WIN32
+           if (S_ISLNK (st.st_mode))
+@@ -208,2 +211,3 @@
+             }
++#endif
+         }
+EOF
+# workaround for missing gio/gdesktopappinfo.h (version >= 3.1.5)
+mkdir -p gio
+cat > gio/gdesktopappinfo.h << EOF
+#ifndef GDESKTOPAPPINFO_H_INCLUDED
+#define GDESKTOPAPPINFO_H_INCLUDED
+#include <gio/gio.h>
+typedef void GDesktopAppInfo;
+#define g_desktop_app_info_new_from_filename(f) NULL
+#define g_desktop_app_info_get_generic_name(i) NULL
+#define g_desktop_app_info_get_categories(i) NULL
+#define g_desktop_app_info_get_nodisplay(i) FALSE
+#define g_desktop_app_info_get_is_hidden(i) FALSE
+#define g_desktop_app_info_get_show_in(i,d) FALSE
+#endif
+EOF
+# fix missing inet_pton/realpath/madvise in libmenu/gmenu-tree.c (version >= 3.32.0)
+mv libmenu/gmenu-tree.c libmenu/gmenu-tree.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > libmenu/gmenu-tree.c &&
+cat libmenu/gmenu-tree.c.bak >> libmenu/gmenu-tree.c
+# fix missing inet_pton/realpath/madvise in libmenu/entry-directories.c (version >= 3.32.0)
+mv libmenu/entry-directories.c libmenu/entry-directories.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > libmenu/entry-directories.c &&
+cat libmenu/entry-directories.c.bak >> libmenu/entry-directories.c
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+# remove gio-unix dependancy
+mv configure configure.bak
+sed -e "s/gio-unix/gio-windows/g" configure.bak > configure
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+#PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no &&
+ wl-showstatus build-install &&
+ make install-strip pyexecdir=$INSTALLPREFIX/python/Lib/site-packages pythondir=$INSTALLPREFIX/python/Lib/site-packages &&
+ mv $INSTALLPREFIX/lib/pkgconfig/libgnome-menu-3.0.pc $INSTALLPREFIX/lib/pkgconfig/libgnome-menu-3.0.pc.bak &&
+ sed -e "s/gio-unix/gio-windows/" $INSTALLPREFIX/lib/pkgconfig/libgnome-menu-3.0.pc.bak > $INSTALLPREFIX/lib/pkgconfig/libgnome-menu-3.0.pc &&
+ rm -f $INSTALLPREFIX/lib/pkgconfig/libgnome-menu-3.0.pc.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

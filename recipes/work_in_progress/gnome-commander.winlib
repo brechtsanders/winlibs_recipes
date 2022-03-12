@@ -1,0 +1,145 @@
+export NAME="gnome-commander"
+export STATUS=
+export URL=http://gcmd.github.io/
+export BASENAME=gnome-commander
+export DESCRIPTION="GNOME Commander is a \"two-pane\" graphical file manager for the GNOME desktop environment."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.2.8.9
+#export VERSIONDATE=20101204
+#export VERSION=1.2.8.10
+#export VERSIONDATE=20110122
+#export VERSION=1.2.8.11
+#export VERSIONDATE=20110502
+#export VERSION=1.2.8.12
+#export VERSIONDATE=20110616
+#export VERSION=1.2.8.13
+#export VERSIONDATE=20110806
+#export VERSION=1.2.8.14
+#export VERSIONDATE=20111005
+#export VERSION=1.2.8.15
+#export VERSIONDATE=20120117
+#export VERSION=1.2.8.16
+#export VERSIONDATE=20121224
+#export VERSION=1.2.8.17
+#export VERSIONDATE=20140113
+#export DEPENDANCIES=gettext,glib2,gtk2,libgnome,libgnomeui
+#export VERSION=1.4.0
+#export VERSIONDATE=20140317
+####src/filter.h:25:21: fatal error: fnmatch.h: No such file or directory
+#export VERSION=1.4.1
+#export VERSIONDATE=20140405
+#export VERSION=1.4.2
+#export VERSIONDATE=20140523
+#export VERSION=1.4.3
+#export VERSIONDATE=20140623
+#export VERSION=1.4.4
+#export VERSIONDATE=20141112
+####No package 'unique-1.0' found
+#export VERSION=1.4.5
+#export VERSIONDATE=20150125
+#export VERSION=1.4.6
+#export VERSIONDATE=20150520
+#export VERSION=1.4.7
+#export VERSIONDATE=20150531
+#export VERSION=1.4.8
+#export VERSIONDATE=20160315
+#export VERSION=1.4.9
+#export VERSIONDATE=20160919
+#export VERSION=1.6.0
+#export VERSIONDATE=20161004
+#export VERSION=1.6.1
+#export VERSIONDATE=20161019
+####src/filter.h:25:21: fatal error: fnmatch.h: No such file or directory
+#export VERSION=1.6.2
+#export VERSIONDATE=20161107
+#export VERSION=1.6.3
+#export VERSIONDATE=20170227
+#export VERSION=1.6.4
+#export VERSIONDATE=20170529
+#export VERSION=1.8.0
+#export VERSIONDATE=20171008
+#export VERSION=1.8.1
+#export VERSIONDATE=20180305
+#export VERSION=1.10.0
+#export VERSIONDATE=20190331
+#export VERSION=1.10.1
+#export VERSIONDATE=20190513
+#export VERSION=1.10.2
+#export VERSIONDATE=20190517
+#export VERSION=1.10.3
+#export VERSIONDATE=20200619
+#export VERSION=1.12.0
+#export VERSIONDATE=20210326
+#export VERSION=1.12.1
+#export VERSIONDATE=20210418
+#export VERSION=1.12.2
+#export VERSIONDATE=20210530
+#export VERSION=1.12.3
+#export VERSIONDATE=20211121
+#export VERSION=1.12.3.1
+#export VERSIONDATE=20211122
+#export VERSION=1.14.0
+#export VERSIONDATE=20220206
+export VERSION=1.14.1
+export VERSIONDATE=20220302
+####gnome-cmd-file.h:93:26: error: 'uid_t' has not been declared
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,glib2,gtk2,libgnome,libgnomeui,gnome-vfs,libunique
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gnome-commander/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing link with main_win_widget in libgcmd/libgcmd-widget-factory.cc
+mv libgcmd/libgcmd-widget-factory.cc libgcmd/libgcmd-widget-factory.cc.bak
+echo "#include <gdk/gdkwin32.h>" > libgcmd/libgcmd-widget-factory.cc
+sed -e "s/GTK_WINDOW (main_win_widget)/GDK_ROOT_WINDOW()/g" libgcmd/libgcmd-widget-factory.cc.bak >> libgcmd/libgcmd-widget-factory.cc
+# fix missing link with main_win_widget in libgcmd/gnome-cmd-dialog.cc
+mv libgcmd/gnome-cmd-dialog.cc libgcmd/gnome-cmd-dialog.cc.bak
+echo "#include <gdk/gdkwin32.h>" > libgcmd/gnome-cmd-dialog.cc
+sed -e "s/GTK_WINDOW (main_win_widget)/GDK_ROOT_WINDOW()/g" libgcmd/gnome-cmd-dialog.cc.bak >> libgcmd/gnome-cmd-dialog.cc
+# fix missing fnmatch.h
+mkdir -p winfix
+cat > winfix/fnmatch.h << EOF
+//#include <windows.h>
+#include <shlwapi.h>
+#define FNM_NOCASE	0x08
+#define FNM_CASEFOLD    0x08
+#define FNM_NOMATCH     1
+inline int fnmatch(const char* pattern, const char* filepath, int flags)
+{
+  if (PathMatchSpec(filepath, pattern) == TRUE)
+    return 0;
+}
+EOF
+for F in $(grep -l "#include <fnmatch.h>" src/*.h src/*.cc); do
+ mv $F $F.bak &&
+ sed -e 's?<fnmatch.h>?"../winfix/fnmatch.h"?' $F.bak > $F
+done
+# avoid invalid -Werror=cast-function-type/-Wno-cast-function-type
+sed -i.bak -e "s/-Werror=cast-function-type\|-Wno-cast-function-type//g" $(grep -l cast-function-type $(find -name Makefile.in))
+# fix detection of newer libunique
+mv configure configure.bak
+sed -e "s/\(unique-\)1\(\.0\)/\13\2/g" configure.bak > configure
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python CXXFLAGS="-I$MINGWPREFIX/include/gnome-keyring-1" LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip CXX="g++ -fpermissive" ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

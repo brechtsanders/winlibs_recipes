@@ -1,0 +1,55 @@
+export NAME="mUPnP for C"
+export STATUS=
+export URL=http://www.cybergarage.org/oss/iot/mupnp-for-c/
+#export URL=https://github.com/cybergarage/mupnp
+export BASENAME=mupnp
+export DESCRIPTION="mUPnP for C is a development package for UPnP(TM) developers. mUPnP controls these protocols automatically, and supports to create your devices and control points quickly."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=3.0.1
+export VERSIONDATE=20200505
+wl-showstatus --package-version
+export DEPENDANCIES=expat
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/cybergarage/mupnp/releases"
+export DOWNLOADURL="https://github.com/cybergarage/mupnp/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/cybergarage/mupnp/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/cybergarage/mupnp/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing mUpnpInt64 in include/mupnp/io/file.h
+mv include/mupnp/io/file.h include/mupnp/io/file.h.bak &&
+echo "#include <stdint.h>" > include/mupnp/io/file.h &&
+sed -e "s/mUpnpInt64/int64_t/g" include/mupnp/io/file.h.bak >> include/mupnp/io/file.h
+# fix missing mUpnpInt64 in src/mupnp/io/file.c
+mv src/mupnp/io/file.c src/mupnp/io/file.c.bak &&
+echo "#include <stdint.h>" > src/mupnp/io/file.c &&
+sed -e "s/mUpnpInt64/int64_t/g" src/mupnp/io/file.c.bak >> src/mupnp/io/file.c
+# fix CMakeLists.txt
+sed -i.bak -e "s?\(src/\)cybergarage\(/[^ ]*/\)c?\1mupnp\2?g" CMakeLists.txt
+sed -i.bak2 -e "s?\(src/mupnp/\)upnp/?\1?g" CMakeLists.txt
+sed -i.bak3 -e "s/\(add_library\s*(\s*[^\s]*\)\s*STATIC\s/\1/g" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCG_HTTP_CURL:BOOL=ON -DCG_USE_OPENSSL:BOOL=ON -DCG_XMLPARSER_LIBXML2:BOOL=OFF -DCG_USE_CFILE:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCG_HTTP_CURL:BOOL=ON -DCG_USE_OPENSSL:BOOL=ON -DCG_XMLPARSER_LIBXML2:BOOL=OFF -DCG_USE_CFILE:BOOL=OFF -S. -Bbuild_shared &&
+ echo "-Wl,--as-needed -lws2_32 -lrpcrt4 -liphlpapi" >> build_shared/CMakeFiles/clinkc.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/include/mupnp/ &&
+ cp -rf include/mupnp/* $INSTALLPREFIX/include/mupnp/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

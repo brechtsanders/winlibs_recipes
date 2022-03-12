@@ -1,0 +1,93 @@
+export NAME="tinymail"
+export STATUS=
+#export URL=http://tinymail.org/
+export URL=https://gitorious.org/tinymail/tinymail
+#export URL=https://source.puri.sm/Librem5/tinymail
+export BASENAME=libtinymail
+export DESCRIPTION="Tinymail is a library for developing mobile applications with E-mail functionality. The framework provides components that aid the developer with the user interface but of course also with the connectivity and the caching of messages. It supports local mail storage (Maildir,mh,spool & mbox), IMAP, POP and NNTP. It can be used to send messages over SMTP and by using sendmail."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.0.9
+export VERSION=1.0.0
+export VERSIONDATE=20111227
+#export VERSION=1.2
+#export VERSIONDATE=20170620
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,gettext,pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=vala
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://tinymail.org/files/releases/pre-releases/"
+#export DOWNLOADURL="http://tinymail.org/files/releases/"
+#export DOWNLOADURL="https://gitorious.org/tinymail/tinymail"
+export DOWNLOADURL="https://github.com/community-ssu/tinymail/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://tinymail.org/files/releases/pre-releases/v$VERSION/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://tinymail.org/files/releases/v`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/v$VERSION/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://github.com/community-ssu/tinymail/archive/master.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/master.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+#cd tinymail-master
+# fix missing fsync in libtinymail/tny-fs-stream.c
+mv libtinymail/tny-fs-stream.c libtinymail/tny-fs-stream.c.bak
+echo "#define fsync(fd) _commit(fd)" > libtinymail/tny-fs-stream.c
+cat libtinymail/tny-fs-stream.c.bak >> libtinymail/tny-fs-stream.c
+# fix libtinymail/tny-cached-file.c (version >= 1.0.0)
+patch -ulbf libtinymail/tny-cached-file.c << EOF
+--- libtinymail/tny-cached-file.c  2010-03-05 11:58:52 +0100
++++ libtinymail/tny-cached-file.c  2011-12-27 09:24:38 +0100
+@@ -192,3 +192,7 @@
+        if (creation) {
++#ifdef O_SYNC
+                flags = O_CREAT | O_RDWR | O_SYNC;
++#else
++               flags = O_CREAT | O_RDWR;
++#endif
+        } else {
+EOF
+## fix missing file
+#mkdir -p libtinymail-camel/camel-lite/sys
+#cat > libtinymail-camel/camel-lite/sys/mman.h << EOF
+##define PROT_READ 0x1
+##define MAP_PRIVATE 0x2
+#EOF
+# skip compilation of libtinymail-camel
+cat > libtinymail-camel/Makefile.in << EOF
+all:
+install:
+clean:
+EOF
+wl-showstatus configure &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# libtoolize --force -i &&
+# autoconf --force &&
+# autoheader --force &&
+# automake --force-missing --add-missing
+# #autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-platform= --enable-gnome=no LDFLAGS="-lregex -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-platform= --enable-gnome=no --with-html-component=gtkhtml LDFLAGS="-Wl,--as-needed -lregex -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-platform= --enable-gnome=no LDFLAGS="-Wl,--as-needed -lpcreposix -Wl,-no-undefined" &&
+PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-platform= --enable-gnome=no LDFLAGS="-Wl,--as-needed -lpcreposix -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs on 64-bit
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  mv libtool libtool.bak && ln -sf `which libtool` libtool
+ fi &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: build 64-bit DLL
+
+
+

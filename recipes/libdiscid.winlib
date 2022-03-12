@@ -1,0 +1,84 @@
+export NAME="libdiscid"
+export STATUS=
+export URL=http://musicbrainz.org/doc/libdiscid
+export BASENAME=libdiscid
+export DESCRIPTION="libdiscid is a C library for creating MusicBrainz DiscIDs from audio CDs. It reads a CD's table of contents (TOC) and generates an identifier which can be used to lookup the CD at MusicBrainz. Additionally, it provides a submission URL for adding the DiscID to the database."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=0.2.2
+#export VERSIONDATE=20101116
+export VERSION=0.6.1
+export VERSIONDATE=20160105
+#export VERSION=0.6.2
+#export VERSIONDATE=20170130
+####src/unix.c:38:31: error: 'O_NONBLOCK' undeclared (first use in this function)
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://musicbrainz.org/doc/libdiscid"
+#export DOWNLOADURL="http://users.musicbrainz.org/~matt/"
+#export DOWNLOADURL="https://github.com/metabrainz/libdiscid/releases v"
+export DOWNLOADURL="http://ftp.musicbrainz.org/pub/musicbrainz/libdiscid/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://users.musicbrainz.org/~matt/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://ftp.musicbrainz.org/pub/musicbrainz/libdiscid/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+#wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+## fix missing mb_disc_read_unportable_nt
+#patch -ulbf src/Makefile.in << EOF
+#--- src/Makefile.in  2008-08-06 21:29:52 +0200
+#+++ src/Makefile.in  2010-11-16 09:34:14 +0100
+#@@ -209,2 +209,2 @@
+#-libdiscid_la_LIBADD = @DISC_OS_OBJ@
+#-libdiscid_la_DEPENDENCIES = @DISC_OS_OBJ@
+#+libdiscid_la_LIBADD = @DISC_OS_OBJ@ disc_win32_new.lo
+#+libdiscid_la_DEPENDENCIES = @DISC_OS_OBJ@ disc_win32_new.lo
+#EOF
+## avoid compiling examples on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#cat > examples/Makefile.in << EOF
+#clean:
+#all:
+#install:
+#install-strip:
+#EOF
+#cp -f examples/Makefile.in examples/Makefile.in.am
+#fi
+# fix missing ddk/ntddcdrm.h (version >= 0.6.1)
+echo "#include <ddk/ntddcdrm.h>" | gcc -c -xc - -o /dev/null &> /dev/null || (
+ mkdir -p ddk &&
+ echo "#include <ntddcdrm.h>" > ddk/ntddcdrm.h
+)
+## create dummy src/unix.c (version >= 0.6.2)
+#mv src/unix.c src/unix.c.bak &&
+#touch src/unix.c
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+echo 'ADD_LIBRARY(libdiscid_s STATIC ${libdiscid_OSDEP_SRCS} src/base64.c src/disc.c src/sha1.c)' >> CMakeLists.txt
+echo 'INSTALL(TARGETS libdiscid_s DESTINATION ${LIB_INSTALL_DIR})' >> CMakeLists.txt
+wl-showstatus configure &&
+cmake.exe -G"MSYS Makefiles" -Wno-dev -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+ wl-showstatus build-install &&
+ make install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ mv $INSTALLPREFIX/lib/liblibdiscid_s.a $INSTALLPREFIX/lib/libdiscid.a &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

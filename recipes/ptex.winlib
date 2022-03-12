@@ -1,0 +1,69 @@
+export NAME="Ptex"
+export STATUS=
+export URL=https://ptex.us/
+export BASENAME=ptex
+export DESCRIPTION="Ptex is a texture mapping system developed by Walt Disney Animation Studios for production-quality rendering."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=2.3.2
+#export VERSIONDATE=20210505
+#export VERSION=2.4.0
+#export VERSIONDATE=20210519
+export VERSION=2.4.1
+export VERSIONDATE=20210804
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja,doxygen
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/wdas/ptex/releases"
+export DOWNLOADURL="https://github.com/wdas/ptex/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/wdas/ptex/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/ptex/PtexInt.h (version >= 2.3.2)
+patch -ulbf src/ptex/PtexInt.h << EOF
+@@ -45,3 +45,3 @@
+
+-#if defined(_MSC_VER) && _MSC_VER >= 1600
++#if defined(__MINGW32__) || (defined(_MSC_VER) && _MSC_VER >= 1600)
+ #include <stdint.h>
+EOF
+# fix src/tests/halftest.cpp (version >= 2.3.2)
+patch -ulbf src/tests/halftest.cpp << EOF
+@@ -47,3 +47,5 @@
+ #include <float.h>
++#ifndef __MINGW32__
+ #define isfinite _finite
++#endif
+ #else
+EOF
+# fix missing version file
+echo $VERSION>version
+# fix src/ptex/CMakeLists.txt (version >= 2.4.0)
+patch -ulbf src/ptex/CMakeLists.txt << EOF
+@@ -23,2 +23,3 @@
+         \${CMAKE_CURRENT_SOURCE_DIR})
++    target_compile_definitions(Ptex_static PRIVATE PTEX_STATIC)
+     target_link_libraries(Ptex_static
+EOF
+## skip building tests
+#sed -i.bak -e "s?^add_subdirectory(src/tests)?#&?" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPTEX_BUILD_SHARED_LIBS:BOOL=OFF -DPTEX_BUILD_STATIC_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPTEX_BUILD_SHARED_LIBS:BOOL=ON -DPTEX_BUILD_STATIC_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ sed -i -e "s?lib\(/libPtex\.dll\"\)?bin\1?" $INSTALLPREFIX/share/cmake/Ptex/ptex-exports-release.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

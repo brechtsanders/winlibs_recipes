@@ -1,0 +1,96 @@
+export NAME="DjVuLibre"
+export STATUS=
+export URL=http://djvu.sourceforge.net/
+export BASENAME=djvulibre
+export DESCRIPTION="DjVu is a web-centric format and software platform for distributing documents and images. DjVuLibre is an open source (GPL'ed) implementation of DjVu, including viewers, browser plugins, decoders, simple encoders, and utilities."
+export CATEGORY=
+export TYPE=library
+#export VERSION=3.5.23
+#export VERSIONDATE=20101014
+#export VERSION=3.5.24
+#export VERSIONDATE=20110307
+#export VERSION=3.5.25
+#export VERSIONDATE=20110316
+#export VERSION=3.5.25.2
+#export VERSIONDATE=20110318
+#export VERSION=3.5.25.3
+#export VERSIONDATE=20110508
+#export VERSION=3.5.27
+#export VERSIONDATE=20150213
+####libdjvu/GString.h:1172:1: warning: 'DJVU::GUTF8String::GUTF8String(const DJVU::GP<DJVU::GStringRep>&)' redeclared without dllimport attribute after being referenced with dll linkage [enabled by default]
+export VERSION=3.5.28
+export VERSIONDATE=20201230
+wl-showstatus --package-version
+export DEPENDANCIES=libjpeg,libtiff
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sourceforge.net/projects/djvu/files/DjVuLibre/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/djvu/DjVuLibre/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/djvu/DjVuLibre/$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*$/\1%2C\2%2C\3/")/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/djvu/DjVuLibre/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\..*$/\1/'`
+# fixes for 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv libdjvu/GContainer.h libdjvu/GContainer.h.bak
+ sed -e "s/\((unsigned long)\)/\1(uintptr_t)/g" libdjvu/GContainer.h.bak > libdjvu/GContainer.h
+ mv libdjvu/GBitmap.cpp libdjvu/GBitmap.cpp.bak
+ sed -e "s/unsigned long x = (unsigned long)/uintptr_t x = (uintptr_t)/" libdjvu/GBitmap.cpp.bak > libdjvu/GBitmap.cpp
+ mv libdjvu/IW44Image.cpp libdjvu/IW44Image.cpp.bak
+ sed -e "s/(long)/(uintptr_t)/g" libdjvu/IW44Image.cpp.bak > libdjvu/IW44Image.cpp
+ mv libdjvu/IW44EncodeCodec.cpp libdjvu/IW44EncodeCodec.cpp.bak
+ sed -e "s/(long)/(uintptr_t)/g" libdjvu/IW44EncodeCodec.cpp.bak > libdjvu/IW44EncodeCodec.cpp
+ mv libdjvu/DjVuPort.cpp libdjvu/DjVuPort.cpp.bak
+ sed -e "s/(long)/(intptr_t)/g" libdjvu/DjVuPort.cpp.bak > libdjvu/DjVuPort.cpp
+fi
+## fix missing size_t in GSmartPointer.h (version <= 3.5.24)
+#mv libdjvu/GSmartPointer.h libdjvu/GSmartPointer.h.bak
+#echo "#include <stdlib.h>" > libdjvu/GSmartPointer.h
+#cat libdjvu/GSmartPointer.h.bak >> libdjvu/GSmartPointer.h
+# fix libdjvu/JPEGDecoder.cpp (version >= 3.5.28)
+mv libdjvu/JPEGDecoder.cpp libdjvu/JPEGDecoder.cpp.bak &&
+echo "#include <windows.h>" > libdjvu/JPEGDecoder.cpp &&
+cat libdjvu/JPEGDecoder.cpp.bak >> libdjvu/JPEGDecoder.cpp
+# fix missing desktopfiles/prebuilt-hi*-djvu.png (if ImageMagick is not installed)
+if [ ! -f $MINGWPREFIX/bin/convert.exe ]; then
+ cp -f desktopfiles/prebuilt-hi22-djvu.png desktopfiles/prebuilt-hi16-djvu.png
+ cp -f desktopfiles/prebuilt-hi22-djvu.png desktopfiles/prebuilt-hi20-djvu.png
+ cp -f desktopfiles/prebuilt-hi22-djvu.png desktopfiles/prebuilt-hi24-djvu.png
+ cp -f desktopfiles/prebuilt-hi64-djvu.png desktopfiles/prebuilt-hi72-djvu.png
+ cp -f desktopfiles/prebuilt-hi64-djvu.png desktopfiles/prebuilt-hi96-djvu.png
+ cp -f desktopfiles/prebuilt-hi64-djvu.png desktopfiles/prebuilt-hi128-djvu.png
+ cp -f desktopfiles/prebuilt-hi64-djvu.png desktopfiles/prebuilt-hi256-djvu.png
+fi
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --without-x --disable-desktopfiles LDFLAGS="-Wl,--enable-auto-import -static-libstdc++" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --without-x --disable-desktopfiles LDFLAGS="-Wl,--enable-auto-import" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --without-x --disable-desktopfiles LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows --without-x --disable-desktopfiles LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ wl-showstatus build &&
+ make -Clibdjvu CFLAGS="-DDJVUAPI_EXPORT -DDDJVUAPI_EXPORT -DMINILISPAPI_EXPORT" CXXFLAGS="-DDJVUAPI_EXPORT -DDDJVUAPI_EXPORT -DMINILISPAPI_EXPORT" &&
+ make &&
+ wl-showstatus build-install &&
+ #( make -j1 all install || make -j1 all install INKSCAPE=false ) &&
+ ( make install-strip || make install-strip INKSCAPE=false ) &&
+ # fix ddjvuapi.pc
+ sed -i -e "s?-L$INSTALLPREFIX/lib?-L\${libdir}?; s?-I$INSTALLPREFIX/include?-I\${includedir}?" $INSTALLPREFIX/lib/pkgconfig/ddjvuapi.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\..*$/\1/'`
+####make -j1 all install CONVERT=/E/Prog/MinGW32/msys/custombuilt32/bin/convert.exe && echo OK
+
+
+

@@ -1,0 +1,71 @@
+export NAME="Tinyproxy"
+export STATUS=
+export URL=https://tinyproxy.github.io/
+export BASENAME=tinyproxy
+export DESCRIPTION="Tinyproxy is a light-weight HTTP/HTTPS proxy daemon for POSIX operating systems. Designed from the ground up to be fast and yet small, it is an ideal solution for use cases such as embedded deployments where a full featured HTTP proxy is required, but the system resources for a larger proxy are unavailable."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.8.4
+#export VERSIONDATE=20161213
+#export VERSION=1.10.0
+#export VERSIONDATE=20180901
+export VERSION=1.11.0
+export VERSIONDATE=20210416
+####configure: error: Could not locate the regexec() function
+wl-showstatus --package-version
+export DEPENDANCIES=sys_wait_h,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/tinyproxy/tinyproxy/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/tinyproxy/tinyproxy/releases/download/$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys
+touch winfix/netdb.h
+#echo "#define _WIN32_WINNT 0x0501" > winfix/netdb.h
+#echo "#include <winsock2.h>" >> winfix/netdb.h
+#echo "#include <ws2tcpip.h>" >> winfix/netdb.h
+echo "#include <winsock2.h>" >> winfix/sys/socket.h
+touch winfix/sys/select.h
+cat > winfix/syslog.h << EOF
+EOF
+## use dummy syslog
+#mv src/log.h src/log.h.bak
+#cat >> src/log.h << EOF
+##define open_log_file(file)
+##define close_log_file()
+##define log_message(level,fmt,...)
+##define setup_logging()
+##define shutdown_logging()
+#EOF
+#mv src/log.c src/log.c.bak
+#touch src/log.c
+# fix missing getaddrinfo/getnameinfo/freeaddrinfo in src/acl.c
+mv src/acl.c src/acl.c.bak
+cat > src/acl.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+EOF
+cat src/acl.c.bak >> src/acl.c
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-reverse --enable-transparent CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lpcre -lepcre -lpcreposix" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-reverse --enable-transparent --disable-regexcheck &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

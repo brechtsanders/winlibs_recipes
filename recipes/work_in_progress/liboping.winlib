@@ -1,0 +1,281 @@
+export NAME="liboping"
+export STATUS=
+#export URL=http://verplant.org/liboping/
+export URL=https://noping.cc/
+export BASENAME=liboping
+export DESCRIPTION=
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.3.5
+export VERSION=1.0.0
+#export VERSION=1.1.1
+#export VERSION=1.1.2
+#export VERSION=1.2.0
+#export VERSION=1.3.1
+#export VERSION=1.3.2
+#export VERSION=1.3.3
+export VERSIONDATE=
+#export VERSION=1.3.4
+#export VERSIONDATE=20091221
+#export VERSION=1.4.0
+#export VERSIONDATE=20100614
+#export VERSION=1.5.0
+#export VERSIONDATE=20101028
+#export VERSION=1.5.1
+#export VERSIONDATE=20101117
+#export VERSION=1.6.0
+#export VERSIONDATE=20110126
+#export VERSION=1.6.1
+#export VERSIONDATE=20110306
+#export VERSION=1.6.2
+#export VERSIONDATE=20120201
+####configure: error: cannot find socket
+#export VERSION=1.7.0
+#export VERSIONDATE=20140926
+#export VERSION=1.8.0
+#export VERSIONDATE=20141120
+####src/liboping.c:466:16: error: storage size of 'msghdr' isn't known
+#export VERSION=1.9.0
+#export VERSIONDATE=20160627
+#export VERSION=1.10.0
+#export VERSIONDATE=20170511
+####configure: error: cannot find socket
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://verplant.org/liboping/"
+#export DOWNLOADURL="https://noping.cc/"
+export DOWNLOADURL="https://github.com/octo/liboping/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://verplant.org/liboping/files/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://noping.cc/files/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir sys
+cat > sys/socket.h << EOF
+#ifndef SYS_SOCKET_H_INCLUDED
+#define SYS_SOCKET_H_INCLUDED
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdint.h>
+#define socklen_t int
+struct ip {
+#if BYTE_ORDER == LITTLE_ENDIAN 
+  u_char ip_hl:4;         //header length
+  u_char ip_v:4;          //version
+#else
+  u_char ip_v:4;          //version
+  u_char ip_hl:4;         //header length
+#endif
+  u_char ip_tos;          //type of service
+  short ip_len;           //total length
+  u_short ip_id;          //identification
+  short ip_off;           //fragment offset field
+#define IP_DF 0x4000      //dont fragment flag
+#define IP_MF 0x2000      //more fragments flag
+#define IP_OFFMASK 0x1FFF //mask for fragmenting bits
+  u_char ip_ttl;          //time to live
+  u_char ip_p;            //protocol
+  u_short ip_sum;         //checksum
+  struct in_addr ip_src;  //source address
+  struct in_addr ip_dst;  //destination address
+};
+typedef short n_short;
+typedef time_t n_time;
+#define ICMP_ECHO 8
+#define ICMP_ECHOREPLY 0
+struct icmp {
+  u_char icmp_type;      //type of message, see below
+  u_char icmp_code;      //type sub code
+  u_short icmp_cksum;     //ones complement cksum of struct
+  union {
+    u_char ih_pptr;           //ICMP_PARAMPROB
+    struct in_addr ih_gwaddr; //ICMP_REDIRECT
+    struct ih_idseq {
+      n_short icd_id;
+      n_short icd_seq;
+    } ih_idseq;
+    int ih_void;
+    //ICMP_UNREACH_NEEDFRAG -- Path MTU Discovery (RFC1191)
+    struct ih_pmtu {
+      n_short ipm_void;    
+      n_short ipm_nextmtu;
+    } ih_pmtu;
+  } icmp_hun;
+#define icmp_pptr icmp_hun.ih_pptr
+#define icmp_gwaddr icmp_hun.ih_gwaddr
+#define icmp_id icmp_hun.ih_idseq.icd_id
+#define icmp_seq icmp_hun.ih_idseq.icd_seq
+#define icmp_void icmp_hun.ih_void
+#define icmp_pmvoid icmp_hun.ih_pmtu.ipm_void
+#define icmp_nextmtu icmp_hun.ih_pmtu.ipm_nextmtu
+  union {
+    struct id_ts {
+      n_time its_otime;
+      n_time its_rtime;
+      n_time its_ttime;
+    } id_ts;
+    struct id_ip  {
+      struct ip idi_ip;
+      //options and then 64 bits of data
+    } id_ip;
+    u_int id_mask;
+    char id_data[1];
+  } icmp_dun;
+#define icmp_otime icmp_dun.id_ts.its_otime
+#define icmp_rtime icmp_dun.id_ts.its_rtime
+#define icmp_ttime icmp_dun.id_ts.its_ttime
+#define icmp_ip icmp_dun.id_ip.idi_ip
+#define icmp_mask icmp_dun.id_mask
+#define icmp_data icmp_dun.id_data
+};
+#define ICMP6_ECHO_REQUEST 128 
+#define ICMP6_ECHO_REPLY 129
+#define IPV6_UNICAST_HOPS 4
+struct icmp6_hdr {
+  uint8_t icmp6_type;   //type field
+  uint8_t icmp6_code;   //code field
+  uint16_t icmp6_cksum; //checksum field
+  union {
+    uint32_t icmp6_un_data32[1];  //type-specific field
+    uint16_t icmp6_un_data16[2];  //type-specific field
+    uint8_t icmp6_un_data8[4];    //type-specific field
+  } icmp6_dataun;
+};
+#define icmp6_data32 icmp6_dataun.icmp6_un_data32
+#define icmp6_data16 icmp6_dataun.icmp6_un_data16
+#define icmp6_data8 icmp6_dataun.icmp6_un_data8
+#define icmp6_pptr icmp6_data32[0]      //parameter prob
+#define icmp6_mtu icmp6_data32[0]       //packet too big
+#define icmp6_id icmp6_data16[0]        //echo request/reply
+#define icmp6_seq icmp6_data16[1]       //echo request/reply
+#define icmp6_maxdelay icmp6_data16[0]  //mcast group membership
+typedef long suseconds_t;
+#define random rand
+#define srandom srand
+#define EAI_SYSTEM -11
+#endif
+EOF
+# fix type warning and missing getaddrinfo in src/liboping.c
+mv src/liboping.c src/liboping.c.bak
+echo "#define _WIN32_WINNT 0x0501" > src/liboping.c
+sed -e "s/\(setsockopt.*\)\(\&ttl\)/\1(void\*)\2/" src/liboping.c.bak >> src/liboping.c
+# fix src/oping.c
+mv src/oping.c src/oping.c.bak
+cat > src/oping.c << EOF
+#include <winsock2.h>
+#include <time.h>
+#if !defined(_TIMESPEC_DEFINED)
+struct timespec {
+  long tv_sec;
+  long tv_nsec;
+};
+#endif
+#if $(if gcc --version|grep -q posix; then echo 0; else echo 1; fi)
+#define nanosleep(ts,p) (Sleep((ts)->tv_sec * 1000 + (ts)->tv_nsec / 1000000000), 0)
+#endif
+struct sigaction {
+  void* sa_handler;
+};
+#define sigaction(a,b,c) 0
+#define getuid() 0
+static int setuid(int uid)
+{
+  return 0;
+}
+static int geteuid()
+{
+  static WSADATA wsaData;
+  int wsaerr = WSAStartup(MAKEWORD(1, 0), &wsaData);
+  if (wsaerr)
+    exit(1);
+  atexit((void(*)())WSACleanup);
+  return 0;
+}
+EOF
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ sed -e "s/%zu/%I64u/g" src/oping.c.bak >> src/oping.c
+else
+ sed -e "s/%zu/%u/g" src/oping.c.bak >> src/oping.c
+fi
+# fix problem detecting socket and nanosleep (version <= 1.4.0)
+patch -ulbf configure << EOF
+--- configure  Tue Feb 17 14:21:18 2009
++++ configure  Mon Mar  2 21:15:12 2009
+@@ -21922,3 +21922,3 @@
+ echo "\$as_me: error: cannot find socket" >&2;}
+-   { (exit 1); exit 1; }; }
++   }
+ fi
+@@ -22096,3 +22096,3 @@
+ echo "\$as_me: error: cannot find nanosleep" >&2;}
+-   { (exit 1); exit 1; }; }
++   }
+ fi
+EOF
+## fix missing files
+#mkdir -p winfix/sys
+#echo "#include <winsock2.h>" > winfix/sys/socket.h
+#echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+## fix problem detecting socket and nanosleep (version >= 1.5.1)
+#patch -ulbf configure << EOF
+#--- configure  2010-11-17 13:17:46 +0100
+#+++ configure  2010-11-17 13:23:08 +0100
+#@@ -11039,4 +11039,2 @@
+#   socket_needs_socket="yes"
+#-else
+#-  as_fn_error \$? "cannot find socket" "\$LINENO" 5
+# fi
+#@@ -11159,4 +11157,2 @@
+#   nanosleep_needs_rt="yes"
+#-else
+#-  as_fn_error \$? "cannot find nanosleep" "\$LINENO" 5
+# fi
+#EOF
+## fix missing -lsocket in configure (version >= 1.10.0)
+#mv configure configure.bak &&
+#sed -e "s/-lsocket/-lws2_32/g; s/return socket ();//" configure.bak > configure
+wl-showstatus configure &&
+#mkdir -p m4 &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-perl-bindings CFLAGS="-I`pwd`" LDFLAGS="-Wl,--allow-multiple-definition -lws2_32 -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-perl-bindings CFLAGS="-I`pwd`" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-perl-bindings CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#src/oping.exe 127.0.0.1
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define WSA_CMSG_FIRSTHDR(mhdr)
+#define WSA_CMSG_NXTHDR(mhdr, cmsg)
+#define WSA_CMSG_SPACE(length)
+#define WSA_CMSG_LEN(length)
+struct msghdr {
+void          *msg_name;
+socklen_t      msg_namelen;
+struct iovec  *msg_iov;
+int            msg_iovlen;
+void          *msg_control;
+socklen_t      msg_controllen;
+int            msg_flags;
+};
+typedef char * caddr_t;
+struct iovec {
+ caddr_t iov_base;
+ int iov_len;
+};
+
+
+

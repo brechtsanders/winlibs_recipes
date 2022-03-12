@@ -1,0 +1,61 @@
+export NAME="libdlna"
+export STATUS=
+export URL=http://libdlna.geexbox.org/
+export BASENAME=libdlna
+export DESCRIPTION="libdlna aims at being the reference open-source implementation of DLNA (Digital Living Network Alliance) standards."
+export CATEGORY=multimedia
+export TYPE=library
+export VERSION=0.2.4
+export VERSIONDATE=20140721
+####src/profiles.lo:profiles.c:(.text+0x9f8): undefined reference to `av_find_stream_info'
+####src/profiles.lo:profiles.c:(.text+0xc09): undefined reference to `av_close_input_file'
+wl-showstatus --package-version
+export DEPENDANCIES=ffmpeg4
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://libdlna.geexbox.org/releases/"
+export DOWNLOADURL="https://libdlna.geexbox.org/#Download"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://libdlna.geexbox.org/releases/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing CODEC_ID_* in src/av_mpeg4_part2.c
+grep -q AV_CODEC_ID_MPEG1VIDEO $MINGWPREFIX/include/libavcodec/avcodec.h && (
+ for F in $(grep -l "\bCODEC_" src/*.c); do
+  sed -i.bak -e "s/\bCODEC_ID_/AV_&/g" $F
+ done
+ patch -ulbf src/profiles.c << EOF
+@@ -290 +290 @@
+-  if (av_find_stream_info (ctx) < 0)
++  if (avformat_find_stream_info (ctx, NULL) < 0)
+@@ -337 +337 @@
+-  av_close_input_file (ctx);
++  avformat_close_input (&ctx);
+EOF
+)
+# fix missing CODEC_ID_* in src/image_*.c (version >= 0.2.4)
+grep -q AV_CODEC_ID_JPEGLS $MINGWPREFIX/ffmpeg4/include/libavcodec/avcodec.h && sed -i.bak -e "s/\bCODEC_ID_/AV_&/g" src/image_*.c src/audio_*.c src/av_*.c
+# fix missing av_find_stream_info/av_close_input_file in src/profiles.c (version >= 0.2.4)
+grep -q av_find_stream_info $MINGWPREFIX/ffmpeg4/include/libavformat/avformat.h || sed -i.bak -e "s/av_find_stream_info\(\s*(\)\([^,)]*\))/avformat_find_stream_info\1\2, NULL)/g; s/av_close_input_file\(\s*(\)/avformat_close_input\1\&/g" src/profiles.c
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX &&
+ #./configure --prefix=$INSTALLPREFIX --enable-static --enable-shared --disable-debug --with-ffmpeg-dir=$MINGWPREFIX/ffmpeg4 &&
+ LIBRARY_PATH=$MINGWPREFIX/ffmpeg4/lib:$LIBRARY_PATH ./configure --prefix=$INSTALLPREFIX --enable-static --enable-shared --disable-debug --with-ffmpeg-dir=$MINGWPREFIX/ffmpeg4/include &&
+ wl-showstatus build-install &&
+ #C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$C_INCLUDE_PATH make install LIBNAME_SHARED=libdlna.dll &&
+ LIBRARY_PATH=$MINGWPREFIX/ffmpeg4/lib:$LIBRARY_PATH make install LIBNAME_SHARED=libdlna.dll &&
+ pexports $INSTALLPREFIX/lib/libdlna.dll | sed -e "s/^LIBRARY.*$/LIBRARY libdlna.dll/" > libdlna.def &&
+ dlltool -D $INSTALLPREFIX/lib/libdlna.dll -d libdlna.def -l $INSTALLPREFIX/lib/libdlna.dll.a &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ rm -f $INSTALLPREFIX/lib/*.dll.[0-9]* &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

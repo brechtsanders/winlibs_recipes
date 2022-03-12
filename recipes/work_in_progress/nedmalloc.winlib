@@ -1,0 +1,52 @@
+export NAME="nedmalloc"
+export STATUS=
+export URL=http://www.nedprod.com/programs/portable/nedmalloc/
+export BASENAME=nedmalloc
+export DESCRIPTION="nedmalloc is a VERY fast, VERY scalable, multithreaded memory allocator with little memory fragmentation."
+export CATEGORY=system
+export TYPE=library
+export VERSION=1.10_beta3
+export VERSIONDATE=20180922
+####AttributeError: 'SConsEnvironment' object has no attribute 'MSVSProject'
+####nedmalloc.c:539:2: error: #error Lack of SEH support makes nedmalloc unreliable with foreign memory blocks. Make sure ENABLE_TOLERANT_NEDMALLOC is turned off!
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=scons
+export LICENSEFILE=License.txt
+export LICENSETYPE=BSL
+#export DOWNLOADURL="https://github.com/ned14/nedmalloc/releases"
+export DOWNLOADURL="https://github.com/ned14/nedmalloc/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/ned14/nedmalloc/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ned14/nedmalloc/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus configure &&
+ INCLUDE=. LIB=. PYTHONPATH=$MINGWPREFIX/python/scons $PY2DIR/python.exe $MINGWPREFIX/python/Scripts/scons.py --prefix=$INSTALLPREFIX &&
+ wl-showstatus build &&
+ make &&
+    echo OK
+
+sed -i.bak -e "s/^static \(FORCEINLINE\)/\1/" nedmalloc.c malloc.c.h
+wl-showstatus build &&
+ gcc -c -o nedmalloc.o nedmalloc.c -I. -O3 -DWIN32 -D_WINDOWS -DUNICODE -D_UNICODE &&
+ #gcc -c -o nedmalloc.o nedmalloc.c -I. -O3 -DWIN32 -D_WINDOWS -DUNICODE -D_UNICODE -DNEDMALLOC_DLL_EXPORTS &&
+ ar cru libnedmalloc.a nedmalloc.o &&
+ #( echo EXPORTS; sed -n -e "s/^.* \**\(nedmalloc_.*\) *(.*$/\1/p" nedmalloc.h ) > nedmalloc.def &&
+ ( echo EXPORTS; gcc -E nedmalloc.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(ned[^ *]*\).*/\1/p" ) > nedmalloc.def &&
+ gcc -shared -s -mwindows -def nedmalloc.def -o nedmalloc.dll libnedmalloc.a -Wl,--out-implib,libnedmalloc.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,196 @@
+export NAME="Processlib"
+export STATUS=
+export URL=http://lima.blissgarden.org/
+#export URL=https://github.com/esrf-bliss/Processlib
+export BASENAME=processlib
+export DESCRIPTION="Small post processing library"
+export CATEGORY=graphics,dataprocessing
+export TYPE=library
+#export VERSION=1.7.2
+#export VERSIONDATE=20200212
+#export VERSION=1.7.3
+#export VERSIONDATE=20200923
+#export VERSION=1.7.4
+#export VERSIONDATE=20201027
+#export VERSION=1.7.5
+#export VERSIONDATE=20210310
+#export VERSION=1.7.6
+#export VERSIONDATE=20210812
+#export VERSION=1.8.0
+#export VERSIONDATE=20210812
+#export VERSION=1.8.1
+#export VERSIONDATE=20211011
+export VERSION=1.8.2
+export VERSIONDATE=20220122
+wl-showstatus --package-version
+#export DEPENDANCIES=
+export DEPENDANCIES=gsl
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/esrf-bliss/Processlib/releases"
+export DOWNLOADURL="https://github.com/esrf-bliss/Processlib/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/esrf-bliss/Processlib/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/esrf-bliss/Processlib/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd Processlib-$VERSION
+# fix already defined struct timespec
+patch -ulbf core/include/WindowSpecific/pthread_mutex.h << EOF
+@@ -50,3 +50,3 @@
+ /* MSC 14 2015 provides this struct */
+-#if _MSC_VER < 1900
++#if _MSC_VER < 1900 && !defined(__MINGW64_VERSION_MAJOR)
+ struct timespec
+EOF
+patch -ulbf core/src/WindowSpecific/pthread_thread.cpp << EOF
+@@ -353,3 +353,3 @@
+       tv->p_state = attr->p_state;
+-      ssize = unsigned int(attr->s_size);
++      ssize = (unsigned int)(attr->s_size);
+     }
+EOF
+# fix missing min in tasks/src/SoftRoi.cpp (version >= 1.7.2)
+patch -ulbf tasks/src/SoftRoi.cpp << EOF
+@@ -53,3 +53,3 @@
+
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ static inline int min(int a,int b) {return a < b ? a : b;}
+EOF
+# fix core/src/PoolThreadMgr.cpp (version >= 1.7.2)
+patch -ulbf core/src/PoolThreadMgr.cpp << EOF
+@@ -23,3 +23,3 @@
+ #include <iostream>
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #include <sys/time.h>
+@@ -260,3 +260,3 @@
+ {
+-#ifdef WIN32
++#if defined(WIN32) && !defined(__MINGW32__)
+   _pthread_once_raw(&_init,_processMgrInit);
+EOF
+# fix core/include/processlib/SinkTaskMgr.h (version >= 1.7.2)
+patch -ulbf core/include/processlib/SinkTaskMgr.h << EOF
+@@ -29,3 +29,3 @@
+ #include <pthread.h>
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #include <sys/time.h>
+EOF
+# fix core/include/processlib/Stat.h (version >= 1.7.2)
+patch -ulbf core/include/processlib/Stat.h << EOF
+@@ -29,3 +29,3 @@
+ #include <stdio.h>      /* for printf() and fprintf() */
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #include <sys/time.h>
+EOF
+# fix tasks/src/Bpm.cpp (version >= 1.7.2)
+patch -ulbf tasks/src/Bpm.cpp << EOF
+@@ -30,3 +30,3 @@
+ #include <math.h>
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #include <sys/time.h>
+EOF
+# fix tasks/src/Flip.cpp (version >= 1.7.2)
+patch -ulbf tasks/src/Flip.cpp << EOF
+@@ -80,3 +80,3 @@
+ }
+-#ifndef __unix
++#if !defined(__unix) && !defined(__MINGW32__)
+ #if _MSC_VER < 1900
+EOF
+# fix tasks/src/BackgroundSubstraction.cpp (version >= 1.7.2)
+patch -ulbf tasks/src/BackgroundSubstraction.cpp << EOF
+@@ -57,3 +57,3 @@
+   int n = aSize >> 1;          // div / 2
+-  if(!((long)srcShort & 15))   // aligned to 128 bits
++  if(!((uintptr_t)srcShort & 15))      // aligned to 128 bits
+     {
+@@ -123,3 +123,3 @@
+   int n = aSize >> 1;          // div / 2
+-  if(!((long)srcShort & 15))   // aligned to 128 bits
++  if(!((uintptr_t)srcShort & 15))      // aligned to 128 bits
+     {
+EOF
+# fix tasks/src/Bpm.cpp (version >= 1.7.2)
+patch -ulbf tasks/src/Bpm.cpp << EOF
+@@ -43,3 +43,3 @@
+ using namespace Tasks;
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ template<class INPUT> static inline INPUT max(INPUT a,INPUT b)
+@@ -55,3 +55,3 @@
+ // oldest windows C++ (VStudio 2008) does not provide round() func with math.h, so wrap it with local function
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #define ROUND(a) round(a)
+EOF
+# fix CMakeLists.txt (version >= 1.7.2)
+patch -ulbf CMakeLists.txt << EOF
+@@ -138,5 +138,5 @@
+     tasks/src/PeakFinder.cpp
+ )
+-if(WIN32)
++if(MSVC)
+     list(APPEND processlib_srcs
+         core/src/WindowSpecific/pthread_cancelling.cpp
+@@ -192,5 +192,5 @@
+     "\$<INSTALL_INTERFACE:\${CMAKE_INSTALL_INCLUDEDIR}>"
+ )
+-if(WIN32)
++if(MSVC)
+     target_include_directories(processlib PUBLIC
+         "\$<BUILD_INTERFACE:\${CMAKE_CURRENT_SOURCE_DIR}/core/include/WindowSpecific>"
+@@ -265,5 +265,5 @@
+ )
+
+-if(WIN32)
++if(MSVC)
+     install(
+         DIRECTORY \${CMAKE_CURRENT_SOURCE_DIR}/core/include/WindowSpecific
+EOF
+#wl-showstatus configure &&
+#cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF . &&
+##cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPROCESSLIB_ENABLE_GSL:BOOL=ON -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Processlib-$VERSION
+# fix building static library
+sed -i.bak2 -e "s/\(add_library\s*(.*\) SHARED/\1/" CMakeLists.txt
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=ON -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=ON -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Processlib-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=ON -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPROCESSLIB_ENABLE_GSL:BOOL=OFF -DPROCESSLIB_ENABLE_GSL:BOOL=ON -DPROCESSLIB_ENABLE_PYTHON:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Processlib-$VERSION
+
+
+

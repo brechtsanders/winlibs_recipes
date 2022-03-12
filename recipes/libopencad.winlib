@@ -1,0 +1,69 @@
+export NAME="libopencad"
+export STATUS=
+export URL=http://sandyre.github.io/libopencad/
+#export URL=https://github.com/sandyre/libopencad
+export BASENAME=libopencad
+export DESCRIPTION="OpenSource library under X11/MIT license for everyday use. Under development, but some of basic functionality is already available."
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=0.2.0
+export VERSIONDATE=20190116
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=X11/MIT
+export DOWNLOADURL="https://github.com/sandyre/libopencad/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/sandyre/libopencad/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# remove extern from definition of OCAD_EXTERN in lib/opencad.h
+sed -i.bak -e "s/\(OCAD_EXTERN \)extern \(.*dll\)/\1\2/" lib/opencad.h
+# add CADVariant constructor from long to lib/cadheader.h and lib/cadheader.cpp
+patch -ulbf lib/cadheader.h << EOF
+@@ -65,2 +65,3 @@
+     CADVariant( const char * val );
++    CADVariant( long val );
+     CADVariant( int val );
+EOF
+patch -ulbf lib/cadheader.cpp << EOF
+@@ -245,2 +245,13 @@
+
++CADVariant::CADVariant( long val )
++{
++    type        = DataType::DECIMAL;
++    decimalVal  = val;
++    stringVal   = to_string( decimalVal );
++    xVal        = 0;
++    yVal        = 0;
++    zVal        = 0;
++    dateTimeVal = 0;
++}
++
+ CADVariant::CADVariant( int val )
+EOF
+# fix for GCC 11 in lib/cadobjects.cpp (version >= 0.2.0)
+mv lib/cadobjects.cpp lib/cadobjects.cpp.bak &&
+echo "#include <limits>" > lib/cadobjects.cpp &&
+cat lib/cadobjects.cpp.bak >> lib/cadobjects.cpp
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_APPS:BOOL=ON -DBUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DOCAD_STATIC" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_APPS:BOOL=ON -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ cp -f $INSTALLPREFIX/lib/libopencadstatic.a $INSTALLPREFIX/lib/libopencad.a &&
+ #wl-showstatus build-install &&
+ #make -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: fix building DLL
+
+
+

@@ -1,0 +1,101 @@
+export NAME="UDNS"
+export STATUS=
+export URL=http://www.corpit.ru/mjt/udns.html
+export BASENAME=udns
+export DESCRIPTION="UDNS is a stub DNS resolver library with ability to perform both syncronous and asyncronous DNS queries."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.0.9
+#export VERSIONDATE=
+#export VERSION=0.1
+#export VERSIONDATE=20101228
+#export VERSION=0.2
+#export VERSIONDATE=20111230
+#export VERSION=0.3
+#export VERSIONDATE=20140118
+####inet_XtoX.c:155: error: 'EAFNOSUPPORT' undeclared (first use in this function)
+####udns_init.c:66:3: error: unknown type name 'PIP_ADAPTER_ADDRESSES'
+export VERSION=0.4
+export VERSIONDATE=20140123
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LGPL
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://www.corpit.ru/mjt/udns.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.corpit.ru/mjt/udns/udns_$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://www.corpit.ru/mjt/udns/udns-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/udns_$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/udns-$VERSION.tar.gz
+cd udns-$VERSION
+#mkdir -p winfix/sys winfix/netinet
+#cat > winfix/sys/socket.h << EOF
+##define _WIN32_WINNT 0x0502
+##include <winsock2.h>
+##include <ws2tcpip.h>
+#EOF
+#touch winfix/netinet/in.h
+# fix dnsget.c
+mv dnsget.c dnsget.c.bak
+cat > dnsget.c << EOF
+#define _WIN32_WINNT 0x0502
+#include <winsock2.h>
+#include <ws2tcpip.h>
+//#include <getopt.h>
+EOF
+cat dnsget.c.bak >> dnsget.c
+# fix udns_XtoX.c
+mv udns_XtoX.c udns_XtoX.c.bak &&
+#sed -e "s?sys/socket\.h?winsock2.h?; s?^.*arpa/inet\.h?//&?" udns_XtoX.c.bak > udns_XtoX.c
+echo "#define _WIN32_WINNT 0x0600" > udns_XtoX.c &&
+sed -e "s?sys/socket\.h?winsock2.h?; s?arpa/inet\.h?ws2tcpip.h?" udns_XtoX.c.bak >> udns_XtoX.c
+# fix ex-rdns.c
+mv ex-rdns.c ex-rdns.c.bak &&
+echo "#define _WIN32_WINNT 0x0600" > ex-rdns.c &&
+echo "#define poll WSAPoll" >> ex-rdns.c &&
+sed -e "s?sys/socket\.h?winsock2.h?; s?^.*\(netinet/in\|poll\)\.h?//&?" ex-rdns.c.bak >> ex-rdns.c
+# add winsock initialization
+for F in $(grep -l "main *(.*{" *.c); do
+ mv $F $F.bak &&
+ sed -e "s/main *(.*{/&\nstatic WSADATA wsaData;\nint wsaerr = WSAStartup(MAKEWORD(1, 0), \&wsaData);\nif (wsaerr) {\nfprintf(stderr, \"WSAStartup failed\\\\n\");\nreturn 1;\n}\natexit((void(\*)())WSACleanup);\n/" $F.bak > $F
+done
+## fix udns_init.c
+#mv udns_init.c udns_init.c.bak &&
+#echo "#define _WIN32_WINNT 0x0501" > udns_init.c &&
+#cat udns_init.c.bak >> udns_init.c
+# fix configure
+patch -ulbf configure << EOF
+--- configure  2011-07-05 16:13:58 +0200
++++ configure  2011-12-30 08:20:44 +0100
+@@ -106,3 +106,3 @@
+ else
+-  ac_fatal "cannot find libraries needed for sockets"
++  echo "cannot find libraries needed for sockets"
+ fi
+EOF
+wl-showstatus configure &&
+CC="gcc -Iwinfix -DWINDOWS -DUDNS_DYNAMIC_LIBRARY -DDNS_LIBRARY_BUILD -lws2_32" ./configure --without-ipv6 &&
+ wl-showstatus build &&
+ echo "#define HAVE_INET_PTON_NTOP 1" >> config.h &&
+ echo "#undef HAVE_GETOPT" >> config.h &&
+ echo "#undef socklen_t" >> config.h &&
+ make LIBS="-Wl,--as-needed -lws2_32" &&
+ strip *.exe &&
+ echo "LIBRARY udns.dll" > libudns.def &&
+ echo "EXPORTS" >> libudns.def &&
+ nm -f posix --defined-only -p libudns.a | grep -v "^_*dns_format_code" | sed -n "s/^_*\(u*dns_[^ ]*\) T.*$/\1/p" >> libudns.def &&
+ gcc -shared -s -mwindows -def libudns.def -Wl,--out-implib,libudns.dll.a -o udns.dll libudns.a -lws2_32 &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp udns.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.exe *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf udns-$VERSION
+
+
+

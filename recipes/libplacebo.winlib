@@ -1,0 +1,70 @@
+export NAME="libplacebo"
+export STATUS=
+export URL=https://code.videolan.org/videolan/libplacebo
+export BASENAME=libplacebo
+export DESCRIPTION="Reusable library for GPU-accelerated image/video processing primitives and shaders, as well a batteries-included, extensible, high-quality rendering pipeline (similar to mpv's vo_gpu). Supports Vulkan, OpenGL and Metal (via MoltenVK)."
+export CATEGORY=multimedia,hardware
+export TYPE=library
+#export VERSION=2.72.0
+#export VERSIONDATE=20200909
+#export VERSION=2.72.2
+#export VERSIONDATE=20201110
+#export VERSION=3.104.0
+#export VERSIONDATE=20210102
+#export VERSION=3.120.0
+#export VERSIONDATE=20210402
+#export VERSION=3.120.1
+#export VERSIONDATE=20210406
+#export VERSION=3.120.2
+#export VERSIONDATE=20210419
+#export VERSION=3.120.3
+#export VERSIONDATE=20210507
+#export VERSION=4.157.0
+#export VERSIONDATE=20210907
+#export VERSION=4.192.0
+#export VERSIONDATE=20220119
+export VERSION=4.192.1
+export VERSIONDATE=20220204
+wl-showstatus --package-version
+export DEPENDANCIES=lcms2,glslang,libepoxy,spirv-tools
+export OPTIONALDEPENDANCIES=vulkan-loader,shaderc
+export BUILDDEPENDANCIES=meson,ninja
+#export BUILDDEPENDANCIES=meson,ninja,mako
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://code.videolan.org/videolan/libplacebo/-/tags"
+#export DOWNLOADURL="https://github.com/haasn/libplacebo/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://code.videolan.org/videolan/libplacebo/-/archive/v$VERSION/libplacebo-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/libplacebo-v$VERSION.tar.bz2
+cd libplacebo-v$VERSION
+# fix for glslang version 10-11.0.0 or higher where GLSLANG_PATCH_LEVEL and glslang/Include/revision.h have been removed
+mkdir -p glslangfix/glslang/Include
+if [ ! -f $MINGWPREFIX/include/glslang/Include/revision.h ]; then
+ echo "#define GLSLANG_PATCH_LEVEL 9999" > glslangfix/glslang/Include/revision.h
+fi
+# fix for glslang version 10-11.0.0 or higher in src/glsl/glslang.cc (version >= 2.72.0)
+patch -ulbf src/glsl/glslang.cc << EOF
+@@ -213,2 +213,5 @@
+ #endif
++#if GLSLANG_PATCH_LEVEL >= 9999
++    /* .maxDualSourceDrawBuffersEXT = */ 1,
++#endif
+
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dopengl=enabled -Dbench=false -Dtests=false . build_both &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dopengl=enabled -Dbench=false -Dtests=false -Dcpp_args="-I$(pwd)/glslangfix -I$(cygpath -m $MINGWPREFIX/include/glslang)" . build_both &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dopengl=enabled -Dbench=false -Dtests=false -Dvulkan-registry=$MINGWPREFIX/share/vulkan/registry/vk.xml -Dcpp_args="-I$(pwd)/glslangfix -I$(cygpath -m $MINGWPREFIX/include/glslang)" . build_both &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/lib:$MINGWPREFIX/python/Lib/site-packages:$PYTHONPATH ninja -Cbuild_both install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/lib:$MINGWPREFIX/python/Lib/site-packages ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libplacebo-v$VERSION
+
+
+

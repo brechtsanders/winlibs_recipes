@@ -1,0 +1,237 @@
+export NAME="man"
+export STATUS=
+export URL=http://primates.ximian.com/~flucifredi/man/
+export BASENAME=man
+export DESCRIPTION="man pager package"
+export CATEGORY=documentation
+export TYPE=application
+#export VERSION=1.6f
+#export VERSIONDATE=20101208
+export VERSION=1.6g
+export VERSIONDATE=20110104
+wl-showstatus --package-version
+export DEPENDANCIES=gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://primates.ximian.com/~flucifredi/man/"
+#export DOWNLOADURL="http://ftp.clfs.org/pub/clfs/conglomeration/man/"
+export DOWNLOADURL="http://ftp.osuosl.org/pub/clfs/conglomeration/man/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://primates.ximian.com/~flucifredi/man/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/glob.c
+mv src/glob.c src/glob.c.bak
+cat > src/glob.c << EOF
+#include <dirent.h>
+#define DIRENT
+EOF
+cat src/glob.c.bak >> src/glob.c
+# fix src/util.c
+mv src/util.c src/util.c.bak
+cat > src/util.c << EOF
+#define getuid() 0
+#define geteuid() 0
+#define getgid() 0
+#define getegid() 0
+#define setuid(ruid)
+#define setgid(rgid)
+#define setreuid(ruid, euid)
+#define setregid(rgid, egid)
+#define WIFSIGNALED(r) 0
+#define WIFEXITED(r) 0
+#define WTERMSIG(r) ~0
+#define SIGINT 0
+#define SIGQUIT 0
+#define fork() -1
+#define wait(stat) -1
+EOF
+cat src/util.c.bak >> src/util.c
+# fix missing files and missing LC_MESSAGES
+mkdir -p src/sys
+touch src/sys/termios.h src/sys/dir.h src/sys/wait.h src/nl_types.h
+echo "#include <libintl.h>" > src/sys/ioctl.h
+#cat src/makemsg.c.bak >> src/makemsg.c
+# fix missing setenv in src/man-getopt.c
+mv src/man-getopt.c src/man-getopt.c.bak &&
+sed -e "s/defined(sun)/& || defined(_WIN32)/" src/man-getopt.c.bak > src/man-getopt.c
+## fix paths in src/man-config.c
+#mv src/man-config.c src/man-config.c.bak &&
+#sed -e "s?\"/usr/?\"$MINGWPREFIX/?g" src/man-config.c.bak > src/man-config.c
+# use relative path in src/man-config.c
+patch -ulbf src/man-config.c << EOF
+@@ -26,2 +26,6 @@
+ #include <stdlib.h>
++#ifdef _WIN32
++#include <windows.h>
++#undef WAIT_FAILED
++#endif
+
+@@ -215,2 +219,3 @@
+
++#ifndef _WIN32
+ char *default_config_files[] = {
+@@ -221,2 +226,3 @@
+ };
++#endif
+
+@@ -231,2 +237,19 @@
+
++#ifdef _WIN32
++     char exefilename[MAX_PATH];
++     DWORD exefilenamelen = GetModuleFileNameA(NULL, exefilename, MAX_PATH);
++     while (exefilenamelen-- > 0 && exefilename[exefilenamelen] != '\\\\')
++         ;
++     while (exefilenamelen-- > 0 && exefilename[exefilenamelen] != '\\\\')
++         ;
++     if (exefilenamelen + 20 >= MAX_PATH)
++         strcpy(exefilename + exefilenamelen, "\\\\ TOO LONG");
++     else
++         strcpy(exefilename + exefilenamelen, "\\\\share\\\\misc\\\\man.conf");
++     if ((config = fopen(exefilename, "r")) == NULL) {
++         perror (exefilename);
++         gripe (CONFIG_OPEN_ERROR, exefilename);
++         return;
++     }
++#else
+      if (cf) {
+@@ -248,2 +271,3 @@
+          }
++
+
+@@ -254,2 +278,3 @@
+      }
++#endif
+
+EOF
+# fix absolute path detection in src/man.c (version >= 1.6g)
+patch -ulbf src/man.c << EOF
+@@ -1017,3 +1017,7 @@
+          fclose (fp);
++#ifdef _WIN32
++         if (*name != '/' && *name != '\\\\' && !(((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z')) && name[1] == ':') && getcwd(fullname, sizeof(fullname))
++#else
+          if (*name != '/' && getcwd(fullname, sizeof(fullname))
++#endif
+              && strlen(fullname) + strlen(name) + 3 < sizeof(fullname)) {
+EOF
+## fix missing index/rindex in src/makemsg.c
+#mv src/makemsg.c src/makemsg.c.bak
+#cat > src/makemsg.c << EOF
+##define index(haystack,needle) strchr(haystack,needle)
+##define rindex(haystack,needle) strrchr(haystack,needle)
+#EOF
+##CC="gcc -O2 -DNONLS -DLC_MESSAGES=6" ./configure +fhs +lang all
+#mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/sbin $INSTALLPREFIX/man $INSTALLPREFIX/lib
+#configure -ask << EOF
+#no
+#/bin/less -is
+#/bin/cmp -s
+#/bin/cat
+#/bin/awk
+#no
+#no
+#$INSTALLPREFIX/bin
+#$INSTALLPREFIX/sbin
+#$INSTALLPREFIX/man
+#$INSTALLPREFIX/lib
+#1
+#5
+#8
+#no
+#no
+#
+#/bin/gunzip -c
+#/bin/bzip2 -c -d
+#
+#/bin/zcat
+#
+#
+#
+#EOF
+wl-showstatus configure &&
+#CC="gcc -O2 -DNONLS -DLC_MESSAGES=6 -Dindex=strchr -Drindex=strrchr" ./configure +fhs +lang en &&
+CC="gcc -O2 -DNONLS -DLC_MESSAGES=6 -Dindex=strchr -Drindex=strrchr" ./configure +fhs +lang all &&
+ # fix CONFIG_FILE in src/paths.h
+ make src/Makefile &&
+ make -Csrc paths.h &&
+ mv src/paths.h src/paths.h.bak &&
+ sed -e "s?^\(#define CONFIG_FILE \"\)/usr/\(.*\)?\1$MINGWPREFIX/\2?" src/paths.h.bak > src/paths.h &&
+ wl-showstatus build &&
+ make -j1 CC="gcc -O2 -DNONLS -DLC_MESSAGES=6 -Dindex=strchr -Drindex=strrchr" LIBS="-Wl,--as-needed -lintl" &&
+ wl-showstatus build &&
+ make -j1 install PREFIX=$INSTALLPREFIX &&
+ mv -f $INSTALLPREFIX/usr/* $INSTALLPREFIX/ &&
+ rmdir $INSTALLPREFIX/usr &&
+ mv $INSTALLPREFIX/share/misc/man.conf $INSTALLPREFIX/share/misc/man.conf.bak &&
+ sed -e "s?/usr\(/[^ \t]*\s*\)\$?$MINGWPREFIX\1?" $INSTALLPREFIX/share/misc/man.conf.bak > $INSTALLPREFIX/share/misc/man.conf &&
+ rm -f $INSTALLPREFIX/share/misc/man.conf.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####To do: use relative path in default_config_files[] in src/man-config.c
+
+
+
+#patch -ulbf src/manpath.c << EOF
+#@@ -56,3 +56,7 @@
+#          for (q = p; ; ) {
+#+#ifdef _WIN32
+#+               if ((r = index(q, ';'))==(char*)0)
+#+#else
+#                if ((r = index(q, ':'))==(char*)0)
+#+#endif
+#                     r=index(q,'\\01');
+#@@ -78,3 +82,7 @@
+#          for (q = p; ; ) {
+#+#ifdef _WIN32
+#+              r = index(q, ';');
+#+#else
+#               r = index(q, ':');
+#+#endif
+#               if (r) {
+#@@ -179,3 +187,8 @@
+#      /* only add absolute paths */
+#+#ifdef _WIN32
+#+     if (*dir != '/' && !(((dir[0] >= 'a' && dir[0] <= 'z') || (dir[0] >= 'A' && dir[0] <= 'Z')) && dir[1] == ':')) {
+#+#else
+#      if (*dir != '/') {
+#+#endif
+#+printf("! not absolute: %s\\n", dir);/////
+#          if (!getcwd(cwd, sizeof(cwd)))
+#@@ -209,2 +222,3 @@
+#          strcat (cwd, lang);
+#+printf("! cwd = %s\\n", cwd);/////
+#          dir = cwd;
+#@@ -373,3 +387,12 @@
+#
+#+printf("! to_mandirlist(%s, %i);\\n", s, perrs);/////
+#      if (*s) {
+#+#ifdef _WIN32
+#+char* p = s;
+#+while (*p) {
+#+  if (*p == '/')
+#+    *p = '\\\\';
+#+  p++;
+#+}
+#+#endif
+#          add_to_mandirlist (s, perrs);
+#@@ -390,2 +413,3 @@
+#
+#+         mandirlist = NULL;
+#          if ((manp = opt_manpath) == NULL &&
+#@@ -394,2 +418,3 @@
+#               manp = "";               /* default path */
+#+printf("! manp = %s\\n!\\n", manp);/////
+#          split (manp, to_mandirlist, 0);
+#@@ -403,3 +428,5 @@
+#
+#+printf("! mandirlist NULL?\\n");/////
+#      if (mandirlist) {
+#+printf("! mandirlist != NULL!\\n");/////
+#          for (dp0 = dp = mandirlist; *dp; dp++) {
+#EOF
+#MANPATH=$MINGWPREFIX/share/man man 1 man

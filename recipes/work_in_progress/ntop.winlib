@@ -1,0 +1,194 @@
+export NAME="ntop"
+export STATUS=
+export URL=http://www.ntop.org/
+export BASENAME=ntop
+export DESCRIPTION="ntop is a network traffic probe that shows the network usage, similar to what the popular top Unix command does."
+export CATEGORY=system
+export TYPE=library
+export VERSION=3.3.8
+#export VERSION=3.3.9
+#export VERSION=3.3.10
+####Error! You need to have libevent 1.4.X or better.
+####(cause by missing -lws2_32)
+#export VERSION=4.0
+#export VERSION=4.0.1
+#export VERSION=4.0.3
+####i686-pc-mingw32 is an unknown/unsupported OS
+export VERSIONDATE=
+#export VERSION=5.0.1
+#export VERSIONDATE=20131004
+wl-showstatus --package-version
+export DEPENDANCIES=gdbm,plibc
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="http://sourceforge.net/projects/ntop/files/ntop/"
+export DOWNLOADURL="http://sourceforge.net/projects/ntop/files/ntop/Stable/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/ntop/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/ntop/Stable/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/ntop/ntop/$VERSION/$BASENAME-$VERSION.tgz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/ntop/ntop/$VERSION/$BASENAME-$VERSION.tgz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/ntop/ntop/Stable/$BASENAME-$VERSION.tgz
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+cd $BASENAME-$VERSION
+# fix autogen.sh 
+mv autogen.sh autogen.sh.bak
+sed -e "s?/usr/local?$MINGWPREFIX?g" autogen.sh.bak > autogen.sh
+
+# generate configure script
+./autogen.sh --noconfig
+# fix dependancy of libgdbm on plibc
+# to do: change line 37225 in configure to a single closing curly brace (don't abort on missing crypt.h)
+mv configure configure.bak
+sed -e "s/\(LIBS=.*-lgdbm\)/\1 -lplibc/" configure.bak > configure
+# fix missing includes on win32
+mkdir win32fix win32fix/sys
+touch win32fix/sys/ioctl.h win32fix/sys/socket.h
+touch win32fix/pwd.h
+mkdir win32fix/security
+touch win32fix/security/pam_appl.h
+# fix for pcap on Windows
+mv ntop.h ntop.h.bak
+sed -e 's/#include "bpf.h"/#include <pcap-bpf.h>/' ntop.h.bak > ntop.h
+
+# fix missing files
+mkdir -p win32fix/sys
+touch win32fix/sys/ioctl.h
+echo "#include <winsock2.h>" > win32fix/sys/socket.h
+# fix configure
+patch -ulbf configure << EOF
+--- configure  2010-11-18 20:23:32 +0100
++++ configure  2010-11-18 20:30:12 +0100
+@@ -13538,3 +13538,3 @@
+       ;;
+-    *-*-mingw32*:gcc* )
++    *-*-mingw32*:*gcc* )
+         DEFINEOS="MINGW"
+@@ -14023,2 +14023,7 @@
+             LIBS="\$LIBS -lgdbm"
++            case "\${DEFINEOS}" in
++              MINGW )
++                LIBS="\$LIBS -lplibc"
++                ;;
++            esac
+         fi
+EOF
+#-DWIN32
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" LDFLAGS="-lplibc" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ipv6 --without-ssl --enable-mysql CFLAGS="-D__MINGW32__ -I`pwd`/win32fix -I$MINGWPREFIX/include/mysql -I$PERLDIR/lib/CORE" LDFLAGS="-lplibc"
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ipv6 --without-ssl --enable-mysql CFLAGS="-I`pwd`/win32fix -I$MINGWPREFIX/include/mysql -I$PERLDIR/lib/CORE" LDFLAGS="-lplibc -Wl,--enable-auto-import"
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ipv6 --without-ssl --enable-mysql CFLAGS="-I`pwd`/win32fix -I$MINGWPREFIX/include/mysql -I$PERLDIR/lib/CORE" LDFLAGS="-lplibc"
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ipv6 --without-ssl --enable-mysql CFLAGS="-I`pwd`/win32fix -I$MINGWPREFIX/include/mysql -I$PERLDIR/lib/CORE" CFLAGS="-I`pwd`/win32fix"
+cat >> config.h << EOF
+#undef HAVE_PTHREAD_H
+#define LOG_LOCAL0 (16<<3)
+#define LOG_LOCAL1 (17<<3)
+#define LOG_LOCAL2 (18<<3)
+#define LOG_LOCAL3 (19<<3)
+#define LOG_LOCAL4 (20<<3)
+#define LOG_LOCAL5 (21<<3)
+#define LOG_LOCAL6 (22<<3)
+#define LOG_LOCAL7 (23<<3)
+EOF
+cat >> globals-defines.h << EOF
+#undef MAKE_STATIC_PLUGIN
+//typedef void* pluginPtr;
+#ifndef HAVE_STRUCT_TIMESPEC
+#define HAVE_STRUCT_TIMESPEC 1
+struct timespec {
+  long tv_sec;
+  long tv_nsec;
+};
+#endif
+#undef HAVE_NETDB_H
+#undef MAKE_WITH_SYSLOG
+EOF
+
+patch -ulbf address.c << EOF
+--- address.c   Wed Dec  3 16:49:55 2008
++++ address.c   Wed Dec  3 22:33:01 2008
+@@ -708,3 +708,3 @@
+ 
+-  myGlobals.dequeueAddressThreadId[dqaIndex] = 0;
++  myGlobals.dequeueAddressThreadId[dqaIndex] = (pthread_t)0;
+EOF
+patch -ulbf globals-core.h << EOF
+--- globals-core.h  Wed Oct  1 23:03:36 2008
++++ globals-core.h  Wed Dec  3 22:31:00 2008
+@@ -683,3 +683,3 @@
+ #ifndef HAVE_LOCALTIME_R
+-extern struct tm *localtime_r(const time_t *t, struct tm *tp);
++//extern struct tm *localtime_r(const time_t *t, struct tm *tp);
+ #endif
+@@ -784,2 +784,3 @@
+ #ifdef HAVE_GETOPT_H
++/*
+ extern int getopt_long(int ___argc, char *const *___argv,
+@@ -788,2 +789,3 @@
+ extern int getopt_long_only();
++*/
+ #endif /* HAVE_GETOPT_H */
+@@ -896,3 +898,3 @@
+ #ifdef HAVE_NETDB_H
+-extern int h_errno; /* netdb.h */
++//extern int h_errno; /* netdb.h */
+ #endif
+EOF
+patch -ulbf ntop_win32.h << EOF
+--- ntop_win32.h  Wed Dec  3 16:12:49 2008
++++ ntop_win32.h  Wed Dec  3 22:52:58 2008
+@@ -55,2 +55,3 @@
+ 
++#undef VERSION
+ extern char _wdir[], VERSION[];
+@@ -85,4 +86,4 @@
+ 
+-extern int getopt_long (int argc, char *const *argv, const char *options,
+-                                               const struct option *long_options, int *opt_index);
++//extern int getopt_long (int argc, char *const *argv, const char *options,
++//                                             const struct option *long_options, int *opt_index);
+EOF
+patch -ulbf plugin.c << EOF
+--- plugin.c  Wed Dec  3 17:44:56 2008
++++ plugin.c   Wed Dec  3 17:45:59 2008
+@@ -37,6 +37,4 @@
+   int i;
+-#ifndef WIN32
+   void *pluginPtr = NULL;
+   void *pluginEntryFctnPtr;
+-#endif
+   PluginInfo* pluginInfo;
+@@ -44,5 +42,3 @@
+   int rc;
+-#ifndef WIN32
+   PluginInfo* (*pluginJumpFunc)();
+-#endif
+   FlowFilterList *newFlow,
+@@ -201,3 +197,2 @@
+ void loadPlugins(void) {
+-#ifndef WIN32
+   char dirPath[256];
+@@ -206,3 +201,2 @@
+   DIR* directoryPointer=NULL;
+-#endif
+EOF
+
+wl-showstatus build-install &&
+make install &&
+    echo OK
+
+
+#make -f Makefile.MingW depend
+
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

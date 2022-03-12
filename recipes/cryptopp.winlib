@@ -1,0 +1,94 @@
+export NAME="Crypto++"
+export STATUS=
+export URL=http://www.cryptopp.com/
+#export URL=https://github.com/weidai11/cryptopp/
+export BASENAME=cryptopp
+export DESCRIPTION="Crypto++ Library is a free C++ class library of cryptographic schemes."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=5.6.2
+#export VERSIONDATE=20151019
+#export VERSION=5.6.3
+#export VERSIONDATE=20151121
+#export VERSION=5.6.4
+#export VERSIONDATE=20160914
+#export VERSION=5.6.5
+#export VERSIONDATE=20161011
+#export VERSION=6.0.0
+#export VERSIONDATE=20180123
+#export VERSION=6.1.0
+#export VERSIONDATE=20180223
+#export VERSION=7.0.0
+#export VERSIONDATE=20180408
+#export VERSION=8.0.0
+#export VERSIONDATE=20181228
+#export VERSION=8.1.0
+#export VERSIONDATE=20190223
+#export VERSION=8.2.0
+#export VERSIONDATE=20190429
+#export VERSION=8.4.0
+#export VERSIONDATE=20210102
+#export VERSION=8.5.0
+#export VERSIONDATE=20210308
+export VERSION=8.6.0
+export VERSIONDATE=20210924
+####WARNING: CRYPTOPP_NO_UNALIGNED_DATA_ACCESS is not defined in config.h.
+####WARNING: CRYPTOPP_INIT_PRIORITY is not defined in config.h.
+####WARNING: CRYPTOPP_MAINTAIN_BACKWARDS_COMPATIBILITY_562 is defined in config.h.
+####WARNING: You should make these changes in config.h, and not CXXFLAGS.
+####WARNING: You can 'mv config.recommend config.h', but it breaks versioning.
+####WARNING: See http://cryptopp.com/wiki/config.h for more details.
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=License.txt
+export LICENSETYPE="Boost Software License"
+export DOWNLOADURL="http://www.cryptopp.com/#download"
+#export DOWNLOADURL="https://github.com/weidai11/cryptopp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.cryptopp.com/cryptopp$(echo $VERSION|sed -e "s/\.//g").zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+unzip -oq $TARBALLDIR/$BASENAME/cryptopp$(echo $VERSION|sed -e "s/\.//g").zip -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION
+## fix ambiguous memcpy_s in validat1.cpp (version <= 5.6.2)
+#mv validat1.cpp validat1.cpp.bak
+#sed -e "s/\(\s*\)\(memcpy_s\)/\1CryptoPP::\2/" validat1.cpp.bak > validat1.cpp
+## fix missing modexppc.cpp (version <= 8.1.0)
+#touch modexppc.cpp
+## fix missing winsock2.h include in socketft.cpp (version <= 8.1.0)
+#mv socketft.cpp socketft.cpp.bak &&
+#echo "#include <winsock2.h>" > socketft.cpp &&
+#echo "#define _WIN32_WINNT 0x0501" >> socketft.cpp &&
+#echo "#include <ws2tcpip.h>" >> socketft.cpp &&
+#cat socketft.cpp.bak >> socketft.cpp
+## fix invalid memcpy_s
+#mv validat1.cpp validat1.cpp.bak &&
+#sed -e "s?using CryptoPP::memcpy_s;?//&?" validat1.cpp.bak > validat1.cpp
+## fix Winsock issues in test.cpp (version <= 8.1.0)
+#####socketft.h:14:4: error: #error Winsock 1 is not supported by this library. Please include this file or winsock2.h before windows.h.
+#mv test.cpp test.cpp.bak &&
+#echo "#include <winsock2.h>" > test.cpp &&
+#cat test.cpp.bak >> test.cpp
+# fix GNUmakefile
+sed -i.bak -e "s/\.so/.dll/g; s?\(\$(CP).*.dll \$(PREFIX)/\)lib?\1bin?; s/\(-shared\s.*\)$/\1 -Wl,--out-implib=\$\@.a -Wl,--as-needed -lws2_32/" GNUmakefile
+#sed -i.bak -e "s/libcryptopp\.so\$(SOLIB_VERSION_SUFFIX)/cryptopp.dll/g; s?\(\$(CP).*.dll .*\)\$(LIBDIR)?\1\$(BINDIR)?; s?\$(LIBDIR)\(/cryptopp-pem\.dll\)?\$(BINDIR)\1?; s/\(-shared\s.*\)$/\1 -Wl,--out-implib=\$\@.a -Wl,--as-needed -lws2_32/" GNUmakefile
+# avoid -fPIC (useless on Windows and not supported by clang) in GNUmakefile
+sed -i.bak2 -e "s/-fPIC//" GNUmakefile
+wl-showstatus build &&
+ make all static dynamic &&
+ #make static dynamic &&
+ wl-showstatus build-install &&
+ make install PREFIX=$INSTALLPREFIX/share/cryptopp &&
+ cp -u libcryptopp.dll.a $INSTALLPREFIX/share/cryptopp/lib/ &&
+ mv -f $INSTALLPREFIX/share/cryptopp/lib/*.dll $INSTALLPREFIX/share/cryptopp/bin/ &&
+ ( strip $INSTALLPREFIX/share/cryptopp/bin/*.exe $INSTALLPREFIX/share/cryptopp/bin/*.dll || true ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Conflicts with cryptopp-pem, which replaces cryptopp with additional (not officially supported) features => install in separate directory
+
+
+

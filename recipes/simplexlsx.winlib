@@ -1,0 +1,87 @@
+export NAME="SimpleXlsxWriter"
+export STATUS=
+export URL=http://sourceforge.net/projects/simplexlsx/
+export BASENAME=simplexlsx
+export DESCRIPTION="This library represents XLSX files writer. The main feature of this library is that it uses C++ standard file streams. On the one hand it results in almost unnoticeable memory and CPU resources consumption while processing (that may be very useful at saving a large data arrays), but on the other hand it makes unfeasible to edit data that were written down once."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=0.20
+#export VERSIONDATE=20131209
+#export VERSION=0.23
+#export VERSIONDATE=20170816
+#export VERSION=0.24
+#export VERSIONDATE=20171203
+#export VERSION=0.25
+#export VERSIONDATE=20180110
+#export VERSION=0.26
+#export VERSIONDATE=20180208
+#export VERSION=0.27
+#export VERSIONDATE=20180214
+#export VERSION=0.28
+#export VERSIONDATE=20180417
+#export VERSION=0.29
+#export VERSIONDATE=20180718
+#export VERSION=0.30
+#export VERSIONDATE=20180722
+#export VERSION=0.31
+#export VERSIONDATE=20181002
+#export VERSION=0.32
+#export VERSIONDATE=20181106
+#export VERSION=0.33
+#export VERSIONDATE=20191215
+#export VERSION=0.34
+#export VERSIONDATE=20200206
+#export VERSION=0.35
+#export VERSIONDATE=20200330
+#export VERSION=0.36
+#export VERSIONDATE=20200512
+export VERSION=0.37
+export VERSIONDATE=20210930
+wl-showstatus --package-version
+export DEPENDANCIES=gtest,stb
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+#export LICENSETYPE=BSD
+export LICENSETYPE=zlib
+export DOWNLOADURL="http://sourceforge.net/projects/simplexlsx/files/ SimpleXlsx%20r"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/simplexlsx/SimpleXlsx%20r$VERSION.zip
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/simplexlsx/SimpleXlsx%20r$VERSION.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+#unzip -oq $TARBALLDIR/$BASENAME/SimpleXlsx\ r$VERSION.zip -d$BASENAME-$VERSION
+unzip -oq $TARBALLDIR/$BASENAME/SimpleXlsx%20r$VERSION.zip -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION/Source
+# fix constant warning in Xlsx/Worksheet.cpp
+####Xlsx/Worksheet.cpp:314:2: warning: this decimal constant is unsigned only in ISO C90 [enabled by default]
+mv Xlsx/Worksheet.cpp Xlsx/Worksheet.cpp.bak
+sed -e "s/\(2208988800\);/\1LL;/" Xlsx/Worksheet.cpp.bak > Xlsx/Worksheet.cpp
+# fix Zip/zip.cpp for 64-bit
+mv Zip/zip.cpp Zip/zip.cpp.bak
+sed -e "s/(unsigned long)/(uintptr_t)/" Zip/zip.cpp.bak > Zip/zip.cpp
+wl-showstatus build &&
+#for F in Xlsx/*.cpp Zip/*.cpp; do
+for F in $(find . -name '*.cpp'); do
+ echo CXX $F &&
+ g++ -c $F
+done &&
+ ar cru libsimplexlsx.a *.o &&
+ ranlib libsimplexlsx.a &&
+ # build shared library (DLL)
+ dlltool --export-all-symbols -D simplexlsx.dll -l libsimplexlsx.dll.a -z in.def libsimplexlsx.a &&
+ ranlib libsimplexlsx.dll.a &&
+ g++ -shared -s -mwindows -def in.def -o simplexlsx.dll libsimplexlsx.a &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include/Xlsx $INSTALLPREFIX/bin &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ #cp -f xmlwriter.h $INSTALLPREFIX/include/ &&
+ #cp -f Xlsx/SimpleXlsxDef.h $INSTALLPREFIX/include/Xlsx/ &&
+ cp -f Xlsx/*.h $INSTALLPREFIX/include/Xlsx/ &&
+ cp -f *.dll $INSTALLPREFIX/bin &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

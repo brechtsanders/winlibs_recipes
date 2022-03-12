@@ -1,0 +1,125 @@
+export NAME="vcpkg"
+export STATUS=
+export URL=https://github.com/Microsoft/vcpkg
+export BASENAME=vcpkg
+export DESCRIPTION="C++ Library Manager for Windows, Linux, and MacOS"
+export CATEGORY=package
+export TYPE=application
+#export VERSION=master
+#export VERSIONDATE=20180622
+#export VERSION=2019.06
+#export VERSIONDATE=20190720
+#export VERSION=2019.07
+#export VERSIONDATE=20190802
+#export VERSION=2019.08
+#export VERSIONDATE=20190910
+#export VERSION=2019.09
+#export VERSIONDATE=20191002
+#export VERSION=2019.10
+#export VERSIONDATE=20191101
+#export VERSION=2019.11
+#export VERSIONDATE=20191204
+#export VERSION=2019.12
+#export VERSIONDATE=20200110
+#export VERSION=2020.01
+#export VERSIONDATE=20200207
+#export VERSION=2020.04
+#export VERSIONDATE=20200422
+#export VERSION=2020.06
+#export VERSIONDATE=20200617
+#export VERSION=2020.07
+#export VERSIONDATE=20200902
+#export VERSION=2020.11
+#export VERSIONDATE=20201103
+export VERSION=2020.11-1
+export VERSIONDATE=20201104
+#export VERSION=2021.04.30
+#export VERSIONDATE=20210501
+#export VERSION=2021.05.12
+#export VERSIONDATE=20210514
+#export VERSION=2021.06.31
+#export VERSIONDATE=20220225
+#export VERSION=2022.02.23
+#export VERSIONDATE=20220225
+#export VERSION=2022.03.10
+#export VERSIONDATE=20220312
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/Microsoft/vcpkg/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Microsoft/vcpkg/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing filesystem in toolsrc/include/pch.h
+#patch -ulbf toolsrc/include/pch.h << EOF
+#@@ -29,3 +29,3 @@
+# #include <cstdint>
+#-#if defined(_WIN32)
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+# #include <filesystem>
+#EOF
+## fix missing filesystem in toolsrc/include/vcpkg/base/files.h
+#patch -ulbf toolsrc/include/vcpkg/base/files.h << EOF
+#@@ -4,3 +4,3 @@
+#
+#-#if defined(_WIN32)
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+# #include <filesystem>
+#EOF
+# fix scripts/bootstrap.sh
+# fix toolsrc/src/vcpkg/commands.edit.cpp (version >= 2020.11)
+patch -ulbf toolsrc/src/vcpkg/commands.edit.cpp << EOF
+@@ -211,3 +211,3 @@
+             const auto comma = std::find(first, last, ',');
+-            candidate_paths.push_back(fs::u8path(first, comma));
++            candidate_paths.push_back(fs::u8path(std::string(first, comma)));
+         }
+EOF
+#patch -ulbf scripts/bootstrap.sh << EOF
+#@@ -106,4 +106,3 @@
+#     else
+#-        echo "Unknown uname: \$UNAME"
+#-        return 1
+#+        os="windows"
+#     fi
+#@@ -194,4 +193,4 @@
+# UNAME="\$(uname)"
+#-fetchTool "cmake" "\$UNAME" cmakeExe || exit 1
+#-fetchTool "ninja" "\$UNAME" ninjaExe || exit 1
+#+cmakeExe="\$(which cmake.exe)"  #fetchTool "cmake" "\$UNAME" cmakeExe || exit 1
+#+ninjaExe="\$(which ninja.exe)"  #fetchTool "ninja" "\$UNAME" ninjaExe || exit 1
+# selectCXX CXX || exit 1
+#EOF
+# fix scripts/bootstrap.sh (version >= 2020.11)
+patch -ulbf scripts/bootstrap.sh << EOF
+@@ -159,2 +159,4 @@
+         os="freebsd"
++    elif echo "\$UNAME"|grep -q "MSYS\\|MINGW"; then
++        os="windows"
+     else
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/vcpkg -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DVCPKG_COMPILER:STRING=gcc -DVCPKG_STANDARD_LIBRARY:STRING=libstdc++ -DVCPKG_USE_STD_FILESYSTEM:BOOL=ON -DVCPKG_DEVELOPMENT_WARNINGS:BOOL=OFF -DVCPKG_WARNINGS_AS_ERRORS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -Stoolsrc -Bbuild_win &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
+ strip build_win/*.{dll,exe} &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_win install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/share/vcpkg/bin &&
+ cp -f build_win/*.{dll,exe} $INSTALLPREFIX/share/vcpkg/bin/ &&
+ cp -rf docs $INSTALLPREFIX/share/vcpkg/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####$MINGWPREFIX/share/vcpkg/bin/vcpkg help topics
+
+
+

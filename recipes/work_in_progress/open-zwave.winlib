@@ -1,0 +1,80 @@
+export NAME="OpenZWave"
+export STATUS=
+export URL=http://www.openzwave.net/
+#export URL=https://github.com/OpenZWave/open-zwave
+export BASENAME=open-zwave
+export DESCRIPTION="a C++ library to control Z-Wave Networks via a USB Z-Wave Controller."
+export CATEGORY=hardware
+export TYPE=library
+#export VERSION=1.5
+#export VERSIONDATE=20180307
+export VERSION=1.6
+export VERSIONDATE=20190504
+wl-showstatus --package-version
+export DEPENDANCIES=cryptlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=license/license.txt
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://github.com/OpenZWave/open-zwave/releases"
+export DOWNLOADURL="https://github.com/OpenZWave/open-zwave/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/OpenZWave/open-zwave/archive/V$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/OpenZWave/open-zwave/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/OpenZWave/open-zwave/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/V$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix version data exports in cpp/src/Manager.cpp
+#sed -i.bak1 -e "s/^extern \(.*ozw_ver.*\)$/\1/" cpp/src/Manager.cpp
+patch -ulbf cpp/src/Manager.cpp << EOF
+@@ -65,4 +65,4 @@
+-extern uint16_t ozw_vers_major;
+-extern uint16_t ozw_vers_minor;
+-extern uint16_t ozw_vers_revision;
+-extern char ozw_version_string[];
++uint16_t ozw_vers_major = $(echo $VERSION.0|sed -e "s/^\([0-9]*\)\.[0-9]*\.[0-9]*.*$/\1/");
++uint16_t ozw_vers_minor = $(echo $VERSION.0|sed -e "s/^[0-9]*\.\([0-9]*\)\.[0-9]*.*$/\1/");
++uint16_t ozw_vers_revision = $(echo $VERSION.0|sed -e "s/^[0-9]*\.[0-9]*\.\([0-9]*\).*$/\1/");
++char ozw_version_string[] = "$VERSION";
+EOF
+# fix undefined reference to localtime_r in cpp/src/command_classes/TimeParameters.cpp (version >= 1.6)
+mv cpp/src/command_classes/TimeParameters.cpp cpp/src/command_classes/TimeParameters.cpp.bak &&
+echo "#define localtime_r(clock,result) (*(result) = *localtime(clock),result)" > cpp/src/command_classes/TimeParameters.cpp &&
+cat cpp/src/command_classes/TimeParameters.cpp.bak >> cpp/src/command_classes/TimeParameters.cpp
+## fix cpp/src/Defs.h (version >= 1.6)
+#patch -ulbf cpp/src/Defs.h << EOF
+#@@ -36,3 +36,3 @@
+# // Compilation export flags
+#-#if (defined _WINDOWS || defined WIN32 || defined _MSC_VER) && (!defined MINGW && !defined __MINGW32__ && !defined __MINGW64__)
+#+#if (defined _WINDOWS || defined WIN32 || defined _MSC_VER || defined __MINGW32__)
+# #      if defined OPENZWAVE_MAKEDLL    // Create the dynamic library.
+#EOF
+mkdir -p cpp/lib/windows-mingw32
+wl-showstatus build &&
+ make -C cpp/build/windows/mingw32 &&
+ g++ -c -o hidapi.o cpp/hidapi/windows/hid.cpp -Icpp/hidapi/hidapi &&
+ ar cru libhidapi.a hidapi.o &&
+ g++ -shared -s -mwindows -def cpp/hidapi/windows/ddk_build/hidapi.def -o hidapi.dll -Wl,--out-implib,libhidapi.dll.a libhidapi.a -lsetupapi &&
+ #g++ -c -o MinOZW.o cpp/examples/MinOZW/Main.cpp -Icpp/src -DMINGW &&
+ #g++ -s -o MinOZW.exe MinOZW.o cpp/lib/windows-mingw32/openzwave.a -lsetupapi -lcl &&
+ #gcc -shared -s -mwindows -o openzwave.dll cpp/lib/windows-mingw32/openzwave.a -Wl,--out-implib,libopenzwave.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/openzwave $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f cpp/lib/windows-mingw32/openzwave.a $INSTALLPREFIX/lib/libopenzwave.a &&
+ for F in $(find cpp/src -name '*.h'); do
+  mkdir -p $INSTALLPREFIX/include/openzwave$(dirname $F | sed -e "s?^cpp/src??") &&
+  cp $F $INSTALLPREFIX/include/openzwave$(echo $F | sed -e "s?^cpp/src??")
+ done &&
+ cp -rf cpp/hidapi/hidapi $INSTALLPREFIX/include/openzwave/ &&
+ cp -f libhidapi*.a $INSTALLPREFIX/lib/ &&
+ cp -f hidapi.dll $INSTALLPREFIX/bin/ &&
+ #cp -f MinOZW.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: build openzwave.dll
+
+
+

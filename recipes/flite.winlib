@@ -1,0 +1,69 @@
+export NAME="Flite (festival-lite)"
+export STATUS=
+#export URL=http://www.speech.cs.cmu.edu/flite/
+#export URL=http://cmuflite.org
+export URL=http://www.festvox.org/flite/
+export BASENAME=flite
+export DESCRIPTION="Flite (festival-lite) is a small, fast run-time synthesis engine developed at CMU and primarily designed for small embedded machines and/or large servers. Flite is designed as an alternative synthesis engine to Festival for voices built using the FestVox suite of voice building tools."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=1.4
+#export VERSIONDATE=20121017
+export VERSION=2.1
+export VERSIONDATE=20190128
+wl-showstatus --package-version
+export DEPENDANCIES=pulseaudio
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="BSD-like"
+export DOWNLOADURL="http://www.speech.cs.cmu.edu/flite/download.html flite- -release.tar.bz2"
+#export DOWNLOADURL="http://www.festvox.org/flite/download.html"
+export DOWNLOADURL="http://www.festvox.org/flite/packed/"
+#export DOWNLOADURL="https://github.com/festvox/flite/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.speech.cs.cmu.edu/flite/packed/flite-$VERSION/flite-$VERSION-release.tar.bz2
+#export DOWNLOADSOURCEURL="http://www.speech.cs.cmu.edu/flite/packed/flite-$VERSION/flite-$VERSION-release.tar.bz2 http://www.speech.cs.cmu.edu/flite/packed/flite-$VERSION/flite-$VERSION-WM-8KHzvoices.tar.bz2"
+export DOWNLOADSOURCEURL="http://www.festvox.org/flite/packed/flite-$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/flite-$VERSION-release.tar.bz2"
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/flite-$VERSION-release.tar.bz2
+cd flite-$VERSION-release
+# fix include/cst_file.h (version >= 2.1)
+patch -ulbf include/cst_file.h << EOF
+@@ -100,3 +100,3 @@
+ int cst_sprintf(char *s, const char *fmt, ...);
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+ #define snprintf c99_snprintf
+EOF
+# fix src/utils/cst_tokenstream.c (version >= 2.1)
+patch -ulbf src/utils/cst_tokenstream.c << EOF
+@@ -268,3 +268,3 @@
+
+- #ifdef _WIN32
++ #if defined(_WIN32) && !defined(__MINGW32__)
+  __inline int ts_utf8_sequence_length(char c0)
+EOF
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sockets &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-sockets --with-mmap=win32 --with-audio=pulseaudio &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-sockets --with-mmap=win32 --with-audio=pulseaudio --with-vox=cmu_us_kal16 --with-lang=usenglish &&
+ wl-showstatus build &&
+ make CC="gcc -DWIN32" AR="ar.exe" RANLIB="ranlib.exe" &&
+ #make -Cwindows NM="nm.exe" DLLWRAP="dllwrap.exe" &&
+ ( echo EXPORTS; gcc -E include/flite.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(flite_[^ *]*\).*/\1/p" ) > windows/flite.def &&
+ gcc -shared -s -mwindows -def windows/flite.def -o flite.dll -Wl,--out-implib,libflite.dll.a build/*/lib/libflite.a -lpulse-simple &&
+ wl-showstatus build-install &&
+ make install &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ cp -f libflite.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f flite.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf flite-$VERSION-release
+####See also: http://typefaster.sourceforge.net/flite-msvc-howto.html
+####TO DO: lib/libflite_cmu_us_kal.dll.a and matching DLL
+
+
+

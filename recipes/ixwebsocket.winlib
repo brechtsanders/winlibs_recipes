@@ -1,0 +1,74 @@
+export NAME="IXWebSocket"
+export STATUS=
+export URL=https://github.com/machinezone/IXWebSocket
+export BASENAME=ixwebsocket
+export DESCRIPTION="websocket and http client and server library, coming with ws, a command line swiss army knife utility "
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=11.0.8
+#export VERSIONDATE=20210825
+#export VERSION=11.3.1
+#export VERSIONDATE=20211023
+#export VERSION=11.3.2
+#export VERSIONDATE=20211125
+export VERSION=11.3.3
+export VERSIONDATE=20220218
+####ixwebsocket/IXSocket.cpp:60:23: error: elements of array 'ix::pollfd fds [2]' have incomplete type
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/machinezone/IXWebSocket/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/machinezone/IXWebSocket/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix ixwebsocket/IXSetThreadName.cpp (version = 11.0.8)
+#patch -ulbf ixwebsocket/IXSetThreadName.cpp << EOF
+#@@ -24,3 +24,8 @@
+# {
+#-#ifdef _WIN32
+#+#ifdef __MINGW32__
+#+    void SetThreadName(DWORD dwThreadID, const char* threadName)
+#+    {
+#+        SetThreadDescriptionA((dwThreadID != -1 ? GetCurrentThread() : dwThreadID), threadName);
+#+    }
+#+#elif defined(_WIN32)
+#     const DWORD MS_VC_EXCEPTION = 0x406D1388;
+#EOF
+# fix missing snprintf/uint16_t in ixwebsocket/IXNetSystem.cpp (version >= 11.3.1)
+mv ixwebsocket/IXNetSystem.cpp ixwebsocket/IXNetSystem.cpp.bak &&
+echo "#include <stdint.h>" > ixwebsocket/IXNetSystem.cpp &&
+echo "#include <stdio.h>" >> ixwebsocket/IXNetSystem.cpp &&
+cat ixwebsocket/IXNetSystem.cpp.bak >> ixwebsocket/IXNetSystem.cpp
+# fix to allow also building shared library
+sed -i.bak -e "s/\(add_library( *[^ ]*\) STATIC/\1/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_ZLIB:BOOL=ON -DUSE_TLS:BOOL=OFF -S. -Bbuild_static &&
+ #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_ZLIB:BOOL=ON -DUSE_TLS:BOOL=OFF -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

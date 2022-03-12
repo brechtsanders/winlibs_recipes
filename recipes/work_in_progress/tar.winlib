@@ -1,0 +1,300 @@
+export NAME="tar"
+export STATUS=
+export URL=http://www.gnu.org/software/tar/
+export BASENAME=tar
+export DESCRIPTION="The Tar program provides the ability to create tar archives, as well as various other kinds of manipulation. For example, you can use Tar on previously created archives to extract files, to store additional files, or to update or list files which were already stored."
+export CATEGORY=compression,fileformat
+export TYPE=application
+#export VERSION=1.20
+#export VERSION=1.21
+#export VERSION=1.22
+#export VERSIONDATE=20091124
+#export VERSION=1.23
+#export VERSIONDATE=20100310
+#export VERSION=1.24
+#export VERSIONDATE=20101025
+#export VERSION=1.25
+#export VERSIONDATE=20101108
+####rtapelib.c:602: error: `SIGPIPE' undeclared (first use in this function)
+#export VERSION=1.26
+#export VERSIONDATE=20110312
+#export VERSION=1.27
+#export VERSIONDATE=20131006
+#export VERSION=1.27.1
+#export VERSIONDATE=20131118
+####src/buffer.o:buffer.c:(.text+0xe68): undefined reference to `_page_aligned_alloc'
+#export VERSION=1.28
+#export VERSIONDATE=20140728
+#export VERSION=1.29
+#export VERSIONDATE=20160517
+export VERSION=1.30
+export VERSIONDATE=20171217
+####lib/rtapelib.c:124:46: error: 'SIGPIPE' undeclared (first use in this function)
+#export VERSION=1.31
+#export VERSIONDATE=20190103
+####gnu/backupfile.c:134:45: error: '_PC_NAME_MAX' undeclared (first use in this function)
+#export VERSION=1.33
+#export VERSIONDATE=20210108
+#export VERSION=1.34
+#export VERSIONDATE=20210213
+####lib/wordsplit.c:29:10: fatal error: glob.h: No such file or directory
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL3
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/tar/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/tar/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix
+cat > winfix/pwd.h << EOF
+#ifndef getpwuid
+//typedef int uid_t;
+struct passwd {
+ int pw_uid;
+ char *pw_name;
+};
+#define getuid() 0
+#define geteuid() 0
+#define getpwuid(uid) NULL
+#define getpwnam(username) NULL
+#endif
+#include <grp.h>
+EOF
+cat > winfix/grp.h << EOF
+#ifndef getgrgid
+//typedef int gid_t;
+struct group {
+ int gr_gid;
+ char *gr_name;
+};
+#define getgid() 0
+#define getgrgid(gid) NULL
+#define getgrnam(groupname) NULL
+#endif
+EOF
+# fix lib/rtapelib.c
+patch -ulbf lib/rtapelib.c << EOF
+--- lib/rtapelib.c  2010-09-14 12:06:44 +0200
++++ lib/rtapelib.c  2012-11-02 16:46:12 +0100
+@@ -119,4 +119,5 @@
+ do_command (int handle, const char *buffer)
+ {
++#ifndef __MINGW32__
+   /* Save the current pipe handler and try to make the request.  */
+
+@@ -132,4 +133,5 @@
+
+   _rmt_shutdown (handle, EIO);
++#endif
+   return -1;
+ }
+@@ -425,4 +427,7 @@
+   }
+
++#ifdef __MINGW32__
++  error (EXIT_ON_EXEC_ERROR, 0, _("Remote execution not supported on this platform"));
++#else
+   /* FIXME: Should somewhat validate the decoding, here.  */
+   if (gethostbyname (remote_host) == NULL)
+@@ -522,4 +527,5 @@
+   }
+ #endif /* not WITH_REXEC */
++#endif
+
+   /* Attempt to open the tape device.  */
+@@ -596,4 +602,7 @@
+ rmt_write__ (int handle, char *buffer, size_t length)
+ {
++#ifdef __MINGW32__
++  return 0;
++#else
+   char command_buffer[COMMAND_BUFFER_SIZE];
+   RETSIGTYPE (*pipe_handler) (int);
+@@ -621,4 +630,5 @@
+   _rmt_shutdown (handle, EIO);
+   return written;
++#endif
+ }
+EOF
+# fix src/extract.c
+patch -ulbf src/extract.c << EOF
+--- src/extract.c  2010-11-27 11:33:22 +0100
++++ src/extract.c  2012-11-02 17:05:00 +0100
+@@ -1201,2 +1202,3 @@
+ #else
++#ifndef __MINGW32__
+   static int warned_once;
+@@ -1210,2 +1212,3 @@
+     }
++#endif
+   return extract_link (file_name, typeflag);
+EOF
+# fix missing fork and pipe in src/misc.c
+mv src/misc.c src/misc.c.bak
+cat > src/misc.c.bak << EOF
+#ifdef __MINGW32__
+#define fork() -1
+#include <windows.h>
+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+#endif
+EOF
+cat src/misc.c.bak >> src/misc.c
+# fix src/system.c
+mv src/system.c src/system.c.bak
+cat > src/system.c << EOF
+#ifdef __MINGW32__
+#define waitpid(p,s,o) 0       //to do: find proper waitpid() for Windows
+#define SIGPIPE 3
+#define WIFEXITED(w) (((w) & 0XFFFFFF00) == 0)
+#endif
+EOF
+cat src/system.c.bak >> src/system.c
+# fix uknown signals in src/tar.c (version <= 1.30)
+patch -ulbf src/tar.c << EOF
+--- src/tar.c  2010-10-24 20:07:56 +0200
++++ src/tar.c  2012-11-02 21:56:22 +0100
+@@ -975,4 +975,5 @@
+     int signo;
+   } const sigtab[] = {
++#ifndef __MINGW32__
+     { "SIGUSR1", SIGUSR1 },
+     { "USR1", SIGUSR1 },
+@@ -981,8 +982,11 @@
+     { "SIGHUP", SIGHUP },
+     { "HUP", SIGHUP },
++#endif
+     { "SIGINT", SIGINT },
+     { "INT", SIGINT },
++#ifndef __MINGW32__
+     { "SIGQUIT", SIGQUIT },
+     { "QUIT", SIGQUIT }
++#endif
+   };
+   struct sigtab const *p;
+@@ -2599,5 +2603,7 @@
+
+   /* System V fork+wait does not work if SIGCHLD is ignored.  */
++#ifndef __MINGW32__
+   signal (SIGCHLD, SIG_DFL);
++#endif
+
+   /* Try to disable the ability to unlink a directory.  */
+EOF
+# fix src/names.c
+mv src/names.c src/names.c.bak &&
+echo "#include <pwd.h>" > src/names.c &&
+cat src/names.c.bak >> src/names.c
+## fix redefinitions of min/max in src/common.h (version >= 1.33)
+#patch -ulbf src/common.h << EOF
+#@@ -631,4 +631,8 @@
+#
+#+#ifndef min
+# #define min(a, b) ((a) < (b) ? (a) : (b))
+#+#endif
+#+#ifndef max
+# #define max(a, b) ((a) < (b) ? (b) : (a))
+#+#endif
+#
+#EOF
+## fix lib/paxlib.h (version >= 1.33)
+#patch -ulbf lib/paxlib.h << EOF
+#@@ -46,2 +46,3 @@
+#   do { if (error_hook) error_hook (); error Args; } while (0)
+#+#undef ERROR
+# #define ERROR(Args) \\
+#EOF
+## fix src/checkpoint.c (version >= 1.33)
+#patch -ulbf src/checkpoint.c << EOF
+#@@ -22,4 +22,6 @@
+# #include "wordsplit.h"
+#+#ifndef _WIN32
+# #include <sys/ioctl.h>
+# #include <termios.h>
+#+#endif
+# #include "fprintftime.h"
+#@@ -161,3 +163,5 @@
+#     {
+#+#ifdef SIG_BLOCK
+#       sigprocmask (SIG_BLOCK, &sigs, NULL);
+#+#endif
+#
+#EOF
+## fix lib/wordsplit.c (version >= 1.33)
+#patch -ulbf lib/wordsplit.c << EOF
+#@@ -28,3 +28,5 @@
+# #include <pwd.h>
+#+#ifndef _WIN32
+# #include <glob.h>
+#+#endif
+#
+#@@ -1698,2 +1700,3 @@
+# {
+#+#ifndef _WIN32
+#   struct wordsplit_node *p;
+#@@ -1765,2 +1768,3 @@
+#   free (uname);
+#+#endif
+#   return 0;
+#@@ -1803,2 +1807,3 @@
+#
+#+#ifndef _WIN32
+#       if (isglob (str, slen))
+#@@ -1878,2 +1883,3 @@
+#        }
+#+#endif
+#     }
+#@@ -2309,4 +2315,6 @@
+#     NULL },
+#+#ifndef _WIN32
+#   { N_("tilde expansion"),      WRDSF_PATHEXPAND, 0,
+#     wordsplit_tildexpand },
+#+#endif
+#   { N_("variable expansion"),   WRDSF_NOVAR,      EXPOPT_NEG,
+#EOF
+## fix src/tar.c (version >= 1.33)
+#patch -ulbf src/tar.c << EOF
+#@@ -1011,7 +1011,15 @@
+#   } const sigtab[] = {
+#+#ifdef SIGUSR1
+#     { "USR1", SIGUSR1 },
+#+#endif
+#+#ifdef SIGUSR2
+#     { "USR2", SIGUSR2 },
+#+#endif
+#+#ifdef SIGHUP
+#     { "HUP", SIGHUP },
+#+#endif
+#     { "INT", SIGINT },
+#+#ifdef SIGQUIT
+#     { "QUIT", SIGQUIT }
+#+#endif
+#   };
+#@@ -2764,3 +2772,5 @@
+#   /* System V fork+wait does not work if SIGCHLD is ignored.  */
+#+#ifdef SIGCHLD
+#   signal (SIGCHLD, SIG_DFL);
+#+#endif
+#
+#EOF
+#make check
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-Dnl_item=int" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/winfix" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-acl --without-posix-acls --without-included-regex --without-selinux --without-xattrs CFLAGS="-I`pwd`/winfix" &&
+ make install-strip &&
+    echo OK
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+#../inst_tar-1.26/bin/tar.exe cfj _TEST.tar.bz2 lib/*
+####../inst_tar-1.26/bin/tar.exe: child process: Cannot fork
+
+
+

@@ -1,0 +1,157 @@
+export NAME="X.Org libXt"
+export STATUS=
+#export URL=http://www.freedesktop.org/wiki/Software/xlibs
+export URL=http://www.x.org/
+export BASENAME=libxt
+export DESCRIPTION="X Toolkit library"
+export CATEGORY=x
+export TYPE=library
+#export VERSION=1.0.8
+#export VERSIONDATE=20101005
+#export VERSION=1.0.9
+#export VERSIONDATE=20101029
+#export VERSION=1.1.0
+#export VERSIONDATE=20110305
+#export VERSION=1.1.1
+#export VERSIONDATE=20120116
+#export VERSION=1.1.2
+#export VERSIONDATE=20120308
+#export VERSION=1.1.3
+#export VERSIONDATE=20120316
+#export VERSION=1.1.4
+#export VERSIONDATE=20130531
+#export VERSION=1.1.5
+#export VERSIONDATE=20150501
+#export VERSION=1.2.0
+#export VERSIONDATE=20190622
+export VERSION=1.2.1
+export VERSIONDATE=20210125
+####64-bit: src/Composite.c:195: undefined reference to `_XtInherit'
+wl-showstatus --package-version
+export DEPENDANCIES=libx11,libsm,libice,libxdmcp,libxau
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://xorg.freedesktop.org/archive/individual/lib/ libXt-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://xorg.freedesktop.org/archive/individual/lib/libXt-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/libXt-$VERSION.tar.bz2
+cd libXt-$VERSION
+## fix redefinition of __XtInherit in src/Initialize.c on 64-bit
+#patch -ulbf src/Initialize.c << EOF
+#--- src/Initialize.c  2011-03-04 21:43:50 +0100
+#+++ src/Initialize.c  2012-01-02 21:52:12 +0100
+#@@ -253,6 +253,5 @@
+#
+# #define _XtInherit __XtInherit
+#-#endif
+#-
+#+#else
+#
+# void _XtInherit(void)
+#@@ -262,4 +261,5 @@
+#               (String *)NULL, (Cardinal *)NULL);
+# }
+#+#endif
+#
+#
+#EOF
+patch -ulbf src/Initialize.c << EOF
+--- src/Initialize.c  2011-03-08 17:21:00 +0100
++++ src/Initialize.c  2012-02-17 21:53:30 +0100
+@@ -247,12 +247,21 @@
+
+ asm (".data\\n\\
+  .globl __XtInherit        \\n\\
+- __XtInherit:      jmp *_y \\n\\
+-  _y: .long ___XtInherit   \\n\\
++ "
++#ifdef __MINGW64__
++ "___XtInherit:     jmp *_y \\n\\
++ "
++#else
++ "__XtInherit:      jmp *_y \\n\\
++ "
++#endif
++ "_y: .long ___XtInherit   \\n\\
+     .text                 \\n");
+
++#ifndef __MINGW64__
+ #define _XtInherit __XtInherit
+ #endif
++#endif
+
+
+ void _XtInherit(void)
+EOF
+## fix missing _XtInherit
+#mv src/Shell.c src/Shell.c.bak
+#echo "#define _XtInherit __XtInherit" > src/Shell.c
+#cat src/Shell.c.bak >> src/Shell.c
+#mv src/Vendor.c src/Vendor.c.bak
+#echo "#define _XtInherit __XtInherit" > src/Vendor.c
+#cat src/Vendor.c.bak >> src/Vendor.c
+#mv src/Object.c src/Object.c.bak
+#echo "#define _XtInherit __XtInherit" > src/Object.c
+#cat src/Object.c.bak >> src/Object.c
+#mv src/RectObj.c src/RectObj.c.bak
+#echo "#define _XtInherit __XtInherit" > src/RectObj.c
+#cat src/RectObj.c.bak >> src/RectObj.c
+#mv src/Constraint.c src/Constraint.c.bak
+#echo "#define _XtInherit __XtInherit" > src/Constraint.c
+#cat src/Constraint.c.bak >> src/Constraint.c
+#mv src/Core.c src/Core.c.bak
+#echo "#define _XtInherit __XtInherit" > src/Core.c
+#cat src/Core.c.bak >> src/Core.c
+#mv src/Composite.c src/Composite.c.bak
+#echo "#define _XtInherit __XtInherit" > src/Composite.c
+#cat src/Composite.c.bak >> src/Composite.c
+# fix missing XUrgencyHint in src/Shell.c
+patch -ulbf src/Shell.c << EOF
+--- src/Shell.c  2013-11-28 21:40:12 +0100
++++ src/Shell.c  2013-11-28 21:48:42 +0100
+@@ -1345,3 +1345,5 @@
+
++#ifdef XUrgencyHint
+        if (w->wm.urgency) hintp->flags |= XUrgencyHint;
++#endif
+ }
+EOF
+## fix missing DllMain in src/Vendor.c
+#patch -ulbf src/Vendor.c << EOF
+#--- src/Vendor.c  2013-11-28 21:40:12 +0100
+#+++ src/Vendor.c  2013-11-28 21:50:58 +0100
+#@@ -72,3 +72,3 @@
+# int __stdcall
+#-DllMain(unsigned long mod_handle, unsigned long flag, void *routine)
+#+DllMain(HINSTANCE mod_handle, DWORD flag, LPVOID routine)
+# {
+#EOF
+## fix invalid DisplayString in src/Converters.c
+#mv src/Converters.c src/Converters.c.bak
+#sed -e 's?\(DisplayString(\)?"(display name unknown)";//\1?' src/Converters.c.bak > src/Converters.c
+## fix building DLLs on 64-bit (version <= 1.1.1)
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+# #mv configure configure.bak
+# #sed -e "s/-Wshadow//g; s/-Wcast-qual//g" configure.bak > configure
+#fi
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-selective-werror &&
+ wl-showstatus build-install &&
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # mv libtool libtool.bak &&
+ # sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool
+ #fi &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libXt-$VERSION
+####Note: in case of many compilation errors try recompiling libx11
+
+
+

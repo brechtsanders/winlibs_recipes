@@ -1,0 +1,115 @@
+export NAME="epkg"
+export STATUS=
+export URL=http://www.encap.org/epkg/
+export BASENAME=epkg
+export DESCRIPTION="epkg is an Encap Package Manager."
+export CATEGORY=development
+export TYPE=application
+export VERSION=2.3.9
+export VERSIONDATE=20111109
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libtar,expat,libcurl
+export OPTIONALDEPENDANCIES=fget
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE=
+export DOWNLOADURL=""
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://ftp.encap.org/pub/encap/epkg/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+mkdir -p sys
+touch sys/wait.h netdb.h pwd.h
+cat > netdb.h << EOF
+//#include <winsock2.h>
+#define MAXHOSTNAMELEN 64
+//#define ELOOP WSAELOOP
+EOF
+cat > sys/utsname.h << EOF
+struct utsname {
+ char* sysname;
+ char* version;
+ char* release;
+ char* machine;
+ char* nodename;
+};
+static int uname(struct utsname* ut)
+{
+ ut->sysname = "Windows";
+ ut->version = "0.0";
+ ut->release = "0.0";
+ ut->machine = "";
+/*
+ if (gethostname(ut->nodename, 63) != 0) {
+  ut->nodename = "";
+  return -1;
+ }
+*/
+ return 0;
+}
+EOF
+mv compat/gethostname.c compat/gethostname.c.bak
+echo "#include <winsock2.h>" > compat/gethostname.c
+patch -ulbf lib/install_pkg.c << EOF
+--- lib/install_pkg.c  2004-04-21 18:00:26 +0200
++++ lib/install_pkg.c  2011-11-09 14:53:54 +0100
+@@ -87,3 +87,8 @@
+        if (!BIT_ISSET(encap->e_options, OPT_SHOWONLY) &&
+-           mkdir(srcinfo->src_target_path, 0755) != 0)
++#ifndef __MINGW32__
++           mkdir(srcinfo->src_target_path, 0755)
++#else
++           mkdir(srcinfo->src_target_path)
++#endif
++           != 0)
+        {
+@@ -150,2 +155,3 @@
+                {
++#ifndef __MINGW32__
+                        /* make sure it's a symlink */
+@@ -159,2 +165,3 @@
+                        }
++#endif
+
+@@ -204,2 +211,3 @@
+
++#ifndef __MINGW32__
+        if (!BIT_ISSET(encap->e_options, OPT_SHOWONLY) &&
+@@ -212,2 +220,3 @@
+        else
++#endif
+                (*encap->e_print_func)(encap, srcinfo, tgtinfo, type, msg);
+EOF
+mv lib/libencap.c lib/libencap.c.bak
+cat > lib/libencap.c << EOF
+#ifndef __MINGW64__
+#define lstat(path, sb) stat((path), (sb))
+#endif
+EOF
+cat lib/libencap.c.bak >> lib/libencap.c
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-encap --disable-epkg-install LDFLAGS="-Wl,--as-needed -lws2_32 -lregex" &&
+ echo "#define HAVE_GETHOSTNAME 1" >> config.h &&
+ # fix missing WEXITSTATUS
+ echo "#define WEXITSTATUS(status) (((status) & 0xFF00) >> 8)" >> config.h &&
+ # fix missing mkstemp
+ echo "#include <plibc.h>" >> config.h &&
+ wl-showstatus build-install &&
+ ( make || make LIBS="-Wl,--as-needed -lregex -lcurl -lz -lplibc" ) && make install &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm CMakeCache.txt &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

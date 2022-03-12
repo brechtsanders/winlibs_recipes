@@ -1,0 +1,101 @@
+#export NAME="OpenSync"
+#export STATUS=
+##export URL=http://www.opensync.org/
+#export URL=https://sourceforge.net/projects/opensync/
+#export BASENAME=libopensync
+#export DESCRIPTION="OpenSync - A Synchronization Framework"
+#export CATEGORY=communication
+#export TYPE=library
+#export VERSION=0.18
+#export VERSIONDATE=20170906
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://sourceforge.net/projects/opensync/files/libopensync/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/opensync/libopensync/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-python --disable-unit-tests &&
+# wl-showstatus build-install &&
+# make install-strip &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="Libopensync"
+export STATUS=
+export URL=http://www.opensync.org/
+export BASENAME=libopensync
+export DESCRIPTION="Synchronization engine"
+export CATEGORY=communication
+export TYPE=library,application
+export VERSION=0.39
+export VERSIONDATE=20110719
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,sqlite3,libxml2,libxslt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://www.opensync.org/download/releases/"
+#export DOWNLOADURL="repository.timesys.com/buildsources/l/libopensync/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.opensync.org/download/releases/$VERSION/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://repository.timesys.com/buildsources/l/libopensync/libopensync-$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix glib includes in opensync/common/opensync_list.c
+mv opensync/common/opensync_list.c opensync/common/opensync_list.c.bak
+sed -e "s?include <glib/.*\.h>?include <glib.h>?" opensync/common/opensync_list.c.bak > opensync/common/opensync_list.c
+# fix opensync/version/opensync_version.c
+mv opensync/version/opensync_version.c opensync/version/opensync_version.c.bak
+echo "#include <regex.h>" > opensync/version/opensync_version.c
+cat opensync/version/opensync_version.c.bak >> opensync/version/opensync_version.c
+# fix opensync/client/opensync_client_proxy.c
+patch -ulbf opensync/client/opensync_client_proxy.c << EOF
+--- opensync/client/opensync_client_proxy.c  2009-09-20 22:14:18 +0200
++++ opensync/client/opensync_client_proxy.c  2012-03-06 15:11:40 +0100
+@@ -54,3 +54,5 @@
+ #define SIGTERM 15     /* can be caught and interpreted or ignored by the process */
++#ifndef __MINGW32__
+ typedef int pid_t;
++#endif
+ #endif //_WIN32
+EOF
+# allow disabling unit tests in CMakeLists.txt (version >= 0.39)
+patch -ulbf CMakeLists.txt << EOF
+@@ -81,3 +81,3 @@
+ OPTION( OPENSYNC_UNITTESTS "enable testing" OFF )
+-IF ( CHECK_FOUND )
++IF ( CHECK_FOUND AND OPENSYNC_UNITTESTS)
+        SET( OPENSYNC_UNITTESTS ON )
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_MODULE_LINKER_FLAGS:STRING="-Wl,--as-needed -lregex" -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--as-needed -lregex" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_EXECUTABLE:FILEPATH==$PYDIR/python.exe -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_EXECUTABLE:FILEPATH==$PYDIR/python.exe -DBUILD_TESTING:BOOL=OFF -DOPENSYNC_UNITTESTS:BOOL=OFF -S. -Bbuild_win &&
+ sed -i.bak -e "s/\(-shared -o.*\)$/\1 -Wl,--as-needed -lregex/" build_win/opensync/CMakeFiles/opensync.dir/build.make &&
+ sed -i.bak -e "s/\(-shared -o.*\)$/\1 -Wl,--as-needed -lregex/" build_win/opensync/CMakeFiles/opensync-testing.dir/build.make &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin &&
+ # fix absolute link in .cmake file(s)
+ sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../../../..?g" $INSTALLPREFIX/share/libopensync*/cmake/modules/OpenSyncInternal.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

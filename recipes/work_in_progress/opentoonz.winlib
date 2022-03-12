@@ -1,0 +1,82 @@
+export NAME="OpenToonz"
+export STATUS=
+export URL=https://opentoonz.github.io/e/index.html
+export BASENAME=opentoonz
+export DESCRIPTION="OpenToonz - An open-source full-featured 2D animation creation software"
+export CATEGORY=graphics
+export TYPE=application
+#export VERSION=1.1.1
+#export VERSIONDATE=20161009
+#export VERSION=1.1.2
+#export VERSIONDATE=20161126
+####estBigEndian.cmake:51 (message): no suitable type found
+#export VERSION=1.1.3
+#export VERSIONDATE=20170607
+#export DEPENDANCIES=qt,glew,freeglut,libjpeg,libpng,liblz4,openblas
+#export VERSION=1.2.0
+#export VERSIONDATE=20171211
+#export VERSION=1.2.1
+#export VERSIONDATE=20180628
+#export VERSION=1.3.0
+#export VERSIONDATE=20190130
+#export VERSION=1.4.0
+#export VERSIONDATE=20200202
+export VERSION=1.5.0
+export VERSIONDATE=20210411
+wl-showstatus --package-version
+export DEPENDANCIES=qt,glew,freeglut,libjpeg,libpng,liblz4,openblas,libmypaint
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE="modified BSD"
+export DOWNLOADURL="https://github.com/opentoonz/opentoonz/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/opentoonz/opentoonz/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## replace obsolere lm.h with levmar.h in toonz/sources/common/tsystem/tfilepath.cpp
+#mv toonz/sources/common/tsystem/tfilepath.cpp toonz/sources/common/tsystem/tfilepath.cpp.bak &&
+#sed -e "s/lm\.h/levmar.h/" toonz/sources/common/tsystem/tfilepath.cpp.bak > toonz/sources/common/tsystem/tfilepath.cpp
+# fix use of obsolete lm.h
+for F in $(grep -l "lm\.h" toonz/sources/common/tsystem/*.cpp); do
+ mv $F $F.bak &&
+ sed -e "s?#include <lm\.h>?#include <levmar.h>\n#include <lmerr.h>\n#include <lmcons.h>\n#include <lmshare.h>\n#include <lmapibuf.h>?" $F.bak > $F
+done
+# fix missing TIFFReadRGBATile_64/TIFFReadRGBAStrip_64 in toonz/sources/image/tif/tiio_tif.cpp
+mv toonz/sources/image/tif/tiio_tif.cpp toonz/sources/image/tif/tiio_tif.cpp.bak &&
+sed -e "s/\(TIFFReadRGBATile\|TIFFReadRGBAStrip\)_64/\1/g; s/uint64/uint32/g" toonz/sources/image/tif/tiio_tif.cpp.bak > toonz/sources/image/tif/tiio_tif.cpp
+# avoid using Windows registry
+sed -i.bak -e "s/#ifdef _WIN32/&_REGISTRY/" toonz/sources/common/tapptools/tenv.cpp
+# remove invalid compiler parameters /wd4251 and /MP and add -fpermissive
+mv toonz/sources/CMakeLists.txt toonz/sources/CMakeLists.txt.bak &&
+sed -e "s?/wd4251?-fpermissive?g; s?/MP??g" toonz/sources/CMakeLists.txt.bak > toonz/sources/CMakeLists.txt
+# remove failing detection fo liblz4
+mv toonz/sources/CMakeLists.txt toonz/sources/CMakeLists.txt.bak2 &&
+sed -e "s?pkg_check_modules(LZ4_LIB?set(LZ4_LIB_INCLUDE_DIRS $MINGWPREFIX/include)\nset(LZ4_LIB_LDFLAGS -llz4)\n#&?" toonz/sources/CMakeLists.txt.bak2 > toonz/sources/CMakeLists.txt
+# prefer openblas over gsl
+mv toonz/sources/CMakeLists.txt toonz/sources/CMakeLists.txt.bak3 &&
+sed -e "s/cblas gslcblas openblas blas/openblas blas cblas gslcblas/g" toonz/sources/CMakeLists.txt.bak3 > toonz/sources/CMakeLists.txt
+wl-showstatus configure &&
+mkdir -p build &&
+ cd build &&
+ PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DQT_PATH:PATH=$MINGWPREFIX/qt -DQt5_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5 -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DTIFF_LIBRARY:FILEPATH=$MINGWPREFIX/bin/libtiff-5.dll ../toonz/sources &&
+ #PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DQT_PATH:PATH=$MINGWPREFIX/qt -DQt5_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5 -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DTIFF_LIBRARY:FILEPATH=$MINGWPREFIX/bin/libtiff-5.dll -DGLEW_SHARED_LIBRARY:FILEPATH=$MINGWPREFIX/bin/glew32.dll -DGLUT_LIB:FILEPATH=-lfreeglut -DGLU_LIB:FILEPATH=-lglu32 -DGL_LIB:FILEPATH=-lopengl32 ../toonz/sources &&
+ cd .. &&
+ wl-showstatus build &&
+ ( make -Cbuild || make -Cbuild CXX="g++ -std=c++11" ) &&
+ wl-showstatus build-install &&
+ ( make -Cbuild install/strip || make -Cbuild install ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#PATH=$MINGWPREFIX/qt/bin:$PATH QT_PLUGIN_PATH=$MINGWPREFIX/qt/plugins $INSTALLPREFIX/bin/OpenToonz_$(echo $VERSION|sed -e "s/\([0-9]\.[0-9]\)\..*$/\1/").exe
+#PATH=$MINGWPREFIX/qt/bin:$PATH QT_PLUGIN_PATH=$MINGWPREFIX/qt/plugins $INSTALLPREFIX/bin/OpenToonz.exe
+#####Build fails on 32-bit due to assembler incombatibility using __asm {}
+
+
+

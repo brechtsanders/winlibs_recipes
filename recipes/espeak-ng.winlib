@@ -1,0 +1,104 @@
+export NAME="eSpeak NG"
+export STATUS=
+export URL=https://github.com/rhdunn/espeak
+export BASENAME=espeak-ng
+export DESCRIPTION="eSpeak is a compact open source software speech synthesizer for English and other languages, for Linux and Windows."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=1.49.1
+#export VERSIONDATE=20170612
+export VERSION=1.49.2
+export VERSIONDATE=20170924
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,sonic,pcaudiolib,pulseaudio
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/rhdunn/espeak/releases"
+export DOWNLOADURL="https://github.com/rhdunn/espeak/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/rhdunn/espeak/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/rhdunn/espeak/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd espeak-$VERSION
+# fix DLL exports in src/include/espeak-ng/espeak_ng.h
+patch -ulbf src/include/espeak-ng/espeak_ng.h << EOF
+@@ -28,3 +28,3 @@
+
+-#if defined(_WIN32) || defined(_WIN64)
++#if defined(DLL_EXPORT) && (defined(_WIN32) || defined(_WIN64))
+ #ifdef LIBESPEAK_NG_EXPORT
+EOF
+# fix DLL exports in src/include/espeak/speak_lib.h
+patch -ulbf src/include/espeak/speak_lib.h << EOF
+@@ -30,3 +30,3 @@
+
+-#if defined(_WIN32) || defined(_WIN64)
++#if defined(DLL_EXPORT) && (defined(_WIN32) || defined(_WIN64))
+ #ifdef LIBESPEAK_NG_EXPORT
+EOF
+# fix DLL exports in src/include/espeak-ng/speak_lib.h (version >= 1.49.2)
+patch -ulbf src/include/espeak-ng/speak_lib.h << EOF
+@@ -30,3 +30,3 @@
+
+-#if defined(_WIN32) || defined(_WIN64)
++#if defined(DLL_EXPORT) && (defined(_WIN32) || defined(_WIN64))
+ #ifdef LIBESPEAK_NG_EXPORT
+EOF
+# fix DLL exports in src/libespeak-ng/translate.h (version >= 1.49.2)
+patch -ulbf src/libespeak-ng/translate.h << EOF
+@@ -238 +238 @@
+-int clause_type_from_codepoint(uint32_t c);
++ESPEAK_NG_API int clause_type_from_codepoint(uint32_t c);
+@@ -676 +676 @@
+-extern int count_characters;
++ESPEAK_NG_API extern int count_characters;
+@@ -696 +696 @@
+-extern Translator *translator;
++ESPEAK_NG_API extern Translator *translator;
+@@ -700 +700 @@
+-extern espeak_ng_TEXT_DECODER *p_decoder;
++ESPEAK_NG_API extern espeak_ng_TEXT_DECODER *p_decoder;
+@@ -765 +765 @@
+-int ReadClause(Translator *tr, char *buf, short *charix, int *charix_top, int n_buf, int *tone_type, char *voice_change);
++ESPEAK_NG_API int ReadClause(Translator *tr, char *buf, short *charix, int *charix_top, int n_buf, int *tone_type, char *voice_change);
+EOF
+# fix DLL exports in src/libespeak-ng/synthesize.h (version >= 1.49.2)
+patch -ulbf src/libespeak-ng/synthesize.h << EOF
+@@ -519 +519 @@
+-extern espeak_EVENT *event_list;
++ESPEAK_NG_API extern espeak_EVENT *event_list;
+EOF
+# fix multiple definitions of samplerate src/espeak-ng.c (version >= 1.49.2)
+patch -ulbf src/espeak-ng.c << EOF
+@@ -117,2 +117,3 @@
+
++#define samplerate MY_samplerate
+ int samplerate;
+EOF
+# fix building DLL
+sed -i.bak -e "s/^src_libespeak_ng_la_CFLAGS\s*=/& -DLIBESPEAK_NG_EXPORT/" Makefile.am
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ touch NEWS README AUTHORS &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-pcaudiolib CFLAGS="-I$(pwd) -I$(pwd)/src/include" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-I$(pwd) -I$(pwd)/src/include" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #( make || make -j1 || make -j1 src_speak_ng_LDADD="src/.libs/libespeak-ng.dll.a" ) &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || ( make install-binPROGRAMS && make install-strip -i )) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf espeak-$VERSION
+#espeak-ng --path=$MINGWPREFIX/share/espeak-ng-data "Test. Testing 1 2 3. Is this working?" -w test.wav
+
+
+

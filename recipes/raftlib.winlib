@@ -1,0 +1,122 @@
+#export NAME="RaftLib"
+#export STATUS=
+#export URL=http://www.raftlib.io/
+##export URL=https://github.com/RaftLib/RaftLib
+#export BASENAME=raftlib
+#export DESCRIPTION="The RaftLib C++ library, streaming/dataflow concurrency via C++ iostream-like operators."
+#export CATEGORY=
+#export TYPE=library
+#export VERSION=a8
+#export VERSIONDATE=20200107
+#wl-showstatus --package-version
+#export DEPENDANCIES=cmdargs
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=Apache
+#export DOWNLOADURL="https://github.com/RaftLib/RaftLib/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/RaftLib/RaftLib/archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd RaftLib-$VERSION
+## fix raftinc/bufferdata.tcc
+#patch -ulbf raftinc/bufferdata.tcc << EOF
+#@@ -222,3 +222,3 @@
+#                                 (this)->length_store );
+#-#elif 0 //defined _WINDOWS
+#+#elif defined(_WIN32) //defined _WINDOWS
+# //FIXME, we need to test this on Win sys before making live
+#EOF
+### fix negative array size in raftinc/datamanager.tcc
+##patch -ulbf raftinc/datamanager.tcc << EOF
+##@@ -232,5 +232,7 @@
+##       };
+##+#if L1D_CACHE_LINE_SIZE > 8
+##       std::uint8_t padding[ L1D_CACHE_LINE_SIZE - 8 /** 64 byte padding **/ ];
+##+#endif
+##    }
+##-#if defined __APPLE__ || defined __linux
+##+#if defined __APPLE__ || defined __linux || (L1D_CACHE_LINE_SIZE <= 8 && defined __MINGW32__)
+##     __attribute__((aligned( L1D_CACHE_LINE_SIZE )))
+##EOF
+## fix typo (_WIND32 instead of _WIN32) and detection of level 1 cache size on Windows
+#patch -ulbf helpers/cacheinfo.cpp << EOF
+#@@ -30,3 +30,3 @@
+# #include <unistd.h>
+#-#elif _WIND32
+#+#elif _WIN32
+# #include <windows.h>
+#@@ -87,3 +87,3 @@
+#     }
+#-    std::cout <<  i;
+#+    std::cout << line_size;
+#     free(buffer);
+#EOF
+## fix building and installing both static and shared library
+#mv src/CMakeLists.txt src/CMakeLists.txt.bak &&
+#sed -e "s/add_library( *[^ ]*/& SHARED/; s/ARCHIVE\( *DESTINATION *[^ ]*\/\)lib/& RUNTIME\1bin/" src/CMakeLists.txt.bak > src/CMakeLists.txt &&
+#sed -n -e "s/\(add_library( *\)\([^ ]*\)/set_target_properties(\2 PROPERTIES LINK_FLAGS_RELEASE -s)/p" src/CMakeLists.txt.bak >> src/CMakeLists.txt
+#sed -n -e "s/\(add_library( *\)\([^ ]*\)/\1\2_static STATIC/; /add_library(/,/)/p" src/CMakeLists.txt.bak >> src/CMakeLists.txt
+#sed -n -e "s/\(add_library( *\)\([^ ]*\)/set_target_properties(\2_static PROPERTIES OUTPUT_NAME \2)/p" src/CMakeLists.txt.bak >> src/CMakeLists.txt
+#sed -n -e "s/\(install( *TARGETS *\)\([^ ]*\)/\1\2_static/; /install(/,/)/p" src/CMakeLists.txt.bak >> src/CMakeLists.txt
+#wl-showstatus configure &&
+#cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-fpermissive" . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf RaftLib-$VERSION
+#####TO DO: also build 32-bit version (assembler errors)
+
+
+
+export NAME="RaftLib"
+export STATUS=
+export URL=http://www.raftlib.io/
+#export URL=https://github.com/RaftLib/RaftLib
+export BASENAME=raftlib
+export DESCRIPTION="The RaftLib C++ library, streaming/dataflow concurrency via C++ iostream-like operators."
+export CATEGORY=
+export TYPE=library
+export VERSION=a9
+export VERSIONDATE=20200522
+#export VERSION=2020.07
+#export VERSIONDATE=20200709
+#export VERSION=2020.07.01
+#export VERSIONDATE=20200714
+####src/mapbase.cpp:34:10: fatal error: demangle.hpp: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=cmdargs
+export OPTIONALDEPENDANCIES=
+#export OPTIONALDEPENDANCIES=qthreads
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/RaftLib/RaftLib/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/RaftLib/RaftLib/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/RaftLib/RaftLib/archive/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/RaftLib/RaftLib/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd RaftLib-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/raftlib -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSEQTHREAD:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/raftlib -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSEQTHREAD:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf RaftLib-$VERSION
+####Note: Conflicts with raft => moved to separate folder
+
+
+

@@ -1,0 +1,97 @@
+export NAME="WinSparkle"
+export STATUS=
+export URL=https://winsparkle.org/
+#export URL=https://github.com/vslavik/winsparkle/
+export BASENAME=winsparkle
+export DESCRIPTION="App update framework for Windows, inspired by Sparkle for OS X"
+export CATEGORY=development
+export TYPE=library
+#export VERSION=0.6.0
+#export VERSIONDATE=20180830
+export VERSION=0.7.0
+export VERSIONDATE=20200607
+wl-showstatus --package-version
+export DEPENDANCIES=expat,wxwidgets
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/vslavik/winsparkle/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/vslavik/winsparkle/releases/download/v$VERSION/WinSparkle-$VERSION-src.7z
+export DOWNLOADSOURCEURL=https://github.com/vslavik/winsparkle/releases/download/v$VERSION/WinSparkle-$VERSION-src.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#"C:\Program Files\7-Zip\7z.exe" x -y -bd $TARBALLDIR/$BASENAME/WinSparkle-$VERSION-src.7z
+unzip -oq $TARBALLDIR/$BASENAME/WinSparkle-$VERSION-src.zip
+cd WinSparkle-$VERSION-src
+# fix missing runtimerror in src/signatureverifier.h
+mv src/signatureverifier.h src/signatureverifier.h.bak &&
+echo "#include <stdexcept>" > src/signatureverifier.h &&
+cat src/signatureverifier.h.bak >> src/signatureverifier.h
+# fix missing Detach() in src/ui.cpp (version >= 0.7.0)
+patch -ulbf src/ui.cpp << EOF
+@@ -1072,3 +1072,3 @@
+                 param->vt = VT_BSTR;
+-                param->bstrVal = wxBasicString(wxString::FromUTF8(info.Description.c_str())).Detach();
++                param->bstrVal = wxBasicString(wxString::FromUTF8(info.Description.c_str()));
+                 SafeArrayUnaccessData(psaStrings);
+EOF
+# avoid using bundled expat/wxWidgets in cmake/CMakeLists.txt
+patch -ulbf cmake/CMakeLists.txt << EOF
+@@ -37,10 +37,2 @@
+
+-set(EXPAT_INCLUDE_DIRS "\${ROOT_DIR}/3rdparty/expat/lib")
+-
+-# bundled expat
+-add_subdirectory(expat)
+-
+-# bundled wxWidgets
+-add_subdirectory(wxWidgets)
+-
+ # WinSparkle
+@@ -49,4 +41,2 @@
+ include_directories(\${ROOT_DIR}/include)
+-include_directories(\${EXPAT_INCLUDE_DIRS})
+-include_directories(\${wxWidgets_INCLUDE_DIRS})
+
+@@ -88,3 +78,3 @@
+
+-add_library(\${PROJECT_NAME} SHARED \${SOURCES} \$<TARGET_OBJECTS:wxWidgets> \$<TARGET_OBJECTS:expat>)
++add_library(\${PROJECT_NAME} SHARED \${SOURCES})
+
+EOF
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=no --unicode=yes --debug=no --cflags)" cmake &&
+# echo "-Wl,--as-needed -lcrypto" >> WinSparkle.dir/linklibs.rsp &&
+# wx-config --static=no --unicode=yes --debug=no --libs >> WinSparkle.dir/linklibs.rsp &&
+# wl-showstatus build-install &&
+# LIBRARY_PATH=$LIBRARY_PATH:$MINGWPREFIX/wx/lib/gcc_dll make install/strip &&
+#    echo OK
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=no --unicode=yes --debug=no --cflags)" ../cmake &&
+ echo "-Wl,--as-needed -lcrypto" >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+ wx-config --static=no --unicode=yes --debug=no --libs >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+ cd .. &&
+ wl-showstatus build-install &&
+ LIBRARY_PATH=$LIBRARY_PATH:$MINGWPREFIX/wx/lib/gcc_dll make -Cbuild_shared install/strip &&
+ wl-showstatus configure &&
+ sed -i.shared.bak -e "s/SHARED/STATIC/" cmake/CMakeLists.txt &&
+ cd build_static &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=yes --unicode=yes --debug=no --cflags)" ../cmake &&
+ echo "-Wl,--as-needed -lcrypto" >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+ wx-config --static=yes --unicode=yes --debug=no --libs >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+ cd .. &&
+ wl-showstatus build &&
+ LIBRARY_PATH=$LIBRARY_PATH:$MINGWPREFIX/wx/lib/gcc_lib make -Cbuild_static &&
+ wl-showstatus install &&
+ cp -f build_static/lib/*.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf WinSparkle-$VERSION-src
+####TO DO: check if static version is usable (since only shared version is installed in lib\cmake\WinSparkle)
+
+
+

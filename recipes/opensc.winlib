@@ -1,0 +1,102 @@
+export NAME="OpenSC"
+export STATUS=
+#export URL=http://www.opensc-project.org/opensc/
+export URL=https://github.com/OpenSC/OpenSC/wiki
+export BASENAME=opensc
+export DESCRIPTION="OpenSC provides a set of libraries and utilities to access smart cards. Its main focus is on cards that support cryptographic operations, and facilitate their use in security applications such as mail encryption, authentication, and digital signature."
+export CATEGORY=hardware,security
+export TYPE=library
+#export VERSION=0.11.12
+#export VERSIONDATE=20091230
+#export VERSION=0.12.0
+#export VERSIONDATE=20101222
+#export VERSION=0.12.1
+#export VERSIONDATE=20110518
+#export VERSION=0.12.2
+#export VERSIONDATE=20110715
+#export VERSION=0.12.2
+#export VERSIONDATE=20130612
+#export VERSION=0.13.0
+#export VERSIONDATE=20130515
+#export VERSION=0.14.0
+#export VERSIONDATE=20140701
+#export VERSION=0.15.0
+#export VERSIONDATE=20150401
+#export VERSION=0.16.0
+#export VERSIONDATE=20160603
+#export DEPENDANCIES=zlib,libiconv,libltdl,openssl,readline,pcsclite
+#export OPTIONALDEPENDANCIES=openpace
+#export BUILDDEPENDANCIES=
+#export VERSION=0.21.0
+#export VERSIONDATE=20210520
+export VERSION=0.22.0
+export VERSIONDATE=20210810
+####src/libopensc/card.c:1105:17: error: 'PATH_MAX' undeclared (first use in this function)
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libiconv,libltdl,openssl,readline,pcsclite,gengetopt,libdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://www.opensc-project.org/files/opensc/"
+#export DOWNLOADURL="http://sourceforge.net/projects/opensc/files/OpenSC/"
+export DOWNLOADURL="https://github.com/OpenSC/OpenSC/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.opensc-project.org/files/opensc/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/opensc/OpenSC/opensc-$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/opensc/OpenSC/opensc-$VERSION/OpenSC-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/opensc/OpenSC/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/OpenSC/OpenSC/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+cd OpenSC-$VERSION
+## fix missing PATH_MAX in src/libopensc/card.c
+#mv src/libopensc/card.c src/libopensc/card.c.bak
+#echo "#include <limits.h>" > src/libopensc/card.c
+#cat src/libopensc/card.c.bak >> src/libopensc/card.c
+## fix missing _set_fmode in src/tools/pkcs11-tool.c (version >= 0.13.0 <= 0.14.0)
+#patch -ulbf src/tools/pkcs11-tool.c << EOF
+#--- src/tools/pkcs11-tool.c  2012-12-04 15:43:40 +0100
+#+++ src/tools/pkcs11-tool.c  2013-05-15 16:10:38 +0200
+#@@ -390,3 +390,3 @@
+#
+#-#ifdef _WIN32
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+#        if (_set_fmode(_O_BINARY) == EINVAL)
+#EOF
+# fix src/ui/notify.c (version >= 0.21.0)
+mv src/ui/notify.c src/ui/notify.c.bak
+cat > src/ui/notify.c << EOF
+#if !defined(NTDDI_VERSION) || NTDDI_VERSION < 0x06000000
+#undef NTDDI_VERSION
+#define NTDDI_VERSION 0x06000000
+#endif
+EOF
+sed -e "s/#if defined(ENABLE_NOTIFY) && defined(ENABLE_GIO2)/& \&\& \!defined(_WIN32)/" src/ui/notify.c.bak >> src/ui/notify.c
+# don't use compiler flag -Wno-unused-function (version >= 0.21.0)
+sed -i.bak -e "s/-Wall -Wextra -Wno-unused-parameter -Werror//" configure
+wl-showstatus configure &&
+ ## fix building DLLs on 64-bit (version <= 0.15.0)
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi &&
+ ## fix missing configure (version >= 0.16.0)
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ## fix missing README (version >= 0.16.0)
+ #touch README &&
+ ## fix missing src/libopensc/.libs/libopensc-3.dll.def
+ #mv src/libopensc/Makefile.in src/libopensc/Makefile.in.bak
+ #sed -e "s/\(list=\)'\$(mylib_DATA)'/\1/" src/libopensc/Makefile.in.bak > src/libopensc/Makefile.in
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-pcsc &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-pcsc --disable-cmocka CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lcomctl32" &&
+ wl-showstatus build-install &&
+ ( make install-strip || make -j1 all install-strip ) && 
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenSC-$VERSION
+
+
+

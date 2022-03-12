@@ -1,0 +1,100 @@
+export NAME="man2chm"
+export STATUS=
+export URL=https://tesall.ru/topic/20764-man2chm-preobrazovatel-unix-man-stranic-spravok-v-html/
+export BASENAME=man2chm
+export DESCRIPTION="Conversion tool to convert man to CHM"
+export CATEGORY=fileformat
+export TYPE=application
+export VERSION=current
+export VERSIONDATE=20200613
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL='https://tesall.ru/index.php?app=core&module=attach&section=attach&attach_id=24798'
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+unzip -oq $TARBALLDIR/$BASENAME/index.php* -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION
+# implement missing CreateDirectoriesA() and SearchFilesA()
+cat > filewin.cpp << EOF
+#include <windows.h>
+#include <dirtrav.h>
+#include "filewin.h"
+DWORD CreateDirectoriesA (const char *lpPath, size_t len, const LPSECURITY_ATTRIBUTES lpSecurityAttributes)
+{
+  return dirtrav_make_full_path(NULL, lpPath, 0);
+}
+struct search_files_callback_data {
+  char* list;
+  size_t listlen;
+};
+int search_files_callback (dirtrav_entry info)
+{
+  struct search_files_callback_data* data = (struct search_files_callback_data*)info->callbackdata;
+  size_t fullpathlen = strlen(info->fullpath);
+  if ((data->list = (char*)realloc(data->list, data->listlen + fullpathlen + 2)) == NULL)
+    return -1;
+  memcpy(data->list + data->listlen, info->fullpath, fullpathlen);
+  data->list[data->listlen += fullpathlen] = '\\n';
+  data->list[data->listlen += 1] = 0;
+  return 0;
+}
+DWORD SearchFilesA (const char *lpFileName, unsigned short clip, char **psFlist, char **psDlist, unsigned char moode, const LPSFPROGRESROUTINE lpRnProgressRoutine, void* LpData)
+{
+  DWORD result;
+  char* p;
+  char path[MAX_PATH];
+  struct search_files_callback_data data;
+  //get path
+  memcpy(path, lpFileName, clip);
+  path[clip] = 0;
+  for (p = path; *p; p++)
+    if (*p == '/')
+      *p = '\\\\';
+  //traverse folder
+  data.list = NULL;
+  data.listlen = 0;
+  result = dirtrav_traverse_directory(path, search_files_callback, NULL, NULL, (void*)&data);
+  *psFlist = (data.list ? data.list : strdup(""));
+  return result;
+}
+EOF
+# fix case issue
+mv src/FILEWIN.H src/filewin.h
+# translate messages
+mv src/MSGS.ME src/msgs.me.bak
+cat > src/msgs.me << EOF
+#define HELLO    "MAN -> HTML converter. run with -? for help\\n"
+#define HELPTEXT "\\
+Convert UNIX man pages to a set of HTML pages.\\
+Usage: man2chm [settings]\\n\\
+Settings:\\n\\
+ -indir:<folder>  sets the path of the folder with the analyzed files\\n\\
+ -outdir:<folder> sets the path of the folder for storing the results\\n\\
+ -nochm           prohibits the generation of project chm files\\n\\
+By default it searches for files in the home folder and writes the results there\\n\\
+Note that the program does not parse file extensions, but it searches for signatures in potential man pages, so it's advisable to remove everything superfluous from the analyzed file block first."
+#define NOTAMANFILE "MAN header not found in file: %s\\n"
+EOF
+wl-showstatus build &&
+ g++ -c -o man2chm.o -O3 -Isrc src/Main.cpp &&
+ g++ -c -o filewin.o -O3 -Isrc filewin.cpp &&
+ windres src/resource.rc resource.o &&
+ g++ -mconsole -s -o man2chm.exe man2chm.o resource.o filewin.o -ldirtrav &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

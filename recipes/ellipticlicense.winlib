@@ -1,0 +1,64 @@
+export NAME="ellipticlicense"
+export STATUS=
+export URL=https://github.com/vslavik/ellipticlicense
+export BASENAME=ellipticlicense
+export DESCRIPTION="Short product key generation and validation framework based on elliptic curve digital signatures (ECDSA). (Fork of defunct dchest/ellipticlicense)"
+export CATEGORY=security
+export TYPE=library
+export VERSION=0.1.1
+export VERSIONDATE=20160709
+wl-showstatus --package-version
+export DEPENDANCIES=openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/vslavik/ellipticlicense/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/vslavik/ellipticlicense/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# add support for OpenSSL 3 in c_api/elliptic_license.c (version >= 0.1.1)
+patch -ulbf c_api/elliptic_license.c << EOF
+@@ -140,2 +140,3 @@
+     int partLen = signatureLength / 2;
++#if OPENSSL_VERSION_NUMBER < 0x020000000L
+     signature->r = BN_bin2bn(signatureData,           partLen, signature->r);
+@@ -143,2 +144,7 @@
+     if (!signature->r || !signature->s)
++#else
++    BIGNUM* r = BN_bin2bn(signatureData,           partLen, NULL);
++    BIGNUM* s = BN_bin2bn(signatureData + partLen, partLen, NULL);
++    if (!r || !s)
++#endif
+     {
+@@ -148,2 +154,7 @@
+     }
++#if OPENSSL_VERSION_NUMBER < 0x020000000L
++    ECDSA_SIG_set0(signature, r, s);
++    BN_free(r);
++    BN_free(s);
++#endif
+
+EOF
+wl-showstatus build
+ gcc -std=c99 -O3 -c -o elliptic_license.o c_api/elliptic_license.c -Ic_api &&
+ gcc -std=c99 -O3 -c -o base32.o c_api/base32.c -Ic_api &&
+ ar cru libelliptic_license.a elliptic_license.o base32.o &&
+ ( echo EXPORTS; sed -n -e "s/^.* \**\(el_.*\) *(.*$/\1/p" c_api/elliptic_license.h | grep -v "(" ) > elliptic_license.def &&
+ gcc -shared -s -mwindows -def elliptic_license.def -o elliptic_license.dll libelliptic_license.a -Wl,--out-implib,libelliptic_license.dll.a -lcrypto &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f c_api/elliptic_license.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

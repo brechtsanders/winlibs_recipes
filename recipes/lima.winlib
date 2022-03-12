@@ -1,0 +1,128 @@
+export NAME="Lima"
+export STATUS=
+#export URL=http://lima.blissgarden.org/
+export URL=https://lima1.rtfd.io/
+#export URL=https://github.com/esrf-bliss/Lima
+export BASENAME=lima
+export DESCRIPTION="Library for image acquisition"
+export CATEGORY=graphics,hardware
+export TYPE=library
+#export VERSION=1.7.6
+#export VERSIONDATE=20180324
+#export VERSION=1.7.7
+#export VERSIONDATE=20180530
+#export VERSION=1.8.0
+#export VERSIONDATE=20190209
+#export VERSION=1.8.1
+#export VERSIONDATE=20190416
+#export VERSION=1.8.2
+#export VERSIONDATE=20190627
+#export VERSION=1.8.3
+#export VERSIONDATE=20190702
+#export VERSION=1.9.0
+#export VERSIONDATE=20190516
+#export VERSION=1.9.1
+#export VERSIONDATE=20190916
+#export VERSION=1.9.2
+#export VERSIONDATE=20200212
+#export VERSION=1.9.3
+#export VERSIONDATE=20200221
+#export VERSION=1.9.4
+#export VERSIONDATE=20200526
+#export VERSION=1.9.5
+#export VERSIONDATE=20200723
+#export VERSION=1.9.6
+#export VERSIONDATE=20200927
+#export VERSION=1.9.7
+#export VERSIONDATE=20210118
+#export VERSION=1.9.8
+#export VERSIONDATE=20210319
+#export VERSION=1.9.9
+#export VERSIONDATE=20210618
+#export VERSION=1.9.10
+#export VERSIONDATE=20210813
+#export VERSION=1.9.11
+#export VERSIONDATE=20210929
+export VERSION=1.9.12
+export VERSIONDATE=20211020
+wl-showstatus --package-version
+export DEPENDANCIES=processlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/esrf-bliss/Lima/releases core-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/esrf-bliss/Lima/archive/core-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/esrf-bliss/Lima/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/core-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd Lima-core-$VERSION
+cd Lima-$VERSION
+# fix missing _int64
+sed -i.bak -e "s/_*int64/int64_t/g" control/src/CtSaving_Edf.cpp control/src/CtSaving_Edf.h
+# fix common/src/Timestamp.cpp (version >= 1.9.3)
+patch -ulbf common/src/Timestamp.cpp << EOF
+@@ -24,3 +24,3 @@
+
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #include <sys/time.h>
+EOF
+# fix common/src/ThreadUtils.cpp (version >= 1.9.3)
+patch -ulbf common/src/ThreadUtils.cpp << EOF
+@@ -25,3 +25,3 @@
+ #include <iomanip>
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #include <sys/time.h>
+EOF
+# fix common/src/Debug.cpp (version >= 1.9.3)
+patch -ulbf common/src/Debug.cpp << EOF
+@@ -29,3 +29,5 @@
+ #include <unistd.h>
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
++#if defined(__MINGW32__)
++#endif
+ #include <sys/time.h>
+EOF
+# fix hardware/src/HwBufferSave.cpp (version >= 1.9.3)
+patch -ulbf hardware/src/HwBufferSave.cpp << EOF
+@@ -37,3 +37,3 @@
+ #include <unistd.h>
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+ #include <sys/time.h>
+EOF
+# fix missing files
+mkdir -p winfix
+touch winfix/time_compat.h
+# fix missing files
+touch third-party/Processlib/CMakeLists.txt camera/common/meta/CMakeLists.txt camera/simulator/CMakeLists.txt
+#make config.inc
+# fix to also support static library
+sed -i.bak -e "s/\(add_library\s*(.*\) SHARED/\1/" CMakeLists.txt
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIMACAMERA_META:BOOL=OFF -DLIMACAMERA_SIMULATOR:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$(pwd)/winfix -D_POSIX_THREAD_SAFE_FUNCTIONS" . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIMACAMERA_META:BOOL=OFF -DLIMACAMERA_SIMULATOR:BOOL=OFF -DLIMA_ENABLE_TIFF:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$(pwd)/winfix -D_POSIX_THREAD_SAFE_FUNCTIONS" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIMACAMERA_META:BOOL=OFF -DLIMACAMERA_SIMULATOR:BOOL=OFF -DLIMA_ENABLE_TIFF:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$(pwd)/winfix -D_POSIX_THREAD_SAFE_FUNCTIONS" -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Lima-core-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Lima-$VERSION
+
+
+

@@ -1,0 +1,68 @@
+export NAME="Aspell"
+export STATUS=
+export URL=http://aspell.net/
+export BASENAME=aspell
+export DESCRIPTION="GNU Aspell is a Free and Open Source spell checker designed to eventually replace Ispell."
+export CATEGORY=language
+export TYPE=library
+#export VERSION=0.60.6
+#export VERSION=0.60.6.1
+#export VERSIONDATE=20110711
+#export VERSION=0.60.7
+#export VERSIONDATE=20190729
+export VERSION=0.60.8
+export VERSIONDATE=20191013
+wl-showstatus --package-version
+#export DEPENDANCIES=pthreads,gettext,pdcurses
+export DEPENDANCIES=pthreads,gettext,ncurses
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://ftp.gnu.org/gnu/aspell/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/aspell/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix pthread.h looking for config.h
+#touch config.h
+# fix common/file_util.cpp
+cp common/file_util.cpp common/file_util.cpp.bak
+echo "#include \"asc_ctype.hpp\"" > common/file_util.cpp
+cat common/file_util.cpp.bak >> common/file_util.cpp
+# fix missing definition of NULL (version >= 0.60.6.1)
+mv common/lock.hpp common/lock.hpp.bak
+echo "#define NULL 0" > common/lock.hpp
+cat common/lock.hpp.bak >> common/lock.hpp
+# build and fix __printf__ errors and avoid conflict between IStream in objidl.h and acommon::IStream in common/istream.hpp:14
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32-relocatable" && 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32-relocatable LDFLAGS="-Wl,--enable-auto-import -ldl" && 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32-relocatable LDFLAGS="-Wl,--enable-auto-import -ldl -no-undefined -Wl,-no-undefined" && 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -ldl -no-undefined -Wl,-no-undefined" && 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" && 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" && 
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-win32-relocatable --disable-nls LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" && 
+ #mv libtool libtool.bak && ln -sf `which libtool` libtool &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ echo "#undef USE_POSIX_MUTEX" >> gen/settings.h && 
+ echo "#define __printf__ printf" >> gen/settings.h && 
+ echo "#undef HAVE_LIBDL" >> gen/settings.h && 
+ wl-showstatus build-install &&
+ ( make -j1 install-strip MKDIR="`which mkdir` -p" || make -j1 install-libLTLIBRARIES install-filterLTLIBRARIES scripts/pspell-config install-pkgdataSCRIPTS install-includeHEADERS install-pspell_includeHEADERS install-data || make -j1 install-strip CXX="g++ -fpermissive" MKDIR="`which mkdir` -p" ) &&
+ mkdir -p $INSTALLPREFIX/bin && 
+ cp scripts/pspell-config $INSTALLPREFIX/bin/ && 
+ # fix absolute paths in pspell-config
+ sed -i.bak -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/pspell-config &&
+ rm -f $INSTALLPREFIX/bin/pspell-config.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####g++.exe: c:/mingw/bin/../lib/gcc/mingw32/4.5.0/../../../dllcrt2.o: No such file or directory
+#####To do: build DLL
+
+
+

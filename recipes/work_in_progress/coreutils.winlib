@@ -1,0 +1,374 @@
+export NAME="Coreutils"
+export STATUS=
+export URL=http://www.gnu.org/software/coreutils/
+export BASENAME=coreutils
+export DESCRIPTION="The GNU Core Utilities are the basic file, shell and text manipulation utilities of the GNU operating system. These are the core utilities which are expected to exist on every operating system."
+export CATEGORY=system
+export TYPE=application
+#export VERSION=8.14
+#export VERSIONDATE=20111219
+#export VERSION=8.15
+#export VERSIONDATE=20120107
+#export VERSION=8.16
+#export VERSIONDATE=20120326
+#export VERSION=8.17
+#export VERSIONDATE=20120511
+#export VERSION=8.18
+#export VERSIONDATE=20120813
+#export VERSION=8.19
+#export VERSIONDATE=20120824
+####src/chown-core.c:247: warning: implicit declaration of function 'fchown'
+#export VERSION=8.20
+#export VERSIONDATE=20121024
+####src/make-prime-list.c:56:3: warning: implicit declaration of function 'binvert
+#export VERSION=8.21
+#export VERSIONDATE=20130215
+#export VERSION=8.22
+#export VERSIONDATE=20131214
+#export VERSION=8.23
+#export VERSIONDATE=20140721
+#export VERSION=8.24
+#export VERSIONDATE=20150724
+#export VERSION=8.25
+#export VERSIONDATE=20160120
+#export VERSION=8.26
+#export VERSIONDATE=20161201
+#export VERSION=8.27
+#export VERSIONDATE=20170309
+#export VERSION=8.28
+#export VERSIONDATE=20170903
+#export VERSION=8.29
+#export VERSIONDATE=20171228
+#export VERSION=8.30
+#export VERSIONDATE=20180702
+#export VERSION=8.31
+#export VERSIONDATE=20190311
+#export VERSION=8.32
+#export VERSIONDATE=20200306
+export VERSION=9.0
+export VERSIONDATE=20210925
+####src/cat.o:cat.c:(.text+0x599): undefined reference to `_ioctl_used_without_requesting_gnulib_module_ioctl'
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/coreutils/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/coreutils/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## fix missing files
+#mkdir -p winfix
+#cat > winfix/pwd.h << EOF
+#struct passwd {
+# int pw_uid;
+# int pw_gid;
+# char *pw_name;
+#};
+##define getuid() 0
+##define geteuid() 0
+##define getpwuid(uid) NULL
+##define getpwnam(username) NULL
+##define HAVE_DECL_GETEUID
+##define HAVE_DECL_GETPWUID
+#EOF
+#cat > winfix/grp.h << EOF
+#struct group {
+# int gr_gid;
+# char *gr_name;
+# char **gr_mem; 
+#};
+##define getgid() 0
+##define getegid() 0
+##define getgrgid(gid) NULL
+##define getgrnam(groupname) NULL
+##define getgrent() NULL
+##define setgrent() NULL
+##define endgrent() NULL
+##define HAVE_DECL_GETGRGID
+#EOF
+# fix missing getuid/getgid/geteuid/getegid in lib/euidaccess.c
+mv lib/euidaccess.c lib/euidaccess.c.bak
+cat > lib/euidaccess.c << EOF
+#include <pwd.h>
+#include <grp.h>
+EOF
+cat lib/euidaccess.c.bak >> lib/euidaccess.c
+## fix missing geteuid/getegid in src/lbracket.c
+#mv src/lbracket.c src/lbracket.c.bak
+#cat > src/lbracket.c << EOF
+##include <pwd.h>
+##include <grp.h>
+#EOF
+#cat src/lbracket.c.bak >> src/lbracket.c
+# fix src/system.h
+patch -ulbf src/system.h << EOF
+--- src/system.h  2012-07-23 12:05:16 +0200
++++ src/system.h  2012-08-25 10:12:46 +0200
+@@ -205,3 +205,3 @@
+
+-#if !HAVE_DECL_GETEUID
++#if !defined(HAVE_DECL_GETEUID)
+ uid_t geteuid ();
+EOF
+# fix src/test.c
+patch -ulbf src/test.c << EOF
+--- src/test.c  2012-07-21 16:54:32 +0200
++++ src/test.c  2012-08-25 10:30:12 +0200
+@@ -423,2 +423,5 @@
+         unary_advance ();
++#ifdef _WIN32
++        return 0;
++#else
+         if (stat (argv[pos - 1], &stat_buf) != 0)
+@@ -429,2 +432,3 @@
+         return ! (euid == NO_UID && errno) && euid == stat_buf.st_uid;
++#endif
+       }
+@@ -434,2 +438,5 @@
+         unary_advance ();
++#ifdef _WIN32
++        return 0;
++#else
+         if (stat (argv[pos - 1], &stat_buf) != 0)
+@@ -440,2 +447,3 @@
+         return ! (egid == NO_GID && errno) && egid == stat_buf.st_gid;
++#endif
+       }
+EOF
+# fix missing config.h in src/make-prime-list.c (version >= 8.20)
+patch -ulbf src/make-prime-list.c << EOF
+--- src/make-prime-list.c  2012-10-23 16:14:12 +0200
++++ src/make-prime-list.c  2012-10-24 08:13:36 +0200
+@@ -19,3 +19,3 @@
+
+-#include <config.h>
++#include <../lib/config.h>
+
+EOF
+# avoid ioctl in src/cat.c (version >= 8.32)
+patch -ulbf src/cat.c << EOF
+@@ -259,3 +259,3 @@
+
+-#ifdef FIONREAD
++#if defined(FIONREAD) && !defined(_WIN32)
+   /* If nonzero, use the FIONREAD ioctl, as an optimization.
+@@ -304,3 +304,3 @@
+               bool input_pending = false;
+-#ifdef FIONREAD
++#if defined(FIONREAD) && !defined(_WIN32)
+               int n_to_read = 0;
+EOF
+# fix missing fpathconf (version >= 8.32)
+sed -i.bak -e "s/fpathconf (dir_fd, _PC_NAME_MAX)/255/; s/fpathconf (destdirfd, _PC_TIMESTAMP_RESOLUTION)/2000000000/; s/fpathconf (desc, _PC_ACL_ENABLED)/0/" $(grep -l fpathconf $(find -name '*.c'))
+# fix missing getpid/getppid/getuid/getgid lib/randread.c (version >= 8.32)
+patch -ulbf lib/randread.c << EOF
+@@ -177,2 +177,3 @@
+   ISAAC_SEED (struct timeval, gettimeofday (&v, NULL));
++#ifndef _WIN32
+   ISAAC_SEED (pid_t, v = getpid ());
+@@ -181,2 +182,3 @@
+   ISAAC_SEED (uid_t, v = getgid ());
++#endif
+
+EOF
+# fix missing geteuid in lib/write-any-file.c (version >= 8.32)
+patch -ulbf lib/write-any-file.c << EOF
+@@ -41,3 +41,3 @@
+       can = (priv_set_ismember (PRIV_FILE_DAC_WRITE) == 1);
+-#else
++#elif !defined(_WIN32)
+       /* In traditional Unix, only root can unlink directories.  */
+EOF
+# fix missing geteuid in src/copy.c (version >= 8.32)
+patch -ulbf src/copy.c << EOF
+@@ -105,2 +105,3 @@
+ }
++# undef mkfifo
+ # define mkfifo rpl_mkfifo
+@@ -1388,3 +1389,7 @@
+
+-      if (!(sb.st_mode & S_IWUSR) && geteuid () != ROOT_UID)
++      if (!(sb.st_mode & S_IWUSR)
++#ifndef _WIN32
++         && geteuid () != ROOT_UID
++#endif
++      )
+         {
+@@ -3047,2 +3052,4 @@
+   }
++#elif _WIN32
++  x->chown_privileges = x->owner_privileges = 0;
+ #else
+EOF
+
+# fix unknown signals in src/csplit.c (version >= 8.32)
+patch -ulbf src/csplit.c << EOF
+@@ -1425,3 +1425,20 @@
+         /* The usual suspects.  */
+-        SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGQUIT, SIGTERM,
++#ifdef SIGALRM
++        SIGALRM,
++#endif
++#ifdef SIGHUP
++       SIGHUP,
++#endif
++#ifdef SIGINT
++       SIGINT,
++#endif
++#ifdef SIGPIPE
++       SIGPIPE,
++#endif
++#ifdef SIGQUIT
++       SIGQUIT,
++#endif
++#ifdef SIGTERM
++       SIGTERM,
++#endif
+ #ifdef SIGPOLL
+EOF
+# fix src/dd.c (version >= 8.32)
+patch -ulbf src/dd.c << EOF
+@@ -63,3 +63,3 @@
+
+-#ifndef SIGINFO
++#if !defined(SIGINFO) && defined(SIGUSR1)
+ # define SIGINFO SIGUSR1
+@@ -665,2 +665,3 @@
+       {
++#ifdef SIGINFO
+         printf (_("\\
+@@ -673,2 +674,3 @@
+ "), SIGINFO == SIGUSR1 ? "USR1" : "INFO");
++#endif
+       }
+@@ -899,3 +901,8 @@
+ {
++#ifdef _WIN32
++#undef SA_NOCLDSTOP
++#define SA_NOCLDSTOP 1
++#else
+   bool catch_siginfo = ! (SIGINFO == SIGUSR1 && getenv ("POSIXLY_CORRECT"));
++#endif
+
+@@ -905,4 +912,6 @@
+   sigemptyset (&caught_signals);
++#ifdef SIGINFO
+   if (catch_siginfo)
+     sigaddset (&caught_signals, SIGINFO);
++#endif
+   sigaction (SIGINT, NULL, &act);
+@@ -912,2 +921,3 @@
+
++#ifdef SIGINFO
+   if (sigismember (&caught_signals, SIGINFO))
+@@ -921,2 +931,3 @@
+     }
++#endif
+
+@@ -1203,2 +1214,3 @@
+     {
++#ifndef _WIN32
+       int old_flags = fcntl (STDOUT_FILENO, F_GETFL);
+@@ -1206,2 +1218,3 @@
+           && status_level != STATUS_NONE)
++#endif
+         error (0, errno, _("failed to turn off O_DIRECT: %s"),
+@@ -2093,2 +2106,3 @@
+
++#ifndef _WIN32
+   if (add_flags)
+@@ -2130,2 +2144,3 @@
+     }
++#endif
+ }
+EOF
+# fix src/ls.c (version >= 8.32)
+patch -ulbf src/ls.c << EOF
+@@ -1508,2 +1508,3 @@
+          default.  Instead, just raise the uncatchable SIGSTOP.  */
++#ifdef SIGSTOP
+       if (stops)
+@@ -1514,2 +1515,3 @@
+       else
++#endif
+         signal (sig, SIG_DFL);
+@@ -1535,6 +1537,25 @@
+       /* This one is handled specially.  */
++#ifdef SIGTSTP
+       SIGTSTP,
++#endif
+
+       /* The usual suspects.  */
+-      SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGQUIT, SIGTERM,
++#ifdef SIGALRM
++      SIGALRM,
++#endif
++#ifdef SIGHUP
++      SIGHUP,
++#endif
++#ifdef SIGINT
++      SIGINT,
++#endif
++#ifdef SIGPIPE
++      SIGPIPE,
++#endif
++#ifdef SIGQUIT
++      SIGQUIT,
++#endif
++#ifdef SIGTERM
++      SIGTERM,
++#endif
+ #ifdef SIGPOLL
+@@ -1591,3 +1612,7 @@
+             {
++#ifndef SIGTSTP
++              signal (sig[j], sighandler);
++#else
+               signal (sig[j], sig[j] == SIGTSTP ? stophandler : sighandler);
++#endif
+               siginterrupt (sig[j], 0);
+@@ -1808,4 +1833,6 @@
+          important anyway.  */
++#ifdef SIGSTOP
+       for (j = stop_signal_count; j; j--)
+         raise (SIGSTOP);
++#endif
+       j = interrupt_signal;
+EOF
+# fix configure
+patch -ulbf configure << EOF
+--- configure  2011-10-12 11:45:50 +0200
++++ configure  2011-12-19 16:45:36 +0100
+@@ -38064,3 +38064,3 @@
+ if test -z "\$ac_list_mounted_fs"; then
+-  as_fn_error \$? "could not determine how to read list of mounted file systems" "\$LINENO" 5
++  as_fn_warning \$? "could not determine how to read list of mounted file systems" "\$LINENO" 5
+   # FIXME -- no need to abort building the whole package
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-selinux --enable-threads=win32 CFLAGS="-I`pwd`/winfix" LIBS="-Wl,--as-needed -lws2_32" &&
+ echo "#ifndef _PC_NAME_MAX" >> lib/config.h &&
+ echo "#define _PC_NAME_MAX 255" >> lib/config.h &&
+ echo "#endif" >> lib/config.h &&
+ #echo "#undef HAVE_DECL_GETEUID" >> lib/config.h &&
+ #echo "#define HAVE_DECL_GETEUID 0" >> lib/config.h &&
+ #echo "#undef HAVE_DECL_GETPWUID" >> lib/config.h &&
+ #echo "#define HAVE_DECL_GETPWUID 0" >> lib/config.h &&
+ #echo "#undef HAVE_DECL_GETGRGID" >> lib/config.h &&
+ #echo "#define HAVE_DECL_GETGRGID 0" >> lib/config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+## fix for missing getaddrinfo/freeaddrinfo
+##define _WIN32_WINNT 0x0501
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

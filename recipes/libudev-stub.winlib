@@ -1,0 +1,69 @@
+export NAME="libudev-stub"
+export STATUS=
+export URL=https://github.com/therealkenc/libudev-stub
+export BASENAME=libudev-stub
+export DESCRIPTION="Libudev-stub is a shim library for libudev, created primarily for the Windows Subsystem for Linux WSL. Theoretically it could be useful for other Linux-ish systems that lack udev support. Udev is part of systemd."
+export CATEGORY=hardware,system
+export TYPE=library
+#export VERSION=1.0.0
+#export VERSIONDATE=20200411
+export VERSION=1.0.4
+export VERSIONDATE=20200411
+wl-showstatus --package-version
+export DEPENDANCIES=libdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/therealkenc/libudev-stub/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/therealkenc/libudev-stub/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd libudev-stub-$VERSION
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/sys/un.h
+#cat > winfix/sys/sysmacros.h << EOF
+##define secure_getenv(n) getenv(n)
+##define socketpair(f,t,p,v) -1
+#EOF
+# fix missing sys/sysmacros.h
+sed -i.bak -e "s/^#include <sys\/sysmacros\.h>$/#ifdef _WIN32\n#ifndef secure_getenv\n#define secure_getenv(n) getenv(n)\n#endif\n#ifndef socketpair\n#define socketpair(f,t,p,v) -1\n#endif\n#else\n&\n#endif/" libudev/libudev.h
+# workaround for error installing libudev.pc
+sed -i.bak -e "s/^\s*install\s*(.*libudev\.pc/#&/" libudev/CMakeLists.txt
+# also build static library
+sed -i.bak2 -e "s/^\(.*add_library *(\)\([^ ]*\) SHARED\( *.*\)$/\1\2 SHARED\3\n\1\2_static STATIC\3\nset_target_properties(\2_static PROPERTIES OUTPUT_NAME \2)/" libudev/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-I$(pwd)/libudev -I$(pwd)/winfix -I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+ echo "-Wl,--as-needed -ldl" >> build_win/libudev/CMakeFiles/udev.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ # manually install static library
+ cp -f build_win/libudev/libudev.a $INSTALLPREFIX/lib/ &&
+ # workaround for error installing libudev.pc
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ cp -f build_win/libudev/libudev.pc $INSTALLPREFIX/lib/pkgconfig &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libudev-stub-$VERSION
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-I$(pwd)/libudev -I$(pwd)/winfix -I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+# #echo "-Wl,--as-needed -ldl" >> build_win/libudev/CMakeFiles/udev.dir/linklibs.rsp &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+# # manually install static library
+# #cp -f build_win/libudev/libudev.a $INSTALLPREFIX/lib/ &&
+# # workaround for error installing libudev.pc
+# mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+# cp -f build_win/libudev/libudev.pc $INSTALLPREFIX/lib/pkgconfig &&
+#    echo OK
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libudev-stub-$VERSION
+
+
+

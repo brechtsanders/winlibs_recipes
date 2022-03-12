@@ -1,0 +1,259 @@
+export NAME="libfyaml"
+export STATUS=
+export URL=https://github.com/pantoniou/libfyaml
+export BASENAME=libfyaml
+export DESCRIPTION="Fully feature complete YAML parser and emitter, supporting the latest YAML spec and passing the full YAML testsuite."
+export CATEGORY=dataprocessing,fileformat
+export TYPE=library
+#export VERSION=0.7
+#export VERSIONDATE=20210627
+#export VERSION=0.7.1
+#export VERSIONDATE=20210922
+#export VERSION=0.7.2
+#export VERSIONDATE=20211109
+#export VERSION=0.7.3
+#export VERSIONDATE=20211116
+#export VERSION=0.7.4
+#export VERSIONDATE=20211228
+#export VERSION=0.7.9
+#export VERSIONDATE=20220114
+#export VERSION=0.7.11
+#export VERSIONDATE=20220115
+export VERSION=0.7.12
+export VERSIONDATE=20220119
+wl-showstatus --package-version
+export DEPENDANCIES=libyaml,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/pantoniou/libfyaml/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/pantoniou/libfyaml/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing alloca.h
+sed -i.bak -e "s/alloca\.h/malloc.h/" $(grep -l "alloca\.h" $(find -name '*.h' -or -name '*.c'))
+# fix missing sysconf(_SC_PAGESIZE) in src/lib/fy-emit.c
+patch -ulbf src/lib/fy-emit.c << EOF
+@@ -18,2 +18,5 @@
+ #include <ctype.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -2107,3 +2110,8 @@
+        int left;
++#ifdef _WIN32
++       SYSTEM_INFO sysinfo;
++       #define pagesize sysinfo.dwPageSize
++#else
+        int pagesize = 0;
++#endif
+        int size;
+@@ -2117,3 +2125,7 @@
+
++#ifdef _WIN32
++               GetSystemInfo(&sysinfo);
++#else
+                pagesize = sysconf(_SC_PAGESIZE);
++#endif
+                size = state->need + pagesize - 1;
+EOF
+## fix missing sysconf(_SC_PAGESIZE) in src/lib/fy-input.c (version <= 0.7)
+#patch -ulbf src/lib/fy-input.c << EOF
+#@@ -21,3 +21,7 @@
+# #include <sys/stat.h>
+#+#ifdef _WIN32
+#+#include <windows.h>
+#+#else
+# #include <sys/ioctl.h>
+#+#endif
+#
+#@@ -334,2 +338,5 @@
+#        int rc;
+#+#ifdef _WIN32
+#+       SYSTEM_INFO sysinfo;
+#+#endif
+#
+#@@ -394,3 +401,8 @@
+#                /* switch to stream mode */
+#+#ifdef _WIN32
+#+               GetSystemInfo(&sysinfo);
+#+               fyi->chunk = sysinfo.dwPageSize;
+#+#else
+#                fyi->chunk = sysconf(_SC_PAGESIZE);
+#+#endif
+#                fyi->buffer = malloc(fyi->chunk);
+#@@ -404,4 +416,10 @@
+#                fyi->chunk = fyi->cfg.stream.chunk;
+#-               if (!fyi->chunk)
+#+               if (!fyi->chunk) {
+#+#ifdef _WIN32
+#+                       GetSystemInfo(&sysinfo);
+#+                       fyi->chunk = sysinfo.dwPageSize;
+#+#else
+#                        fyi->chunk = sysconf(_SC_PAGESIZE);
+#+#endif
+#+               }
+#                fyi->buffer = malloc(fyi->chunk);
+#EOF
+# fix src/lib/fy-input.c (version >= 0.7.1)
+patch -ulbf src/lib/fy-input.c << EOF
+@@ -21,3 +21,7 @@
+ #include <sys/stat.h>
++#ifdef _WIN32
++#include <windows.h>
++#else
+ #include <sys/ioctl.h>
++#endif
+ #include <errno.h>
+@@ -312,2 +316,5 @@
+        int rc;
++#ifdef _WIN32
++       SYSTEM_INFO sysinfo;
++#endif
+
+@@ -374,3 +381,8 @@
+                /* switch to stream mode */
++#ifdef _WIN32
++               GetSystemInfo(&sysinfo);
++               fyi->chunk = sysinfo.dwPageSize;
++#else
+                fyi->chunk = sysconf(_SC_PAGESIZE);
++#endif
+                fyi->buffer = malloc(fyi->chunk);
+@@ -383,4 +395,10 @@
+                fyi->chunk = fyi->cfg.stream.chunk;
+-               if (!fyi->chunk)
++               if (!fyi->chunk) {
++#ifdef _WIN32
++                       GetSystemInfo(&sysinfo);
++                       fyi->chunk = sysinfo.dwPageSize;
++#else
+                        fyi->chunk = sysconf(_SC_PAGESIZE);
++#endif
++               }
+                fyi->buffer = malloc(fyi->chunk);
+@@ -401,3 +419,8 @@
+        case fyit_callback:
++#ifdef _WIN32
++               GetSystemInfo(&sysinfo);
++               fyi->chunk = sysinfo.dwPageSize;
++#else
+                fyi->chunk = sysconf(_SC_PAGESIZE);
++#endif
+                fyi->buffer = malloc(fyi->chunk);
+EOF
+# fix src/lib/fy-parse.c
+patch -ulbf src/lib/fy-parse.c << EOF
+@@ -16,3 +16,5 @@
+ #include <sys/stat.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <fcntl.h>
+EOF
+# fix src/lib/fy-utils.h (version >= 0.7.9)
+patch -ulbf src/lib/fy-utils.h << EOF
+@@ -18,3 +18,7 @@
+ #include <unistd.h>
++#ifdef _WIN32
++struct termios;
++#else
+ #include <termios.h>
++#endif
+
+EOF
+# fix src/lib/fy-utils.c (version >= 0.7.9)
+patch -ulbf src/lib/fy-utils.c << EOF
+@@ -17,5 +17,11 @@
+ #include <errno.h>
++#ifndef _WIN32
+ #include <termios.h>
++#endif
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/select.h>
++#endif
+ #include <sys/time.h>
+@@ -402,2 +408,5 @@
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        struct termios newt, t;
+@@ -425,2 +434,3 @@
+        return 0;
++#endif
+ }
+@@ -429,2 +439,5 @@
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        /* must be a terminal */
+@@ -434,2 +447,3 @@
+        return tcsetattr(fd, TCSANOW, oldt);
++#endif
+ }
+@@ -616,2 +630,5 @@
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        struct termios old_term;
+@@ -633,2 +650,3 @@
+        return ret;
++#endif
+ }
+EOF
+# fix src/lib/fy-emit.c (version >= 0.7.9)
+patch -ulbf src/lib/fy-emit.c << EOF
+@@ -2289,3 +2289,5 @@
+ #ifdef _WIN32
++               SYSTEM_INFO sysinfo;
+                GetSystemInfo(&sysinfo);
++              pagesize = sysinfo.dwPageSize;
+ #else
+EOF
+# fix missing setenv()/unsetenv() in src/valgrind/fy-valgrind.h
+sed -i.bak2 -e "s/setenv(\"\([^\"]*\)\", \"\([^\"]*\)\", 1)/putenv(\"\1=\2\")/; s/unsetenv(\"\([^\"]*\)\")/putenv(\"\1=\")/" src/valgrind/fy-valgrind.h
+# fix missing rand_r() in src/internal/libfyaml-parser.c
+mv src/internal/libfyaml-parser.c src/internal/libfyaml-parser.c.bak &&
+echo "#define rand_r(__seed) (__seed == __seed ? rand () : rand ())" > src/internal/libfyaml-parser.c &&
+cat src/internal/libfyaml-parser.c.bak >> src/internal/libfyaml-parser.c
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: install .cmake files
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_static &&
+# #wl-showstatus configure &&
+# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# #wl-showstatus build-install &&
+# #ninja -Cbuild_shared install/strip &&
+# ( echo "EXPORTS"; gcc -E include/libfyaml.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(fy_[^ *]*\).*/\1/p" ) > libfyaml.def &&
+# gcc -shared -s -mwindows -def libfyaml.def -o libfyaml.dll build_static/libfyaml.a -Wl,--out-implib,libfyaml.dll.a -lmman &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build shared library
+
+
+

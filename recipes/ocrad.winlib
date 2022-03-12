@@ -1,0 +1,106 @@
+export NAME="ocrad"
+export STATUS=
+export URL=http://www.gnu.org/software/ocrad/
+export BASENAME=ocrad
+export DESCRIPTION="GNU Ocrad is an OCR (Optical Character Recognition) program based on a feature extraction method. It reads images in pbm (bitmap), pgm (greyscale) or ppm (color) formats and produces text in byte (8-bit) or UTF-8 formats."
+export CATEGORY=ocr
+export TYPE=library
+#export VERSION=0.17
+#export VERSION=0.21
+#export VERSIONDATE=20120116
+#export VERSION=0.25
+#export VERSIONDATE=20160405
+#export VERSION=0.26
+#export VERSIONDATE=20170331
+#export VERSION=0.27
+#export VERSIONDATE=20190112
+export VERSION=0.28
+export VERSIONDATE=20220118
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/ocrad/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/ocrad/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/ocrad/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/ocrad/$BASENAME-$VERSION.tar.lz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfa $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.lz
+cd $BASENAME-$VERSION
+# fix missing stuff
+mv common.h common.h.bak
+cat > common.h << EOF
+#include <stdio.h>
+#include <limits.h>
+#include <string>
+#include <cstring>
+#include <cstdio>
+#include <cmath>
+#include <algorithm>
+EOF
+cat common.h.bak >> common.h
+# fix error: call of overloaded 'abs(int)' is ambiguous
+patch -ulbf character_r12.cc << EOF
+--- character_r12.cc  Fri Jun 29 14:29:14 2007
++++ character_r12.cc  Tue Jul  7 09:32:32 2009
+@@ -143,3 +143,3 @@
+           int hdiff;
+-          if( b2.bottom_hook( &hdiff ) && std::abs( hdiff ) >= b2.height() / 2 )
++          if( b2.bottom_hook( &hdiff ) && std::abs( (double)hdiff ) >= b2.height() / 2 )
+             {
+@@ -168,3 +168,3 @@
+                     ( 3 * f2.wp[f2.wp.pos(10)] < 2 * f1.wp.max() ||
+-                      b1.left() <= b2.left() && b2.vpos( 80 ) > charbox.bottom() ) )
++                      ( b1.left() <= b2.left() && b2.vpos( 80 ) > charbox.bottom() ) ) )
+                   { add_guess( UCS::IEXCLAM, 0 ); return; }
+EOF
+patch -ulbf textline_r2.cc << EOF
+--- textline_r2.cc  Fri Jun 29 14:29:14 2007
++++ textline_r2.cc  Tue Jul  7 09:35:30 2009
+@@ -443,4 +443,4 @@
+                       cap = ( c1.bottom() + 2 <= c2.bottom() ); break;
+-            case 'Q': cap = ( std::abs( c1.top() - c2.top() ) <= 2 ); break;
+-            default : cap = ( std::abs( c1.bottom() - c2.bottom() ) <= 2 );
++            case 'Q': cap = ( std::abs( (double)(c1.top() - c2.top()) ) <= 2 ); break;
++            default : cap = ( std::abs( (double)(c1.bottom() - c2.bottom()) ) <= 2 );
+             }
+@@ -449,3 +449,3 @@
+       if( !valid_c2 && i > big_initials() && !character(i-1).maybe(' ') )
+-        cap = ( std::abs( c1.bottom() - charbox(c1).bottom() ) <= 2 );
++        cap = ( std::abs( (double)(c1.bottom() - charbox(c1).bottom()) ) <= 2 );
+       if( cap ) c1.only_guess( 'P', 0 );
+EOF
+# fix already defined Rectangle in rectangle.h (version >= 0.25)
+mv rectangle.h rectangle.h.bak
+cat > rectangle.h << EOF
+#undef Rectangle
+#include <windows.h>
+#define Rectangle ocrad_Rectangle
+#define left ocrad_left
+#define top ocrad_top
+#define right ocrad_right
+#define bottom ocrad_bottom
+EOF
+cat rectangle.h.bak >> rectangle.h
+mv Makefile.in Makefile.in.bak
+sed -e "s/\(\$(INSTALL) -p\) -m [0-9]*/\1/; s?\$(INSTALL_PROGRAM) ./\$(progname) \$(DESTDIR)\$(bindir)/\$(progname)?\$(INSTALL_PROGRAM) ./\$(progname).exe \$(DESTDIR)\$(bindir)/\$(progname).exe?" Makefile.in.bak > Makefile.in
+mkdir -p $INSTALLPREFIX/bin
+#make check
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus install &&
+ cp ocrad.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

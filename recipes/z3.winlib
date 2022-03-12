@@ -1,0 +1,156 @@
+export NAME="Z3"
+export STATUS=
+export URL=https://github.com/Z3Prover/z3
+export BASENAME=z3
+export DESCRIPTION="Z3 is a theorem prover from Microsoft Research."
+export CATEGORY=math
+export TYPE=library
+#export VERSION=4.5.0
+#export VERSIONDATE=20170909
+#export VERSION=4.6.0
+#export VERSIONDATE=20171219
+#export VERSION=4.7.1
+#export VERSIONDATE=20180523
+#export VERSION=4.8.1
+#export VERSIONDATE=20181016
+#export VERSION=4.8.3
+#export VERSIONDATE=20181120
+#export VERSION=4.8.4
+#export VERSIONDATE=20181221
+#export VERSION=4.8.5
+#export VERSIONDATE=20190601
+#export VERSION=4.8.6
+#export VERSIONDATE=20190920
+#export VERSION=4.8.7
+#export VERSIONDATE=20191120
+#export VERSION=4.8.8
+#export VERSIONDATE=20200509
+#export VERSION=4.8.9
+#export VERSIONDATE=20200911
+#export VERSION=4.8.10
+#export VERSIONDATE=20210121
+#export VERSION=4.8.11
+#export VERSIONDATE=20210711
+#export VERSION=4.8.12
+#export VERSIONDATE=20210714
+#export VERSION=4.8.13
+#export VERSIONDATE=20211119
+export VERSION=4.8.14
+export VERSIONDATE=20211224
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,gmp
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/Z3Prover/z3/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/Z3Prover/z3/archive/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/Z3Prover/z3/archive/Z3-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/Z3Prover/z3/archive/z3-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/Z3-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/z3-$VERSION.tar.gz
+cd z3-z3-$VERSION
+##sed -i.bak -e "s/\(IS_CYGWIN_MINGW=\)False/\1True/" scripts/mk_util.py
+##cp src/math/polynomial/algebraic_numbers.h src/math/polynomial/algebraic_numbers.hpp
+#wl-showstatus configure &&
+##$PYDIR/python.exe scripts/mk_make.py -m --prefix=$INSTALLPREFIX --pypkgdir=$INSTALLPREFIX/python/Lib/site-packages --staticlib &&
+#PYTHON=$PYDIR/python.exe ./configure -m --pypkgdir=$INSTALLPREFIX/python/Lib/site-packages --staticlib &&
+##--staticbin --noomp
+# wl-showstatus build  &&
+# make -j1 -Cbuild CC="gcc -fpermissive" CXX="g++ -fpermissive" CXX_OUT_FLAG=-o OBJ_EXT=.o LIB_EXT=.a AR=ar AR_OUTFLAG= EXE_EXT=.exe LINK=ld LINK_OUT_FLAG=-o SO_EXT=.dll SLINK=ld SLINK_OUT_FLAG=-o OS_DEFINES=-D_WINDOWS AR_FLAGS= LINK_FLAGS=-shared SLINK_FLAGS=-static CXXFLAGS="-D_EXTERNAL_RELEASE -DWIN32 -DNDEBUG -D_CONSOLE -D_WINDOWS -DASYNC_COMMANDS -D_NO_OMP_" LINK_EXTRA_FLAGS="" SLINK_EXTRA_FLAGS="" &&
+#    echo OK
+## fix missing _CRT_ASSERT in src/util/warning.cpp
+#mv src/util/warning.cpp src/util/warning.cpp.bak &&
+#echo "#include <crtdbg.h>" > src/util/warning.cpp &&
+#cat src/util/warning.cpp.bak >> src/util/warning.cpp
+## fix missing _CrtDumpMemoryLeaks in src/shell/main.cpp
+#mv src/shell/main.cpp src/shell/main.cpp.bak &&
+#echo "#include <crtdbg.h>" > src/shell/main.cpp &&
+#cat src/shell/main.cpp.bak >> src/shell/main.cpp
+## fix src/util/hwf.cpp
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# # avoid intrinsics in order to support older CPUs in src/util/hwf.cpp
+# sed -i.bak -e "s?^#define USE_INTRINSICS?//&?" src/util/hwf.cpp
+#else
+# # fix missing _mm_fmadd_sd in src/util/hwf.cpp
+# mv src/util/hwf.cpp src/util/hwf.cpp.bak &&
+# echo "#include <immintrin.h>" > src/util/hwf.cpp &&
+# cat src/util/hwf.cpp.bak >> src/util/hwf.cpp
+#fi
+## fix src/util/mpz.cpp (version = 4.8.11)
+##### bug report: https://github.com/Z3Prover/z3/issues/5333
+#patch -ulbf src/util/mpz.cpp << EOF
+#@@ -50,3 +50,3 @@
+#
+#-#if defined(_WINDOWS) && !defined(_M_ARM) && !defined(_M_ARM64)
+#+#if defined(_WINDOWS) && !defined(_M_ARM) && !defined(_M_ARM64) && !defined(__MINGW32__)
+# // This is needed for _tzcnt_u32 and friends.
+#EOF
+# fix missing numeric_limits when using clang (version >= 4.8.14)
+####include/c++/v1/cmath:642:26: error: no template named 'numeric_limits'
+if echo $CXX|grep -q clang++; then
+for F in $(find -name '*.cpp'); do
+ mv $F $F.bak &&
+ echo "#include <cstdlib>" > $F &&
+ echo "#include <limits>" >> $F &&
+ cat $F.bak >> $F
+done
+fi
+# fix ambiguous log2() in src/ast/rewriter/seq_eq_solver.cpp (version >= 4.8.14)
+patch -ulbf src/ast/rewriter/seq_eq_solver.cpp << EOF
+@@ -286,3 +288,3 @@
+         unsigned sz = bv.get_bv_size(n);
+-        if (es.size() > (sz + log2(10)-1)/log2(10)) {
++        if (es.size() > (sz + log2(10.0)-1)/log2(10.0)) {
+             set_conflict();
+EOF
+## fix missing -mfma flag in CMakeLists.txt (version <= 4.8.9)
+#sed -i.bak -e 's/set(SSE_FLAGS.*"-msse2"/& "-mfma" "-fpermissive"/' CMakeLists.txt
+# disable SSE2 in CMakeLists.txt (version >= 4.8.10)
+#### bug report: https://github.com/Z3Prover/z3/issues/5248
+#### see also: https://github.com/brechtsanders/winlibs_mingw/issues/39
+sed -i.bak -e "s/if (HAS_SSE2/& AND NOT MINGW/" CMakeLists.txt
+## fix invalid version in CMakeLists.txt (version = 4.5.0)
+#sed -i.orig2 -e "s/\(set(Z3_VERSION_MAJOR \)[0-9]*/\1$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*$/\1/")/; s/\(set(Z3_VERSION_MINOR \)[0-9]*/\1$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*$/\2/")/; s/\(set(Z3_VERSION_PATCH \)[0-9]*/\1$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*$/\3/")/" CMakeLists.txt
+#wl-showstatus configure &&
+#$PYDIR/python.exe contrib/cmake/bootstrap.py create &&
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_LIBZ3_SHARED:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DUSE_LIB_GMP:BOOL=ON -DBUILD_PYTHON_BINDINGS:BOOL=OFF -DBUILD_DOTNET_BINDINGS:BOOL=OFF -DBUILD_JAVA_BINDINGS:BOOL=OFF -DENABLE_EXAMPLE_TARGETS:BOOL=OFF .. &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZ3_BUILD_LIBZ3_SHARED:BOOL=OFF -DZ3_USE_LIB_GMP:BOOL=ON -DSINGLE_THREADED:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DZ3_BUILD_PYTHON_BINDINGS:BOOL=OFF -DZ3_BUILD_DOTNET_BINDINGS:BOOL=OFF -DZ3_BUILD_JAVA_BINDINGS:BOOL=OFF -DZ3_INCLUDE_GIT_DESCRIBE:BOOL=OFF -DZ3_INCLUDE_GIT_HASH:BOOL=OFF -DZ3_ENABLE_EXAMPLE_TARGETS:BOOL=OFF -DZ3_BUILD_DOCUMENTATION:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_LIBZ3_SHARED:BOOL=ON -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DUSE_LIB_GMP:BOOL=ON -DBUILD_PYTHON_BINDINGS:BOOL=OFF -DBUILD_DOTNET_BINDINGS:BOOL=OFF -DBUILD_JAVA_BINDINGS:BOOL=OFF -DENABLE_EXAMPLE_TARGETS:BOOL=OFF .. &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZ3_BUILD_LIBZ3_SHARED:BOOL=ON -DZ3_USE_LIB_GMP:BOOL=ON -DSINGLE_THREADED:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DZ3_BUILD_PYTHON_BINDINGS:BOOL=OFF -DZ3_BUILD_DOTNET_BINDINGS:BOOL=OFF -DZ3_BUILD_JAVA_BINDINGS:BOOL=OFF -DZ3_INCLUDE_GIT_DESCRIBE:BOOL=OFF -DZ3_INCLUDE_GIT_HASH:BOOL=OFF -DZ3_ENABLE_EXAMPLE_TARGETS:BOOL=OFF -DZ3_BUILD_DOCUMENTATION:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# #mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf z3-z3-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZ3_BUILD_LIBZ3_SHARED:BOOL=OFF -DZ3_USE_LIB_GMP:BOOL=ON -DSINGLE_THREADED:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DZ3_BUILD_PYTHON_BINDINGS:BOOL=OFF -DZ3_BUILD_DOTNET_BINDINGS:BOOL=OFF -DZ3_BUILD_JAVA_BINDINGS:BOOL=OFF -DZ3_INCLUDE_GIT_DESCRIBE:BOOL=OFF -DZ3_INCLUDE_GIT_HASH:BOOL=OFF -DZ3_ENABLE_EXAMPLE_TARGETS:BOOL=OFF -DZ3_BUILD_DOCUMENTATION:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZ3_BUILD_LIBZ3_SHARED:BOOL=OFF -DZ3_USE_LIB_GMP:BOOL=ON -DSINGLE_THREADED:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DZ3_BUILD_PYTHON_BINDINGS:BOOL=OFF -DZ3_BUILD_DOTNET_BINDINGS:BOOL=OFF -DZ3_BUILD_JAVA_BINDINGS:BOOL=OFF -DZ3_INCLUDE_GIT_DESCRIBE:BOOL=OFF -DZ3_INCLUDE_GIT_HASH:BOOL=OFF -DZ3_ENABLE_EXAMPLE_TARGETS:BOOL=OFF -DZ3_BUILD_DOCUMENTATION:BOOL=OFF $(if ( echo $RUNPLATFORM | grep -vq x86_64 ); then echo "-DCMAKE_CXX_FLAGS=-march=pentium4"; fi) -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZ3_BUILD_LIBZ3_SHARED:BOOL=ON -DZ3_USE_LIB_GMP:BOOL=ON -DSINGLE_THREADED:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DZ3_BUILD_PYTHON_BINDINGS:BOOL=OFF -DZ3_BUILD_DOTNET_BINDINGS:BOOL=OFF -DZ3_BUILD_JAVA_BINDINGS:BOOL=OFF -DZ3_INCLUDE_GIT_DESCRIBE:BOOL=OFF -DZ3_INCLUDE_GIT_HASH:BOOL=OFF -DZ3_ENABLE_EXAMPLE_TARGETS:BOOL=OFF -DZ3_BUILD_DOCUMENTATION:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZ3_BUILD_LIBZ3_SHARED:BOOL=ON -DZ3_USE_LIB_GMP:BOOL=ON -DSINGLE_THREADED:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DZ3_BUILD_PYTHON_BINDINGS:BOOL=OFF -DZ3_BUILD_DOTNET_BINDINGS:BOOL=OFF -DZ3_BUILD_JAVA_BINDINGS:BOOL=OFF -DZ3_INCLUDE_GIT_DESCRIBE:BOOL=OFF -DZ3_INCLUDE_GIT_HASH:BOOL=OFF -DZ3_ENABLE_EXAMPLE_TARGETS:BOOL=OFF -DZ3_BUILD_DOCUMENTATION:BOOL=OFF $(if ( echo $RUNPLATFORM | grep -vq x86_64 ); then echo "-DCMAKE_CXX_FLAGS=-march=pentium4"; fi) -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ #mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf z3-z3-$VERSION
+
+
+

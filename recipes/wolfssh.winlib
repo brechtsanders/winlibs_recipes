@@ -1,0 +1,77 @@
+export NAME="wolfSSH"
+export STATUS=
+export URL=https://www.wolfssl.com/products/wolfssh/
+export BASENAME=wolfssh
+export DESCRIPTION="The wolfSSH library is a lightweight SSHv2 client and server library written in ANSI C and targeted for embedded, RTOS, and resource-constrained environments - primarily because of its small size, speed, and feature set. It is commonly used in standard operating environments as well because of its royalty-free pricing and excellent cross platform support."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.4.5
+#export VERSIONDATE=20210121
+#export VERSION=1.4.6
+#export VERSIONDATE=20210204
+#export VERSION=1.4.7
+#export VERSIONDATE=20210724
+export VERSION=1.4.8
+export VERSIONDATE=20211105
+wl-showstatus --package-version
+export DEPENDANCIES=wolfssl,libtommath
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSING
+export LICENSETYPE=GPL
+#export DOWNLOADURL=https://www.wolfssl.com/download/
+export DOWNLOADURL=https://github.com/wolfSSL/wolfssh/releases
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/wolfSSL/wolfssh/archive/v$VERSION-stable.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION-stable.tar.gz
+cd $BASENAME-$VERSION-stable
+# fix missing pthread_t in examples/client/client.c
+mv examples/client/client.c examples/client/client.c.bak &&
+echo "#include <pthread.h>" > examples/client/client.c &&
+cat examples/client/client.c.bak >> examples/client/client.c
+# fix missing struct dirent in src/wolfscp.c
+mv src/wolfscp.c src/wolfscp.c.bak &&
+echo "#include <dirent.h>" > src/wolfscp.c &&
+cat src/wolfscp.c.bak >> src/wolfscp.c
+## fix missing wolfSSH_ConvertConsole in wolfssh/ssh.h
+#sed -i.bak -e "s/USE_WINDOWS_API/_WIN32/" wolfssh/ssh.h src/wolfterm.c
+# fix dllexport/dllimport in wolfssh/visibility.h
+#sed -i.bak -e "s/_MSC_VER/_WIN32/" wolfssh/visibility.h
+patch -ulbf wolfssh/visibility.h << EOF
+@@ -42,4 +42,4 @@
+ #if defined(BUILDING_WOLFSSH)
+-    #if defined(_MSC_VER) || defined(__CYGWIN__)
+-        #ifdef WOLFSSH_DLL
++    #if defined(_WIN32) || defined(__CYGWIN__)
++        #ifdef DLL_EXPORT
+             #define WOLFSSH_API extern __declspec(dllexport)
+@@ -60,4 +60,4 @@
+ #else /* BUILDING_WOLFSSH */
+-    #if defined(_MSC_VER) || defined(__CYGWIN__)
+-        #ifdef WOLFSSH_DLL
++    #if defined(_WIN32) || defined(__CYGWIN__)
++        #if !defined(STATIC_WOLFSSH) && !defined(STATIC)
+             #define WOLFSSH_API extern __declspec(dllimport)
+EOF
+# fix missing wolfSSH_ConvertConsole in tests/api.c and examples/client/client.c
+sed -i.bak2 -e "s/#include <wolfssh\/ssh\.h>/&\n#undef USE_WINDOWS_API/" tests/api.c examples/client/client.c
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ # fix DLL exports
+ #sed -i.bak -e "s/-DBUILDING_WOLFSSH/& -DWOLFSSH_DLL/" Makefile.in &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-examples LDFLAGS="-Wl,--as-needed -ltommath" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-keygen --enable-agent --disable-examples LDFLAGS="-Wl,--as-needed -ltommath" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-term --disable-shell --enable-keygen --disable-scp --disable-sftp --enable-fwd --enable-agent --disable-examples LDFLAGS="-Wl,--as-needed -ltommath" &&
+ #CFLAGS="-DUSE_WINDOWS_API" 
+ #--enable-scp
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || ( make install-binPROGRAMS install-libLTLIBRARIES install-includeHEADERS install-nobase_includeHEADERS install-data install-exec-local install-exec-am install-data-am && strip $INSTALLPREFIX/bin/*.dll )) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION-stable
+
+
+

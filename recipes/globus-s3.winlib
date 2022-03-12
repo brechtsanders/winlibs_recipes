@@ -1,0 +1,77 @@
+export NAME="globus-s3"
+export STATUS=
+#export URL=http://www.globus.org/
+export URL=https://github.com/globus/globus-s3
+export BASENAME=globus-s3
+export DESCRIPTION="Amazon Web Services S3 Connector"
+export CATEGORY=communications
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20180924
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2,libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/globus/globus-s3/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/globus/globus-s3/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/select.h
+#echo "#define uname(p) -1" > winfix/sys/utsname.h
+# fix redefinition of putenv in src/s3.c
+sed -i.bak -e "s?^extern int putenv?//&?" src/s3.c
+# fix src/request.c
+patch -ulbf src/request.c << EOF
+@@ -30,3 +30,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <sys/utsname.h>
++#endif
+ #include <libxml/parser.h>
+@@ -1441,2 +1443,7 @@
+
++#if defined(_WIN64)
++#define platform "win64"
++#elif defined(_WIN32)
++#define platform "win32"
++#else
+     char platform[96];
+@@ -1450,2 +1457,3 @@
+     }
++#endif
+
+@@ -1702,4 +1710,6 @@
+ #endif
++#if CURLE_SSL_CACERT != CURLE_PEER_FAILED_VERIFICATION
+     case CURLE_SSL_CACERT:
+         return S3StatusServerFailedVerification;
++#endif
+     default:
+EOF
+# fix src/mingw_functions.c
+mv src/mingw_functions.c src/mingw_functions.c.bak &&
+echo "#include <pthread.h>" > src/mingw_functions.c
+# fix missing SetEnvironmentVariable in src/mingw_s3_functions.c
+mv src/mingw_s3_functions.c src/mingw_s3_functions.c.bak &&
+echo "#define _WIN32_WINNT 0x0600" > src/mingw_s3_functions.c &&
+echo "#include <windows.h>" >> src/mingw_s3_functions.c &&
+cat src/mingw_s3_functions.c.bak >> src/mingw_s3_functions.c
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-xmltest CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -lkernel32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-xmltest CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -lkernel32 -lssl -lcrypto" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

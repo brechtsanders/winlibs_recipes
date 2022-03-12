@@ -1,0 +1,70 @@
+export NAME="lyd"
+export STATUS=
+export URL=http://pippin.gimp.org/lyd/
+#export URL=https://github.com/hodefoting/lyd
+export BASENAME=lyd
+export DESCRIPTION="Realtime paralell audio synthesis engine for games and instruments "
+export CATEGORY=audio
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20210414
+wl-showstatus --package-version
+export DEPENDANCIES=sdl,jack,liblo,libsndfile,libdl
+export OPTIONALDEPENDANCIES=mmm
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=ISC
+export DOWNLOADURL="https://github.com/hodefoting/lyd/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/hodefoting/lyd/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing stderr in lyd/lyd-audio-output.c
+mv lyd/lyd-audio-output.c lyd/lyd-audio-output.c.bak &&
+echo "#include <stdio.h>" > lyd/lyd-audio-output.c &&
+cat lyd/lyd-audio-output.c.bak >> lyd/lyd-audio-output.c
+# fix missing _SC_NPROCESSORS_ONLN in lyd/core/lyd-mixer.c (version >= master)
+patch -ulbf lyd/core/lyd-mixer.c << EOF
+@@ -22,2 +22,5 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+ #include "core/lyd-private.h"
+@@ -139,4 +142,10 @@
+ {
++#ifdef _WIN32
++  SYSTEM_INFO sysinfo;
++  GetSystemInfo(&sysinfo);
++  return sysinfo.dwNumberOfProcessors;
++#else
+ /* XXX: works only for Linux, Solaris, AIX */
+   return sysconf (_SC_NPROCESSORS_ONLN);
++#endif
+ }
+EOF
+# skip building examples
+cat > examples/Makefile.am << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/lyd/core -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make EXEEXT=.exe &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

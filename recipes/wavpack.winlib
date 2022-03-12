@@ -1,0 +1,123 @@
+export NAME="wavpack"
+export STATUS=
+export URL=http://www.wavpack.com/
+export BASENAME=wavpack
+export DESCRIPTION="WavPack is a completely open audio compression format providing lossless, high-quality lossy, and a unique hybrid compression mode. Although the technology is loosely based on previous versions of WavPack, the new version 4 format has been designed from the ground up to offer unparalleled performance and functionality."
+export CATEGORY=audio,codec
+export TYPE=library
+#export VERSION=4.60.1
+#export VERSIONDATE=20101202
+#export VERSION=4.70.0
+#export VERSIONDATE=20131021
+#export VERSION=4.75.0
+#export VERSIONDATE=20150527
+####src/.libs/libwavpack_la-read_words.o:read_words.c:(.text+0x43f): undefined reference to `_BitScanForward'
+#export VERSION=4.75.2
+#export VERSIONDATE=20151008
+#export VERSION=4.80.0
+#export VERSIONDATE=20160406
+####cli/wavpack.c:1315:22: error: storage size of 'time1' isn't known     struct __timeb64 time1, time2;
+#export VERSION=5.0.0
+#export VERSIONDATE=20160406
+#export VERSION=5.1.0
+#export VERSIONDATE=20170122
+export VERSION=5.4.0
+export VERSIONDATE=20210119
+####src/open_filename.c:(.text+0x36): undefined reference to `_ftelli64'
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=license.txt
+export LICENSETYPE=
+export DOWNLOADURL="http://www.wavpack.com/downloads.html wavpack- .zip"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.wavpack.com/sources.zip
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#mv $TARBALLDIR/$BASENAME/sources.zip $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip
+#unzip -oq $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip -d $BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.wavpack.com/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing __stat64 in cli/utils.c
+patch -ulbf cli/utils.c << EOF
+--- cli/utils.c  2009-12-01 05:24:52 +0100
++++ cli/utils.c  2010-12-02 12:02:58 +0100
+@@ -18,2 +18,3 @@
+ #include <shlobj.h>
++#define __MSVCRT_VERSION__ 0x0601
+ #elif defined(__GNUC__) || defined(__sun)
+EOF
+## fix missing _BitScanForward in src/read_words.c (version >= 4.75.0)
+#mv src/read_words.c src/read_words.c.bak
+#cat > src/read_words.c << EOF
+##include <stdint.h>
+#int32_t _BitScanForward(uint32_t *Index, uint32_t Mask)
+#{
+#  __asm__ __volatile__("bsfl %1,%0" : "=r" (Mask),"=m" ((*(volatile long *)Index)));
+#  return (Mask != 0);
+#}
+#EOF
+#cat src/read_words.c.bak >> src/read_words.c
+## fix missing __timeb64 in cli/wavpack.c (version >= 4.75.2)
+#mv cli/wavpack.c cli/wavpack.c.bak &&
+#echo "#define __MSVCRT_VERSION__ 0x0800" > cli/wavpack.c &&
+#cat cli/wavpack.c.bak >> cli/wavpack.c
+## fix missing __timeb64 in cli/wvunpack.c (version >= 4.75.2)
+#mv cli/wvunpack.c cli/wvunpack.c.bak &&
+#echo "#define __MSVCRT_VERSION__ 0x0800" > cli/wvunpack.c &&
+#cat cli/wvunpack.c.bak >> cli/wvunpack.c
+## fix missing _ftelli64/_fseeki64 in src/open_filename.c (version >= 5.1.0)
+#patch -ulbf src/open_filename.c << EOF
+#--- src/open_filename.c  2017-01-08 02:17:16 +0100
+#+++ src/open_filename.c  2017-01-23 09:37:52 +0100
+#
+#@@ -69,7 +69,7 @@
+#
+# static int64_t get_pos (void *id)
+# {
+#-#ifdef _WIN32
+#+#ifdef __MINGW64_VERSION_MAJOR
+#     return _ftelli64 ((FILE*) id);
+# #else
+#     return ftell ((FILE*) id);
+#@@ -78,7 +78,7 @@
+#
+# static int set_pos_abs (void *id, int64_t pos)
+# {
+#-#ifdef _WIN32
+#+#ifdef __MINGW64_VERSION_MAJOR
+#     return _fseeki64 (id, pos, SEEK_SET);
+# #else
+#     return fseek (id, pos, SEEK_SET);
+#@@ -87,7 +87,7 @@
+#
+# static int set_pos_rel (void *id, int64_t delta, int mode)
+# {
+#-#ifdef _WIN32
+#+#ifdef __MINGW64_VERSION_MAJOR
+#     return _fseeki64 (id, delta, mode);
+# #else
+#     return fseek (id, delta, mode);
+#@@ -149,7 +149,7 @@
+#     return (int32_t) fwrite (data, 1, bcount, (FILE*) id);
+# }
+#
+#-#ifdef _WIN32
+#+#ifdef __MINGW64_VERSION_MAJOR
+#
+# static int truncate_here (void *id)
+# {
+#EOF
+##make LIBS="-Wl,--as-needed -lmsvcr80"
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DWIN32" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

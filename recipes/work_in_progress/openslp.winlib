@@ -1,0 +1,140 @@
+export NAME="OpenSLP"
+export STATUS=
+export URL=http://www.openslp.org/
+export BASENAME=openslp
+export DESCRIPTION="The OpenSLP project is an effort to develop an open-source implementation of Service Location Protocol suitable for commercial and non-commercial application. Service Location Protocol is an IETF standards track protocol that provides a framework to allow networking applications to discover the existence, location, and configuration of networked services in enterprise networks."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.2.1
+#export VERSION=1.3.0
+#export VERSIONDATE=
+export VERSION=2.0.0
+export VERSIONDATE=20130608
+####config.status: linking ././fnmatch_.h to ./fnmatch.h
+####config.status: error: ././fnmatch_.h: file not found
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="https://sourceforge.net/projects/openslp/files/OpenSLP/ openslp-"
+#export DOWNLOADURL="https://github.com/openslp-org/openslp/releases"
+export DOWNLOADURL="https://github.com/openslp-org/openslp/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://prdownloads.sourceforge.net/openslp/openslp-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/openslp-org/openslp/archive/openslp-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/openslp-org/openslp/archive/refs/tags/openslp-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/openslp-$VERSION.tar.gz
+cd openslp-$VERSION
+
+#./autogen.sh && automake
+
+# fixes for missing includes of config.h
+mv common/slp_property.c common/slp_property.c.bak
+sed -e "s/#ifndef _WIN32/#if \!defined(_WIN32) || defined(__MINGW32__)/" common/slp_property.c.bak > common/slp_property.c
+patch -ulbf slptool/slptool.c << EOF
+--- slptool/slptool.c   Wed Jun 25 09:26:54 2008
++++ slptool/slptool.c   Wed Jun 25 09:27:29 2008
+@@ -40,3 +40,4 @@
+ # define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))
+-#else
++#endif
++#if !defined(_WIN32) || defined(__MINGW32__)
+ # ifdef HAVE_CONFIG_H
+EOF
+# fix usage of winsock.h instead of winsock2.h
+mv common/slp_iface.h common/slp_iface.h.bak
+sed -e "s/winsock.h/winsock2.h/" common/slp_iface.h.bak > common/slp_iface.h
+mv common/slp_net.h common/slp_net.h.bak
+sed -e "s/winsock.h/winsock2.h/" common/slp_net.h.bak > common/slp_net.h
+mv common/slp_dhcp.h common/slp_dhcp.h.bak
+sed -e "s/winsock.h/winsock2.h/" common/slp_dhcp.h.bak > common/slp_dhcp.h
+mv common/slp_message.h common/slp_message.h.bak
+sed -e "s/winsock.h/winsock2.h/" common/slp_message.h.bak > common/slp_message.h
+## fix missing intptr_t in common/slp_atomic.c (version >= 2.0.0)
+#mv common/slp_atomic.c common/slp_atomic.c.bak
+#echo "#include <stdint.h>" > common/slp_atomic.c
+#cat common/slp_atomic.c.bak >> common/slp_atomic.c
+
+# fix type definitions in common/slp_types.h (version >= 2.0.0)
+patch -ulbf common/slp_types.h << EOF
+--- common/slp_types.h   2012-12-11 00:31:54 +0100
++++ common/slp_types.h  2013-06-08 19:33:04 +0200
+@@ -100,2 +100,5 @@
+ /* inttypes.h stuff for windows */
++#ifdef __MINGW32__
++#include <stdint.h>
++#else
+ typedef signed char int8_t;
+@@ -106,2 +109,3 @@
+ typedef unsigned long uint32_t;
++#endif
+
+EOF
+# fix already defined interface in common/slp_iface.c (version >= 2.0.0)
+patch -ulbf common/slp_iface.c << EOF
+--- common/slp_iface.c  2012-12-11 00:31:54 +0100
++++ common/slp_iface.c  2013-06-08 19:37:14 +0200
+@@ -43,2 +43,7 @@
+
++#ifdef __MINGW32__
++#define _WIN32_WINNT 0x0501
++#include <winsock2.h>
++#include <iphlpapi.h>
++#endif
+ #include "slp_types.h"
+@@ -1032,3 +1037,3 @@
+          char *token, *saveptr;
+-         char interface[MAX_IFACE_LEN];
++         char iface[MAX_IFACE_LEN];
+          struct ifaddrs *ifaddrs;
+@@ -1042,3 +1047,3 @@
+          {
+-            ret = SLPD_Get_Iface_From_Ip(token, (char *)&interface);
++            ret = SLPD_Get_Iface_From_Ip(token, (char *)&iface);
+
+@@ -1078,3 +1083,3 @@
+                      {
+-                        if ((sts = GetV6Scope(&v6addr, interface)) == 0)
++                        if ((sts = GetV6Scope(&v6addr, iface)) == 0)
+                            memcpy(&ifaceinfo->iface_addr[ifaceinfo->iface_count++], &v6addr, sizeof(v6addr));
+EOF
+
+# fix missing fnmatch.h
+cat > fnmatch.h << EOF
+//#define FNM_NOMATCH NULL
+#include <shlwapi.h>
+#define FNM_NOMATCH 1
+#define fnmatch(p,s,f) (PathMatchSpec(s,p) ? 0 : FNM_NOMATCH)
+EOF
+# fix missing fnmatch.h
+mv configure configure.bak &&
+sed -e "s/as_fn_error\(.*ac_source: file not found\)/echo\1/; s/as_fn_error\(.*cannot link or copy \$ac_source to \)/echo\1/" configure.bak > configure
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build-install &&
+    echo OK
+#### slp_xcast.c:199: error: `IP_MULTICAST_IF' undeclared (first use in this function)
+#### slp_xcast.c:208: error: `IP_MULTICAST_TTL' undeclared (first use in this function)
+
+mv slpd/Makefile slpd/Makefile.bak
+cat > slpd/Makefile << EOF
+all:
+depend:
+links:
+generate:
+install:
+EOF
+
+#make -C common install && make -C libslp install
+make install
+
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION
+cd ..
+
+
+

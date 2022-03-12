@@ -1,0 +1,248 @@
+export NAME="net-snmp"
+export STATUS=
+export URL=http://net-snmp.sourceforge.net/
+#export URL=https://github.com/net-snmp/net-snmp
+#export BASENAME=snmplib
+export BASENAME=netsnmp
+export DESCRIPTION="Simple Network Management Protocol (SNMP) is a widely used protocol for monitoring the health and welfare of network equipment (eg. routers), computer equipment and even devices like UPSs. Net-SNMP is a suite of applications used to implement SNMP v1, SNMP v2c and SNMP v3 using both IPv4 and IPv6."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=5.3.3
+#export VERSIONDATE=20091102
+#export VERSION=5.4.1.1
+#export VERSION=5.4.2
+#export VERSION=5.4.2.1
+####configure: error: socket(2) not found.
+#export VERSION=5.4.3
+#export VERSIONDATE=20100524
+#export VERSION=5.5.1
+#export VERSIONDATE=20110318
+#export VERSION=5.5.2
+#export VERSIONDATE=20120718
+#export VERSION=5.5.2.1
+#export VERSIONDATE=20140225
+####util_funcs.c:358:7: error: 'struct extensible' has no member named 'tid'
+#export VERSION=5.6
+#export VERSIONDATE=20101008
+#export VERSION=5.6.1
+#export VERSIONDATE=20110220
+#export VERSION=5.6.1.1
+#export VERSIONDATE=20110527
+#export VERSION=5.6.2
+#export VERSIONDATE=20120719
+#export VERSION=5.6.2.1
+#export VERSIONDATE=20140225
+#export VERSION=5.7
+#export VERSIONDATE=20110711
+#export VERSION=5.7.1
+#export VERSIONDATE=20111005
+#export VERSION=5.7.2
+#export VERSIONDATE=20121010
+#export VERSION=5.7.2.1
+#export VERSIONDATE=20140225
+#export VERSION=5.7.3
+#export VERSIONDATE=20141209
+#export VERSION=5.8
+#export VERSIONDATE=20180716
+####agent/mibgroup/mibII/.libs/vacm_conf.o: file not recognized: File format not recognized
+#export VERSION=5.9
+#export VERSIONDATE=20200815
+export VERSION=5.9.1
+export VERSIONDATE=20210526
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,zlib,libbz2,pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD-style
+#export DOWNLOADURL="http://sourceforge.net/projects/net-snmp/files/ net-snmp-"
+#export DOWNLOADURL="http://sourceforge.net/projects/net-snmp/files/net-snmp/ net-snmp-"
+#export DOWNLOADURL="https://github.com/net-snmp/net-snmp/releases"
+export DOWNLOADURL="https://github.com/net-snmp/net-snmp/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.freesnmp.com/mirrors/net-snmp/net-snmp-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://ovh.dl.sourceforge.net/sourceforge/net-snmp/net-snmp-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/net-snmp/net-snmp/$VERSION/net-snmp-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/net-snmp-$VERSION.tar.gz
+cd net-snmp-$VERSION
+# fix duplicate definition of struct timezone
+mv include/net-snmp/system/mingw32.h include/net-snmp/system/mingw32.h.bak
+sed -e "s/\(struct timezone\)/\1EXISTS/" include/net-snmp/system/mingw32.h.bak > include/net-snmp/system/mingw32.h
+# fix missing socket (version >= 5.5)
+mkdir sys
+echo "#include <winsock2.h>" > sys/socket.h
+# fix build of snmptrapd.exe
+mv apps/Makefile.in apps/Makefile.in.bak
+sed -e "s?\(snmptrapd_sql\)\(\.l*o\)?\1\2 ../snmplib/winservice\2?" apps/Makefile.in.bak > apps/Makefile.in
+## workaround for undefined reference to app_name_long in snmplib/winservice.c
+#mv snmplib/Makefile snmplib/Makefile.bak
+#sed -e "s?winservice\.[a-z]* winservicerc\.[a-z]*??" snmplib/Makefile.bak > snmplib/Makefile
+# workaround for undefined external app_name_long in snmplib/winservice.c when building DLL
+#### TO DO: only apply the workaround for the shared library
+mv snmplib/winservice.c snmplib/winservice.c.bak
+sed -e 's/extern LPTSTR app_name_long;/static const LPTSTR app_name_long = "netsnmp_service";/' snmplib/winservice.c.bak > snmplib/winservice.c
+# use relative MIB directory in snmplib/mib.c (version >= 5.8)
+mv snmplib/mib.c snmplib/mib.c.bak
+cat > snmplib/mib.c << EOF
+#include <winsock2.h>
+#include <windows.h>
+void netsnmp_set_mib_directory_relative ()
+{
+  char abspath[MAX_PATH];
+  DWORD abspathlen = GetModuleFileNameA(NULL, abspath, MAX_PATH);
+  //strip filename
+  while (abspathlen > 0 && abspath[abspathlen - 1] != '\\\\') {
+    abspathlen--;
+  }
+  //strip deepest folder name
+  if (abspathlen > 0) {
+    abspathlen--;
+    while (abspathlen > 0 && abspath[abspathlen - 1] != '\\\\') {
+      abspathlen--;
+    }
+  }
+  //append relative path
+  strcpy(abspath + abspathlen, "share\\\\snmp\\\\mibs");
+  //set the MIB directory
+  netsnmp_set_mib_directory(abspath);
+}
+EOF
+sed -e "s/netsnmp_set_mib_directory(NETSNMP_DEFAULT_MIBDIRS)/netsnmp_set_mib_directory_relative()/" snmplib/mib.c.bak >> snmplib/mib.c
+# use relative persistent directory in snmplib/read_config.c (version >= 5.8)
+patch -ulbf snmplib/read_config.c << EOF
+@@ -1185,4 +1185,25 @@
+         const char *persdir = netsnmp_getenv("SNMP_PERSISTENT_DIR");
++#ifndef WIN32
+         if (NULL == persdir)
+             persdir = NETSNMP_PERSISTENT_DIRECTORY;
++#else
++        char abspath[MAX_PATH];
++        if (NULL == persdir) {
++            DWORD abspathlen = GetModuleFileNameA(NULL, abspath, MAX_PATH);
++            //strip filename
++            while (abspathlen > 0 && abspath[abspathlen - 1] != '\\\\') {
++              abspathlen--;
++            }
++            //strip deepest folder name
++            if (abspathlen > 0) {
++              abspathlen--;
++              while (abspathlen > 0 && abspath[abspathlen - 1] != '\\\\') {
++                abspathlen--;
++              }
++            }
++            //append relative path
++            strcpy(abspath + abspathlen, "etc\\\\net-snmp");
++            persdir = abspath;
++        }
++#endif
+         set_persistent_directory(persdir);
+EOF
+# fix agent/kernel.c (version >= 5.9)
+patch -ulbf agent/kernel.c << EOF
+@@ -145,4 +145,7 @@
+ init_kmem(const char *file)
+ {
++#ifdef _WIN32
++    return FALSE;
++#else
+     const int no_root_access = netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID,
+                                               NETSNMP_DS_AGENT_NO_ROOT_ACCESS);
+@@ -173,4 +176,5 @@
+ #endif
+     return res;
++#endif
+ }
+
+EOF
+# fix undefined reference to app_name_long in snmplib/winservice.c (version >= 5.9)
+patch -ulbf snmplib/winservice.c << EOF
+@@ -87,3 +87,3 @@
+  */
+-extern char    *app_name_long;
++char    *app_name_long;
+
+EOF
+# remove object files shipped with tarball (version >= 5.9)
+rm -rf $(find -name '*.o' -or -name '*.lo')
+## skip making agent
+#mv agent/Makefile agent/Makefile.bak
+#cat > agent/Makefile << EOF
+#all:
+#install:
+#installlibs:
+#EOF
+#make -C snmplib
+#cat snmplib/Makefile << EOF
+#netsnmp.dll: $(TOBJS)
+# $(LIB_LD_CMD) $@ $(TOBJS) $(LDFLAGS) -Wl,--allow-multiple-definition -Wl,-no-undefined -mdll -liphlpapi -lregex -lcrypto
+# $(RANLIB) $@
+# cp netsnmp.dll .libs/
+#EOF
+#make -C snmplib netsnmp.dll
+# note: Version 5.4.1 had compile errors because of compiler parameter -fnative-struct 
+#       which shlould be -mms-bitfields on GCC3. Without this parameter any .DLL files
+#       generated will not be able to work correctly with MSVC.
+# workaround: --without-perl-modules --disable-embedded-perl --disable-perl-cc-checks --without-python-modules
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mini-agent --disable-agent --disable-applications --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --without-perl-modules --disable-embedded-perl --disable-perl-cc-checks --without-python-modules LDFLAGS="-no-undefined -lwsock32"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mini-agent --disable-agent --disable-applications --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --without-perl-modules --disable-embedded-perl --disable-perl-cc-checks --without-python-modules LDFLAGS="-lwsock32"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --disable-applications --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --without-perl-modules --disable-embedded-perl --disable-perl-cc-checks --without-python-modules LDFLAGS="-lwsock32"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --disable-applications --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --without-perl-modules --disable-embedded-perl --disable-perl-cc-checks --without-python-modules LDFLAGS="-lws2_32"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-ucd-snmp-compatibility --disable-agent --disable-applications --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules LDFLAGS="-lws2_32"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --disable-applications --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules LDFLAGS="-lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --disable-applications --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules LDFLAGS="-lws2_32 -lregex -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --enable-applications --disable-snmptrapd-subagent --disable-embedded-perl --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules LDFLAGS="-Wl,--as-needed -lws2_32 -ladvapi32 -lregex -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --enable-applications --disable-snmptrapd-subagent --disable-embedded-perl --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules LDFLAGS="-Wl,--as-needed -lws2_32 -ladvapi32 -lpcreposix -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --enable-applications --disable-snmptrapd-subagent --disable-embedded-perl --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules LDFLAGS="-Wl,--as-needed -lws2_32 -ladvapi32 -lpcreposix -Wl,-no-undefined -Wl,--allow-multiple-definition" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --enable-applications --disable-snmptrapd-subagent --disable-embedded-perl --disable-manuals --disable-scripts --with-default-snmp-version=3 --with-sys-contact=nobody --with-sys-location=unknown --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules LDFLAGS="-Wl,--as-needed -lws2_32 -ladvapi32 -lpcreposix -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ucd-snmp-compatibility --disable-mini-agent --disable-agent --enable-applications --disable-snmptrapd-subagent --disable-embedded-perl --disable-manuals --disable-scripts --with-default-snmp-version=2 --with-sys-contact=nobody --with-sys-location=unknown --without-kmem-usage --with-logfile=/snmpd.log --with-persistent-directory=/etc/net-snmp --with-mib-modules="agentx disman/event-mib examples/example" --disable-embedded-perl --without-perl-modules CFLAGS="-DWIN32 -DWIN32SERVICE" LDFLAGS="-Wl,--as-needed -lws2_32 -ladvapi32 -lpcreposix -Wl,-no-undefined" &&
+ # fix missing syslog.h (version >= 5.8)
+ echo "#undef HAVE_PRIORITYNAMES" >> include/net-snmp/net-snmp-config.h &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix issue with building winservice
+ sed -i.bak s/winservice\.l*o// snmplib/Makefile &&
+ ## fix winsock.h/winsock2.h problems in include/net-snmp/net-snmp-config.h (version >= 5.7.2)
+ #mv include/net-snmp/net-snmp-config.h include/net-snmp/net-snmp-config.h.bak &&
+ #echo "#include <winsock2.h>" > include/net-snmp/net-snmp-config.h &&
+ #cat include/net-snmp/net-snmp-config.h.bak >> include/net-snmp/net-snmp-config.h &&
+ # fix using static pcre when building static library (version >= 5.9)
+ echo -e "#ifndef DLL_EXPORT\n#define PCRE_STATIC\n#endif" >> include/net-snmp/net-snmp-config.h &&
+ wl-showstatus build &&
+ ( make || make -j1 ) &&
+ wl-showstatus build-install &&
+ #make -j1 all install &&
+ make -j1 install &&
+ # fix absolute paths in net-snmp-config
+ sed -i.bak -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/net-snmp-config &&
+ rm -f $INSTALLPREFIX/bin/net-snmp-config.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf net-snmp-$VERSION
+####Note: on first run will create folder $MINGWPREFIX/etc/net-snmp/mib_indexes
+
+
+
+#rm -f agent/mibgroup/mibII/vacm_conf.lo
+#make -j1
+#rm -f agent/mibgroup/utilities/execute.lo
+#make -j1
+#rm -f agent/mibgroup/agentx/master.lo
+#make -j1
+#rm -f agent/mibgroup/agentx/subagent.lo
+#make -j1
+#rm -f agent/mibgroup/agentx/protocol.lo
+#make -j1
+#rm -f agent/mibgroup/agentx/client.lo
+#make -j1
+#rm -f agent/mibgroup/agentx/master_admin.lo
+#make -j1
+#rm -f agent/mibgroup/agentx/agentx_config.lo
+#make -j1
+#rm -f agent/mibgroup/utilities/iquery.lo
+#make -j1
+#rm -f agent/mibgroup/disman/event/mte*.lo
+#make -j1
+#rm -f apps/snmpnetstat/ffs.lo
+#make -j1

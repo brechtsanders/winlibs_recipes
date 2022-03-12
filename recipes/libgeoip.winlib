@@ -1,0 +1,92 @@
+export NAME="GeoIP C API"
+export STATUS=
+export URL=http://www.maxmind.com/app/c
+export BASENAME=libgeoip
+export DESCRIPTION="The open source GeoIP C API includes a free GeoLite Country database."
+export CATEGORY=geo
+export TYPE=library
+#export VERSION=1.4.6
+#export VERSION=1.4.7
+#export VERSIONDATE=20110416
+####libGeoIP/GeoIP.c:492: warning: implicit declaration of function 'lseek'
+####libGeoIP/GeoIP.c:494: warning: implicit declaration of function 'read'
+####libGeoIP/GeoIP.c:551: warning: implicit declaration of function 'pread'
+####libGeoIP/GeoIP.c:551: undefined reference to `pread'
+####libGeoIP/GeoIP.c:680: undefined reference to `pread'
+####libGeoIP/GeoIP.c:662: undefined reference to `pread'
+####libGeoIP/GeoIP.c:795: undefined reference to `pread'
+####libGeoIP/GeoIP.c:1601: undefined reference to `pread'
+#export VERSION=1.4.8
+#export VERSIONDATE=20121116
+####mv: cannot stat `.deps/GeoIP.Tpo': No such file or directory
+#export VERSION=1.6.0
+#export VERSIONDATE=20140227
+#export VERSION=1.6.7
+#export VERSIONDATE=20151107
+#export VERSION=1.6.8
+#export VERSIONDATE=201601114
+#export VERSION=1.6.9
+#export VERSIONDATE=20160114
+#export VERSION=1.6.10
+#export VERSIONDATE=20170330
+#export VERSION=1.6.11
+#export VERSIONDATE=20170516
+export VERSION=1.6.12
+export VERSIONDATE=20180118
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://geolite.maxmind.com/download/geoip/api/c/ GeoIP-"
+export DOWNLOADURL="https://github.com/maxmind/geoip-api-c/releases GeoIP-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://geolite.maxmind.com/download/geoip/api/c/GeoIP-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/maxmind/geoip-api-c/releases/download/v$VERSION/GeoIP-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/GeoIP-$VERSION.tar.gz
+cd GeoIP-$VERSION
+# fix for missing getaddrinfo/freeaddrinfo
+mv libGeoIP/GeoIP.c libGeoIP/GeoIP.c.bak
+cat > libGeoIP/GeoIP.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <winsock2.h>
+#include <ws2tcpip.h>
+EOF
+cat libGeoIP/GeoIP.c.bak >> libGeoIP/GeoIP.c
+# fix build of libGeoIPUpdate.dll.a
+mv libGeoIP/Makefile.in libGeoIP/Makefile.in.bak
+sed -e "s/^\(libGeoIPUpdate_la_LIBADD *=.*\)/\1 -lws2_32/" libGeoIP/Makefile.in.bak > libGeoIP/Makefile.in
+#patch -ulbf test/test-geoip.c << EOF
+#--- test/test-geoip.c  Tue Feb 24 17:03:24 2009
+#+++ test/test-geoip.c  Tue Sep  1 11:29:36 2009
+#@@ -23,2 +23,7 @@
+# int main () {
+#+  static WSADATA wsaData;
+#+  int wsaerr = WSAStartup(MAKEWORD(1, 0), &wsaData);
+#+  if (wsaerr)
+#+    exit(1);
+#+  atexit((void(*)())WSACleanup);
+#   FILE *f;
+#EOF
+#cp data/GeoIP.dat test/ && make check
+# fix missing wspiapi.h (version >= 1.4.7)
+touch libGeoIP/wspiapi.h
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -lws2_32 -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -lws2_32 -Wl,-no-undefined" &&
+ # fix: undefined reference to `rpl_malloc' and: undefined reference to `rpl_realloc'
+ ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -lws2_32 -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf GeoIP-$VERSION
+####To do: https://github.com/maxmind/geoipupdate
+
+
+

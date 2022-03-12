@@ -1,0 +1,148 @@
+export NAME="Hyperscan"
+export STATUS=
+#export URL=https://01.org/hyperscan
+export URL=https://www.hyperscan.io/
+#export URL=https://github.com/intel/hyperscan
+export BASENAME=hyperscan
+export DESCRIPTION="Hyperscan is a high-performance multiple regex matching library. It follows the regular expression syntax of the commonly-used libpcre library, yet functions as a standalone library with its own API written in C. Hyperscan uses hybrid automata techniques to allow simultaneous matching of large numbers (up to tens of thousands) of regular expressions, as well as matching of regular expressions across streams of data."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=5.0.0
+#export VERSIONDATE=20180823
+#export VERSION=5.1.0
+#export VERSIONDATE=20190131
+#export VERSION=5.1.1
+#export VERSIONDATE=20190412
+#export VERSION=5.2.0
+#export VERSIONDATE=20190813
+#export VERSION=5.2.1
+#export VERSIONDATE=20191030
+#export VERSION=5.3.0
+#export VERSIONDATE=20200525
+export VERSION=5.4.0
+export VERSIONDATE=20210113
+wl-showstatus --package-version
+export DEPENDANCIES=boost,ragel
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/intel/hyperscan/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/intel/hyperscan/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing _BitScanReverse in src/util/bitutils.h
+mv src/util/bitutils.h src/util/bitutils.h.bak &&
+echo "#include <windows.h>" > src/util/bitutils.h &&
+cat src/util/bitutils.h.bak >> src/util/bitutils.h
+# fix missing __cpuidex in src/util/cpuid_inline.h
+mv src/util/cpuid_inline.h src/util/cpuid_inline.h.bak &&
+echo "#include <psdk_inc/intrin-impl.h>" > src/util/cpuid_inline.h &&
+cat src/util/cpuid_inline.h.bak >> src/util/cpuid_inline.h
+# fix error: multiple storage classes in declaration specifiers
+sed -i.bak2 -e "s/\(static\) never_inline/\1/g; s/static \([^ ]*inline\)/\1/" $(grep -l "static [^ ]*inline" $(find -name '*.h' -or -name '*.c'))
+# fix missing hs_scan_stream_internal in src/runtime.c (version >= 5.1.1)
+patch -ulbf src/runtime.c << EOF
+@@ -865,3 +865,2 @@
+
+-inline
+ hs_error_t hs_scan_stream_internal(hs_stream_t *id, const char *data,
+EOF
+## fix CMakeLists.txt (version <= 5.1.0)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -111,7 +111,3 @@
+# if (BUILD_STATIC_AND_SHARED OR BUILD_SHARED_LIBS)
+#-    if (WIN32)
+#-        message(FATAL_ERROR "Windows DLLs currently not supported")
+#-    else()
+#         message(STATUS "Building shared libraries")
+#-    endif()
+# endif()
+#@@ -182,26 +178,3 @@
+#     if (CMAKE_COMPILER_IS_GNUCC)
+#-        message(STATUS "gcc version \${CMAKE_C_COMPILER_VERSION}")
+#-        # If gcc doesn't recognise the host cpu, then mtune=native becomes
+#-        # generic, which isn't very good in some cases. march=native looks at
+#-        # cpuid info and then chooses the best microarch it can (and replaces
+#-        # the flag), so use that for tune.
+#-
+#-        # arg1 might exist if using ccache
+#-        string (STRIP "\${CMAKE_C_COMPILER_ARG1}" CC_ARG1)
+#-        set (EXEC_ARGS \${CC_ARG1} -c -Q --help=target -march=native -mtune=native)
+#-        execute_process(COMMAND \${CMAKE_C_COMPILER} \${EXEC_ARGS}
+#-            OUTPUT_VARIABLE _GCC_OUTPUT)
+#-        string(REGEX REPLACE ".*march=[ \\t]*([^ \\n]*)[ \\n].*" "\\\\1"
+#-            GNUCC_ARCH "\${_GCC_OUTPUT}")
+#-
+#-        # test the parsed flag
+#-        set (EXEC_ARGS \${CC_ARG1} -E - -mtune=\${GNUCC_ARCH})
+#-        execute_process(COMMAND \${CMAKE_C_COMPILER} \${EXEC_ARGS}
+#-            OUTPUT_QUIET ERROR_QUIET
+#-            INPUT_FILE /dev/null
+#-            RESULT_VARIABLE GNUCC_TUNE_TEST)
+#-        if (NOT GNUCC_TUNE_TEST EQUAL 0)
+#-            message(SEND_ERROR "Something went wrong determining gcc tune: -mtune=\${GNUCC_ARCH} not valid")
+#-        endif()
+#-        set(TUNE_FLAG \${GNUCC_ARCH})
+#+        set(TUNE_FLAG native)
+#     else ()
+#EOF
+# fix CMakeLists.txt (version >= 5.1.1)
+patch -ulbf CMakeLists.txt << EOF
+@@ -111,3 +111,3 @@
+ if (BUILD_STATIC_AND_SHARED OR BUILD_SHARED_LIBS)
+-    if (WIN32)
++    if (WIN32 AND NOT MINGW)
+         message(FATAL_ERROR "Windows DLLs currently not supported")
+@@ -181,3 +181,3 @@
+
+-    if (CMAKE_COMPILER_IS_GNUCC)
++    if (CMAKE_COMPILER_IS_GNUCC AND NOT MINGW)
+         message(STATUS "gcc version \${CMAKE_C_COMPILER_VERSION}")
+EOF
+# fix issue with pointer to inline function in src/rose/program_runtime.c (version >= 5.1.0)
+patch -ulbf src/rose/program_runtime.c << EOF
+@@ -1492,3 +1492,2 @@
+
+-rose_inline
+ int roseNfaEarliestSom(u64a start, UNUSED u64a end, UNUSED ReportID id,
+
+EOF
+# remove invalid flags
+sed -i.bak -e "s?/wd[0-9]*??g" unit/CMakeLists.txt
+sed -i.bak -e "s?/STACK:[0-9,]*??g" tools/hscollider/CMakeLists.txt
+#wl-showstatus configure &&
+##PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe . &&
+#PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_STATIC_LIBS:BOOL=ON -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC_AND_SHARED:BOOL=ON . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# PKG_CONFIG= cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# PKG_CONFIG= cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

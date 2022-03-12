@@ -1,0 +1,143 @@
+export NAME="Plzip"
+export STATUS=
+export URL=http://lzip.nongnu.org/plzip.html
+export BASENAME=plzip
+export DESCRIPTION="Plzip is a massively parallel (multi-threaded), lossless data compressor based on the LZMA algorithm, with very safe integrity checking and a user interface similar to the one of gzip or bzip2. Plzip uses the lzip file format; the files produced by plzip are fully compatible with lzip-1.4 or newer."
+export CATEGORY=compression
+export TYPE=application
+#export VERSION=0.7
+#export VERSIONDATE=
+#export VERSION=0.8
+#export VERSIONDATE=20120118
+#export VERSION=0.9
+#export VERSIONDATE=20120415
+####main.cc:390: error: 'kill' was not declared in this scope
+#export VERSION=1.0
+#export VERSIONDATE=20130603
+#export VERSION=1.1
+#export VERSIONDATE=20130925
+####main.cc:520:50: error: '_SC_NPROCESSORS_ONLN' was not declared in this scope
+####main.cc:520:71: error: 'sysconf' was not declared in this scope
+####main.cc:521:31: error: '_SC_THREAD_THREADS_MAX' was not declared in this scope
+#export VERSION=1.5
+#export VERSIONDATE=20170418
+#export VERSION=1.6-rc1
+#export VERSIONDATE=20170418
+#export VERSION=1.6
+#export VERSIONDATE=20170425
+#export VERSION=1.7
+#export VERSIONDATE=20180211
+#export VERSION=1.8
+#export VERSIONDATE=20190106
+#export VERSION=1.9
+#export VERSIONDATE=20210106
+export VERSION=1.10
+export VERSIONDATE=20220127
+wl-showstatus --package-version
+export DEPENDANCIES=lzlib,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://download.savannah.gnu.org/releases/lzip/"
+export DOWNLOADURL="http://download.savannah.gnu.org/releases/lzip/plzip/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/lzip/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/lzip/plzip/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing pthread stuff in lzip.h (version <= 1.8)
+#mv lzip.h lzip.h.bak &&
+#echo "#include <pthread.h>" > lzip.h &&
+#cat lzip.h.bak >> lzip.h
+# fix missing pread/pwrite in decompress.cc
+mv decompress.cc decompress.cc.bak
+cat > decompress.cc << EOF
+#include <io.h>
+#include <stdio.h>
+#include <stdint.h>
+
+ssize_t pread (int fildes, void *buf, size_t nbyte, off_t offset)
+{
+  int64_t pos = _telli64(fildes);
+  ssize_t len = read(fildes, buf, nbyte);
+  _lseeki64(fildes, pos, SEEK_SET);
+  return len;
+}
+
+ssize_t pwrite (int fildes, const void *buf, size_t nbyte, off_t offset)
+{
+  int64_t pos = _telli64(fildes);
+  ssize_t len = _write(fildes, buf, nbyte);
+  _lseeki64(fildes, pos, SEEK_SET);
+  return len;
+}
+EOF
+cat decompress.cc.bak >> decompress.cc
+## fix main.cc (version <= 1.7)
+#patch -ulbf main.cc << EOF
+#--- main.cc  2013-05-28 21:04:54 +0200
+#+++ main.cc  2013-06-03 21:25:26 +0200
+#@@ -383,4 +383,5 @@
+#
+#
+#+#ifndef __MINGW32__
+# extern "C" void signal_handler( int sig )
+#   {
+#@@ -399,4 +400,5 @@
+#   std::signal( SIGTERM, signal_handler );
+#   }
+#+#endif
+#
+# } // end namespace
+#@@ -411,5 +413,9 @@
+# //
+# void fatal( const int retval )
+#-  { signal_handler( ( retval != 2 ) ? SIGUSR1 : SIGUSR2 ); }
+#+  {
+#+#ifndef __MINGW32__
+#+  signal_handler( ( retval != 2 ) ? SIGUSR1 : SIGUSR2 );
+#+#endif
+#+  }
+#
+#
+#@@ -493,6 +499,13 @@
+#     internal_error( "bad library version" );
+#
+#+#ifndef __MINGW32__
+#   const long num_online = std::max( 1L, sysconf( _SC_NPROCESSORS_ONLN ) );
+#   long max_workers = sysconf( _SC_THREAD_THREADS_MAX );
+#+#else
+#+  SYSTEM_INFO info;
+#+  GetSystemInfo(&info);
+#+  const long num_online = info.dwNumberOfProcessors;
+#+  long max_workers = 64;
+#+#endif
+#   if( max_workers < 1 || max_workers > INT_MAX / (int)sizeof (pthread_t) )
+#     max_workers = INT_MAX / sizeof (pthread_t);
+#@@ -596,4 +609,5 @@
+#
+#   if( filenames.empty() ) filenames.push_back("-");
+#+#ifndef __MINGW32__
+#   if( !to_stdout && program_mode != m_test &&
+#       ( filenames_given || default_output_filename.size() ) )
+#@@ -601,4 +615,5 @@
+#   std::signal( SIGUSR1, signal_handler );
+#   std::signal( SIGUSR2, signal_handler );
+#+#endif
+#
+#   Pretty_print pp( filenames );
+#EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX &&
+ wl-showstatus build-install &&
+ ( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.exe ) ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: probably not fully functional - needs more testing
+####See also: https://gist.github.com/przemoc/fbf2bfb11af0d9cd58726c200e4d133e
+
+
+

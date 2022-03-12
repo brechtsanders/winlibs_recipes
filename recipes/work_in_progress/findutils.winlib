@@ -1,0 +1,116 @@
+export NAME="GNU Find Utilities"
+export STATUS=
+export URL=http://www.gnu.org/software/findutils/
+export BASENAME=findutils
+export DESCRIPTION="The GNU Find Utilities are the basic directory searching utilities of the GNU operating system. These programs are typically used in conjunction with other programs to provide modular and powerful directory search and file locating capabilities to other commands. The tools supplied with this package are: * find - search for files in a directory hierarchy * locate - list files in databases that match a pattern * updatedb - update a file name database * xargs - build and execute command lines from standard input"
+export CATEGORY=
+export TYPE=library
+#export VERSION=4.4.2
+#export VERSIONDATE=20121019
+####find/pred.c:1974:3: warning: implicit declaration of function 'waitpid' [-Wimplicit-function-declaration]
+#export VERSION=4.6.0
+#export VERSIONDATE=20151229
+#export VERSION=4.7.0
+#export VERSIONDATE=20190830
+#export VERSION=4.8.0
+#export VERSIONDATE=20210110
+export VERSION=4.9.0
+export VERSIONDATE=20220202
+####lib/fdleak.c:24:18: fatal error: poll.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/findutils/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/findutils/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/findutils/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing nlink_t in gnulib/lib/fts.c
+mv gnulib/lib/fts.c gnulib/lib/fts.c.bak
+echo "#define nlink_t size_t" > gnulib/lib/fts.c
+cat gnulib/lib/fts.c.bak >> gnulib/lib/fts.c
+# fix missing _POSIX_ARG_MAX in lib/buildcmd.c
+mv lib/buildcmd.c lib/buildcmd.c.bak
+echo "#define _POSIX_ARG_MAX 64" > lib/buildcmd.c
+cat lib/buildcmd.c.bak >> lib/buildcmd.c
+# fix missing files
+cat > pwd.h << EOF
+#undef uid_t
+typedef int uid_t;
+#define getpwuid(uid) NULL
+#define getpwnam(username) NULL
+struct passwd {
+ int pw_uid;
+ char *pw_name;
+};
+EOF
+cat > grp.h << EOF
+#undef gid_t
+typedef int gid_t;
+#define getgrgid(gid) NULL
+#define getgrnam(groupname) NULL
+struct group {
+ int gr_gid;
+ char *gr_name;
+};
+EOF
+# fix lib/fdleak.c (version >= 4.9.0)
+patch -ulbf lib/fdleak.c << EOF
+@@ -24,3 +24,5 @@
+ #include <limits.h>
++#ifndef _WIN32
+ #include <poll.h>
++#endif
+ #include <stdarg.h>
+@@ -117,2 +119,3 @@
+
++#ifndef _WIN32
+   open_max = sysconf (_SC_OPEN_MAX);
+@@ -120,2 +123,3 @@
+     open_max = _POSIX_OPEN_MAX;        /* underestimate */
++#endif
+
+EOF
+## fix detection of how to read list of mounted file systems (version <= 4.4.2)
+#patch -ulbf configure << EOF
+#--- configure  2009-05-16 17:28:18 +0200
+#+++ configure  2012-10-19 22:48:14 +0200
+#@@ -22529,3 +22529,3 @@
+# echo "\$as_me: error: could not determine how to read list of mounted file systems" >&2;}
+#-   { (exit 1); exit 1; }; }
+#+   }
+#   # FIXME -- no need to abort building the whole package
+#EOF
+# fix detection of how to read list of mounted file systems (version >= 4.6.0)
+patch -ulbf configure << EOF
+--- configure  2015-12-28 22:31:23.000000000 +0100
++++ configure  2015-12-29 08:28:41.066015600 +0100
+@@ -32270,3 +32270,3 @@
+ if test -z "\$ac_list_mounted_fs"; then
+-  as_fn_error \$? "could not determine how to read list of mounted file systems" "\$LINENO" 5
++  as_fn_warning \$? "could not determine how to read list of mounted file systems" "\$LINENO" 5
+   # FIXME -- no need to abort building the whole package
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-threads &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=windows &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm CMakeCache.txt &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

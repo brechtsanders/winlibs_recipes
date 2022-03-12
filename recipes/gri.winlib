@@ -1,0 +1,74 @@
+export NAME="Gri"
+export STATUS=
+export URL=http://gri.sourceforge.net/
+export BASENAME=gri
+export DESCRIPTION="Gri is a language for scientific graphics programming. The word \"language\" is important: Gri is command-driven, not point/click."
+export CATEGORY=graphics
+export TYPE=library
+export VERSION=2.12.23
+export VERSIONDATE=20181108
+wl-showstatus --package-version
+export DEPENDANCIES=readline
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/gri/files/gri/"
+#export DOWNLOADURL="https://github.com/dankelley/gri/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://download.sourceforge.net/project/gri/gri/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix incorrect SECOND_TYPE in src/gr.hh
+patch -ulbf src/gr.hh << EOF
+@@ -381,3 +381,3 @@
+ // Time type (time_t, int, or long) varies per machine (ug).
+-#if defined(VMS) || defined(MSDOS) || defined(IS_DEC_ALPHA) || defined(AIX) ||
+defined(IS_FREEBSD) || defined(IS_NETBSD) || defined(IS_OPENBSD)
++#if defined(VMS) || defined(MSDOS) || defined(IS_DEC_ALPHA) || defined(AIX) ||
+defined(IS_FREEBSD) || defined(IS_NETBSD) || defined(IS_OPENBSD) || defined(__MINGW32__)
+ #define SECOND_TYPE time_t
+EOF
+# fix missing _PATH_TMP in src/utility.cc
+patch -ulbf src/utility.cc << EOF
+@@ -2214,3 +2214,3 @@
+ {
+-#if defined(HAVE_MKSTEMP)
++#if defined(HAVE_MKSTEMP) && !defined(__MINGW32__)
+        static char rval[PATH_MAX];
+EOF
+# fix SECOND_TYPE in src/gr.hh (version >= 2.12.23)
+patch -ulbf src/gr.hh << EOF
+@@ -381,3 +381,3 @@
+ // Time type (time_t, int, or long) varies per machine (ug).
+-#if defined(VMS) || defined(MSDOS) || defined(IS_DEC_ALPHA) || defined(AIX) || defined(IS_FREEBSD) || defined(IS_NETBSD) || defined(IS_OPENBSD)
++#if defined(__MINGW32__) || defined(VMS) || defined(MSDOS) || defined(IS_DEC_ALPHA) || defined(AIX) || defined(IS_FREEBSD) || defined(IS_NETBSD) || defined(IS_OPENBSD)
+ #define SECOND_TYPE time_t
+EOF
+## avoid conversion errors
+#for F in $(grep -l "if (.*superuser.*FLAG_AUT[12])" * -r); do
+#  sed -i.bak2 -e "s?if (.*superuser.*FLAG_AUT[12]).*printf?//&?" $F
+#done
+#sed -i.bak -e "s/\((long unsigned int)\)\(this\|(*\&\)/\1(uintptr_t)\2/g" src/CmdFile.hh
+#sed -i.bak -e "s/unsigned(long(this))/(unsigned long)(uintptr_t)this/g" src/GriPath.cc
+#sed -i.bak -e "s/(long unsigned int)/(uintptr_t)/g" src/DataFile.hh
+# skip making doc
+cat > doc/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-std=c++11" &&
+ wl-showstatus build-install &&
+ make install-strip CXX="g++ -fpermissive" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

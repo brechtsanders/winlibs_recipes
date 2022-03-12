@@ -1,0 +1,114 @@
+export NAME="LibVMI"
+export STATUS=
+export URL=https://github.com/libvmi/libvmi
+export BASENAME=libvmi
+export DESCRIPTION="LibVMI is a virtual machine introspection library. This means that it helps you access the memory of a running virtual machine. LibVMI provides primitives for accessing this memory using physical or virtual addresses and kernel symbols. LibVMI also supports accessing memory from a physical memory snapshot, which is helpful for debugging or forensic analysis."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=0.12.0-rc3
+#export VERSIONDATE=20160805
+#export VERSION=0.12.0
+#export VERSIONDATE=20180423
+####libvmi/libvmi.h:46:22: fatal error: sys/mman.h: No such file or directory
+export VERSION=0.14.0
+export VERSIONDATE=20201230
+####TARGET_SONAME_FILE is not allowed for DLL target platforms.
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE="GPL/LGPL"
+export DOWNLOADURL="https://github.com/libvmi/libvmi/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/libvmi/libvmi/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus configure &&
+mkdir -p m4 &&
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-xen --disable-kvm CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+#--without-xenstore
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+
+# fix libvmi/core.c (version >= 0.14.0)
+patch -ulbf libvmi/core.c << EOF
+@@ -32,5 +32,9 @@
+ #include <limits.h>
++#ifndef _WIN32
+ #include <fnmatch.h>
++#endif
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <pwd.h>
++#endif
+ #include <unistd.h>
+@@ -96,2 +100,3 @@
+
++#ifndef _WIN32
+     /* next check home directory of sudo user */
+@@ -107,2 +112,3 @@
+     }
++#endif
+
+EOF
+# fix missing bzero (version >= 0.14.0)
+sed -i.bak -e "s/bzero\s*\(\s*([^,]*,\)/memset\1 0,/" $(grep -l " \bbzero\s*(" $(find -name '*.h' -or -name '*.c'))
+# fix missing strndup (version >= 0.14.0)
+cat > winfix_strndup.h << EOF
+#include <malloc.h>
+#include <string.h>
+static inline char* strndup (const char* s, size_t n)
+{
+  char* result;
+  size_t len = strlen(s);
+  if (len > n)
+    len = n;
+  result = (char*)malloc(len + 1);
+  if (!result)
+    return 0;
+  result[len] = 0;
+  return (char*)memcpy(result, s, len);
+}
+EOF
+for F in $(grep -l " \bstrndup\s*(" $(find libvmi -name '*.c')); do
+ mv $F $F.bak2 &&
+ echo "#include \"$(dirname $F|sed -e "s?[^/]*?..?g")/winfix_strndup.h\"" > $F &&
+ cat $F.bak2 >> $F
+done
+# fix CMake issues
+sed -i.bak -e "s/message(FATAL_ERROR.*Undetect architecture.*$/set($(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "X86_64"; else echo "I386"; fi) ON)/" cmake/modules/DetectArchitecture.cmake
+sed -i.bak -e "s/TARGET_SONAME_FILE_NAME/TARGET_NAME/" libvmi/libtool_template.in
+sed -i.bak -e "s/-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now//" CMakeLists.txt
+
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DENABLE_XEN:BOOL=OFF -DENABLE_XENSTORE:BOOL=OFF -DENABLE_BAREFLANK:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_test -LH && echo OK && make -Cbuild_test > /dev/null && echo OK; rm -rf build_test
+
+#export BUILDDEPENDANCIES=cmake,ninja
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_XEN:BOOL=OFF -DENABLE_XENSTORE:BOOL=OFF -DENABLE_BAREFLANK:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

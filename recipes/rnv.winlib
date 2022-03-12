@@ -1,0 +1,56 @@
+export NAME="RNV"
+export STATUS=
+export URL=http://www.davidashen.net/rnv.html
+export BASENAME=rnv
+export DESCRIPTION="RNV is an implementation of Relax NG Compact Syntax validator in ANSI C."
+export CATEGORY=fileformat,dataprocessing
+export TYPE=library
+export VERSION=1.7.8
+export VERSIONDATE=20210613
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=license.txt
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://ftp.davidashen.net/PreTI/RNV/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.davidashen.net/PreTI/RNV/$BASENAME-$VERSION.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip
+cd $BASENAME-$VERSION
+# fix rvp.c (version >= 1.7.8)
+patch -ulbf rvp.c << EOF
+@@ -57,2 +57,5 @@
+ #include "er.h"
++#ifdef _WIN32
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#endif
+
+@@ -269,3 +272,5 @@
+     if(pipe(erp)==-1||dup2(erp[1],2)==-1) longjmp(IOER,1);
++#ifndef _WIN32
+     fcntl(erp[0],F_SETFL,O_NONBLOCK);
++#endif
+     setbuf(stderr,NULL);
+EOF
+wl-showstatus build &&
+ make CC=gcc &&
+ strip *.exe &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p librnv.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > rnv.def &&
+ gcc -shared -s -mwindows -def rnv.def -o rnv.dll librnv.a -Wl,--out-implib,librnv.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/rnv $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/rnv/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ # don't install rvp as it is broken
+ rm -f $INSTALLPREFIX/bin/rvp.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: fix rvp.exe
+
+
+

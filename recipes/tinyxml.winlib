@@ -1,0 +1,130 @@
+export NAME="TinyXML"
+export STATUS=
+export URL=http://www.grinninglizard.com/tinyxml/
+export BASENAME=tinyxml
+export DESCRIPTION="TinyXML is a simple, small, C++ XML parser that can be easily integrating into other programs."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=2.6.2
+export VERSIONDATE=20110910
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE="ZLib license"
+export DOWNLOADURL="http://sourceforge.net/projects/tinyxml/files/tinyxml/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/tinyxml/tinyxml/$VERSION/tinyxml_`echo $VERSION|sed -e "s/\./_/g"`.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/tinyxml_`echo $VERSION|sed -e "s/\./_/g"`.tar.gz
+cd tinyxml
+# fix for building library
+patch -ulbf Makefile << EOF
+--- Makefile  2010-03-23 01:16:36.000000000 -0400
++++ Makefile  2011-04-16 19:08:39.000000000 -0400
+@@ -17,6 +17,11 @@
+ # will not be used. YES will include the STL files.
+ TINYXML_USE_STL := NO
+
++# TINYXML_CREATE_LIB can be used to create a basic static library for tinyxml
++# YES will create libtinyxml.a and static link to xmltrest
++# NO will not create the library and link all as .o files
++TINYXML_CREATE_LIB := NO
++
+ #****************************************************************************
+
+ CC     := gcc
+@@ -28,7 +33,7 @@
+ DEBUG_CFLAGS     := -Wall -Wno-format -g -DDEBUG
+ RELEASE_CFLAGS   := -Wall -Wno-unknown-pragmas -Wno-format -O3
+
+-LIBS            :=
++LIBS            := 
+
+ DEBUG_CXXFLAGS   := \${DEBUG_CFLAGS}
+ RELEASE_CXXFLAGS := \${RELEASE_CFLAGS}
+@@ -83,27 +88,45 @@
+
+ OUTPUT := xmltest
+
+-all: \${OUTPUT}
++ifeq (YES, \${TINYXML_CREATE_LIB})
++  XMLLIB := libtinyxml.a
++  LIBS := -L. -ltinyxml
++else
++  XMLLIB := 
++endif
++
++all: \${XMLLIB} \${OUTPUT}
+
+
+ #****************************************************************************
+ # Source files
+ #****************************************************************************
+
+-SRCS := tinyxml.cpp tinyxmlparser.cpp xmltest.cpp tinyxmlerror.cpp tinystr.cpp
++ifeq (YES, \${TINYXML_CREATE_LIB})
++  SRCS := xmltest.o
++  LIB_SRCS := tinyxml.cpp tinyxmlparser.cpp tinyxmlerror.cpp tinystr.cpp
++else
++  SRCS := tinyxml.cpp tinyxmlparser.cpp tinyxmlerror.cpp tinystr.cpp xmltest.o
++endif
+
+ # Add on the sources for libraries
+-SRCS := \${SRCS}
++SRCS := \${SRCS} 
+
+ OBJS := \$(addsuffix .o,\$(basename \${SRCS}))
++LIB_OBJS := \$(addsuffix .o,\$(basename \${LIB_SRCS}))
+
+ #****************************************************************************
+ # Output
+ #****************************************************************************
+
+-\${OUTPUT}: \${OBJS}
++\${OUTPUT}: \${OBJS} \${LIB_OBJS}
+        \${LD} -o \$@ \${LDFLAGS} \${OBJS} \${LIBS} \${EXTRA_LIBS}
+
++ifeq (YES, \${TINYXML_CREATE_LIB})
++\${XMLLIB}: \${LIB_OBJS}
++`printf "\\t"`\${AR} \${XMLLIB} \${LIB_OBJS}
++endif
++
+ #****************************************************************************
+ # common rules
+ #****************************************************************************
+@@ -119,7 +142,7 @@
+        bash makedistlinux
+
+ clean:
+-       -rm -f core \${OBJS} \${OUTPUT}
++`printf "\\t"`-rm -f core \${OBJS} \${LIB_OBJS} \${OUTPUT} \${XMLLIB}
+
+ depend:
+        #makedepend \${INCS} \${SRCS}
+EOF
+wl-showstatus build &&
+make TINYXML_CREATE_LIB=YES TINYXML_USE_STL=YES &&
+ # manually create DLL
+ dlltool --export-all-symbols -D tinyxml.dll -l libtinyxml.dll.a -z in.def libtinyxml.a && 
+ ranlib libtinyxml.dll.a && 
+ g++ -shared -s -mwindows -def in.def -o tinyxml.dll libtinyxml.a && 
+ #( echo "EXPORTS" && nm -f posix --defined-only -p libtinyxml.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > tinyxml.def &&
+ #g++ -shared -s -mwindows -def tinyxml.def -o tinyxml.dll libtinyxml.a -Wl,--out-implib,libtinyxml.dll.a && 
+ ## manually create DLL
+ #cp -f libtinyxml.a libtinyxml2.a &&
+ #dlltool --export-all-symbols -D tinyxml2.dll -l libtinyxml2.dll.a -z in.def libtinyxml.a && 
+ #ranlib libtinyxml2.dll.a && 
+ #g++ -shared -s -mwindows -def in.def -o tinyxml2.dll libtinyxml.a && 
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tinyxml
+
+
+

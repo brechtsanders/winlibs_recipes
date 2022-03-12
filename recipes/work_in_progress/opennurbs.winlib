@@ -1,0 +1,87 @@
+export NAME="openNURBS"
+export STATUS=
+#export URL=https://www.rhino3d.com/opennurbs
+export URL=http://opennurbs.org/
+export BASENAME=opennurbs
+export DESCRIPTION="The openNURBS (R) Initiative provides CAD, CAM, CAE, and computer graphics software developers the tools to accurately transfer 3-D geometry between applications."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=6.11.18282.01000
+#export VERSIONDATE=20190211
+#export VERSION=6.15.19158.19451
+#export VERSIONDATE=20190611
+#export VERSION=7.0.19309.17460
+#export VERSIONDATE=20191107
+#export VERSION=7.0.20255.14200
+#export VERSIONDATE=20200918
+#export VERSION=7.6.21127.19001
+#export VERSIONDATE=20210603
+export VERSION=7.11.21285.13001
+export VERSIONDATE=20220122
+####opennurbs_lock.h:118:44: error: use of deleted function 'std::atomic<int>::atomic(const std::atomic<int>&)'
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/louipc/opennurbs/releases"
+#export DOWNLOADURL="https://github.com/mcneel/opennurbs/releases"
+export DOWNLOADURL="https://github.com/mcneel/opennurbs/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/louipc/opennurbs/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/mcneel/opennurbs/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/mcneel/opennurbs/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing PRIu64 in opennurbs_system.h
+mv opennurbs_system.h opennurbs_system.h.bak &&
+echo "#define __STDC_FORMAT_MACROS" > opennurbs_system.h &&
+cat opennurbs_system.h.bak >> opennurbs_system.h
+# fix opennurbs_lock.h
+patch -ulbf opennurbs_lock.h << EOF
+@@ -117,3 +117,3 @@
+ #else
+-  std::atomic<int> m_lock_value = ON_Lock::UnlockedValue;
++  std::atomic<int> m_lock_value = {ON_Lock::UnlockedValue};
+ #endif
+EOF
+# fix opennurbs_file_utilities.cpp (version >= 7.6.21127.19001)
+patch -ulbf opennurbs_file_utilities.cpp << EOF
+@@ -43,2 +43,13 @@
+ #endif
++#elif defined(ON_RUNTIME_WIN)
++#define ON_COMPILER_MSC
++#if !defined(NTDDI_VERSION) || NTDDI_VERSION < 0x06000000
++#undef NTDDI_VERSION
++#define NTDDI_VERSION 0x06000000
++#endif
++#include <shlwapi.h>
++#include <shlobj.h>
++#if !defined(NAME_MAX)
++#define NAME_MAX 255
++#endif
+ #endif
+@@ -550,3 +561,3 @@
+
+-  DWORD rc = ::GetCurrentDirectory(directory_capacity - 1, directory);
++  DWORD rc = ::GetCurrentDirectoryW(directory_capacity - 1, directory);
+   ON_wString fullpath = directory;
+@@ -2441,3 +2452,3 @@
+
+-    m_impl->m_h = ::FindFirstFile(static_cast<const wchar_t*>(s), &m_impl->m_fd);
++    m_impl->m_h = ::FindFirstFileW(static_cast<const wchar_t*>(s), &m_impl->m_fd);
+     if (0 == m_impl->m_h || INVALID_HANDLE_VALUE == m_impl->m_h || 0 == m_impl->m_fd.cFileName[0])
+EOF
+wl-showstatus build &&
+ make &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

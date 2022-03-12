@@ -1,0 +1,103 @@
+export NAME="GCalctool"
+export STATUS=
+export URL=http://live.gnome.org/Gcalctool
+export BASENAME=gcalctool
+export DESCRIPTION="GCalctool is an application that solves mathematical equations and is suitable as a default application in a Desktop environment."
+export CATEGORY=math
+export TYPE=application
+#export VERSION=5.32.2
+#export VERSIONDATE=20101123
+#export VERSION=6.0.0
+#export VERSIONDATE=20110404
+#export VERSION=6.0.1
+#export VERSIONDATE=20110426
+#export VERSION=6.0.2
+#export VERSIONDATE=20110524
+#export VERSION=6.1.3
+#export VERSIONDATE=20110713
+#export VERSION=6.1.5
+#export VERSIONDATE=20110823
+#export VERSION=6.2.0
+#export VERSIONDATE=20110927
+#export VERSION=6.3.4
+#export VERSIONDATE=20120117
+#export VERSION=6.3.5
+#export VERSIONDATE=20120207
+####Unknown option: no-translations
+#export VERSION=6.4.0
+#export VERSIONDATE=20120327
+#export VERSION=6.4.1.1
+#export VERSIONDATE=20120417
+#export VERSION=6.4.2.1
+#export VERSIONDATE=20120515
+#export VERSION=6.5.1
+#export VERSIONDATE=20120503
+#export VERSION=6.5.3
+#export VERSIONDATE=20120703
+#export VERSION=6.5.91
+#export VERSIONDATE=20120904
+#export VERSION=6.5.92
+#export VERSIONDATE=20120917
+#export VERSION=6.6.0
+#export VERSIONDATE=20120925
+#export VERSION=6.6.1
+#export VERSIONDATE=20121015
+export VERSION=6.6.2
+export VERSIONDATE=20121113
+####src/mp-convert.c:18:22: fatal error: langinfo.h: No such file or directory
+wl-showstatus --package-version
+#export DEPENDANCIES=plibc,glib2,gtk3,gettext,pango,libxml2
+export DEPENDANCIES=glib2,gtk3,gettext,pango,libxml2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=itstool
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gcalctool/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing srand48 in src/gcalctool.c
+mv src/gcalctool.c src/gcalctool.c.bak
+echo "#define srand48(x) srand(x)" > src/gcalctool.c
+cat src/gcalctool.c.bak >> src/gcalctool.c
+# fix missing srand48 in src/mp-convert.c
+mv src/mp-convert.c src/mp-convert.c.bak
+echo "#define drand48() (((float) rand())/((float) RAND_MAX))" > src/mp-convert.c
+cat src/mp-convert.c.bak >> src/mp-convert.c
+# fix missing srand48 in src/gcalccmd.c
+mv src/gcalccmd.c src/gcalccmd.c.bak
+echo "#define srand48(x) srand(x)" > src/gcalccmd.c
+cat src/gcalccmd.c.bak >> src/gcalccmd.c
+# fix invalid parameter --no-translations
+mv configure configure.bak2
+sed -e "s/--no-translations//" configure.bak2 > configure
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+# fix missing langinfo.h
+mkdir -p winfix
+echo '#define nl_langinfo(codeset) "UTF-8"' > winfix/langinfo.h
+wl-showstatus configure &&
+####You must have XML::Parser installed to run /bin/intltool-merge
+#$PERLDIR/bin/perl.exe $PERLDIR/bin/cpan install XML::Parser
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" LIBS="-Wl,--as-needed -lplibc" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lplibc" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lplibc" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined" &&
+ # fix src/Makefile
+ cp src/Makefile src/Makefile.bak &&
+ sed -e "s/ln -s \(gcalctool\) \(gnome-calculator\)/cp -f \1.exe \2.exe/" src/Makefile.bak > src/Makefile &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

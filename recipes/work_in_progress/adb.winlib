@@ -1,0 +1,280 @@
+export NAME="Android ADB and Fastboot"
+export STATUS=
+export URL=https://github.com/android/platform_system_core/tree/master/adb
+export BASENAME=adb
+export DESCRIPTION="Android Debug Bridge (ADB) and Fastboot"
+export CATEGORY=system
+export TYPE=application
+#export VERSION=7.1.2_r17
+#export VERSIONDATE=20170703
+#export VERSION=8.0.0_r12
+#export VERSIONDATE=20171001
+#export VERSION=8.0.0_r24
+#export VERSIONDATE=20171029
+#export VERSION=11.0.0_r16
+#export VERSIONDATE=20201118
+#export VERSION=11.0.0_r21
+#export VERSIONDATE=20201208
+#export VERSION=11.0.0_r25
+#export VERSIONDATE=20201208
+#export VERSION=11.0.0_r28
+#export VERSIONDATE=20210105
+#export VERSION=11.0.0_r31
+#export VERSIONDATE=20210202
+#export VERSION=11.0.0_r33
+#export VERSIONDATE=20210302
+#export VERSION=11.0.0_r35
+#export VERSIONDATE=20210406
+#export VERSION=11.0.0_r37
+#export VERSIONDATE=20210504
+#export VERSION=11.0.0_r38
+#export VERSIONDATE=20210608
+#export VERSION=11.0.0_r39
+#export VERSIONDATE=20210708
+#export VERSION=11.0.0_r40
+#export VERSIONDATE=20210803
+#export VERSION=11.0.0_r42
+#export VERSIONDATE=20210827
+#export VERSION=11.0.0_r43
+#export VERSIONDATE=20210908
+#export VERSION=11.0.0_r45
+#export VERSIONDATE=20210908
+#export VERSION=11.0.0_r48
+#export VERSIONDATE=20211005
+export VERSION=12.0.0_r2
+export VERSIONDATE=20211005
+#export VERSION=12.0.0_r3
+#export VERSIONDATE=20211020
+#export VERSION=12.0.0_r7
+#export VERSIONDATE=20211029
+#export VERSION=12.0.0_r13
+#export VERSIONDATE=20211102
+#export VERSION=12.0.0_r15
+#export VERSIONDATE=20211117
+#export VERSION=12.0.0_r16
+#export VERSIONDATE=20211207
+#export VERSION=12.0.0_r20
+#export VERSIONDATE=20211214
+#export VERSION=12.0.0_r21
+#export VERSIONDATE=20211216
+#export VERSION=12.0.0_r26
+#export VERSIONDATE=20220105
+#export VERSION=12.0.0_r27
+#export VERSIONDATE=20220115
+#export VERSION=12.0.0_r31
+#export VERSIONDATE=20220208
+#export VERSION=12.0.0_r32
+#export VERSIONDATE=20220218
+#export VERSION=12.1.0_r1
+#export VERSIONDATE=20220308
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=NOTICE
+export LICENSETYPE=Apache
+#export DOWNLOADURL="https://github.com/android/platform_system_core/releases android-"
+export DOWNLOADURL="https://android.googlesource.com/platform/system/core.git android-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/android/platform_system_core/archive/android-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/aosp-mirror/platform_system_core/archive/refs/tags/android-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://android.googlesource.com/platform/system/core.git/+archive/1d37c4499249b17f143df12cebc5ee9ea3600ce3.tar.gz
+#export DOWNLOADSOURCEURL=https://android.googlesource.com/platform/system/core.git/+archive/1a458e21f244d05ed05cb73336ec237365837831.tar.gz
+#export DOWNLOADSOURCEURL=https://android.googlesource.com/platform/system/core.git/+archive/773bc40b522b752961a76128966380e054338328.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/android-$VERSION.tar.gz -C$BASENAME-$VERSION --no-wildcards platform_system_core-android-$VERSION/adb/ platform_system_core-android-$VERSION/base/ platform_system_core-android-$VERSION/libcutils/ --strip-components=1
+#tar xfzv $TARBALLDIR/$BASENAME/1d37c4499249b17f143df12cebc5ee9ea3600ce3.tar.gz -C$BASENAME-$VERSION
+#tar xfzv $TARBALLDIR/$BASENAME/1a458e21f244d05ed05cb73336ec237365837831.tar.gz -C$BASENAME-$VERSION
+#tar xfzv $TARBALLDIR/$BASENAME/773bc40b522b752961a76128966380e054338328.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/adb
+
+# fix sysdeps.h (version >= 11.0.0_r28)
+patch -ulbf sysdeps.h << EOF
+@@ -25,2 +25,5 @@
+ #endif
++#ifdef __MINGW32__
++#  define _POSIX_SOURCE
++#endif
+
+@@ -66,5 +69,5 @@
+ #include <utime.h>
+-#include <windows.h>
+ #include <winsock2.h>
+ #include <ws2tcpip.h>
++#include <windows.h>
+
+EOF
+mkdir -p build
+cat > build/version.h << EOF
+EOF
+cat > platform_tools_version.h << EOF
+#define PLATFORM_TOOLS_VERSION "$VERSION"
+EOF
+for F in *.cpp; do
+ echo CXX $F
+ g++ -c -o $F.o $F -I. -I../base/include -std=gnu++11 -fpermissive -DADB_HOST=1 || break
+done
+####See also: https://aaporantalainen.wordpress.com/2015/12/05/cross-compiling-adb-for-windows/
+
+
+
+echo -e '
+# standalone Makefile for adb for windows
+SRCS+= adb.c
+SRCS+= adb_main.c
+SRCS+= sysdeps_win32.c    #replaces fdevent.c 
+SRCS+= adb_client.c
+SRCS+= commandline.c
+SRCS+= console.c
+SRCS+= file_sync_client.c
+SRCS+= get_my_path_windows.c    #replaces get_my_path_linux.c
+SRCS+= services.c
+SRCS+= sockets.c
+SRCS+= transport.c
+SRCS+= transport_local.c
+SRCS+= transport_usb.c
+SRCS+= usb_windows.c       #replaces  usb_linux.c
+SRCS+= adb_auth_host.c
+SRCS+= adb_auth.c
+SRCS+= adb_listeners.c
+  
+#VPATH+= ../libcutils  #not used, because of USE_SYSDEPS_WIN32
+ 
+SRCS+= ../libzipfile/centraldir.c
+SRCS+= ../libzipfile/zipfile.c
+ 
+ 
+CPPFLAGS+= -DADB_HOST=1
+CPPFLAGS+= -DHAVE_FORKEXEC=1
+#CPPFLAGS+= -DHAVE_SYMLINKS    #readlink will fail
+#CPPFLAGS+= -DHAVE_TERMIO_H    #No concept of tty in Windows
+CPPFLAGS+= -DHAVE_SYS_SOCKET_H
+CPPFLAGS+= -DHAVE_OFF64_T
+CPPFLAGS+= -D_GNU_SOURCE
+CPPFLAGS+= -D_XOPEN_SOURCE
+ 
+#Added for Windows
+CPPFLAGS+= -DHAVE_WINSOCK
+CPPFLAGS+= -D_WIN32
+CPPFLAGS+= -DHAVE_WIN32_IPC
+CPPFLAGS+= -DHAVE_WIN32_PROC
+ 
+CPPFLAGS+= -I.
+CPPFLAGS+= -I../include
+ 
+#Locally compiled
+CPPFLAGS+= -Iopenssl/include/
+LDFLAGS+= -Lopenssl/
+CPPFLAGS+= -Izlib/
+LDFLAGS+= -Lzlib/
+ 
+#Precompiled
+LIBS+= AdbWinUsbApi.dll
+LIBS+= AdbWinApi.dll
+ 
+LIBS+= -lcrypto -lpthread -lz  #lrt dropped, not used in Windows
+LIBS+= -lws2_32 -lgdi32
+ 
+CC= gcc
+LD= gcc
+CXX= g++
+ 
+CXXFLAGS+= $(CPPFLAGS)
+ 
+OBJS= $(SRCS:.c=.o)
+ 
+all: adb.exe
+  
+adb.exe: $(OBJS)
+\t$(CXX) $(CXXFLAGS) -c -o adb_io.o adb_io.cpp
+\t$(LD) -o $@ $(LDFLAGS) $(OBJS) adb_io.o  $(LIBS)
+\tstrip $@
+  
+clean:
+\trm -rf *.o adb.exe
+' > standalone_Makefile
+make -f standalone_Makefile
+
+
+  ./configure --help
+  head COPYING* LICENSE*
+  ls -l COPYING* LICENSE* COPYRIGHT* configure* CMakeLists.txt Makefile GNUmakefile
+wl-showstatus configure &&
+#./autogen.sh &&
+#    echo OK
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#mkdir -p build_test; cd build_test; cmake.exe -G"MSYS Makefiles" . -LH && echo OK; cd ..; rm -rf build_test
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#export BUILDDEPENDANCIES=cmake
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####See also: https://github.com/nmeum/android-tools
+
+
+
+#export NAME="android-tools"
+#export STATUS=
+#export URL=https://github.com/nmeum/android-tools
+#export BASENAME=android-tools
+#export DESCRIPTION="Unoffical CMake-based build system for android command line utilities"
+#export CATEGORY=hardware
+#export TYPE=application
+#export VERSION=31.0.3
+#export VERSIONDATE=20211110
+#wl-showstatus --package-version
+#export DEPENDANCIES=libusb,pcre,googletest,protobuf,brotli,zstd,liblz4
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=Apache
+#export DOWNLOADURL="https://github.com/nmeum/android-tools/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/nmeum/android-tools/releases/download/$VERSION/android-tools-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d  -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/android-tools-$VERSION.tar.xz
+#cd android-tools-$VERSION
+##grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
+##mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_win &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf android-tools-$VERSION
+
+
+

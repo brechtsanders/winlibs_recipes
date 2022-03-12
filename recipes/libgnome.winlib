@@ -1,0 +1,79 @@
+export NAME="libgnome"
+export STATUS=
+export URL=http://www.gnome.org/
+export BASENAME=libgnome
+export DESCRIPTION="GNOME 2 is a new desktop environment which is an extension to GNOME 1, but is built in such a way that they can coexist. libgnome is one of the core libraries for GNOME 2."
+export CATEGORY=gui
+export TYPE=library
+#export VERSION=2.32.0
+#export VERSIONDATE=20101115
+export VERSION=2.32.1
+export VERSIONDATE=20110202
+wl-showstatus --package-version
+export DEPENDANCIES=orbit2,libbonobo,libcanberra,gconf,glib2,gnome-vfs,gettext,popt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LIB
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/libgnome/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix schemas/Makefile.in
+patch -ulbf schemas/Makefile.in << EOF
+--- schemas/Makefile.in     2010-09-27 19:29:08 +0200
++++ schemas/Makefile.in     2010-11-15 18:09:08 +0100
+@@ -502,16 +502,8 @@
+ # useful, but not this time.
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@install-data-local:
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@    if test -z "\$(DESTDIR)" ; then \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@        for p in \$(schema_DATA) ; do \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@            (echo set GCONF_CONFIG_SOURCE=\$(GCONF_SCHEMA_CONFIG_SOURCE); \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@             echo \$(GCONFTOOL) --makefile-install-rule \$\$p) >_temp.bat; \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@            cmd /c _temp.bat; \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@        done \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_TRUE@    fi
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_FALSE@install-data-local:
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_FALSE@    if test -z "\$(DESTDIR)" ; then \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_FALSE@        for p in \$(schema_DATA) ; do \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_FALSE@            GCONF_CONFIG_SOURCE=\$(GCONF_SCHEMA_CONFIG_SOURCE) \$(GCONFTOOL) --makefile-install-rule \$\$p; \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_FALSE@        done \\
+-@GCONF_SCHEMAS_INSTALL_TRUE@@OS_WIN32_FALSE@    fi
++@GCONF_SCHEMAS_INSTALL_TRUE@install-data-local:
++@GCONF_SCHEMAS_INSTALL_TRUE@`printf "\\t"`if test -z "\$(DESTDIR)" ; then \\
++@GCONF_SCHEMAS_INSTALL_TRUE@`printf "\\t"`    for p in \$(schema_DATA) ; do \\
++@GCONF_SCHEMAS_INSTALL_TRUE@`printf "\\t"`        GCONF_CONFIG_SOURCE=\$(GCONF_SCHEMA_CONFIG_SOURCE) \$(GCONFTOOL) --makefile-install-rule \$\$p; \\
++@GCONF_SCHEMAS_INSTALL_TRUE@`printf "\\t"`    done \\
++@GCONF_SCHEMAS_INSTALL_TRUE@`printf "\\t"`fi
+ @GCONF_SCHEMAS_INSTALL_FALSE@install-data-local:
+EOF
+# fix deprecated glib errors
+mv libgnome/Makefile.in libgnome/Makefile.in.bak
+sed -e "s/-DG_DISABLE_DEPRECATED//" libgnome/Makefile.in.bak > libgnome/Makefile.in
+# avoid UTF-8 issues in glib-mkenums
+mkdir -p fixes
+sed -e 's/, *encoding="utf-8"//' $MINGWPREFIX/bin/glib-mkenums > fixes/glib-mkenums
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+wl-showstatus configure &&
+####You must have XML::Parser installed to run /bin/intltool-merge
+#$PERLDIR/bin/perl.exe $PERLDIR/bin/cpan install XML::Parser
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libgcc -static-libstdc++ -Wl,--enable-auto-import" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libgcc -static-libstdc++ -Wl,--enable-auto-import" &&
+#PATH=$PATH:$PERLDIR/../c/bin PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libgcc -static-libstdc++ -Wl,--enable-auto-import" &&
+PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libgcc -static-libstdc++ -Wl,--enable-auto-import" &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ #PATH=$(pwd)/fixes:$PATH:$PERLDIR/../c/bin make install-strip &&
+ PATH=$(pwd)/fixes:$PATH:$PERLDIR/../c/bin:$PYDIR make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

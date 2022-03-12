@@ -1,0 +1,69 @@
+export NAME="fstrcmp"
+export STATUS=
+export URL=https://sourceforge.net/projects/fstrcmp/
+export BASENAME=fstrcmp
+export DESCRIPTION="The fstrcmp project provides a shared library for making fuzzy string comparisons, and also provides an fstrcmp command for use in shell scripts."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=0.7.D001
+export VERSIONDATE=20190112
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=gnu-ghostscript
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/fstrcmp/files/fstrcmp/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://datapacket.dl.sourceforge.net/project/fstrcmp/fstrcmp/$(echo $VERSION|sed -e "s/\.[A-Z].*$//")/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix detection of running executable in lib/program_name.c
+patch -ulbf lib/program_name.c << EOF
+@@ -23,2 +23,5 @@
+ #include <lib/ac/unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -85,2 +88,7 @@
+
++#ifdef _WIN32
++    char buf[sizeof(progname)];
++    if (GetModuleFileNameA(NULL, buf, sizeof(buf)) != 0)
++        fstrcmp_program_name_set_real(buf);
++#else
+     /*
+@@ -107,2 +115,3 @@
+     fstrcmp_program_name_set_real(getenv("_"));
++#endif
+     if (progname[0])
+EOF
+# stub user id detection in test_user/main.c
+patch -ulbf test_user/main.c << EOF
+@@ -27,2 +27,5 @@
+ {
++#ifdef _WIN32
++    printf("0\n");
++#else
+     int             u;
+@@ -38,2 +41,3 @@
+         printf("%d\n", u);
++#endif
+     return 0;
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lkernel32" &&
+ wl-showstatus build-install &&
+ make install &&
+ ( echo EXPORTS; gcc -E lib/fstrcmp.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(fstr[^ *]*\).*/\1/p" ) > fstrcmp.def &&
+ gcc -shared -s -mwindows -def fstrcmp.def -o $INSTALLPREFIX/bin/fstrcmp.dll $INSTALLPREFIX/lib/libfstrcmp.a -Wl,--out-implib,$INSTALLPREFIX/lib/libfstrcmp.dll.a &&
+ wl-showstatus install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

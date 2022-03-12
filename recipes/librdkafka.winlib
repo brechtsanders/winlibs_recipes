@@ -1,0 +1,98 @@
+export NAME="librdkafka"
+export STATUS=
+export URL=https://github.com/edenhill/librdkafka
+export BASENAME=librdkafka
+export DESCRIPTION="librdkafka is a C library implementation of the Apache Kafka protocol, providing Producer, Consumer and Admin clients. It was designed with message delivery reliability and high performance in mind, current figures exceed 1 million msgs/second for the producer and 3 million msgs/second for the consumer."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.3.0
+#export VERSIONDATE=20200214
+#export VERSION=1.4.0
+#export VERSIONDATE=20200403
+#export VERSION=1.4.2
+#export VERSIONDATE=20200506
+#export VERSION=1.4.4
+#export VERSIONDATE=20200620
+#export VERSION=1.5.0
+#export VERSIONDATE=20200720
+#export VERSION=1.5.2
+#export VERSIONDATE=20201020
+#export VERSION=1.5.3
+#export VERSIONDATE=20201209
+#export VERSION=1.6.0
+#export VERSIONDATE=20210126
+#export VERSION=1.6.1
+#export VERSIONDATE=20210224
+#export VERSION=1.6.2
+#export VERSIONDATE=20211125
+#export VERSION=1.7.0
+#export VERSIONDATE=20210510
+#export VERSION=1.8.0
+#export VERSIONDATE=20210916
+export VERSION=1.8.2
+export VERSIONDATE=20211018
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,cyrus-sasl,zlib,zstd,liblz4
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/edenhill/librdkafka/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/edenhill/librdkafka/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing files
+#mkdir -p winfix/sys
+#echo "#include <winsock2.h>" > winfix/sys/socket.h
+#sed -i.bak -e "s/^#include <sys/socket\.h>.*/#ifdef _WIN32\n#include <winsock2.h>\n#else\n&\n#endif/" $(grep -lr "#include <sys/socket\.h>" *)
+#sed -i.bak -e "s/^#include <alloca\.h>.*/#ifdef _WIN32\n#include <malloc.h>\n#else\n&\n#endif/" src/rdposix.h
+#wl-showstatus configure &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ssl --enable-gssapi --enable-zstd --enable-lz4-ext --enable-c11threads --CFLAGS="-I$(pwd)/winfix" --CXXFLAGS="-I$(pwd)/winfix" &&
+# ## fix building DLLs
+# #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# #wl-showstatus build &&
+# #make &&
+# wl-showstatus build-install &&
+# make install-strip &&
+#    echo OK
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/netinet/in.h
+echo "#include <winsock2.h>" > winfix/arpa/inet.h
+echo "#include <winsock2.h>" > winfix/netdb.h
+# fix detection of liblz4 via pkg-config (version >= 1.7.0)
+patch -ulbf packaging/cmake/Config.cmake.in << EOF
+@@ -26,3 +26,7 @@
+ if(@WITH_LZ4_EXT@)
++ include(FindPkgConfig)
++ pkg_search_module(LZ4 OPTIONAL liblz4)
++ if (NOT LZ4_FOUND)
+   find_dependency(LZ4)
++ endif()
+ endif()
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DRDKAFKA_BUILD_STATIC:BOOL=ON -DWITHOUT_WIN32_CONFIG:BOOL=ON -DWITH_PLUGINS:BOOL=ON -DWITH_SSL:BOOL=ON -DWITH_SASL:BOOL=ON -DWITH_ZLIB:BOOL=ON -DENABLE_LZ4_EXT:BOOL=ON -DWITH_ZSTD:BOOL=ON -DRDKAFKA_BUILD_EXAMPLES:BOOL=OFF -DRDKAFKA_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DWITH_PLUGINS -I$(pwd)/winfix" -DCMAKE_CXX_FLAGS="-DWITH_PLUGINS -I$(pwd)/winfix" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DRDKAFKA_BUILD_STATIC:BOOL=OFF -DWITHOUT_WIN32_CONFIG:BOOL=ON -DWITH_PLUGINS:BOOL=ON -DWITH_SSL:BOOL=ON -DWITH_SASL:BOOL=ON -DWITH_ZLIB:BOOL=ON -DENABLE_LZ4_EXT:BOOL=ON -DWITH_ZSTD:BOOL=ON -DRDKAFKA_BUILD_EXAMPLES:BOOL=OFF -DRDKAFKA_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DWITH_PLUGINS -I$(pwd)/winfix" -DCMAKE_CXX_FLAGS="-DWITH_PLUGINS -I$(pwd)/winfix" -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,53 @@
+export NAME="libmed"
+export STATUS=
+export URL=https://www.salome-platform.org/
+export BASENAME=libmed
+export DESCRIPTION="MED File library"
+export CATEGORY=math
+export TYPE=library
+#export VERSION=4.0.0
+#export VERSIONDATE=20200517
+export VERSION=4.1.0
+export VERSIONDATE=20200729
+wl-showstatus --package-version
+export DEPENDANCIES=hdf5
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://www.salome-platform.org/downloads/ med-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://files.salome-platform.org/Salome/other/med-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/med-$VERSION.tar.gz
+cd med-$VERSION
+# fix additional fields parameter for newer HDF5 in src/hdfi/_MEDchecknSublinkFunc.c (version >= 4.1.0)
+sed -i.bak -e "s/\(H5Oget_info_by_name.*,\)\( H5P_DEFAULT\)/\1H5O_INFO_ALL,\2/" $(grep -l "H5Oget_info_by_name.*, H5P_DEFAULT" $(find -name '*.c'))
+sed -i.bak2 -e "s/\(H5Oget_info([^,]*,\)/\1H5O_INFO_ALL,/" $(grep -l "H5Oget_info(" $(find -name '*.c'))
+# disable errors (version >= 4.1.0)
+sed -i.bak -e "s/^#error/#warning/" src/hdfi/_MEDfileCreate.c src/hdfi/_MEDfileOpen.c src/hdfi/_MEDmemFileOpen.c src/ci/MEDfileCompatibility.c
+# fix detection of newer HDF5 in config/cmake_files/medMacros.cmake (version >= 4.1.0)
+patch -ulbf config/cmake_files/medMacros.cmake << EOF
+@@ -449,3 +449,3 @@
+     ##
+-    IF (NOT HDF_VERSION_MAJOR_REF EQUAL 1 OR NOT HDF_VERSION_MINOR_REF EQUAL 10 OR NOT HDF_VERSION_RELEASE_REF GREATER 1)
++    IF (NOT HDF_VERSION_MAJOR_REF EQUAL 1 OR HDF_VERSION_MINOR_REF LESS 10)
+         MESSAGE(FATAL_ERROR "HDF5 version is \${HDF_VERSION_REF}. Only versions >= 1.10.2 are supported.")
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_STATIC_LIBS:BOOL=ON -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_STATIC_LIBS:BOOL=OFF -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf med-$VERSION
+
+
+

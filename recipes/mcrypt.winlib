@@ -1,0 +1,106 @@
+export NAME="MCrypt"
+export STATUS=
+export URL=http://mcrypt.sourceforge.net/
+export BASENAME=mcrypt
+export DESCRIPTION="MCrypt is a replacement for the old crypt() package and crypt(1) command, with extensions. It allows developers to use a wide range of encryption functions, without making drastic changes to their code. It allows users to encrypt files or data streams without having to be cryptographers."
+export CATEGORY=security
+export TYPE=application
+export VERSION=2.6.8
+export VERSIONDATE=20160627
+####src/mcrypt.c:194:11: error: 'SIGQUIT' undeclared (first use in this function)
+####src/mcrypt.c:660: undefined reference to `copyDate'
+wl-showstatus --package-version
+export DEPENDANCIES=libmcrypt,mhash,zlib,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/mcrypt/files/MCrypt/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/mcrypt/MCrypt/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing signals in src/mcrypt.c
+patch -ulbf src/mcrypt.c << EOF
+--- src/mcrypt.c  2007-11-07 18:10:21.000000000 +0100
++++ src/mcrypt.c  2016-06-27 08:37:03.132782900 +0200
+
+@@ -42,2 +42,3 @@
+ #endif
++#undef HAVE_UTIME_H
+
+@@ -193,11 +194,23 @@
+    Signal(SIGINT, shandler);
++#ifdef SIGQUIT
+    Signal(SIGQUIT, shandler);
++#endif
+    Signal(SIGSEGV, shandler);
++#ifdef SIGPIPE
+    Signal(SIGPIPE, shandler);
++#endif
+    Signal(SIGTERM, shandler);
++#ifdef SIGHUP
+    Signal(SIGHUP, shandler);
++#endif
++#ifdef SIGUSR1
+    Signal(SIGUSR1, SIG_IGN);
++#endif
++#ifdef SIGUSR2
+    Signal(SIGUSR2, SIG_IGN);
++#endif
++#ifdef SIGALRM
+    Signal(SIGALRM, SIG_IGN);
+ #endif
++#endif
+
+EOF
+# fix missing signals in src/extra.c
+patch -ulbf src/extra.c << EOF
+--- src/extra.c  2007-11-07 18:10:20.000000000 +0100
++++ src/extra.c  2016-06-27 08:36:35.069901000 +0200
+@@ -542,8 +542,14 @@
+        Signal(SIGINT, snhandler);
++#ifdef SIGQUIT
+        Signal(SIGQUIT, snhandler);
++#endif
+        Signal(SIGSEGV, snhandler);
++#ifdef SIGPIPE
+        Signal(SIGPIPE, snhandler);
++#endif
+        Signal(SIGTERM, snhandler);
++#ifdef SIGHUP
+        Signal(SIGHUP, snhandler);
+ #endif
++#endif
+
+@@ -570,8 +576,14 @@
+        Signal(SIGINT, shandler);
++#ifdef SIGQUIT
+        Signal(SIGQUIT, shandler);
++#endif
+        Signal(SIGSEGV, shandler);
++#ifdef SIGPIPE
+        Signal(SIGPIPE, shandler);
++#endif
+        Signal(SIGTERM, shandler);
++#ifdef SIGHUP
+        Signal(SIGHUP, shandler);
+ #endif
++#endif
+
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ mv Makefile Makefile.bak &&
+ sed -e "s/\(LN_S.* \)\(mcrypt\) /\1src\/\2.exe /; s/bindir)\/mdecrypt$/&.exe/" Makefile.bak > Makefile &&
+ echo "#undef HAVE_UTIME_H" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

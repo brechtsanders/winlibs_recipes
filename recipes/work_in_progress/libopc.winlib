@@ -1,0 +1,94 @@
+export NAME="libopc"
+export STATUS=
+export URL=http://libopc.codeplex.com/
+export BASENAME=libopc
+export DESCRIPTION="the libopc open source library is a ISO/IEC 29500 standard conformant, cross-platform, open source, standard C99-based implementation of Part II (OPC) and Part III (MCE) of the ISO/IEC 29500 specification (OOXML)."
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=0.0.3
+export VERSIONDATE=20130316
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="http://libopc.codeplex.com/releases/view/70014 libopc_"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=
+#export DOWNLOADSOURCEURL='http://download-codeplex.sec.s-msft.com/Download/Release?ProjectName=libopc&DownloadId=344733&FileTime=129742108536800000&Build=20266'
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/Release@ProjectName=libopc* $TARBALLDIR/$BASENAME/libopc_$VERSION.tar.gz
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/libopc_$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/libopc
+
+patch -ulbf configure << EOF
+--- configure  2012-02-20 10:23:16 +0100
++++ configure 2013-03-16 15:35:08 +0100
+@@ -146,3 +146,3 @@
+        PYTHON_VERSION="\`\$PYTHON_PATH -V 2>&1\`"
+-       if [[ \$PYTHON_VERSION =~ ^"Python 2.6."[1-9][0-9]*\$|^"Python 2."[7-9][0-9]*(\\.[0-9]*(\\+)?)?\$|^"Python "[3][0-9]*(\\.[0-9]*(\\.[0-9]*)(\\+)?)?\$ ]]; then
++       if [[ \$PYTHON_VERSION =~ ^"Python 2.6."[1-9][0-9]*\$\\|^"Python 2."[7-9][0-9]*\\(\\.[0-9]*\\(\\+\\)?\\)?\$\\|^"Python "[3][0-9]*\\(\\.[0-9]*\\(\\.[0-9]*\\)\\(\\+\\)?\\)?\$ ]]; then
+                FLAGS=\`\$PYTHON_PATH generate.py --include Makefile.platform.xml --config-dir \$BUILDDIR --with-zlib=\$EXTERNAL_ZLIB --with-zlib-cppflags="\$EXTERNAL_ZLIB_CPPFLAGS" --with-zlib-ldflags="\$EXTERNAL_ZLIB_LDFLAGS" --with-libxml=\$EXTERNAL_LIBXML --with-libxml-cppflags="\$EXTERNAL_LIBXML_CPPFLAGS" --with-libxml-ldflags="\$EXTERNAL_LIBXML_LDFLAGS" --print-env \$PLATFORM\`
+EOF
+
+cd plib &&
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+cd .. &&
+
+for F in opc/*.c mce/*.c; do
+ if [ "$F" != "opc/main.c" ]; then
+  gcc -std=gnu99 -c -o $F.o $F -I. -Iconfig -Iplib/include `pkg-config --cflags libxml-2.0`
+ fi
+done
+ar rcs libopc.a opc/*.o mce/*.o
+
+# dlltool --export-all-symbols -D opc.dll -l libopc.dll.a -z in.def .libs/libopc.a && 
+# ranlib libopc.dll.a && 
+# gcc -shared -s -mwindows -def in.def -o opc.dll .libs/libopc.a && 
+#gcc -shared -s -mwindows --export-symbols-regex "^(opc|mpc)" -o opc.dll .libs/libopc.a
+#gcc -shared -s -mwindows -Wl,'--export-symbols-regex "^mpc"' -o opc.dll libopc.a
+gcc -shared -s -mwindows -Wl,--export-all-symbols -o opc.dll libopc.a
+ pexports.exe opc.dll
+
+#gcc -std=gnu99 -o libopc.a opc/*.c mce/*.c -I. -Iconfig -Iplib/include `pkg-config --cflags --libs libxml-2.0` -lz
+
+wl-showstatus configure &&
+./configure --with-python=$PYDIR/python.exe --os=win32 --target=release --toolchain=gcc --arch=`echo $RUNPLATFORM|sed -e "s/-.*$//"` &&
+    echo OK
+  ./configure --help
+  head COPYING* LICENSE*
+  ls -l COPYING* LICENSE*
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+    
+#$PY2DIR/python.exe  generate.py --include Makefile.xml
+
+#    cmake.exe . -LH; rm -f CMakeCache.txt &&
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && rm -rf $BASENAME-$VERSION
+
+
+

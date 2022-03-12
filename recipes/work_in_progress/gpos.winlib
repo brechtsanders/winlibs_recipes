@@ -1,0 +1,72 @@
+export NAME="GPOS"
+export STATUS=
+export URL=https://github.com/greenplum-db/gpos
+export BASENAME=gpos
+export DESCRIPTION="The Greenplum Database OS abstraction layer"
+export CATEGORY=database
+export TYPE=library
+export VERSION=1.147
+export VERSIONDATE=20210408
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/greenplum-db/gpos/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/greenplum-db/gpos/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix libgpos/include/gpos/common/clibtypes.h (version >= 1.147)
+patch -ulbf libgpos/include/gpos/common/clibtypes.h << EOF
+@@ -17,3 +17,5 @@
+ #include <sys/time.h>
+-#ifndef _WIN32
++#ifdef _WIN32
++struct rusage {};
++#else
+ #include <sys/resource.h>
+EOF
+# fix missing sigset_t in libgpos/include/gpos/common/pthreadtypes.h (version >= 1.147)
+patch -ulbf libgpos/include/gpos/common/pthreadtypes.h << EOF
+@@ -40,3 +40,7 @@
+        // set of signals
++#ifdef __MINGW32__
++       typedef _sigset_t SIGSET_T;
++#else
+        typedef sigset_t SIGSET_T;
++#endif
+ }
+EOF
+# fix missing rand_r/strerror_r/localtime_r in libgpos/src/common/clibwrapper.cpp
+mv libgpos/src/common/clibwrapper.cpp libgpos/src/common/clibwrapper.cpp.bak &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > libgpos/src/common/clibwrapper.cpp &&
+echo "#define strerror_r(a,b,c) (strerror_s((b),(c),(a)))" >> libgpos/src/common/clibwrapper.cpp &&
+cat libgpos/src/common/clibwrapper.cpp.bak >> libgpos/src/common/clibwrapper.cpp
+# fix missing signals in libgpos/src/task/CThreadManager.cpp (version >= 1.147)
+sed -i.bak -e "s/^\(\s*pthread::SigAddSet(\&sigset, \)\(SIG[A-Z0-9]*\)\();.*\)$/#ifdef \2\n\1\2\3\n#endif/" libgpos/src/task/CThreadManager.cpp
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DENABLE_EXTENDED_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DENABLE_EXTENDED_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

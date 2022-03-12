@@ -1,0 +1,65 @@
+export NAME="pxCore"
+export STATUS=
+export URL=https://code.google.com/archive/p/pxcore/
+export BASENAME=pxcore
+export DESCRIPTION="Portable framebuffer library and related projects"
+export CATEGORY=gui
+export TYPE=library
+export VERSION=1.3
+export VERSIONDATE=20210318
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=
+export DOWNLOADURL="https://code.google.com/archive/p/pxcore/downloads pxCore"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/pxcore/pxCore$(echo $VERSION|tr . _).zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+unzip -oq $TARBALLDIR/$BASENAME/pxCore$(echo $VERSION|tr . _).zip -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION
+# fix src/win/pxWindowNative.h
+sed -i.bak -e "s/\(virtual.*= \)(0)/\10/" src/win/pxWindowNative.h
+# fix src/win/pxWindowNative.cpp
+patch -ulbf src/win/pxWindowNative.cpp << EOF
+@@ -11,2 +11,3 @@
+ #include <tchar.h>
++#ifndef __MINGW32__
+ #define _ATL_NO_HOSTING
+@@ -14,2 +15,3 @@
+ #endif
++#endif
+
+@@ -33,3 +35,3 @@
+ #ifndef WINCE
+-    SetWindowLongPtr(w, GWLP_USERDATA, (LONG)p);
++    SetWindowLongPtr(w, GWLP_USERDATA, (intptr_t)p);
+ #else
+EOF
+# create make file for Windows
+sed -e "s?-I/usr/X11R6/include?-I.?; s?PX_PLATFORM_X11?PX_PLATFORM_WIN?g; s?x11?win?g" src/Makefile.x11 > src/Makefile.mingw
+wl-showstatus build &&
+ make -Csrc -f Makefile.mingw &&
+ #( echo "EXPORTS" && nm -f posix --defined-only -p build/win/libpxCore.a | sed -n -e "s/^_*\([^ ]*\) T .*$/_\1/p" | grep -vi main ) > build/win/libpxCore.def &&
+ #g++ -shared -s -mwindows -def build/win/libpxCore.def -o build/win/libpxCore.dll build/win/libpxCore.a -Wl,--out-implib,build/win/libpxCore.dll.a &&
+ ## build examples
+ #for F in examples/*/*.cpp; do
+ # echo CXX $F
+ # g++ -o $(basename -s.cpp $F) $F -Isrc -DPX_PLATFORM_WIN -Lbuild/win -lpxCore -lgdi32
+ #done &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/win $INSTALLPREFIX/lib &&
+ cp -f src/*.h $INSTALLPREFIX/include/ &&
+ cp -f src/win/*.h $INSTALLPREFIX/include/win/ &&
+ cp -f build/win/*.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build shared library -> not supported as library calls pxMain() in calling program (only possible with static linking)
+####See also: http://code.google.com/p/pxcamera
+
+
+

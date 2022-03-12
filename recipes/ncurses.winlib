@@ -1,0 +1,186 @@
+export NAME="Ncurses"
+export STATUS=
+export URL=http://www.gnu.org/software/ncurses/
+export BASENAME=ncurses
+export DESCRIPTION="The Ncurses (new curses) library is a free software emulation of curses in System V Release 4.0, and more. It uses Terminfo format, supports pads and color and multiple highlights and forms characters and function-key mapping, and has all the other SYSV-curses enhancements over BSD Curses."
+export CATEGORY=console
+export TYPE=library
+#export VERSION=5.8
+#export VERSIONDATE=20110227
+#export VERSION=5.9
+#export VERSIONDATE=20130206
+####configure: error: Shared libraries are not supported in this version
+####lib/libncurses.a(lib_ttyflags.o):lib_ttyflags.c:(.text+0x44): undefined reference to `_nc_mingw_ioctl'
+#export VERSION=6.0
+#export VERSIONDATE=20150811
+#export VERSION=6.1
+#export VERSIONDATE=20180128
+#export VERSION=6.2
+#export VERSIONDATE=20200212
+export VERSION=6.3
+export VERSIONDATE=20211109
+wl-showstatus --package-version
+export DEPENDANCIES=pcre
+#export DEPENDANCIES=pcre2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=cproto
+export LICENSEFILE=AUTHORS
+export LICENSETYPE=
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/ncurses/"
+#export DOWNLOADURL="https://invisible-mirror.net/archives/ncurses/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/ncurses/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd ncurses-$VERSION
+# fall back to empty TERM if value of TERM environment variable is not found ncurses/base/lib_initscr.c (version >= 6.2)
+# fix ncurses/base/lib_initscr.c (version >= 6.2)
+patch -ulbf ncurses/base/lib_initscr.c << EOF
+@@ -94,4 +94,10 @@
+        if (newterm(name, stdout, stdin) == 0) {
++#ifdef __MINGW32__
++         if (newterm("", stdout, stdin) == 0) {
++#endif
+            fprintf(stderr, "Error opening terminal: %s.\\n", name);
+            ExitProgram(EXIT_FAILURE);
++#ifdef __MINGW32__
++         }
++#endif
+        }
+EOF
+# use Windows console if TERM=cygwin in ncurses/win32con/win_driver.c (version >= 6.2)
+patch -ulbf ncurses/win32con/win_driver.c << EOF
+@@ -643,3 +643,3 @@
+        }
+-    } else if (tname != 0 && stricmp(tname, "unknown") == 0) {
++    } else if (tname != 0 && (stricmp(tname, "unknown") == 0 || stricmp(tname, "cygwin") == 0)) {
+        code = TRUE;
+EOF
+# fix configure for building DLL
+patch -ulbf configure << EOF
+--- configure  2011-04-01 01:35:52 +0200
++++ configure  2013-12-16 16:50:06 +0100
+@@ -5856,2 +5856,6 @@
+                ;;
++       mingw*)
++               CC_SHARED_OPTS=''
++               MK_SHARED_LIB='\${CC} \${CFLAGS} -shared -o \$@'
++               ;;
+        *)
+EOF
+## fix WINVER (version >= 5.9)
+#mv ncurses/curses.priv.h ncurses/curses.priv.h.bak
+#echo "#define WINVER 0x0501" > ncurses/curses.priv.h
+#cat ncurses/curses.priv.h.bak >> ncurses/curses.priv.h
+#mv test/test.priv.h test/test.priv.h.bak
+#echo "#define WINVER 0x0501" > test/test.priv.h
+#cat test/test.priv.h.bak >> test/test.priv.h
+## fix ncurses/tinfo/db_iterator.c to use relative TERMINFO path
+#patch -ulbf ncurses/tinfo/db_iterator.c << EOF
+#@@ -219,2 +219,15 @@
+#            }
+#+#ifdef _WIN32
+#+            char modulepath[MAX_PATH];
+#+            HMODULE hm;
+#+           size_t i;
+#+            if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPSTR)&_nc_tic_dir, &hm)) {
+#+                GetModuleFileNameA(hm, modulepath, sizeof(modulepath));
+#+               i = strlen(modulepath);
+#+               while (i > 0 && modulepath[i - 1] != '\\')
+#+                   i--;
+#+               strcpy(modulepath + i, "lib\\terminfo");
+#+                return _nc_tic_dir(strdup(modulepath));
+#+            }
+#+#endif
+#        }
+#EOF
+## fix pcre/regex linking issue (version >= 6.1)
+#sed -i.bak -e "s/^SHLIB_LIST.*=.*-lncurses/& -Wl,--as-needed -lpcreposix/" form/Makefile.in
+## fix link errors when building wide version
+#sed -i.bak -e "s/^\(SHLIB_LIST.*=.*-lncurses\)\( .* -lpcreposix\)\(@USE_LIB_SUFFIX@\)/\1\3\2/" form/Makefile.in
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-overwrite --enable-getcap &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-overwrite --enable-getcap &&
+## --disable-hashmap --disable-overwrite
+## --disable-database
+## --disable-ext-funcs
+## --with-pthread
+## --with-shared
+#####configure: error: Shared libraries are not supported in this version
+## --with-termlib --enable-getcap
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-manpages --enable-term-driver --enable-sp-funcs &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --enable-sp-funcs &&
+#####Note: --enable-widec builds wide version, but no longer the narrow version
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --enable-sp-funcs --disable-termcap --enable-getcap &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --enable-sp-funcs &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --enable-sp-funcs --disable-home-terminfo --enable-database --disable-termcap --enable-interop &&
+# wl-showstatus build-install &&
+# #( make -j1 all install PKG_CONFIG_LIBDIR="$INSTALLPREFIX/lib/pkgconfig" || make -j1 all install PKG_CONFIG_LIBDIR="$INSTALLPREFIX/lib/pkgconfig" ) &&
+# make -j1 all install PKG_CONFIG_LIBDIR="$INSTALLPREFIX/lib/pkgconfig" &&
+# #make -j1 all install PKG_CONFIG_LIBDIR="$INSTALLPREFIX/lib/pkgconfig" CFLAGS="-DWINVER=0x0501" &&
+# ## create proper shared libraries (version <= 5.9)
+# #for F in $(ls -1 $INSTALLPREFIX/lib/*.so); do
+# # mv -f $F $INSTALLPREFIX/bin/$(echo $F|sed -e "s?^.*/lib/\(.*\)\.so?\1?").dll &&
+# # echo "LIBRARY $(echo $F|sed -e "s?^.*/lib/\(.*\)\.so?\1?").dll" > temp.def &&
+# # echo "EXPORTS" >> temp.def &&
+# # sed -n -e 's/^.*"\(.*\)".*$/ \1/p' misc/$(echo $F|sed -e "s?^.*/lib/lib\(.*\)\.so?\1?").def | grep -v "," >> temp.def &&
+# # dlltool -d temp.def -D $INSTALLPREFIX/bin/$(echo $F|sed -e "s?^.*/lib/\(.*\)\.so?\1?").dll -l $(echo $F|sed -e "s?.so??").dll.a
+# #done &&
+# # fix missing ncurses_mingw.h
+# #cp -f include/ncurses_mingw.h $INSTALLPREFIX/include/ncurses/ &&
+# cp -f include/ncurses_mingw.h $INSTALLPREFIX/include/ &&
+# # fix absolute paths in ncurses6-config and ncursesw6-config
+# sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/ncurses*-config &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+##### -> add ./win32con/win_driver.c to AUTO_SRC in ncurses/Makefile
+#####To do: fix prefix in bin/ncurses5-config
+#####To do: build DLL
+## dlltool -d misc/ncurses.def -D $INSTALLPREFIX/lib/ncurses5.dll -l $INSTALLPREFIX/lib/libncurses.dll.a $INSTALLPREFIX/lib/libncurses.a && 
+## ranlib $INSTALLPREFIX/lib/libncurses.dll.a && 
+## gcc -shared -s -mwindows -def misc/ncurses.def -o $INSTALLPREFIX/lib/ncurses5.dll $INSTALLPREFIX/lib/libncurses.a && 
+# fix link errors when building wide version
+sed -i.bak -e "s/^SHLIB_LIST.*=.*-lncurses.*$/& -Wl,--as-needed -lpcreposix/" form/Makefile.in
+mkdir -p build_wide build_normal &&
+ wl-showstatus configure &&
+ cd build_wide &&
+ #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --enable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --enable-sp-funcs --disable-home-terminfo --enable-database --disable-termcap --enable-interop &&
+ #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --enable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks &&
+ #PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --enable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-ext-mouse --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks &&
+ PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --enable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-ext-mouse --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks CC=$(which gcc.exe) &&
+ #PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --enable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-ext-mouse --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --with-fallbacks=ms-terminal --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks &&
+ #PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --enable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --enable-exp-win32 --enable-ext-funcs --without-termlib --enable-ext-colors --enable-ext-putwin --enable-sp-funcs --disable-home-terminfo --enable-database --disable-termcap --disable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-hard-tabs --disable-echo --disable-overwrite --disable-symlinks &&
+ #--with-fallbacks=ms-terminal 
+ #--enable-ext-mouse
+ #--with-ticlib
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_normal &&
+ #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --disable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --enable-sp-funcs --disable-home-terminfo --enable-database --disable-termcap --enable-interop &&
+ #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --disable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks &&
+ #PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --disable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-ext-mouse --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks &&
+ PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --disable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-ext-mouse --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks CC=$(which gcc.exe) &&
+ #PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --disable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --without-termlib --enable-ext-colors --enable-ext-putwin --enable-ext-mouse --enable-sp-funcs --disable-home-terminfo --disable-database --enable-termcap --with-fallbacks=ms-terminal --enable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-symlinks &&
+ #PKG_CONFIG= ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --disable-widec --without-debug --without-develop --with-pkg-config --enable-pc-files --without-ada --without-manpages --with-pcre2 --with-xterm-kbs=BS --enable-term-driver --enable-exp-win32 --enable-ext-funcs --without-termlib --enable-ext-colors --enable-ext-putwin --enable-sp-funcs --disable-home-terminfo --enable-database --disable-termcap --disable-getcap --disable-getcap-cache --disable-home-terminfo --enable-interop --disable-hard-tabs --disable-echo --disable-overwrite --disable-symlinks &&
+ #--with-fallbacks=ms-terminal 
+ cd .. &&
+ wl-showstatus build-install &&
+ make -Cbuild_wide install &&
+ wl-showstatus build-install &&
+ make -Cbuild_normal install &&
+ # fix missing ncurses_mingw.h
+ cp -f include/ncurses_mingw.h $INSTALLPREFIX/include/ &&
+ # fix absolute paths in ncurses6-config and ncursesw6-config
+ sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/ncurses*-config &&
+ # manually install .pc files
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ cp -f build_normal/misc/*.pc build_wide/misc/*.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####make -Cncurses llib-lncursesw && make -Cform llib-lformw && make -Cmenu llib-lmenuw && make -Cpanel llib-lpanel
+####TERMINFO=$MINGWPREFIX/lib/terminfo infocmp
+
+
+

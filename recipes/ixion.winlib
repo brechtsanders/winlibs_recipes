@@ -1,0 +1,153 @@
+#export NAME="Ixion"
+#export STATUS=
+#export URL=https://gitlab.com/ixion/ixion
+#export BASENAME=ixion
+#export DESCRIPTION="Ixion is a general purpose formula parser & interpreter that can calculate multiple named targets, or \"cells\"."
+#export CATEGORY=
+#export TYPE=library
+##export VERSION=0.13.0
+##export VERSIONDATE=20171209
+##export VERSION=0.14.0
+##export VERSIONDATE=20180823
+#####include/mdds-1.4/mdds/multi_type_vector_def.inl:492:58: error: call of overloaded 'mdds_mtv_get_element_type(const long long unsigned int&)' is ambiguous
+##export VERSION=0.14.1
+##export VERSIONDATE=20180915
+##export VERSION=0.15.0
+##export VERSIONDATE=20190809
+#####src/libixion/module.cpp:(.rdata$.refptr._ZN5boost6system6detail25generic_category_instanceE[.refptr._ZN5boost6system6detail25generic_category_instanceE]+0x0): undefined reference to `boost::system::detail::generic_category_instance'
+#####include/ixion/model_context.hpp:64:29: error: field 'nullptr_t' has incomplete type 'ixion::model_context::input_cell'
+##export VERSION=0.16.0
+##export VERSIONDATE=20200902
+#export VERSION=0.16.1
+#export VERSIONDATE=20200927
+#wl-showstatus --package-version
+#export DEPENDANCIES=boost,mdds,spdlog
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+##export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=MPL
+#export DOWNLOADURL="https://gitlab.com/ixion/ixion/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=https://gitlab.com/ixion/ixion/repository/$VERSION/archive.tar.bz2
+#export DOWNLOADSOURCEURL=https://gitlab.com/ixion/ixion/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+##mv $TARBALLDIR/$BASENAME/archive.tar.bz2 $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfj $TARBALLDIR/$BASENAME/archive.tar.bz2
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+##cd $BASENAME-$VERSION-*
+#cd $BASENAME-$VERSION
+### fix missing nullptr_t in include/ixion/model_context.hpp (version = 0.15.0)
+##sed -i.bak -e "s/nullptr_t/std::&/g" include/ixion/model_context.hpp
+## fix for newer mdds
+#sed -i.bak -e "s/mdds-1.2/$(ls -1 $MINGWPREFIX/share/pkgconfig/mdds-*.pc|sed -e "s/^.*\/\(mdds-.*\)\.pc$/\1/")/" configure.ac
+#wl-showstatus configure &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-threads --disable-python PYTHON=$PYDIR/python.exe &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-threads --disable-python PYTHON=$PYDIR/python.exe LDFLAGS="-Wl,--as-needed -lboost_system-mt" &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION-*
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="Ixion"
+export STATUS=
+export URL=https://gitlab.com/ixion/ixion
+export BASENAME=ixion
+export DESCRIPTION="Ixion is a general purpose formula parser & interpreter that can calculate multiple named targets, or \"cells\"."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.16.1
+#export VERSIONDATE=20200927
+export VERSION=0.17.0
+export VERSIONDATE=20211029
+wl-showstatus --package-version
+export DEPENDANCIES=boost,mdds,spdlog
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MPL
+export DOWNLOADURL="https://gitlab.com/ixion/ixion/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.com/ixion/ixion/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# also allow static builds in include/ixion/env.hpp (version >= 0.16.1)
+patch -ulbf include/ixion/env.hpp << EOF
+@@ -19,5 +19,8 @@
+      #endif
+-  #else
++  #elif !defined(STATIC)
+      #define IXION_DLLPUBLIC
+      #define IXION_DLLPUBLIC_VAR extern __declspec(dllimport)
++  #else
++     #define IXION_DLLPUBLIC
++     #define IXION_DLLPUBLIC_VAR extern
+   #endif
+EOF
+# fix src/libixion/module.cpp (version >= 0.17.0)
+patch -ulbf src/libixion/module.cpp << EOF
+@@ -67,3 +67,3 @@
+         fp_register_module_type fp_register_module;
+-        *(void**)(&fp_register_module) = GetProcAddress(hdl, "register_module");
++        *(void**)(&fp_register_module) = (void*)GetProcAddress(hdl, "register_module");
+
+EOF
+# fix to also allow also building static library
+#sed -i.bak -e "s/\(add_library(.*\) SHARED/\1/" src/libixion/CMakeLists.txt
+patch -ulbf src/libixion/CMakeLists.txt << EOF
+@@ -1,3 +1,3 @@
+
+-add_library(ixion-\${IXION_API_VERSION} SHARED
++add_library(ixion-\${IXION_API_VERSION}
+     address.cpp
+@@ -50,3 +50,7 @@
+
+-target_compile_definitions(ixion-\${IXION_API_VERSION} PRIVATE IXION_BUILD DLL_EXPORT)
++if (BUILD_SHARED_LIBS)
++    target_compile_definitions(ixion-\${IXION_API_VERSION} PRIVATE IXION_BUILD DLL_EXPORT)
++else()
++    target_compile_definitions(ixion-\${IXION_API_VERSION} PRIVATE IXION_BUILD STATIC)
++endif()
+
+EOF
+# fix building .pc file
+cat >> CMakeLists.txt << EOF
+SET(prefix "\${CMAKE_INSTALL_PREFIX}")
+SET(exec_prefix "\${CMAKE_INSTALL_PREFIX}")
+SET(libdir "\${CMAKE_INSTALL_PREFIX}/lib")
+SET(includedir "\${CMAKE_INSTALL_PREFIX}/include")
+SET(VERSION "\${CMAKE_PROJECT_VERSION}")
+CONFIGURE_FILE(\${PROJECT_SOURCE_DIR}/libixion.pc.in libixion-\${IXION_API_VERSION}.pc)
+INSTALL(FILES \${CMAKE_CURRENT_BINARY_DIR}/libixion-\${IXION_API_VERSION}.pc DESTINATION lib/pkgconfig)
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMDDS_INCLUDEDIR:STRING:PATH=$(ls -1d $MINGWPREFIX/include/mdds-*|tail -n1) -DSPDLOG_INCLUDEDIR:STRING:PATH=$MINGWPREFIX/include/spdlog -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMDDS_INCLUDEDIR:STRING:PATH=$(ls -1d $MINGWPREFIX/include/mdds-*|tail -n1) -DSPDLOG_INCLUDEDIR:STRING:PATH=$MINGWPREFIX/include/spdlog -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ # don't use older C++ standard (version >= 0.16.1)
+ sed -i.bak -e "s/-std=gnu++11/-std=gnu++17/" build_{static,shared}/build.ninja &&
+ # fix invalid compile flag (version >= 0.17.0)
+ sed -i.bak2 -e "s/-D\(-DBOOST_LIB_DIAGNOSTIC\)/\1/" build_{static,shared}/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static $(sed -ne "s/^build \(libixion.*\.a\):.*$/\1/p" build_static/build.ninja) &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib &&
+ cp -f build_static/src/libixion/*.a $INSTALLPREFIX/lib/ &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

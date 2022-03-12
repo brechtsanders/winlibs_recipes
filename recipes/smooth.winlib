@@ -1,0 +1,86 @@
+export NAME="smooth Class Library"
+export STATUS=
+export URL=http://www.smooth-project.org/
+#export URL=https://sourceforge.net/projects/smooth/
+#export URL=https://github.com/enzo1982/smooth
+export BASENAME=smooth
+export DESCRIPTION="smooth is an object oriented C++ class library for Windows, macOS, Linux and most Unix-like operating systems. It provides basic functionality and platform support for applications and libraries."
+export CATEGORY=gui,framework
+export TYPE=library
+#export VERSION=0.9.5
+#export VERSIONDATE=20200926
+#export VERSION=0.9.6
+#export VERSIONDATE=20201011
+#export VERSION=0.9.7
+#export VERSIONDATE=20210215
+#export VERSION=0.9.8
+#export VERSIONDATE=20210627
+export VERSION=0.9.9
+export VERSIONDATE=20220122
+wl-showstatus --package-version
+export DEPENDANCIES=libbz2,libcurl,fribidi,gtk3,libjpeg,libpng,libwebp,libxml2,libiconv,libcpuid
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://sourceforge.net/projects/smooth/files/smooth/"
+#export DOWNLOADURL="https://github.com/enzo1982/smooth/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/smooth/smooth/$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/enzo1982/smooth/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing use_iconv in libraries/libxml2/encoding.c (version >= 0.9.5)
+patch -ulbf libraries/libxml2/encoding.c << EOF
+@@ -1691,3 +1691,3 @@
+ #ifdef LIBXML_ICONV_ENABLED
+-if (use_iconv) {
++{
+     /* check whether iconv can handle this */
+EOF
+# fix missing use_iconv in misc/init.cpp (version >= 0.9.5)
+patch -ulbf misc/init.cpp << EOF
+@@ -95,4 +95,2 @@
+        if (LoadIconvDLL() == True) Setup::useIconv = True;
+-
+-       use_iconv = (Setup::useIconv ? 1 : 0);
+ #endif
+EOF
+# fix missing include/support/libiconv/iconv.h (version >= 0.9.5)
+patch -ulbf include/support/libiconv/iconv.h << EOF
+@@ -19,2 +19,6 @@
+
++#define iconv       SMOOTH_iconv
++#define iconv_open  SMOOTH_iconv_open
++#define iconv_close SMOOTH_iconv_close
++#define iconvctl    SMOOTH_iconvctl
+                extern size_t    (*iconv)(iconv_t, char **, size_t *, char **, size_t *);
+EOF
+# fix classes/backends/win32/backendwin32.cpp (version >= 0.9.5)
+patch -ulbf classes/backends/win32/backendwin32.cpp << EOF
+@@ -14,3 +14,3 @@
+ #include <shlobj.h>
+-#include <iconv.h>
++#include "../../../include/support/libiconv/iconv.h"
+
+EOF
+# fix linking with external libiconv
+sed -i.bak -e "s/-luuid/& -Wl,--as-needed -liconv/" Makefile
+wl-showstatus build &&
+ #PATH=$PYDIR:$PATH make CC="gcc -I$(pwd)/include/support/libiconv/libiconv" config="release,systemlibbz2,systemlibcpuid,systemlibcurl,systemlibfribidi,systemlibiconv,systemlibjpeg,systemlibpng,systemlibxml2,systemzlib" BUILD_V8=False LIBDIR=lib BINDIR=bin &&
+ PATH=$PYDIR:$PATH make CC="gcc -I$(pwd)/include/support/libiconv/libiconv" config="release,systemlibbz2,systemlibcpuid,systemlibcurl,systemlibfribidi,systemlibiconv,systemlibjpeg,systemlibpng,systemlibxml2,systemzlib" BUILD_V8=False USE_BUNDLED_LIBBZ2=False USE_BUNDLED_LIBCPUID=False USE_BUNDLED_LIBCURL=False USE_BUNDLED_LIBFRIBIDI=False USE_BUNDLED_LIBICONV=False USE_BUNDLED_LIBJPEG=False USE_BUNDLED_LIBPNG=False USE_BUNDLED_LIBWEBP=False USE_BUNDLED_LIBXML2=False USE_BUNDLED_ZLIB=False LIBDIR=lib BINDIR=bin &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/smooth* $INSTALLPREFIX/include/ &&
+ cp -f lib/* $INSTALLPREFIX/lib/ &&
+ mv $INSTALLPREFIX/lib/libsmooth.a $INSTALLPREFIX/lib/libsmooth.dll.a &&
+ cp -f bin/* $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

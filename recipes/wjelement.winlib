@@ -1,0 +1,54 @@
+export NAME="wjelement"
+export STATUS=
+export URL=https://github.com/netmail-open/wjelement
+export BASENAME=wjelement
+export DESCRIPTION="advanced, flexible JSON manipulation in C"
+export CATEGORY=dataprocessing,fileformat
+export TYPE=library
+export VERSION=1.3
+export VERSIONDATE=20200215
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/netmail-open/wjelement/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/netmail-open/wjelement/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix for missing getaddrinfo/freeaddrinfo in src/wjelement/schema.c
+mv src/wjelement/schema.c src/wjelement/schema.c.bak
+cat > src/wjelement/schema.c << EOF
+#if _WIN32_WINNT < 0x0501
+#define _WIN32_WINNT 0x0501
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+EOF
+cat src/wjelement/schema.c.bak >> src/wjelement/schema.c
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSTATIC_LIB:BOOL=ON -S. -Bbuild_static &&
+ echo "-Wl,--as-needed -lpcreposix -lws2_32" >> build_static/src/cli/CMakeFiles/wjecli.dir/linklibs.rsp &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSTATIC_LIB:BOOL=OFF -S. -Bbuild_shared &&
+ echo "-Wl,--as-needed -lpcreposix -lws2_32" >> build_shared/src/cli/CMakeFiles/wjecli.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lpcreposix -lws2_32" >> build_shared/src/wjelement/CMakeFiles/wjelement.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ strip build_shared/src/*/*.dll &&
+ cp -f build_shared/src/*/*.dll $INSTALLPREFIX/bin/ &&
+ # fix missing version in .pc file
+ sed -i -e "s/^Version: $/&$VERSION/" $INSTALLPREFIX/lib/pkgconfig/wjelement.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

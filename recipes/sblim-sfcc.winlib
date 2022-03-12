@@ -1,0 +1,71 @@
+export NAME="SBLIM-SFCC"
+export STATUS=
+export URL=https://github.com/kkaempf/sblim-sfcc
+#export URL=https://sourceforge.net/projects/sblim/
+export BASENAME=sblim-sfcc
+export DESCRIPTION="CIM client library. SBLIM (pronounced \"sublime\"), the Standards Based Linux Instrumentation for Manageability is an IBM-initiated Open Source project, intended to enhance the manageability of GNU/Linux systems. It does so by enabling WBEM, Web Based Enterprise Management."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=2.2.8
+export VERSIONDATE=20180306
+wl-showstatus --package-version
+export DEPENDANCIES=libcurl,libdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=EPL
+export DOWNLOADURL="https://github.com/kkaempf/sblim-sfcc/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/kkaempf/sblim-sfcc/archive/SFCC_$(echo $VERSION|tr . _).tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/SFCC_$(echo $VERSION|tr . _).tar.gz
+cd sblim-sfcc-SFCC_$(echo $VERSION|tr . _)
+# fix missing localtime_r in backend/cimxml/datetime.c
+mv backend/cimxml/datetime.c backend/cimxml/datetime.c.bak &&
+echo "#define localtime_r(clock,result) (*(result) = *localtime(clock),result)" > backend/cimxml/datetime.c &&
+sed -e "s?^\(\s*\)\(.*tm_gmtoff\)?\1//\2?" backend/cimxml/datetime.c.bak >> backend/cimxml/datetime.c
+# fix backend/cimxml/indicationlistener.c
+patch -ulbf backend/cimxml/indicationlistener.c << EOF
+@@ -26,4 +26,11 @@
+ #include <pthread.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#define setbuffer(fd,buf,len);
++#define __SOCKADDR_ARG   struct sockaddr *
++#else
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#endif
+ #include <fcntl.h>
+EOF
+# fix backend/cimxml/client.c
+mv backend/cimxml/client.c backend/cimxml/client.c.bak &&
+sed -e "s?.*sys/un\.h.*?#ifndef _WIN32\n&\n#endif?; s/LIBCURL_VERSION_NUM >= 0x071101$/& \&\& \!defined(_WIN32)/" backend/cimxml/client.c.bak > backend/cimxml/client.c
+# fix missing gethostname
+for F in $(grep -l gethostname TEST/*.c); do
+ mv $F $F.bak &&
+ echo "#include <winsock2.h>" > $F
+ cat $F.bak >> $F
+done
+# fix missing sbrk in TEST/test_leak.c
+mv TEST/test_leak.c TEST/test_leak.c.bak &&
+echo "#define sbrk(incr) NULL" > TEST/test_leak.c &&
+cat TEST/test_leak.c.bak >> TEST/test_leak.c
+# fix issue with inline functions in backend/cimxml/cimXmlParser.c
+sed -i.bak -e "s/^inline //"  backend/cimxml/cimXmlParser.c
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf sblim-sfcc-SFCC_$(echo $VERSION|tr . _)
+
+
+

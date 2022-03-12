@@ -1,0 +1,60 @@
+export NAME="libsoup"
+export STATUS=
+export URL=http://live.gnome.org/LibSoup
+export BASENAME=libsoup
+export DESCRIPTION="libsoup is an HTTP client/server library for GNOME"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=3.0.0
+#export VERSIONDATE=20210919
+#export VERSION=3.0.1
+#export VERSIONDATE=20210927
+#export VERSION=3.0.2
+#export VERSIONDATE=20211025
+#export VERSION=3.0.3
+#export VERSIONDATE=20211125
+export VERSION=3.0.4
+export VERSIONDATE=20220106
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gnutls,gconf,libproxy,sqlite3,libxml2,libgcrypt,zlib,glib-networking,libpsl,vala,gobject-introspection,mman-win32
+export OPTIONALDEPENDANCIES=gnome-keyring,libcurl
+export BUILDDEPENDANCIES=meson
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/libsoup/ libsoup-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/libsoup/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+# fix detection of Python (version >= 2.99.6)
+sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build libsoup/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -D gssapi=disabled -D ntlm=disabled -D tls_check=false -D gnome=true -D vapi=enabled -D introspection=enabled -D vapi=enabled -D sysprof=disabled -D doc=disabled -D examples=false -D tests=false -Dc_args="-fcommon -I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32)" -Dc_link_args="-Wl,--as-needed -lws2_32 -lmman" . build_both &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgssapi=disabled -Dntlm=disabled -Dtls_check=false -Dvapi=enabled -Dintrospection=enabled -Dvapi=enabled -Dsysprof=disabled -Dgtk_doc=false -Dtests=false -Dc_args="-fcommon -I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32)" -Dc_link_args="-Wl,--as-needed -lws2_32 -lmman" . build_both &&
+ # fix slash/backslash path issue when calling Python from Ninja
+ sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_both/build.ninja &&
+ # fix execution of Python scripts
+ sed -i.bak2 -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ # fix invalid -R flag (version >= 2.71.1)
+ sed -i.bak3 -e "s/ \"*-R[^ ]*//" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH ninja -C build_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

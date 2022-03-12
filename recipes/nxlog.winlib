@@ -1,0 +1,160 @@
+export NAME="NXLOG"
+export STATUS=
+export URL=http://nxlog-ce.sourceforge.net/
+export BASENAME=nxlog
+export DESCRIPTION="NXLOG is a universal log collector and forwarder supporting different platforms (BSD, Unix, Linux, Windows, Android), log sources and protocols (Syslog, Windows EventLog, Graylog2 GELF, XML, JSON, CSV and more)."
+export CATEGORY=system,dataprocessing
+export TYPE=application
+#export VERSION=1.4.764
+#export VERSIONDATE=20120727
+####configure: error: nl_langinfo not found in your libiconv
+#export VERSION=1.4.803
+#export VERSIONDATE=20120901
+#export VERSION=2.0.926
+#export VERSIONDATE=20121031
+####64-bit: /include/apr-1/apr_network_io.h:241:29: error: field 'sin6' has incomplete type
+#export VERSION=2.0.927
+#export VERSIONDATE=20121104
+####64-bit: /include/apr-1/apr_network_io.h:241:29: error: field 'sin6' has incomplete type
+####gcc.exe: unrecognized option '-rdynamic'
+####src/common/../core/../common/types.h:95: error: redefinition of typedef 'boolean'
+#export VERSION=2.1.957
+#export VERSIONDATE=20121219
+#export VERSION=2.2.1017
+#export VERSIONDATE=20130207
+#export VERSION=2.3.1027
+#export VERSIONDATE=20130312
+#export VERSION=2.4.1054
+#export VERSIONDATE=20130430
+#export VERSION=2.5.1089
+#export VERSIONDATE=20130704
+####$PERLDIR/lib/CORE/win32.h:256:15: error: conflicting types for 'uid_t'
+####/custombuilt32/include/apr-1/apr.h:613:22: note: previous declaration of 'uid_t' was here
+#export DEPENDANCIES=plibc,apr,libdbi,expat,libiconv,pcre,zlib
+#export VERSION=2.7.1189
+#export VERSIONDATE=20140204
+####checking for apr_socket_create in -lapr-1... no
+####configure: error: libapr-1 not found
+#export VERSION=2.7.1191
+#export VERSIONDATE=20140209
+export VERSION=2.8.1248
+export VERSIONDATE=20140721
+####src/modules/input/msvistalog/im_msvistalog.c:1252:5: error: unknown type name 'EVT_HANDLE'
+#export VERSION=2.10.2150
+#export VERSIONDATE=20191203
+#export VERSION=2.11.2190
+#export VERSIONDATE=20210707
+#export VERSION=3.0.2272
+#export VERSIONDATE=20220203
+####checking for EVP_CIPHER_CTX_init in -lcrypto... no
+####configure: error: libcrypto not found
+wl-showstatus --package-version
+export DEPENDANCIES=apr,libdbi,expat,libiconv,pcre,zlib,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="GPL/LGPL"
+#export DOWNLOADURL="http://sourceforge.net/projects/nxlog-ce/files/ nxlog-ce-"
+export DOWNLOADURL="https://nxlog.co/products/nxlog-community-edition/download nxlog-ce-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/nxlog-ce/nxlog-ce-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://nxlog.co/system/files/products/files/348/nxlog-ce-2.10.2150.tar.gz
+#export DOWNLOADSOURCEURL=https://nxlog.co/system/files/products/files/348/nxlog-ce-3.0.2272.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/nxlog-ce-$VERSION.tar.gz
+cd nxlog-ce-$VERSION
+# fix missing boolean type
+#echo "typedef unsigned char boolean;" >> src/common/types.h
+cat >> src/common/types.h << EOF
+#ifndef __TYPES_H_BOOLEAN_DEFINED
+#define __TYPES_H_BOOLEAN_DEFINED
+typedef unsigned char boolean;
+#endif
+EOF
+# fix undeclared MB_OK
+mv src/common/error_debug.c src/common/error_debug.c.bak
+echo "#define _WIN32_WINNT 0x0501" > src/common/error_debug.c
+echo "#include <winsock2.h>" >> src/common/error_debug.c
+echo "#include <windows.h>" >> src/common/error_debug.c
+cat src/common/error_debug.c.bak >> src/common/error_debug.c
+## fix missing files (version >= 2.0.926)
+#mkdir -p src/modules/extension/perl/netinet src/modules/extension/perl/arpa src/modules/extension/perl/sys
+#touch src/modules/extension/perl/netinet/in.h src/modules/extension/perl/arpa/inet.h src/modules/extension/perl/sys/times.h
+# fix missing EVT_HANDLE in src/modules/input/msvistalog/im_msvistalog.h
+mv src/modules/input/msvistalog/im_msvistalog.h src/modules/input/msvistalog/im_msvistalog.h.bak &&
+echo "#include <winevt.h>" > src/modules/input/msvistalog/im_msvistalog.h &&
+cat src/modules/input/msvistalog/im_msvistalog.h.bak >> src/modules/input/msvistalog/im_msvistalog.h
+# fix src/common/ssl.c for OpenSSL 1.1.0 and newer (version >= 2.8.1248)
+patch -ulbf src/common/ssl.c << EOF
+@@ -371,3 +371,3 @@
+
+-    meth = SSLv3_method();
++    meth = SSLv23_method();
+     if ( meth == NULL )
+@@ -401,3 +401,5 @@
+     }
+-    X509_VERIFY_PARAM_set_flags(ssl_ctx->param, verify_flags);
++    X509_VERIFY_PARAM* param = SSL_CTX_get0_param(ssl_ctx);
++    X509_VERIFY_PARAM_set_flags(param, verify_flags);
++    SSL_CTX_set1_param(ssl_ctx, param);
+
+EOF
+# ignore nl_langinfo detection error
+patch -ulbf configure << EOF
+--- configure  2012-08-27 10:06:12 +0200
++++ configure  2012-09-01 22:49:16 +0200
+@@ -12151,4 +12151,2 @@
+
+-else
+-  as_fn_error \$? "nl_langinfo not found in your libiconv" "\$LINENO" 5
+ fi
+EOF
+# ignore libapr-1 detection error (version >= 2.7.1189)
+patch -ulbf configure << EOF
+--- configure  2014-02-04 22:09:52 +0100
++++ configure  2014-02-04 22:17:24 +0100
+@@ -11381,3 +11381,3 @@
+ else
+-  as_fn_error \$? "libapr-1 not found" "\$LINENO" 5
++  as_fn_warning \$? "libapr-1 not found" "\$LINENO" 5
+ fi
+EOF
+# fix missing EVP_CIPHER_CTX_init for OpenSSL 1.1.0 and newer
+sed -i.bak2 -e "s/EVP_CIPHER_CTX_init/EVP_CIPHER_CTX_reset/" configure
+# fix missing SSL_library_init for OpenSSL 1.1.0 and newer
+sed -i.bak3 -e "s/SSL_library_init/OPENSSL_init_ssl/" configure
+wl-showstatus configure &&
+#mkdir -p m4 &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lplibc -liconv" &&
+#PATH=$PATH:$PERLDIR/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lplibc -liconv" &&
+#PATH=$PATH:$PERLDIR/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -liconv" &&
+PATH=$PATH:$PERLDIR/bin:$PERLDIR/../c/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -liconv" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ wl-showstatus build-install &&
+ ( make install-strip || (
+cat > src/modules/extension/perl/Makefile << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+  make install-strip
+ ) ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf nxlog-ce-$VERSION
+####TO DO: fix building DLL(s)
+####TO DO: fix location of config file
+####nxlog -f
+####Failed to open config file E:/Prog/MinGW-mSys32-4.7.0/msys/home/win32/inst_nxlog-1.4.803/etc/nxlog/nxlog.conf
+####The system cannot find the path specified.
+
+
+
+#cd nxlog-ce-2.10.7
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-xm_perl --disable-documentation &&

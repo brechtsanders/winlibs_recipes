@@ -1,0 +1,89 @@
+export NAME="libcaca"
+export STATUS=
+#export URL=http://caca.zoy.org/wiki/libcaca
+export URL=https://github.com/cacalabs/libcaca
+export BASENAME=libcaca
+export DESCRIPTION="libcaca is a graphics library that outputs text instead of pixels, so that it can work on older video cards or text terminals."
+export CATEGORY=console,graphics
+export TYPE=library
+#export VERSION=0.9
+#export VERSIONDATE=20120413
+#export VERSION=0.99.beta19
+#export VERSIONDATE=20150329
+export VERSION=0.99.beta20
+export VERSIONDATE=20220307
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://caca.zoy.org/files/libcaca/"
+export DOWNLOADURL="https://github.com/cacalabs/libcaca/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://caca.zoy.org/raw-attachment/wiki/libcaca/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://caca.zoy.org/raw-attachment/wiki/libcaca/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/cacalabs/libcaca/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of vsnprintf (version >= 0.99.beta19)
+patch -ulbf caca/string.c << EOF
+--- caca/string.c  2012-12-28 18:34:08.000000000 +0100
++++ caca/string.c  2015-03-29 21:03:19.808038500 +0200
+@@ -612,3 +612,3 @@
+
+-#if defined _WIN32 && defined __GNUC__ && __GNUC__ >= 3
++#if defined _WIN32 && defined __GNUC__ && __GNUC__ >= 3 && !defined(__MINGW32__)
+ int vsnprintf_s(char *s, size_t n, size_t c, const char *fmt, va_list ap)
+EOF
+patch -ulbf caca/figfont.c << EOF
+--- caca/figfont.c  2012-12-28 18:34:08.000000000 +0100
++++ caca/figfont.c  2015-03-29 21:07:13.480353700 +0200
+@@ -638,3 +638,3 @@
+
+-#if defined _WIN32 && defined __GNUC__ && __GNUC__ >= 3
++#if defined _WIN32 && defined __GNUC__ && __GNUC__ >= 3 && !defined(__MINGW32__)
+ int sprintf_s(char *s, size_t n, const char *fmt, ...)
+EOF
+# fix caca/caca.h (version >= 0.99.beta20)
+patch -ulbf caca/caca.h << EOF
+@@ -675,2 +675,3 @@
+ __extern void   caca_conio_window(int left, int top, int right, int bottom);
++__extern void *_caca_alloc2d(size_t width, size_t height, size_t elem_size);
+ /*  @} */
+EOF
+# fix configure.ac (version >= 0.99.beta20)
+patch -ulbf configure.ac << EOF
+@@ -2,3 +2,2 @@
+ AC_INIT([libcaca],[0.99.beta20])
+-AC_PREREQ([2.71])
+ AC_CONFIG_AUX_DIR(.auto)
+EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-x11 --without-x --enable-win32 --disable-slang --disable-ncurses --disable-conio --disable-x11 --disable-imlib2 --disable-doc &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-x11 --without-x --enable-win32 --disable-slang --disable-ncurses --disable-conio --disable-x11 --disable-imlib2 --disable-doc --disable-csharp &&
+ echo "#undef HAVE_SIGNAL" >> config.h &&
+ # fix redefinition of vsnprintf_s/sprintf_s (version >= 0.99.beta20)
+ echo "#define HAVE_VSNPRINTF_S 1" >> config.h &&
+ echo "#define HAVE_SPRINTF_S 1" >> config.h &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || make -j1 install-strip ) &&
+ ## manually generate .DLL
+ #dlltool --export-all-symbols -z caca_full.def $INSTALLPREFIX/lib/libcaca.a &&
+ #grep "^[A-Z]\|caca" caca_full.def > caca.def &&
+ #dlltool -D caca.dll -l $INSTALLPREFIX/lib/libcaca.dll.a -d caca.def $INSTALLPREFIX/lib/libcaca.a &&
+ ##ranlib $INSTALLPREFIX/lib/libcaca.dll.a && 
+ #gcc -shared -s -mwindows -def caca.def -o $INSTALLPREFIX/bin/caca.dll $INSTALLPREFIX/lib/libcaca.a -Wl,--as-needed -lz && 
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,289 @@
+#export NAME="libaes"
+#export STATUS=
+#export URL=https://sourceforge.net/projects/libaes/
+#export BASENAME=libaes
+#export DESCRIPTION="A library implementing the AES (American Encryption Standard) or Rijndael algorithms, intended to provide a neat packaged solution for other projects to use."
+#export CATEGORY=security
+#export TYPE=library
+#export VERSION=0.03
+#export VERSIONDATE=20210226
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=BSD
+#export DOWNLOADURL="https://sourceforge.net/projects/libaes/files/libaes/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/libaes/libaes/$VERSION/$BASENAME-$VERSION.tar.bz2
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#cd $BASENAME-$VERSION
+#mv aes.h aes.h.bak &&
+#echo "#include <stdint.h>" > aes.h &&
+#sed -e "s/u_\(int[0-9]*_t\)/u\1/g" aes.h.bak >> aes.h
+#sed -i.bak -e "s/u_\(int[0-9]*_t\)/u\1/g" cbc_generic.h
+#wl-showstatus build &&
+# make CC=gcc &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export NAME="libaes"
+#export STATUS=
+#export URL=https://github.com/wookey-project/libaes
+#export BASENAME=libaes
+#export DESCRIPTION="Secure software and hardware-accelerated AES library"
+#export CATEGORY=security
+#export TYPE=library
+#export VERSION=0.8.5
+#export VERSIONDATE=20210226
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://github.com/wookey-project/libaes/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/wookey-project/libaes/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#wl-showstatus build &&
+# make -Clib CC="gcc -I$MINGWPREFIX/include/mman-win32" &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export NAME="libaes"
+#export STATUS=
+#export URL=https://github.com/Tchinmai7/libaes
+#export BASENAME=libaes
+#export DESCRIPTION="This project implements the AES standard as defined by NIST as a library in C"
+#export CATEGORY=security
+#export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20210226
+#wl-showstatus --package-version
+#export DEPENDANCIES=mman-win32
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/Tchinmai7/libaes/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/Tchinmai7/libaes/archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix lib/includes/utils.h
+#patch -ulbf lib/includes/utils.h << EOF
+#@@ -17,3 +17,7 @@
+# void get_random_bytes(uint8_t* /* result */, size_t /* size */);
+#+#ifndef _WIN32
+# int valid_pointer(void * /* p */);
+#+#else
+#+#define valid_pointer(p) (p != NULL)
+#+#endif
+# void copy_byte(uint8_t * /* r */, const uint8_t * /* a */, uint32_t /* b */);
+#EOF
+## fix lib/src/utils.c
+#patch -ulbf lib/src/utils.c << EOF
+#@@ -1,3 +1,5 @@
+# #include <stdio.h>
+#+#ifndef _WIN32
+# #include <sys/ioctl.h>
+#+#endif
+# #include <unistd.h>
+#@@ -6,3 +8,7 @@
+# #include <sys/stat.h>
+#+#ifdef _WIN32
+#+#include <windows.h>
+#+#else
+# #include <linux/random.h>
+#+#endif
+# #include <fcntl.h>
+#@@ -127,2 +133,8 @@
+#     // implement POS01-C: Prevent following symlinks
+#+#ifdef _WIN32
+#+    HCRYPTPROV cryptprovider = 0;
+#+    assert(CryptAcquireContext(&cryptprovider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT));
+#+    assert(CryptGenRandom(cryptprovider, size, (BYTE*)result));
+#+    assert(CryptReleaseContext(cryptprovider, 0));
+#+#else
+#     int fd = open("/dev/urandom", O_NOFOLLOW | O_RDONLY | O_CLOEXEC);
+#@@ -151,4 +163,6 @@
+#     assert(ret >= 0);
+#+#endif
+# }
+#
+#+#ifndef _WIN32
+# // A Linux only method that checks validity of a pointer - defined by SEI
+#@@ -159,2 +173,3 @@
+# }
+#+#endif
+#
+#EOF
+## fix lib/src/aes.c
+#patch -ulbf lib/src/aes.c << EOF
+#@@ -4,3 +4,7 @@
+# #include <sys/mman.h>
+#+#ifdef _WIN32
+#+#include <windows.h>
+#+#else
+# #include <sys/resource.h>
+#+#endif
+# #include <unistd.h>
+#@@ -34,2 +38,3 @@
+# {
+#+#ifndef _WIN32
+#     struct rlimit limit;
+#@@ -41,3 +46,9 @@
+#     }
+#+#endif
+#
+#+#ifdef _WIN32
+#+    SYSTEM_INFO sysinfo;
+#+    GetSystemInfo(&sysinfo);
+#+    #define pagesize sysinfo.dwPageSize
+#+#else
+#     long pagesize = sysconf(_SC_PAGESIZE);
+#@@ -47,2 +58,3 @@
+#     }
+#+#endif
+#
+#@@ -54,2 +66,3 @@
+#
+#+#ifndef _WIN32
+#     /* mlock() may require that address be a multiple of PAGESIZE */
+#@@ -61,2 +74,3 @@
+#     }
+#+#endif
+#     get_random_bytes(*key, keysize);
+#@@ -68,2 +82,6 @@
+# {
+#+#ifdef _WIN32
+#+    SYSTEM_INFO sysinfo;
+#+    GetSystemInfo(&sysinfo);
+#+#else
+#     long pagesize = sysconf(_SC_PAGESIZE);
+#@@ -77,2 +95,3 @@
+#     }
+#+#endif
+#     *key = NULL;
+#EOF
+## fix missing folder
+#mkdir -p lib/bin
+#wl-showstatus build &&
+# make -Clib CC="gcc -I$MINGWPREFIX/include/mman-win32" &&
+# ( echo "EXPORTS" && nm -f posix --defined-only -p lib/bin/libaes.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > libaes.def &&
+# gcc -shared -s -mwindows -def libaes.def -o libaes.dll lib/bin/libaes.a -Wl,--out-implib,libaes.dll.a -fstack-protector-all &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include/libaes $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp -f lib/includes/*.h $INSTALLPREFIX/include/libaes/ &&
+# cp -f lib/bin/*.a *.a *.def $INSTALLPREFIX/lib/ &&
+# cp -f *.dll $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="Brian Gladman's AES implementation"
+export STATUS=
+export URL=https://github.com/BrianGladman/aes
+export BASENAME=aes_gladman
+export DESCRIPTION="AES library"
+export CATEGORY=security
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20210227
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=yasm
+export LICENSEFILE=license.txt
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/users/BrianGladman/packages?repo_name=aes"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/BrianGladman/aes/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd aes-$VERSION
+#wl-showstatus configure &&
+# PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/lib/site-packages:$PYDIR/Lib/site-packages:$PYTHONPATH $MINGWPREFIX/python/Scripts/cmake-converter-script.py -s aes.sln &&
+#    echo OK
+## fix brg_types.h (version >= master)
+#patch -ulbf brg_types.h << EOF
+#@@ -134,3 +134,3 @@
+# #  define RETURN_VALUES
+#-#  if defined( DLL_EXPORT )
+#+#  if defined( BUILDING_AES_DLL )
+# #    if defined( _MSC_VER ) || defined ( __INTEL_COMPILER )
+#EOF
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMSVC_RUNTIME_LIBRARY_STR:STRING=" " -Slib_asm_$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "amd64_c"; else echo "x86_v2c"; fi) -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMSVC_RUNTIME_LIBRARY_STR:STRING=" " -DCMAKE_C_FLAGS:STRING="-DBUILDING_AES_DLL" -Sdll_asm_$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "amd64_c"; else echo "x86_v2c"; fi) -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# wl-showstatus build &&
+# ninja -Cbuild_static &&
+# wl-showstatus build &&
+# ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK
+cat > aes_gladman.pc << EOF
+prefix=$INSTALLPREFIX
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: $BASENAME
+Description: $DESCRIPTION
+Version: $VERSION
+Libs: -L\${libdir} -laes_gladman
+Cflags: -I\${includedir}/gladman
+EOF
+wl-showstatus build &&
+ #aes_ni.c
+ for F in aescrypt.c aeskey.c aestab.c aes_modes.c; do
+  echo CC $F &&
+  gcc -c -o $F.o $F -O3 -I. || break
+ done &&
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  echo YASM aes_amd64.asm &&
+  vsyasm -a x86 -m amd64 -f win64 --objext=o aes_amd64.asm
+ else
+  echo YASM aes_x86_v2.asm &&
+  vsyasm -a x86 -m x86 -f win32 --objext=o aes_x86_v2.asm
+ fi &&
+ ar cr libaes_gladman.a *.o &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libaes_gladman.a | sed -n -e "s/^_*\(aes[^ ]*\) T .*$/\1/p" ) > aes_gladman.def &&
+ gcc -shared -s -mwindows -def aes_gladman.def -o aes_gladman.dll libaes_gladman.a -Wl,--out-implib,libaes_gladman.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/gladman $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+ cp -f aes.h aescpp.h aesopt.h aestab.h $INSTALLPREFIX/include/gladman/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f aes_gladman.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf aes-$VERSION
+
+
+

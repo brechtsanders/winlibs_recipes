@@ -1,0 +1,143 @@
+#export NAME="getdns"
+#export STATUS=
+#export URL=https://getdnsapi.net/
+#export BASENAME=getdns
+#export DESCRIPTION="getdns is a modern asynchronous DNS API. It implements DNS entry points from a design developed and vetted by application developers, in an API specification."
+#export CATEGORY=communication
+#export TYPE=library
+##export VERSION=1.4.2
+##export VERSIONDATE=20180625
+##export VERSION=1.5.0
+##export VERSIONDATE=20181222
+##export VERSION=1.5.1
+##export VERSIONDATE=20190112
+#export VERSION=1.5.2
+#export VERSIONDATE=20190404
+#wl-showstatus --package-version
+#export DEPENDANCIES=libev,unbound,libidn2,openssl,pthreads
+##libevent,libuv
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+##export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=BSD
+#export DOWNLOADURL="https://getdnsapi.net/releases/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://getdnsapi.net/releases/getdns-$(echo $VERSION|tr . -)/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix redefinition of X509_NAME in src/ssl_dane/danessl.c
+#mv src/ssl_dane/danessl.c src/ssl_dane/danessl.c.bak
+#cat > src/ssl_dane/danessl.c << EOF
+##define X509_NAME WIN_X509_NAME
+##include <windows.h>
+##undef X509_NAME
+#EOF
+#cat src/ssl_dane/danessl.c.bak >> src/ssl_dane/danessl.c
+## fix redefinition of inet_pton
+#mv src/compat/inet_pton.c src/compat/inet_pton.c.bak &&
+#touch src/compat/inet_pton.c
+## fix redefinition of inet_ntop
+#mv src/compat/inet_ntop.c src/compat/inet_ntop.c.bak &&
+#touch src/compat/inet_ntop.c
+## remove extgra commas in src/context.c (version >= 1.5.0)
+#patch -ulbf src/context.c << EOF
+#@@ -195,3 +195,3 @@
+#        _getdns_log(&ctxt->log, GETDNS_LOG_SYS_STUB, GETDNS_LOG_DEBUG
+#-           , "%s: %s\\n", STUB_DEBUG_SETUP_TLS,
+#+           , "%s: %s\\n", STUB_DEBUG_SETUP_TLS
+#            , "Adding Windows certificates from system root store to CA store")
+#@@ -245,3 +245,3 @@
+#                        _getdns_log(&ctxt->log
+#-                           , GETDNS_LOG_SYS_STUB, GETDNS_LOG_ERR,
+#+                           , GETDNS_LOG_SYS_STUB, GETDNS_LOG_ERR
+#                            , "%s: %s %d:%s\\n"
+#EOF
+### fix missing getdns_context_set_resolvconf (version <= 1.4.2)
+##sed -i.bak "s/^getdns_context_set_resolvconf$//" src/libgetdns.symbols
+## fix missing exports (version >= 1.5.0)
+#sed -i.bak2 "s/^\(getdns_context_set_resolvconf\|getdns_context_\)$//" src/libgetdns.symbols
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=$MINGWPREFIX --with-libidn2=$MINGWPREFIX --with-libunbound=$MINGWPREFIX --with-libev=$MINGWPREFIX &&
+##--with-libevent=$MINGWPREFIX --with-libuv=$MINGWPREFIX 
+# wl-showstatus build-install &&
+# make install &&
+# strip $INSTALLPREFIX/bin/*.dll $INSTALLPREFIX/bin/*.exe &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="getdns"
+export STATUS=
+export URL=https://getdnsapi.net/
+export BASENAME=getdns
+export DESCRIPTION="getdns is a modern asynchronous DNS API. It implements DNS entry points from a design developed and vetted by application developers, in an API specification."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.6.0
+#export VERSIONDATE=20200229
+export VERSION=1.7.0
+export VERSIONDATE=20210605
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libev,libevent,libuv,unbound,libidn2,openssl,gnutls,libnettle,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,doxygen
+#export LICENSEFILE=COPYING
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://getdnsapi.net/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://getdnsapi.net/releases/getdns-$(echo $VERSION|tr . -)/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of inet_pton
+mv src/compat/inet_pton.c src/compat/inet_pton.c.bak &&
+touch src/compat/inet_pton.c
+# fix redefinition of inet_ntop
+mv src/compat/inet_ntop.c src/compat/inet_ntop.c.bak &&
+touch src/compat/inet_ntop.c
+# fix missing inet_ntop/inet_pton in config.h
+cat > winfix.h << EOF
+#ifndef CONFIG_H
+#if _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define HAVE_DECL_INET_PTON 1
+#define HAVE_DECL_INET_NTOP 1
+#define HAVE_WIN_DECL_INET_PTON 1
+#define HAVE_WIN_DECL_INET_PTON 1
+#endif
+EOF
+# fix missing file COPYING
+( ls -1 COPYING &> /dev/null || cp LICENSE COPYING ) &&
+wl-showstatus configure &&
+cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=ON -DUSE_GNUTLS:BOOL=ON -DENABLE_TCP_FAST_OPEN:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF . &&
+ echo "-Wl,--as-needed -lgmp" >> CMakeFiles/getdns_shared.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lgmp" >> CMakeFiles/getdns_query.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lgmp" >> CMakeFiles/getdns_server_mon.dir/linklibs.rsp &&
+ # fix missing inet_ntop/inet_pton in config.h
+ mv config.h config.h.bak &&
+ echo "#include \"winfix.h\"" > config.h &&
+ cat config.h.bak >> config.h &&
+ wl-showstatus build-install &&
+ make install/strip &&
+ strip *.dll &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ for F in $INSTALLPREFIX/lib/*_static.a; do
+  cp -u $F $(echo $F|sed -e "s/_static\(\.a\)$/\1/")
+ done &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

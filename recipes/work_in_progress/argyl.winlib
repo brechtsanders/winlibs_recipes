@@ -1,0 +1,98 @@
+export NAME="Argyl"
+export STATUS=
+export URL=http://www.argyllcms.com/
+export BASENAME=argyl
+export DESCRIPTION="ArgyllCMS is an ICC compatible color management system, available as Open Source. It supports accurate ICC profile creation for scanners, cameras and film recorders, and calibration and profiling of displays and RGB & CMYK printers."
+export CATEGORY=graphics
+export TYPE=application
+#export VERSION=1.8.3
+#export VERSIONDATE=20160620
+####don't know how to make <tiff>libport.lib
+#export VERSION=1.9.1
+#export VERSIONDATE=20160928
+#export VERSION=1.9.2
+#export VERSIONDATE=20161017
+#export VERSION=2.0.0
+#export VERSIONDATE=20171118
+#export VERSION=2.0.1
+#export VERSIONDATE=20180709
+#export VERSION=2.1.0
+#export VERSIONDATE=20190412
+#export VERSION=2.1.1
+#export VERSIONDATE=20190429
+#export VERSION=2.1.2
+#export VERSIONDATE=20200115
+#export VERSION=2.2.0
+#export VERSIONDATE=20210504
+#export VERSION=2.2.1
+#export VERSIONDATE=20210916
+export VERSION=2.3.0
+export VERSIONDATE=20211224
+####Segmentation fault
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libjpeg,libpng,libtiff,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=ftjam,xxd
+export LICENSEFILE=License.txt
+export LICENSETYPE=AGPL
+export DOWNLOADURL="http://www.argyllcms.com/downloadsrc.html Argyll_V _src.zip"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.argyllcms.com/Argyll_V$VERSION\_src.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/Argyll_V$VERSION\_src.zip
+cd Argyll_V$VERSION
+# fix already defined interface in spectro/usbio_nt.c
+patch -ulbf spectro/usbio_nt.c << EOF
+--- spectro/usbio_nt.c  2016-06-20 14:09:24.706477500 +0200
++++ spectro/usbio_nt.c  2016-06-20 14:09:30.251031900 +0200
+@@ -1,2 +1 @@
+-
+ /* General USB I/O support, MSWin native libusb0.sys implementation. */
+@@ -26,2 +25,5 @@
+ #include <driver_api.h>
++#ifdef interface
++#undef interface
++#endif
+
+EOF
+## fix spectro/dispwin.c (version >= 2.2.1)
+#patch -ulbf spectro/dispwin.c << EOF
+#@@ -274,4 +274,5 @@
+#
+#-#if !defined(NTDDI_LONGHORN) || NTDDI_VERSION < NTDDI_LONGHORN
+#+#if !defined(NTDDI_LONGHORN) || NTDDI_VERSION < NTDDI_LONGHORN || defined(__MINGW32__)
+#
+#+#ifndef __MINGW32__
+# typedef enum {
+#@@ -280,2 +281,3 @@
+# } WCS_PROFILE_MANAGEMENT_SCOPE;
+#+#endif
+#
+#@@ -300,3 +302,3 @@
+#                /* Vista calls */
+#-#if !defined(NTDDI_LONGHORN) || NTDDI_VERSION < NTDDI_LONGHORN
+#+#if !defined(NTDDI_LONGHORN) || NTDDI_VERSION < NTDDI_LONGHORN || defined(__MINGW32__)
+#                pWcsAssociateColorProfileWithDevice = (BOOL (WINAPI*)(WCS_PROFILE_MANAGEMENT_SCOPE,PCWSTR,PCWSTR)) GetProcAddress(LoadLibrary("mscms"), "WcsAssociateColorProfileWithDevice");
+#EOF
+# fix xml/mxml-attr.c (version >= 2.2.1)
+mv xml/mxml-attr.c xml/mxml-attr.c.bak &&
+echo "#include <stdarg.h>" > xml/mxml-attr.c &&
+cat xml/mxml-attr.c.bak >> xml/mxml-attr.c
+#wl-showstatus build &&
+# #MINGW=$MINGWDIR ./makeall.sh &&
+# make MINGW=$MINGWDIR &&
+wl-showstatus install &&
+ #make install MINGW=$MINGWDIR SUFLIB=.a SUFIMPLIB=.dll.a SUFOBJ=.o AR="ar cru" MANDIR=$INSTALLPREFIX/share/man HDRS=$INSTALLPREFIX/include BINDIR=$INSTALLPREFIX/bin LIBDIR=$INSTALLPREFIX/lib &&
+ #make install MINGW=$MINGWDIR SUFLIB=.a SUFIMPLIB=.dll.a SUFOBJ=.o CCFLAGS="-fcommon -DNT -pipe" AR="ar cru" MANDIR=$INSTALLPREFIX/share/man HDRS=$INSTALLPREFIX/include BINDIR=$INSTALLPREFIX/bin LIBDIR=$INSTALLPREFIX/lib &&
+ jam -q -j $NUMBER_OF_PROCESSORS -fJambase install -sMINGW=$MINGWDIR -sBUILTIN_Z=false -sBUILTIN_JPEG=false -sBUILTIN_PNG=false -sBUILTIN_SSL=false -sSUFLIB=.a -sSUFIMPLIB=.dll.a -sSUFOBJ=.o -sCCFLAGS="-fcommon -DNT -pipe" -sAR="ar cru" -sMANDIR=$INSTALLPREFIX/share/man -sHDRS=$INSTALLPREFIX/include -sBINDIR=$INSTALLPREFIX/bin -sLIBDIR=$INSTALLPREFIX/lib &&
+ #CC="gcc -DNT -DTIFF_UINT64_FORMAT=PRIu64 -I$(cygpath -w $(pwd)/usb/driver)" $MINGWPREFIX/share/jam/bin/jam -q -j $NUMBER_OF_PROCESSORS -fJambase install -sMINGW=$MINGWDIR -sBUILTIN_Z=false -sBUILTIN_JPEG=false -sBUILTIN_PNG=false -sBUILTIN_SSL=false -sSUFLIB=.a -sSUFIMPLIB=.dll.a -sSUFOBJ=.o -sCCFLAGS="-fcommon -DNT -pipe" -sAR="ar cru" -sMANDIR=$INSTALLPREFIX/share/man -sHDRS=$INSTALLPREFIX/include -sBINDIR=$INSTALLPREFIX/bin -sLIBDIR=$INSTALLPREFIX/lib &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f bin/*.exe $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Argyll_V$VERSION
+
+
+

@@ -1,0 +1,762 @@
+export NAME="FreeRDP"
+export STATUS=
+export URL=http://www.freerdp.com/
+export BASENAME=freerdp
+export DESCRIPTION="FreeRDP is a free implementation of the Remote Desktop Protocol (RDP), released under the Apache license."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.0-beta4
+#export VERSIONDATE=20111226
+#export VERSION=1.0.0
+#export VERSIONDATE=20120117
+#export DEPENDANCIES=openssl,pthreads
+#export VERSION=1.0.1
+#export VERSIONDATE=20120210
+export VERSION=1.0.2
+export VERSIONDATE=20151006
+#export VERSION=2.0.0-rc1
+#export VERSIONDATE=20180326
+#export VERSION=2.0.0-rc3
+#export VERSIONDATE=20181012
+#export VERSION=2.0.0-rc4
+#export VERSIONDATE=20190120
+#export VERSION=2.0.0
+#export VERSIONDATE=20200410
+#export VERSION=2.1.0
+#export VERSIONDATE=20200508
+#export VERSION=2.1.1
+#export VERSIONDATE=20200521
+#export VERSION=2.1.2
+#export VERSIONDATE=20200622
+#export VERSION=2.2.0
+#export VERSIONDATE=20200721
+#export VERSION=2.3.0
+#export VERSIONDATE=20210225
+#export VERSION=2.3.2
+#export VERSIONDATE=20210315
+#export VERSION=2.4.0
+#export VERSIONDATE=20210727
+#export VERSION=2.4.1
+#export VERSIONDATE=20211021
+#export VERSION=2.5.0
+#export VERSIONDATE=20220112
+#export VERSION=2.6.0
+#export VERSIONDATE=20220222
+#export VERSION=2.6.1
+#export VERSIONDATE=20220308
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,pthreads,libxkbfile,libx11
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE="Apache License"
+#export DOWNLOADURL="https://github.com/FreeRDP/FreeRDP/downloads FreeRDP-"
+#export DOWNLOADURL="https://github.com/FreeRDP/FreeRDP/downloads"
+export DOWNLOADURL="https://github.com/FreeRDP/FreeRDP/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/downloads/FreeRDP/FreeRDP/FreeRDP-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/downloads/FreeRDP/FreeRDP/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/FreeRDP/FreeRDP/archive/$VERSION.tar.gz
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/FreeRDP-$VERSION.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/FreeRDP-$VERSION.tar.gz
+#mv FreeRDP-* $BASENAME-$VERSION
+wl-showstatus download
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd FreeRDP-$VERSION
+# fix definition of boolean in include/freerdp/types.h
+patch -ulbf include/freerdp/types.h << EOF
+--- include/freerdp/types.h  2012-02-10 03:01:42 +0100
++++ include/freerdp/types.h  2012-03-06 23:59:32 +0100
+@@ -67,3 +67,3 @@
+
+-#ifdef HAVE_STDBOOL_H
++#if defined(HAVE_STDBOOL_H) && !defined(_WIN32)
+
+EOF
+# fix define conflicts
+cat >> libfreerdp-core/tcp.h << EOF
+#undef X509_NAME
+#undef X509_EXTENSIONS
+EOF
+# fix missing struct timeval on 32-bit in libfreerdp-utils/pcap.c
+patch -ulbf libfreerdp-utils/pcap.c << EOF
+--- libfreerdp-utils/pcap.c  2012-02-10 03:01:42 +0100
++++ libfreerdp-utils/pcap.c  2012-03-08 22:53:22 +0100
+@@ -28,3 +28,3 @@
+
+-#if !defined(__MINGW32__) && !defined(__MINGW64__)
++#if defined(__MINGW32__) && !defined(__MINGW64__) && !`if gcc --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
+ struct timeval
+EOF
+## fix libfreerdp-core/listener.c
+#patch -ulbf libfreerdp-core/listener.c << EOF
+#--- libfreerdp-core/listener.c  2012-03-08 22:57:30 +0100
+#+++ libfreerdp-core/listener.c  2012-03-08 22:57:36 +0100
+#@@ -34,2 +34,6 @@
+# #else
+#+#if _WIN32_WINNT < 0x0501
+#+#define _WIN32_WINNT 0x0501
+#+#endif
+#+#include <ws2tcpip.h>
+# #define close(_fd) closesocket(_fd)
+#EOF
+# fix missing inet_ntop in libfreerdp-core/listener.c
+mv libfreerdp-core/listener.c libfreerdp-core/listener.c.bak
+cat > libfreerdp-core/listener.c << EOF
+#include <io.h>
+#include <stdio.h>
+#define _WIN32_WINNT 0x0501
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define close(_fd) closesocket(_fd)
+inline const char* inet_ntop (int af, void const *src, char *dst, size_t dstlen)
+{
+  struct sockaddr_in srcaddr;
+  memset(&srcaddr, 0, sizeof(struct sockaddr_in));
+  memcpy(&(srcaddr.sin_addr), src, sizeof(srcaddr.sin_addr));
+  srcaddr.sin_family = af;
+  if (WSAAddressToString((struct sockaddr*)&srcaddr, sizeof(struct sockaddr_in), 0, dst, (LPDWORD)&dstlen) != 0) {
+    DWORD rv = WSAGetLastError();
+    fprintf(stderr, "WSAAddressToString() : %d\n",rv);
+    return NULL;
+  }
+  return dst;
+}
+EOF
+cat libfreerdp-core/listener.c.bak >> libfreerdp-core/listener.c
+# fix missing GetConsoleWindow in client/Windows/wfreerdp.c (version <= 1.0.1)
+mv client/Windows/wfreerdp.c client/Windows/wfreerdp.c.bak
+echo "#define _WIN32_WINNT 0x0500" > client/Windows/wfreerdp.c
+cat client/Windows/wfreerdp.c.bak >> client/Windows/wfreerdp.c
+# fix invalid parameters
+mv CMakeLists.txt CMakeLists.txt.bak
+sed -e "s/ -Wno-unused-result\| -Wno-unused-but-set-variable//g" CMakeLists.txt.bak > CMakeLists.txt
+cat >> CMakeLists.txt << EOF
+if(WIN32)
+  find_required_package(ZLIB)
+  find_optional_package(PulseAudio)
+  find_optional_package(PCSC)
+  find_optional_package(FFmpeg)
+  add_subdirectory(libfreerdp-kbd)
+  #add_subdirectory(channels)
+endif()
+EOF
+## fix winpr/include/winpr/nt.h (version >= 2.0.0)
+#patch -ulbf winpr/include/winpr/nt.h << EOF
+#@@ -1288,2 +1288,3 @@
+#
+#+#ifndef __MINGW32__
+# typedef enum _FILE_INFORMATION_CLASS
+#@@ -1331,2 +1332,3 @@
+# } FILE_INFORMATION_CLASS;
+#+#endif
+#
+#EOF
+## fix winpr/libwinpr/sspi/NTLM/ntlm.h (version >= 2.0.0)
+#patch -ulbf winpr/libwinpr/sspi/NTLM/ntlm.h << EOF
+#@@ -79,2 +79,3 @@
+#
+#+#ifndef __MINGW32__
+# enum _NTLM_AV_ID
+#@@ -94,2 +95,3 @@
+# typedef enum _NTLM_AV_ID NTLM_AV_ID;
+#+#endif
+#
+#EOF
+## fix missing MsvAvTimestamp in winpr/libwinpr/sspi/NTLM/ntlm.h (version >= 2.0.0-rc4)
+#mv winpr/libwinpr/sspi/NTLM/ntlm.h winpr/libwinpr/sspi/NTLM/ntlm.h.bak
+#cat > winpr/libwinpr/sspi/NTLM/ntlm.h << EOF
+##if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0602
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0602
+##endif
+##define InterlockedAdd64 dummyInterlockedAdd64
+##define _InterlockedAdd64 dummy_InterlockedAdd64
+##include <intrin.h>
+##undef InterlockedAdd64
+##undef _InterlockedAdd64
+##include <ntifs.h>
+#EOF
+#cat winpr/libwinpr/sspi/NTLM/ntlm.h.bak >> winpr/libwinpr/sspi/NTLM/ntlm.h
+# fix winpr/include/winpr/spec.h (version >= 2.1.2)
+patch -ulbf winpr/include/winpr/spec.h << EOF
+@@ -961,2 +961,3 @@
+ #define DECLSPEC_EXPORT __attribute__((dllexport))
++#undef DECLSPEC_IMPORT
+ #define DECLSPEC_IMPORT __attribute__((dllimport))
+EOF
+## fix cmake/FindOpenSSL.cmake (version >= 2.0.0)
+#patch -ulbf cmake/FindOpenSSL.cmake << EOF
+#@@ -65,3 +65,3 @@
+#
+#-IF(WIN32)
+#+IF(MSVC)
+#   if(${MSVC_RUNTIME} STREQUAL "static")
+#EOF
+## fix cmake/FindOpenSSL.cmake (version >= 2.0.0-rc3)
+#sed -i.bak -e "s/(WIN32)/(MSVC)/" cmake/FindOpenSSL.cmake
+## fix error: Unknown generator (version >= 2.0.0-rc3)
+#sed -i.bak -e "s/Ninja/MSYS/" CMakeLists.txt
+## fix missing find_required_package/find_optional_package (version >= 2.0.0-rc3)
+#sed -i.bak2 -e "s/find_\(required\|optional\)_package/find_package/" CMakeLists.txt
+mkdir -Cbuild_win
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_LINKER:FILEPATH="ld -Wl,--enable-auto-import" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS="-DFREERDP_EXPORTS -Dsprintf_s=snprintf" -DWITH_SSE2=OFF -DWITH_SSE2_TARGET=OFF -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=ON -DWITH_NEON:BOOL=OFF -DWITH_SSE2=ON -DWITH_SSE2_TARGET=ON -DCMAKE_C_FLAGS="-DFREERDP_EXPORTS -Dsprintf_s=snprintf" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=OFF -DWITH_NEON:BOOL=OFF -DWITH_SSE2=ON -DWITH_SSE2_TARGET=ON -DCMAKE_C_FLAGS="-DFREERDP_EXPORTS -Dsprintf_s=snprintf" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=ON -DWITH_NEON:BOOL=OFF -DWITH_SSE2:BOOL=ON -DWITH_SSE2_TARGET:BOOL=ON -DCMAKE_C_FLAGS="-DFREERDP_EXPORTS -Dsprintf_s=snprintf" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=ON -DWITH_NEON:BOOL=OFF -DWITH_SSE2:BOOL=ON -DWITH_SSE2_TARGET:BOOL=ON -DCMAKE_C_FLAGS="-DFREERDP_EXPORTS" -S. -Bbuild_win &&
+ PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=ON -DWITH_NEON:BOOL=OFF -DWITH_SSE2:BOOL=ON -DWITH_SSE2_TARGET:BOOL=ON -DCMAKE_C_FLAGS="-DFREERDP_EXPORTS" -S. -Bbuild_win &&
+ #PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=ON -DWITH_NEON:BOOL=OFF -DWITH_SSE2:BOOL=ON -DWITH_SSE2_TARGET:BOOL=ON -DWITH_NATIVE_SSPI:BOOL=ON -DCHANNEL_SMARTCARD:BOOL=OFF -DWITH_MBEDTLS=ON -DWITH_JPEG=ON -DWITH_X264=ON -DWITH_GSM=ON -DWITH_GSSAPI=OFF -DWITH_ICU:BOOL=ON -DWITH_OPENH264:BOOL=ON -DWITH_X264:BOOL=ON -DWITH_WINMM:BOOL=ON -DCMAKE_C_FLAGS="-I$(dirname $(find $MINGWDIR -name ntddk.h))" -S. -Bbuild_win &&
+ #echo "-I$(dirname $(find $MINGWDIR -name ntddk.h))" >> build_win/winpr/libwinpr/CMakeFiles/winpr.dir/includes_C.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FreeRDP-$VERSION
+#mkdir -Cbuild_win
+# wl-showstatus configure &&
+# PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=ON -DWITH_NEON:BOOL=OFF -DWITH_SSE2:BOOL=ON -DWITH_SSE2_TARGET:BOOL=ON -DCMAKE_C_FLAGS="-DFREERDP_EXPORTS" -S. -Bbuild_win &&
+# #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_NAME="Windows" -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_CLIENT:BOOL=ON -DWITH_SERVER:BOOL=ON -DWITH_NEON:BOOL=OFF -DWITH_SSE2:BOOL=ON -DWITH_SSE2_TARGET:BOOL=ON -DWITH_NATIVE_SSPI:BOOL=ON -DCHANNEL_SMARTCARD:BOOL=OFF -DWITH_MBEDTLS=ON -DWITH_JPEG=ON -DWITH_X264=ON -DWITH_GSM=ON -DWITH_GSSAPI=OFF -DWITH_ICU:BOOL=ON -DWITH_OPENH264:BOOL=ON -DWITH_X264:BOOL=ON -DWITH_WINMM:BOOL=ON -DCMAKE_C_FLAGS="-I$(dirname $(find $MINGWDIR -name ntddk.h))" -S. -Bbuild_win &&
+# #echo "-I$(dirname $(find $MINGWDIR -name ntddk.h))" >> build_win/winpr/libwinpr/CMakeFiles/winpr.dir/includes_C.rsp &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+# mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FreeRDP-$VERSION
+####See also: http://www.mail-archive.com/freerdp-devel@lists.sourceforge.net/msg01729.html
+
+
+
+#export BUILDDEPENDANCIES=cmake,ninja
+## fix redefinitions in winpr/include/winpr/nt.h
+#mv winpr/include/winpr/nt.h winpr/include/winpr/nt.h.bak &&
+#echo "#include <windows.h>" > winpr/include/winpr/nt.h &&
+##grep "#define STATUS_" winpr/include/winpr/nt.h.bak >> winpr/include/winpr/nt.h
+## fix winpr/include/winpr/spec.h (version >= 2.2.0)
+#patch -ulbf winpr/include/winpr/spec.h << EOF
+#@@ -958,2 +958,3 @@
+#
+#+#if !defined(DECLSPEC_EXPORT) && !defined(DECLSPEC_IMPORT)
+# #if defined(_WIN32) || defined(__CYGWIN__)
+#@@ -974,2 +975,3 @@
+# #endif
+#+#endif
+# #endif
+#EOF
+## fix winpr/include/winpr/nt.h (version >= 2.6.0)
+#patch -ulbf winpr/include/winpr/nt.h << EOF
+#@@ -1269,2 +1269,5 @@
+#
+#+#ifdef __MINGW32__
+#+#include <winternl.h>
+#+#else
+# #ifdef _WIN32
+#@@ -1335,2 +1338,3 @@
+# } FILE_INFORMATION_CLASS;
+#+#endif
+#
+#EOF
+## fix winpr/libwinpr/sspi/NTLM/ntlm.h (version >= 2.6.0)
+#patch -ulbf winpr/libwinpr/sspi/NTLM/ntlm.h << EOF
+#@@ -81,12 +81,23 @@
+# {
+#+#define MsvAvEOL FREERDP_MsvAvEOL
+#        MsvAvEOL,
+#+#define MsvAvNbComputerName FREERDP_MsvAvNbComputerName
+#        MsvAvNbComputerName,
+#+#define MsvAvNbDomainName FREERDP_MsvAvNbDomainName
+#        MsvAvNbDomainName,
+#+#define MsvAvDnsComputerName FREERDP_MsvAvDnsComputerName
+#        MsvAvDnsComputerName,
+#+#define MsvAvDnsDomainName FREERDP_MsvAvDnsDomainName
+#        MsvAvDnsDomainName,
+#+#define MsvAvDnsTreeName FREERDP_MsvAvDnsTreeName
+#        MsvAvDnsTreeName,
+#+#define MsvAvFlags FREERDP_MsvAvFlags
+#        MsvAvFlags,
+#+#define MsvAvTimestamp FREERDP_MsvAvTimestamp
+#        MsvAvTimestamp,
+#+#define MsvAvSingleHost FREERDP_MsvAvSingleHost
+#        MsvAvSingleHost,
+#+#define MsvAvTargetName FREERDP_MsvAvTargetName
+#        MsvAvTargetName,
+#+#define MsvChannelBindings FREERDP_MsvChannelBindings
+#        MsvChannelBindings
+#EOF
+#mkdir -p libfreerdp-kbd; touch libfreerdp-kbd/CMakeLists.txt
+#sed -i.bak -e "s/find_required_package/find_package/; s/find_optional_package/#&/" CMakeLists.txt
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -D_OPENSSL_VERSION:STRING=$(openssl version|sed -n -e "s/^OpenSSL \([^ ]*\)* .*$/\1/p") -DCHANNEL_DRIVE:BOOL=OFF -DCHANNEL_PRINTER:BOOL=OFF -DCHANNEL_RAIL:BOOL=OFF -DCHANNEL_RDPDR:BOOL=OFF -DCHANNEL_RDPGFX:BOOL=OFF -DCHANNEL_RDPSND:BOOL=OFF -DCHANNEL_SMARTCARD:BOOL=OFF -DCHANNEL_SERIAL:BOOL=OFF -DWITH_WINPR_TOOLS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_C_FLAGS:STRING="-D_IME_CMODES_ -D_IMM_" -S. -Bbuild_win &&
+# #-DWITH_NATIVE_SSPI:BOOL=OFF
+# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -D_OPENSSL_VERSION:STRING=$(openssl version|sed -n -e "s/^OpenSSL \([^ ]*\)* .*$/\1/p") -DCHANNEL_DRIVE:BOOL=OFF -DWITH_CHANNELS:BOOL=OFF -DCHANNEL_PRINTER:BOOL=OFF -DWITH_WINPR_TOOLS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
+
+
+
+#// Build unit tests
+#BUILD_TESTING:BOOL=OFF
+#
+#// Combine all channels into their respective base library
+#BUILTIN_CHANNELS:BOOL=ON
+#
+#// Path to a program.
+#CCACHE:FILEPATH=D:/Prog/winlibs64-9.2.0/custombuilt/bin/ccache.exe
+#
+#// Build audin DYNAMIC channel
+#CHANNEL_AUDIN:BOOL=ON
+#
+#// Build audin DYNAMIC channel client
+#CHANNEL_AUDIN_CLIENT:BOOL=ON
+#
+#// Build audin DYNAMIC channel server
+#CHANNEL_AUDIN_SERVER:BOOL=ON
+#
+#// Build cliprdr STATIC channel
+#CHANNEL_CLIPRDR:BOOL=ON
+#
+#// Build cliprdr STATIC channel client
+#CHANNEL_CLIPRDR_CLIENT:BOOL=ON
+#
+#// Build cliprdr STATIC channel server
+#CHANNEL_CLIPRDR_SERVER:BOOL=ON
+#
+#// Build disp DYNAMIC channel
+#CHANNEL_DISP:BOOL=ON
+#
+#// Build disp DYNAMIC channel client
+#CHANNEL_DISP_CLIENT:BOOL=ON
+#
+#// Build disp DYNAMIC channel server
+#CHANNEL_DISP_SERVER:BOOL=OFF
+#
+#// Build drdynvc STATIC channel
+#CHANNEL_DRDYNVC:BOOL=ON
+#
+#// Build drdynvc STATIC channel client
+#CHANNEL_DRDYNVC_CLIENT:BOOL=ON
+#
+#// Build drdynvc STATIC channel server
+#CHANNEL_DRDYNVC_SERVER:BOOL=ON
+#
+#// Build drive DEVICE channel
+#CHANNEL_DRIVE:BOOL=ON
+#
+#// Build drive DEVICE channel client
+#CHANNEL_DRIVE_CLIENT:BOOL=ON
+#
+#// Build drive DEVICE channel server
+#CHANNEL_DRIVE_SERVER:BOOL=OFF
+#
+#// Build echo DYNAMIC channel
+#CHANNEL_ECHO:BOOL=ON
+#
+#// Build echo DYNAMIC channel client
+#CHANNEL_ECHO_CLIENT:BOOL=ON
+#
+#// Build echo DYNAMIC channel server
+#CHANNEL_ECHO_SERVER:BOOL=ON
+#
+#// Build encomsp STATIC channel
+#CHANNEL_ENCOMSP:BOOL=ON
+#
+#// Build encomsp STATIC channel client
+#CHANNEL_ENCOMSP_CLIENT:BOOL=ON
+#
+#// Build encomsp STATIC channel server
+#CHANNEL_ENCOMSP_SERVER:BOOL=ON
+#
+#// Build geometry DYNAMIC channel
+#CHANNEL_GEOMETRY:BOOL=ON
+#
+#// Build geometry DYNAMIC channel client
+#CHANNEL_GEOMETRY_CLIENT:BOOL=ON
+#
+#// Build parallel DEVICE channel
+#CHANNEL_PARALLEL:BOOL=OFF
+#
+#// Build printer DEVICE channel
+#CHANNEL_PRINTER:BOOL=ON
+#
+#// Build printer DEVICE channel client
+#CHANNEL_PRINTER_CLIENT:BOOL=ON
+#
+#// Build printer DEVICE channel server
+#CHANNEL_PRINTER_SERVER:BOOL=OFF
+#
+#// Build rail STATIC channel
+#CHANNEL_RAIL:BOOL=ON
+#
+#// Build rail STATIC channel client
+#CHANNEL_RAIL_CLIENT:BOOL=ON
+#
+#// Build rail STATIC channel server
+#CHANNEL_RAIL_SERVER:BOOL=OFF
+#
+#// Build rdp2tcp STATIC channel
+#CHANNEL_RDP2TCP:BOOL=ON
+#
+#// Build rdp2tcp STATIC channel client
+#CHANNEL_RDP2TCP_CLIENT:BOOL=ON
+#
+#// Build rdp2tcp STATIC channel server
+#CHANNEL_RDP2TCP_SERVER:BOOL=OFF
+#
+#// Build rdpdr STATIC channel
+#CHANNEL_RDPDR:BOOL=ON
+#
+#// Build rdpdr STATIC channel client
+#CHANNEL_RDPDR_CLIENT:BOOL=ON
+#
+#// Build rdpdr STATIC channel server
+#CHANNEL_RDPDR_SERVER:BOOL=ON
+#
+#// Build rdpei DYNAMIC channel
+#CHANNEL_RDPEI:BOOL=ON
+#
+#// Build rdpei DYNAMIC channel client
+#CHANNEL_RDPEI_CLIENT:BOOL=ON
+#
+#// Build rdpei DYNAMIC channel server
+#CHANNEL_RDPEI_SERVER:BOOL=OFF
+#
+#// Build rdpgfx DYNAMIC channel
+#CHANNEL_RDPGFX:BOOL=ON
+#
+#// Build rdpgfx DYNAMIC channel client
+#CHANNEL_RDPGFX_CLIENT:BOOL=ON
+#
+#// Build rdpgfx DYNAMIC channel server
+#CHANNEL_RDPGFX_SERVER:BOOL=OFF
+#
+#// Build rdpsnd STATIC channel
+#CHANNEL_RDPSND:BOOL=ON
+#
+#// Build rdpsnd STATIC channel client
+#CHANNEL_RDPSND_CLIENT:BOOL=ON
+#
+#// Build rdpsnd STATIC channel server
+#CHANNEL_RDPSND_SERVER:BOOL=ON
+#
+#// Build remdesk STATIC channel
+#CHANNEL_REMDESK:BOOL=ON
+#
+#// Build remdesk STATIC channel client
+#CHANNEL_REMDESK_CLIENT:BOOL=ON
+#
+#// Build remdesk STATIC channel server
+#CHANNEL_REMDESK_SERVER:BOOL=ON
+#
+#// Build serial DEVICE channel
+#CHANNEL_SERIAL:BOOL=OFF
+#
+#// Build smartcard DEVICE channel
+#CHANNEL_SMARTCARD:BOOL=ON
+#
+#// Build smartcard DEVICE channel client
+#CHANNEL_SMARTCARD_CLIENT:BOOL=ON
+#
+#// Build smartcard DEVICE channel server
+#CHANNEL_SMARTCARD_SERVER:BOOL=OFF
+#
+#// Build sshagent DYNAMIC channel
+#CHANNEL_SSHAGENT:BOOL=OFF
+#
+#// Build tsmf DYNAMIC channel
+#CHANNEL_TSMF:BOOL=OFF
+#
+#// Build urbdrc DYNAMIC channel
+#CHANNEL_URBDRC:BOOL=ON
+#
+#// Build urbdrc DYNAMIC channel client
+#CHANNEL_URBDRC_CLIENT:BOOL=ON
+#
+#// Build urbdrc DYNAMIC channel server
+#CHANNEL_URBDRC_SERVER:BOOL=OFF
+#
+#// Build video DYNAMIC channel
+#CHANNEL_VIDEO:BOOL=ON
+#
+#// Build video DYNAMIC channel client
+#CHANNEL_VIDEO_CLIENT:BOOL=ON
+#
+#// No help, variable specified on the command line.
+#CMAKE_BUILD_TYPE:STRING=Release
+#
+#// Convert GNU import libraries to MS format (requires Visual Studio)
+#CMAKE_GNUtoMS:BOOL=OFF
+#
+#// No help, variable specified on the command line.
+#CMAKE_INSTALL_PREFIX:PATH=R:/winlibs64-9.2.0/inst_freerdp-2.0.0
+#
+#// Path to a file.
+#LIBUSB_1_INCLUDE_DIR:PATH=D:/Prog/winlibs64-9.2.0/custombuilt/include/libusb-1.0
+#
+#// Path to a library.
+#LIBUSB_1_LIBRARY:FILEPATH=D:/Prog/winlibs64-9.2.0/custombuilt/lib/libusb-1.0.dll.a
+#
+#// FreeRDP package name
+#PRODUCT:STRING=FreeRDP
+#
+#// Extract FreeRDP version from git tag.
+#USE_VERSION_FROM_GIT_TAG:BOOL=OFF
+#
+#// FreeRDP package vendor
+#VENDOR:STRING=FreeRDP
+#
+#// Use CAIRO image library for screen resizing
+#WITH_CAIRO:BOOL=OFF
+#
+#// Use ccache support if available
+#WITH_CCACHE:BOOL=ON
+#
+#// Build virtual channel plugins
+#WITH_CHANNELS:BOOL=ON
+#
+#// Detect clang-format. run 'cmake --build . --target clangformat' to format.
+#WITH_CLANG_FORMAT:BOOL=ON
+#
+#// Build client binaries
+#WITH_CLIENT:BOOL=ON
+#
+#// Build virtual channel plugins
+#WITH_CLIENT_CHANNELS:BOOL=ON
+#
+#// Build client common library
+#WITH_CLIENT_COMMON:BOOL=ON
+#
+#// Build clients as a library with an interface
+#WITH_CLIENT_INTERFACE:BOOL=OFF
+#
+#// Print all debug messages.
+#WITH_DEBUG_ALL:BOOL=OFF
+#
+#// Print capability negotiation debug messages.
+#WITH_DEBUG_CAPABILITIES:BOOL=OFF
+#
+#// Print certificate related debug messages.
+#WITH_DEBUG_CERTIFICATE:BOOL=OFF
+#
+#// Print channel manager debug messages.
+#WITH_DEBUG_CHANNELS:BOOL=OFF
+#
+#// Print clipboard redirection debug messages
+#WITH_DEBUG_CLIPRDR:BOOL=OFF
+#
+#// Print dynamic virtual channel debug messages.
+#WITH_DEBUG_DVC:BOOL=OFF
+#
+#// Print keyboard related debug messages.
+#WITH_DEBUG_KBD:BOOL=OFF
+#
+#// Print license debug messages.
+#WITH_DEBUG_LICENSE:BOOL=OFF
+#
+#// Print mutex debug messages
+#WITH_DEBUG_MUTEX:BOOL=OFF
+#
+#// Print negotiation related debug messages.
+#WITH_DEBUG_NEGO:BOOL=OFF
+#
+#// Print authentication related debug messages.
+#WITH_DEBUG_NLA:BOOL=OFF
+#
+#// Print NTLM debug messages
+#WITH_DEBUG_NTLM:BOOL=OFF
+#
+#// Print RemoteApp debug messages
+#WITH_DEBUG_RAIL:BOOL=OFF
+#
+#// Print RDP debug messages
+#WITH_DEBUG_RDP:BOOL=OFF
+#
+#// Rdpdr debug messages
+#WITH_DEBUG_RDPDR:BOOL=OFF
+#
+#// Print input virtual channel debug messages
+#WITH_DEBUG_RDPEI:BOOL=OFF
+#
+#// Print RDPGFX debug messages
+#WITH_DEBUG_RDPGFX:BOOL=OFF
+#
+#// Redirection debug messages
+#WITH_DEBUG_REDIR:BOOL=OFF
+#
+#// Print RemoteFX debug messages.
+#WITH_DEBUG_RFX:BOOL=OFF
+#
+#// Enable Ringbuffer debug messages
+#WITH_DEBUG_RINGBUFFER:BOOL=OFF
+#
+#// Print smartcard debug messages
+#WITH_DEBUG_SCARD:BOOL=OFF
+#
+#// Print rdpsnd debug messages
+#WITH_DEBUG_SND:BOOL=OFF
+#
+#// Print static virtual channel debug messages.
+#WITH_DEBUG_SVC:BOOL=OFF
+#
+#// Pack debug symbols to installer
+#WITH_DEBUG_SYMBOLS:BOOL=OFF
+#
+#// Print thread debug messages, enables handle dump
+#WITH_DEBUG_THREADS:BOOL=OFF
+#
+#// Print timezone debug messages.
+#WITH_DEBUG_TIMEZONE:BOOL=OFF
+#
+#// Print transport debug messages.
+#WITH_DEBUG_TRANSPORT:BOOL=OFF
+#
+#// Print Terminal Server Gateway debug messages
+#WITH_DEBUG_TSG:BOOL=OFF
+#
+#// Print window order debug messages
+#WITH_DEBUG_WND:BOOL=OFF
+#
+#// Print X11 Client debug messages
+#WITH_DEBUG_X11:BOOL=OFF
+#
+#// Print X11 clipboard redirection debug messages
+#WITH_DEBUG_X11_CLIPRDR:BOOL=OFF
+#
+#// Print X11 Client local movesize debug messages
+#WITH_DEBUG_X11_LOCAL_MOVESIZE:BOOL=OFF
+#
+#// Print XVideo debug messages
+#WITH_DEBUG_XV:BOOL=OFF
+#
+#// Enable experimental sound encoder/decoder formats
+#WITH_DSP_EXPERIMENTAL:BOOL=OFF
+#
+#// Enable feature FAAC for codec
+#WITH_FAAC:BOOL=OFF
+#
+#// Enable feature FAAD2 for codec
+#WITH_FAAD2:BOOL=OFF
+#
+#// Compile with GProf profiler.
+#WITH_GPROF:BOOL=OFF
+#
+#// Enable feature GSM for codec
+#WITH_GSM:BOOL=OFF
+#
+#// Compile support for kerberos authentication. (EXPERIMENTAL)
+#WITH_GSSAPI:BOOL=OFF
+#
+#// Use ICU for unicode conversion
+#WITH_ICU:BOOL=OFF
+#
+#// Use Intel Performance Primitives.
+#WITH_IPP:BOOL=OFF
+#
+#// Use JPEG decoding.
+#WITH_JPEG:BOOL=OFF
+#
+#// Enable feature LAME for codec
+#WITH_LAME:BOOL=OFF
+#
+#// Generate manpages.
+#WITH_MANPAGES:BOOL=ON
+#
+#// Enable feature MbedTLS for cryptography
+#WITH_MBEDTLS:BOOL=OFF
+#
+#// Enable H264 media foundation decoder.
+#WITH_MEDIA_FOUNDATION:BOOL=ON
+#
+#// Use native SSPI modules
+#WITH_NATIVE_SSPI:BOOL=ON
+#
+#// Enable feature OpenCL for codec
+#WITH_OPENCL:BOOL=OFF
+#
+#// Enable feature OpenH264 for codec
+#WITH_OPENH264:BOOL=OFF
+#
+#// Enable feature OpenSSL for cryptography
+#WITH_OPENSSL:BOOL=ON
+#
+#// Compile profiler.
+#WITH_PROFILER:BOOL=OFF
+#
+#// Build sample code
+#WITH_SAMPLE:BOOL=OFF
+#
+#// Build server binaries
+#WITH_SERVER:BOOL=OFF
+#
+#// Build servers as a library with an interface
+#WITH_SERVER_INTERFACE:BOOL=ON
+#
+#// Enable SmartCard API Inspector
+#WITH_SMARTCARD_INSPECT:BOOL=OFF
+#
+#// Enable feature soxr for codec
+#WITH_SOXR:BOOL=OFF
+#
+#// Enable SSE2 optimization.
+#WITH_SSE2:BOOL=ON
+#
+#// Use SWScale image library for screen resizing
+#WITH_SWSCALE:BOOL=OFF
+#
+#// Build third-party components
+#WITH_THIRD_PARTY:BOOL=OFF
+#
+#// Use Windows 8 libraries
+#WITH_WIN8:BOOL=OFF
+#
+#// Use Windows Multimedia
+#WITH_WINMM:BOOL=ON
+#
+#// Build WinPR helper binaries
+#WITH_WINPR_TOOLS:BOOL=ON
+#
+#// Enable feature x264 for codec
+#WITH_X264:BOOL=OFF
+
+
+
+#-- Found OpenSSL: D:/Prog/winlibs64-9.2.0/custombuilt/lib/libssleay32.dll.a;D:/Prog/winlibs64-9.2.0/custombuilt/lib/libeay32.dll.a (found version "1.1.1f")
+#-- Skipping optional feature MbedTLS for cryptography (encryption, certificate validation, hashing functions)
+#--     Enable feature MbedTLS using "-DWITH_MBEDTLS=ON"
+#-- Skipping disabled feature OpenSLES for multimedia (OpenSLES audio / video)
+#-- Skipping disabled feature OSS for sound (audio input, audio output and multimedia redirection)
+#-- Skipping disabled feature ALSA for sound (audio input, audio output and multimedia redirection)
+#-- Skipping disabled feature Pulse for sound (audio input, audio output and multimedia redirection)
+#-- Skipping disabled feature Cups for printing (printer device redirection)
+#-- Skipping disabled feature PCSC for smart card (smart card device redirection)
+#-- Skipping disabled feature FFmpeg for multimedia (multimedia redirection, audio and video playback)
+#-- Skipping optional feature JPEG for codec (use JPEG library)
+#--     Enable feature JPEG using "-DWITH_JPEG=ON"
+#-- Skipping optional feature x264 for codec (use x264 library)
+#--     Enable feature x264 using "-DWITH_X264=ON"
+#-- Skipping optional feature OpenH264 for codec (use OpenH264 library)
+#--     Enable feature OpenH264 using "-DWITH_OPENH264=ON"
+#-- Skipping optional feature OpenCL for codec (use OpenCL library)
+#--     Enable feature OpenCL using "-DWITH_OPENCL=ON"
+#-- Skipping optional feature GSM for codec (GSM audio codec library)
+#--     Enable feature GSM using "-DWITH_GSM=ON"
+#-- Skipping optional feature LAME for codec (lame MP3 audio codec library)
+#--     Enable feature LAME using "-DWITH_LAME=ON"
+#-- Skipping optional feature FAAD2 for codec (FAAD2 AAC audio codec library)
+#--     Enable feature FAAD2 using "-DWITH_FAAD2=ON"
+#-- Skipping optional feature FAAC for codec (FAAC AAC audio codec library)
+#--     Enable feature FAAC using "-DWITH_FAAC=ON"
+#-- Skipping optional feature soxr for codec (SOX audio resample library)
+#--     Enable feature soxr using "-DWITH_SOXR=ON"
+#-- Skipping optional feature GSSAPI for auth (add kerberos support)
+#--     Enable feature GSSAPI using "-DWITH_GSSAPI=ON"
+#-- Skipping optional feature IPP for performance (Intel Integrated Performance Primitives library)
+#--     Enable feature IPP using "-DWITH_IPP=ON"

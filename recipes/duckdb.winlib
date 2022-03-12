@@ -1,0 +1,206 @@
+export NAME="DuckDB"
+export STATUS=
+export URL=https://www.duckdb.org/
+#export URL=https://github.com/cwida/duckdb
+export BASENAME=duckdb
+export DESCRIPTION="DuckDB is an embedded database designed to execute analytical SQL queries fast while embedded in another process. It is designed to be easy to install and easy to use. DuckDB has no external dependencies. DuckDB has bindings for C/C++, Python and R."
+export CATEGORY=database
+export TYPE=library
+#export VERSION=0.1.1
+#export VERSIONDATE=20191125
+#export VERSION=0.1.2
+#export VERSIONDATE=20200106
+#export VERSION=0.1.3
+#export VERSIONDATE=20200203
+#export VERSION=0.1.4
+#export VERSIONDATE=20200303
+#export VERSION=0.1.6
+#export VERSIONDATE=20200405
+#export VERSION=0.1.7
+#export VERSIONDATE=20200504
+#export VERSION=0.1.8
+#export VERSIONDATE=20200529
+#export VERSION=0.1.9
+#export VERSIONDATE=20200620
+#export VERSION=0.2.0
+#export VERSIONDATE=20200723
+#export VERSION=0.2.1
+#export VERSIONDATE=20200829
+#export VERSION=0.2.2
+#export VERSIONDATE=20201101
+#export VERSION=0.2.3
+#export VERSIONDATE=20201204
+#export VERSION=0.2.4
+#export VERSIONDATE=20210202
+#export VERSION=0.2.5
+#export VERSIONDATE=20210310
+#export VERSION=0.2.6
+#export VERSIONDATE=20210508
+####ld.exe: CMakeFiles/sqlite3_api_wrapper.dir/objects.a(sqlite3_api_wrapper.cpp.obj):sqlite3_api_wrapper.cpp:(.text+0x2ed): undefined reference to `duckdb::DuckDB::DuckDB(char const*, duckdb::DBConfig*)'
+#export VERSION=0.2.7
+#export VERSIONDATE=20210614
+#export VERSION=0.2.8
+#export VERSIONDATE=20210802
+#export VERSION=0.2.9
+#export VERSIONDATE=20210906
+#export VERSION=0.3.0
+#export VERSIONDATE=20211007
+#export VERSION=0.3.1
+#export VERSIONDATE=20211116
+export VERSION=0.3.2
+export VERSIONDATE=20220208
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+#export DEPENDANCIES=pthreads,tpch-dbgen
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/cwida/duckdb/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/cwida/duckdb/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix comparison issue in third_party/catch/catch.hpp (version <= 0.1.2)
+#patch -ulbf third_party/catch/catch.hpp << EOF
+#@@ -1445 +1445 @@
+#-    auto compareNotEqual( LhsT const& lhs, RhsT&& rhs ) -> bool { return static_cast<bool>(lhs != rhs); }
+#+    auto compareNotEqual( LhsT const& lhs, RhsT&& rhs ) -> bool { return static_cast<bool>((uintptr_t)lhs != (uintptr_t)rhs); }
+#EOF
+#patch -ulbf src/common/types/value.cpp << EOF
+# bool Value::IsUTF8String(const char *s) {
+#        int c;
+#
+#        if (s == NULL) {
+#-               return true;
+#+               return nullptr;
+#        }
+#        if (*s == '\200' && s[1] == '\0') {
+#                return true; /* str_nil */
+#        }
+#EOF
+# fix test/sql/capi/test_capi.cpp (version <= 0.1.3)
+sed -i.bak -e "s/REQUIRE(stmt != NULL)/REQUIRE(stmt != nullptr);/" test/sql/capi/test_capi.cpp
+# fix already defined DELETE in src/include/common/enums/statement_type.hpp (version <= 0.1.3)
+patch -ulbf src/include/common/enums/statement_type.hpp << EOF
+@@ -22,2 +22,3 @@
+        UPDATE,       // update statement type
++#undef DELETE
+        DELETE,       // delete statement type
+EOF
+## fix src/include/duckdb/parser/parsed_data/create_info.hpp (version >= 0.1.7)
+#patch -ulbf src/include/duckdb/parser/parsed_data/create_info.hpp << EOF
+#@@ -17,4 +17,6 @@
+#        // Standard: throw error
+#+#undef ERROR
+#        ERROR,
+#        // CREATE IF NOT EXISTS, silently do nothing on conflict
+#+#undef IGNORE
+#        IGNORE,
+#EOF
+## fix src/include/duckdb/common/enums/physical_operator_type.hpp (version >= 0.1.7)
+#patch -ulbf src/include/duckdb/common/enums/physical_operator_type.hpp << EOF
+#@@ -67,2 +67,3 @@
+#        INSERT_SELECT,
+#+#undef DELETE
+#        DELETE,
+#EOF
+# fix missing strlen in src/execution/index/art/art_key.cpp (version >= 0.1.3)
+mv src/execution/index/art/art_key.cpp src/execution/index/art/art_key.cpp.bak &&
+echo "#include <string.h>" > src/execution/index/art/art_key.cpp &&
+cat src/execution/index/art/art_key.cpp.bak >> src/execution/index/art/art_key.cpp
+## fix already defined DELETE (version >= 0.1.4)
+#sed -i.bak -e "s/^\s*DELETE,/#undef DELETE\n#define DELETE DUCKDB_DELETE\n&/" src/include/duckdb/common/enums/statement_type.hpp src/include/duckdb/common/enums/logical_operator_type.hpp src/include/duckdb/common/enums/physical_operator_type.hpp
+#sed -i.bak -e "s/^\s*\(DELETE\),/#undef \1\n#define \1 DUCKDB\1\n&/" $(grep -l "^\s*DELETE," $(find -name '*.hpp'))
+## fix third_party/dbgen/include/config.h (version >= 0.1.6)
+#patch -ulbf third_party/dbgen/include/config.h << EOF
+#@@ -107,8 +107,14 @@
+# #if (defined(WIN32) && !defined(_POSIX_))
+# #define PATH_SEP '\\'
+# #define DSS_HUGE __int64
+#+#define RN     G_A 6364136223846793005uI64
+#+#ifdef __MINGW32__
+#+#define RNG_A 6364136223846793005ull
+#+#define RNG_C 1ull
+#+#else
+# #define RNG_A 6364136223846793005uI64
+# #define RNG_C 1uI64
+#+#endif
+# #define HUGE_FORMAT "%I64d"
+# #define HUGE_DATE_FORMAT "%02I64d"
+# /* requried by move to Visual Studio 2005 */
+#EOF
+## fix src/include/duckdb/parser/parsed_data/create_info.hpp (version >= 0.1.7)
+#patch -ulbf src/include/duckdb/parser/parsed_data/create_info.hpp << EOF
+#@@ -17,2 +17,4 @@
+#        // Standard: throw error
+#+#undef ERROR
+#+#define ERROR DUCKDB_ERROR
+#        ERROR,
+#EOF
+## fix src/include/duckdb/common/enums/logical_operator_type.hpp (version >= 0.2.2)
+#patch -ulbf src/include/duckdb/common/enums/logical_operator_type.hpp << EOF
+#@@ -60,2 +60,3 @@
+#        INSERT = 100,
+#+#undef DELETE
+#        DELETE = 101,
+## avoid invalid disable_target_warnings and remove definition of MAC (version >= 0.1.4)
+#sed -i.bak -e "s/^disable_target_warnings(/#&/; s/-DMAC/-DWIN32/; s/\(add_library([^ ]*\) STATIC/\1/" third_party/dbgen/CMakeLists.txt
+## don't build test
+#mv test/CMakeLists.txt test/CMakeLists.txt.bak &&
+#touch test/CMakeLists.txt
+## skip building test and benchmark
+#sed -i.bak -e "s/add_subdirectory(\(test\|benchmark\))/#&/" CMakeLists.txt
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLEAN:BOOL=ON -DUSEPCRE:BOOL=OFF -DRE2_BUILD_TESTING:BOOL=OFF -DBUILD_TESTING:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLEAN:BOOL=ON -DUSEPCRE:BOOL=OFF -DRE2_BUILD_TESTING:BOOL=OFF -DBUILD_TESTING:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus build &&
+# make -Cbuild_static &&
+# wl-showstatus build &&
+# make -Cbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+#    echo OK
+## also build dbgen (version >= 0.1.7)
+#echo "add_subdirectory(dbgen)" >> third_party/CMakeLists.txt
+wl-showstatus configure &&
+ #mkdir -p build_dbgen &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLEAN:BOOL=ON -DUSEPCRE:BOOL=OFF -DRE2_BUILD_TESTING:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -Sthird_party/dbgen -Bbuild_dbgen &&
+ #wl-showstatus configure &&
+ mkdir -p build &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLEAN:BOOL=ON -DUSEPCRE:BOOL=OFF -DRE2_BUILD_TESTING:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild &&
+ #echo "-Wl,--as-needed -lws2_32" >> build/tools/rest/CMakeFiles/duckdb_dbgen.dir/linklibs.rsp &&
+ #echo "-L$(pwd)/build_dbgen" >> build/src/CMakeFiles/duckdb.dir/linklibs.rsp &&
+ #sed -i.bak -e "s?-ldbgen?-L$(pwd)/build_dbgen/libdbgen.a?" build/tools/rest/CMakeFiles/duckdb_dbgen.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ #make -Cbuild_dbgen &&
+ make -Cbuild install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ strip build/src/libduckdb.dll &&
+ cp -f build/src/libduckdb.dll $INSTALLPREFIX/bin/ &&
+ cp -f $INSTALLPREFIX/lib/libduckdb_static.a $INSTALLPREFIX/lib/libduckdb.a &&
+ # remove unwanted static libraries
+ for F in $INSTALLPREFIX/lib/*.a; do
+  if echo $F|grep -vq "/libduckdb[^/]*\.a"; then
+   rm -f $F
+  fi
+ done &&
+ # fix absolute link in .cmake file(s)
+ sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../..?g" $INSTALLPREFIX/cmake/DuckDBExports-release.cmake $INSTALLPREFIX/cmake/DuckDBExports.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: check if deleted library files really are not needed
+
+
+

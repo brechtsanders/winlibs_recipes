@@ -1,0 +1,74 @@
+export NAME="ntlmclient"
+export STATUS=
+export URL=https://github.com/ethomson/ntlmclient
+export BASENAME=ntlmclient
+export DESCRIPTION="A POSIX implementation of NTLM2 client authentication"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20200120
+export VERSION=0.9.1
+export VERSIONDATE=20210825
+wl-showstatus --package-version
+export DEPENDANCIES=libiconv,openssl
+#export DEPENDANCIES=libiconv,mbedtls
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/ethomson/ntlmclient/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/ethomson/ntlmclient/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ethomson/ntlmclient/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing htonll in src/ntlm.c
+patch -ulbf src/ntlm.c << EOF
+@@ -16,5 +16,13 @@
+ #include <fcntl.h>
+ #include <time.h>
++#ifdef _WIN32
++#include <winsock2.h>
++inline uint64_t htonll(uint64_t value)
++{
++  return ((uint64_t)htonl((uint32_t)(value & 0xFFFFFFFFLL)) << 32) | htonl((uint32_t)(value >> 32));
++}
++#else
+ #include <arpa/inet.h>
++#endif
+
+ #include "ntlm.h"
+EOF
+# fix src/util.c (version >= 0.9.1)
+patch -ulbf src/util.c << EOF
+@@ -10,3 +10,7 @@
+ #include <stdint.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <arpa/inet.h>
++#endif
+
+EOF
+wl-showstatus configure &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCRYPT:STRING=openssl -DUNICODE:STRING=iconv -DBUILD_TESTS:BOOL=OFF -DCMAKE_MODULE_LINKER_FLAGS:STRING= -DCMAKE_SHARED_LINKER_FLAGS:STRING= -DCMAKE_STATIC_LINKER_FLAGS:STRING= CMAKE_EXE_LINKER_FLAGS:STRING= -S. -Bbuild_win &&
+ echo "-Wl,--as-needed -lws2_32" >> build_win/CMakeFiles/ntlmclient_shared.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lws2_32" >> build_win/CMakeFiles/ntlm.dir/linklibs.rsp &&
+ wl-showstatus build &&
+ make -Cbuild_win &&
+ strip build_win/*.dll &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_win/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_win/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,48 @@
+export NAME="GtkSourceView 2"
+export STATUS=
+export URL=http://projects.gnome.org/gtksourceview/
+export BASENAME=gtksourceview2
+export DESCRIPTION="GtkSourceView is a portable C library that extends the standard GTK+ framework for multiline text editing with support for configurable syntax highlighting, unlimited undo/redo, UTF-8 compliant caseless searching, printing and other features typical of a source code editor."
+export CATEGORY=gui
+export TYPE=library
+export VERSION=2.11.2
+export VERSIONDATE=20101008
+####gtksourceview/gtksourcecompletion.h:60: error: expected specifier-qualifier-list before 'GtkObject'
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,gdk-pixbuf,gettext,pango,cairo,libxml2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gtksourceview/"
+export INSTALLPREFIX=`pwd`/inst_gtksourceview-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/gtksourceview/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/gtksourceview-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/gtksourceview-$VERSION.tar.bz2
+cd gtksourceview-$VERSION
+# skip making tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+# avoid building against gtk3 and fix issues with deprecated G_CONST_RETURN
+mv configure configure.bak
+sed -e "s/gtk+-3/gtk+-2/g; s/-DG_DISABLE_DEPRECATED//" configure.bak > configure
+wl-showstatus configure &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ PATH=$PYDIR:$PATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gtksourceview-$VERSION
+
+
+

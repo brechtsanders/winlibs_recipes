@@ -1,0 +1,98 @@
+export NAME="libwpd"
+export STATUS=
+export URL=http://libwpd.sourceforge.net/
+export BASENAME=libwpd
+export DESCRIPTION="libwpd is a C++ library designed to help process WordPerfect documents."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=0.8.6
+#export VERSION=0.9.4
+#export VERSIONDATE=20120109
+#export VERSION=0.9.5
+#export VERSIONDATE=20120924
+#export VERSION=0.9.6
+#export VERSIONDATE=20120925
+#export VERSION=0.9.7
+#export VERSIONDATE=20130418
+#export VERSION=0.9.8
+#export VERSIONDATE=20130514
+#export VERSION=0.9.9
+#export VERSIONDATE=20130816
+#export DEPENDANCIES=
+#export VERSION=0.10.0
+#export VERSIONDATE=20140524
+#export VERSION=0.10.1
+#export VERSIONDATE=20151230
+#export VERSION=0.10.2
+#export VERSIONDATE=20170913
+export VERSION=0.10.3
+export VERSIONDATE=20181229
+####configure: error: conditional "HAVE_VISIBILITY" was never defined.
+wl-showstatus --package-version
+export DEPENDANCIES=librevenge
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=LGPL
+export LICENSEFILE=COPYING.LGPL
+export LICENSETYPE="LGPL/MPL"
+#export DOWNLOADURL="http://libwpd.sourceforge.net/download.html"
+export DOWNLOADURL="http://sourceforge.net/projects/libwpd/files/libwpd/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/libwpd/libwpd/libwpd-$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing exported symbol PropertyFactory::newDoubleProp needed by libvisio
+patch -ulbf src/lib/libwpd-0.9.def << EOF
+--- src/lib/libwpd-0.9.def  2010-11-09 09:36:12 +0100
++++ src/lib/libwpd-0.9.def  2012-07-27 11:08:58 +0200
+@@ -48,2 +48,3 @@
+ _ZN18WPXPropertyFactory12newPointPropEd
++_ZN18WPXPropertyFactory13newDoublePropEd
+ _ZN18WPXPropertyFactory13newStringPropEPKc
+EOF
+# fix redefinition of DECIMAL in src/lib/libwpd_internal.h
+mv src/lib/libwpd_internal.h src/lib/libwpd_internal.h.bak
+cat > src/lib/libwpd_internal.h << EOF
+#define DECIMAL RENAMED_DECIMAL
+#include <wtypes.h>
+#undef DECIMAL
+EOF
+cat src/lib/libwpd_internal.h.bak >> src/lib/libwpd_internal.h
+# fix redefinition of DECIMAL in src/lib/WPXHeader.h (version >= 4.9.2)
+mv src/lib/WPXHeader.h src/lib/WPXHeader.h.bak
+cat > src/lib/WPXHeader.h << EOF
+#define DECIMAL RENAMED_DECIMAL
+#include <wtypes.h>
+#undef DECIMAL
+EOF
+cat src/lib/WPXHeader.h.bak >> src/lib/WPXHeader.h
+# fix redefinition of byte in src/lib/WP6EOLGroup.cpp
+mv src/lib/WP6EOLGroup.cpp src/lib/WP6EOLGroup.cpp.bak
+sed -e "s/byte/mybyte/" src/lib/WP6EOLGroup.cpp.bak > src/lib/WP6EOLGroup.cpp
+# fix undefined stddef.h in src/lib/WPXTable.h (version >= 0.10.3)
+mv src/lib/WPXTable.h src/lib/WPXTable.h.bak &&
+echo "#include <stddef.h>" > src/lib/WPXTable.h &&
+cat src/lib/WPXTable.h.bak >> src/lib/WPXTable.h
+# avoid -pedantic on 64-bit
+sed -i.bak -e "s/-pedantic//" configure
+#sed -i.bak -e "s/-pedantic//" configure.ac
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+# ignore undefined HAVE_VISIBILITY (version >= 0.10.3)
+sed -i.bak -e "s/as_fn_error\(.*HAVE_VISIBILITY.*was never defined\)/echo\1/" configure
+wl-showstatus configure &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-def-files &&
+ #WINDRES= RC= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-def-files &&
+ WINDRES= RC= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-def-files &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

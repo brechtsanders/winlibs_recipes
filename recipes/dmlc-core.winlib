@@ -1,0 +1,72 @@
+export NAME="DMLC-Core"
+export STATUS=
+export URL=https://github.com/dmlc/dmlc-core
+export BASENAME=dmlc-core
+export DESCRIPTION="A common bricks library for building scalable and portable distributed machine learning."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=0.3
+export VERSIONDATE=20200221
+####src/io/azure_filesys.cc:8:10: fatal error: stdafx.h: No such file or directory
+#export VERSION=0.4
+#export VERSIONDATE=20200609
+#export VERSION=0.5
+#export VERSIONDATE=20210702
+wl-showstatus --package-version
+export DEPENDANCIES=libcurl,openssl
+export OPTIONALDEPENDANCIES=libhdfs3
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/dmlc/dmlc-core/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/dmlc/dmlc-core/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix test/unittest/unittest_thread_group.cc (version >= 0.3)
+patch -ulbf test/unittest/unittest_thread_group.cc << EOF
+@@ -5,3 +5,3 @@
+ #include <gtest/gtest.h>
+-#if defined(_MSC_VER) && _MSC_VER <= 1800
++#if (defined(_MSC_VER) && _MSC_VER <= 1800) || defined(__MINGW32__)
+ #include <Windows.h>
+@@ -9,3 +9,3 @@
+
+-#if defined(_MSC_VER)
++#if defined(_WIN32)
+ static void usleep(__int64 usec)
+EOF
+sed -i.bak -e "s/^\(\s*add_library\s*(\)\([^ ]*\)\s\(\s*.*\)$/\1\2 SHARED \3\n\1\2_static STATIC \3\nset_target_properties(\2_static PROPERTIES OUTPUT_NAME \2)/; s/^\(\s*target_link_libraries\s*(\)\([^ ]*\)\s\(\s*.*\)$/&\n\1\2_static \3/; s/^\(\s*install\s*(TARGETS\s*\)\([^ ]*\)\s\(\s*.*\)$/\1\2 RUNTIME DESTINATION bin \3\n\1\2_static \3/" CMakeLists.txt
+mkdir -p build &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_CXX14_IF_AVAILABLE:BOOL=ON -DUSE_AZURE:BOOL=OFF -DUSE_S3:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild &&
+ echo "-Wl,--as-needed -lws2_32" >> build/CMakeFiles/dmlc.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lws2_32 -lshlwapi" >> build/test/unittest/CMakeFiles/dmlc_unit_tests.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lcurl" >> build/CMakeFiles/dmlc.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+##export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_CXX14_IF_AVAILABLE:BOOL=ON -DDMLC_ENABLED_SANITIZERS:STRING="address;leak;thread" -DUSE_HDFS:BOOL=OFF -DUSE_AZURE:BOOL=OFF -DUSE_S3:BOOL=OFF -DINSTALL_DOCUMENTATION:BOOL=OFF -DGOOGLE_TEST:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_CXX14_IF_AVAILABLE:BOOL=ON -DDMLC_ENABLED_SANITIZERS:STRING="address;leak;thread" -DUSE_HDFS:BOOL=OFF -DUSE_AZURE:BOOL=OFF -DUSE_S3:BOOL=OFF -DINSTALL_DOCUMENTATION:BOOL=OFF -DGOOGLE_TEST:BOOL=OFF -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK

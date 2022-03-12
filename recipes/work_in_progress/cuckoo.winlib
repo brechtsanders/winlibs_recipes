@@ -1,0 +1,56 @@
+export NAME="cuckoo"
+export STATUS=
+export URL=https://github.com/tromp/cuckoo
+export BASENAME=cuckoo
+export DESCRIPTION="a memory-bound graph-theoretic proof-of-work system "
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20180808
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE="FAIR MINING/GPLv2+"
+export DOWNLOADURL="https://github.com/tromp/cuckoo/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/tromp/cuckoo/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing posix_memalign in src/mean_miner.hpp
+patch -ulbf src/mean_miner.hpp << EOF
+@@ -270,2 +270,5 @@
+   void* operator new(size_t size) noexcept {
++#ifdef _WIN32
++    return _aligned_malloc(sizeof(edgetrimmer), NSIPHASH * sizeof(u32));
++#else
+     void* newobj;
+@@ -278,2 +281,3 @@
+     return newobj;
++#endif
+   }
+EOF
+# fix missing file
+mkdir -p winfix
+cat > winfix/endian.h << EOF
+#if defined(_WIN32) && !defined(htole64)
+#define htole32(x) (x)
+#define htole64(x) (x)
+#endif
+EOF
+# fix for building for Windows
+sed -e "s/\$(C*FLAGS)$/& -I$(echo $(pwd)/winfix|sed -e 's?/?\\/?g')/; s/\(lib[^ ]*\.\)so/\1dll/g; s/\(-shared -o \)\(libblake2b.dll\)/\1\2 -Wl,--out-implib,\2.a/" src/Makefile > src/Makefile.mingw
+# avoid demo30x8 because it fails
+sed -i.bak -e "s/^\(all\s*:.*\)demo30x8$/\1/" src/Makefile.mingw
+wl-showstatus build &&
+ make -Csrc -fMakefile.mingw &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

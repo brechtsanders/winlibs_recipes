@@ -1,0 +1,102 @@
+export NAME="SILC Toolkit"
+export STATUS=
+export URL=http://silcnet.org/software/developers/toolkit/
+export BASENAME=silc-toolkit
+export DESCRIPTION="SILC Toolkit is a software development toolkit which provides full SILC protocol implementation for application developers. The SILC Toolkit provides SILC Client Library, SILC Protocol Core Library, SILC Key Exchange Library, SILC Crypto Library, SILC Math Library, SILC Utility Library, and other libraries. The SILC Toolkit also includes full reference manual and developer guide with examples and tutorials."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=1.1.10
+#export VERSIONDATE=20101121
+export VERSION=1.1.12
+export VERSIONDATE=20170727
+wl-showstatus --package-version
+export DEPENDANCIES=pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="GPL/BSD"
+#export DOWNLOADURL="http://silcnet.org/software/download/toolkit/"
+export DOWNLOADURL="http://silcnet.org/dev.html"
+#export DOWNLOADURL="https://github.com/silc/silc/releases silc.toolkit."
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://silcnet.org/download/toolkit/sources/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/silc/silc/toolkit/sources/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing GWL_USERDATA in lib/silcutil/win32/silcwin32schedule.c (version >= 1.1.12)
+patch -ulbf lib/silcutil/win32/silcwin32schedule.c << EOF
+@@ -21,2 +21,5 @@
+ #include "silc.h"
++#ifdef _WIN64
++#define GWL_USERDATA GWLP_USERDATA
++#endif
+
+EOF
+# fix DLLAPI definition in includes/silcwin32.h
+patch -ulbf includes/silcwin32.h << EOF
+@@ -41,2 +41,13 @@
+
++#if defined(_WIN32)
++# ifndef _LIB
++#  if defined(DLL_EXPORT)
++#   define DLLAPI __declspec(dllexport)
++#  else
++#   define DLLAPI __declspec(dllimport)
++#  endif
++# else
++#  define DLLAPI
++# endif
++#else
+ #ifdef WIN32
+@@ -51,2 +62,3 @@
+ #endif
++#endif
+ #endif
+EOF
+# fix missing exports in lib/silcutil/silcfsm.h
+mv lib/silcutil/silcfsm.h lib/silcutil/silcfsm.h.bak &&
+sed -e "s/^[a-zA-Z0-9\*]*\s\{0,1\}\**silc_fsm_[^(]*\s*(/DLLAPI &/" lib/silcutil/silcfsm.h.bak > lib/silcutil/silcfsm.h
+# fix missing exports in lib/silccore/silcargument.h
+mv lib/silccore/silcargument.h lib/silccore/silcargument.h.bak &&
+sed -e "s/^\(unsigned \|long \)*[a-zA-Z0-9\*]*\s\{0,1\}\**silc_argument_[^(]*\s*(/DLLAPI &/" lib/silccore/silcargument.h.bak > lib/silccore/silcargument.h
+# fix missing exports in lib/silcutil/silcmutex.h
+mv lib/silcutil/silcmutex.h lib/silcutil/silcmutex.h.bak &&
+sed -e "s/^[a-zA-Z0-9\*]*\s\{0,1\}silc_[^(]*\s*(/DLLAPI &/" lib/silcutil/silcmutex.h.bak > lib/silcutil/silcmutex.h
+# fix missing exports in lib/silccore/silcstatus.h
+mv lib/silccore/silcstatus.h lib/silccore/silcstatus.h.bak &&
+sed -e "s/^[a-zA-Z0-9\*]*\s\{0,1\}silc_[^(]*\s*(/DLLAPI &/" lib/silccore/silcstatus.h.bak > lib/silccore/silcstatus.h
+# fix missing exports in lib/silcutil/silcmemory.h
+mv lib/silcutil/silcmemory.h lib/silcutil/silcmemory.h.bak &&
+sed -e "s/^[a-zA-Z0-9\*]*\s\{0,1\}silc_[^(]*\s*(/DLLAPI &/" lib/silcutil/silcmemory.h.bak > lib/silcutil/silcmemory.h
+# fix DLL extension
+mv lib/silcsim/Makefile.in lib/silcsim/Makefile.in.bak
+sed -e "s/\.so/\.dll/g" lib/silcsim/Makefile.in.bak > lib/silcsim/Makefile.in
+# fix configure
+mv configure configure.bak &&
+sed -e "s/-mno-cygwin//g" configure.bak > configure
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-win32 --disable-shared &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-win32 LDFLAGS="-Wl,--as-needed -lregex -ldl -lws2_32 -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-win32 LDFLAGS="-Wl,--as-needed -lregex -ldl -lws2_32 -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-win32 --disable-asm LDFLAGS="-Wl,--as-needed -lregex -ldl -lws2_32 -Wl,-no-undefined" &&
+ wl-showstatus build &&
+ make -j1 LIBS="-lregex -ldl -lws2_32" &&
+ wl-showstatus build-install &&
+ make -j1 install-strip LIBS="-lregex -ldl -lws2_32" &&
+ make -j1 -C lib/silcclient install-strip &&
+ make -j1 -C lib/silcsim install-strip &&
+ #( make || make -j1 ) &&
+ #cp win32/libsilc/libsilc.def libsilc.def &&
+ #sed -n -e "s/^extern DLLAPI.* \(silc_[a-z0-9_]*\).*$/_imp__\1=\1 DATA/p" lib/silccrypt/*.h >> libsilc.def &&
+ #cp win32/libsilcclient/libsilcclient.def libsilcclient.def &&
+ #gcc -shared -s -mwindows -def win32/libsilc/libsilc.def -o libsilc.dll -Wl,--out-implib,lib/.libs/libsilc.dll.a lib/.libs/libsilc.a -Wl,--as-needed -lws2_32 -lregex &&
+ #gcc -shared -s -mwindows -def win32/libsilcclient/libsilcclient.def -o libsilcclient.dll -Wl,--out-implib,lib/.libs/libsilcclient.dll.a lib/.libs/libsilcclient.a -Wl,--as-needed -lws2_32 -lregex &&
+    echo OK
+####(warning, even returns OK on error)
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,68 @@
+export NAME="OpenSP"
+export STATUS=
+export URL=http://openjade.sourceforge.net/
+export BASENAME=opensp
+export DESCRIPTION="Jade is James Clark's implementation of DSSSL -- Document Style Semantics and Specification Language -- an ISO standard for formatting SGML (and XML) documents. OpenJade is a project undertaken by the DSSSL community to maintain and extend Jade, as well as the related SP suite of SGML/XML processing tools. OpenJade and OpenSP are distributed under the same license as Jade."
+export CATEGORY=documentation,fileformat
+export TYPE=library
+#export VERSION=1.5.1
+#export VERSIONDATE=20101020
+export VERSION=1.5.2
+export VERSIONDATE=20130605
+####lib/CodingSystemKit.cxx:353: undefined reference to `OpenSP::Win32CodingSystem::Win32CodingSystem(OpenSP::Win32CodingSystem::SpecialCodePage, unsigned int)'
+wl-showstatus --package-version
+export DEPENDANCIES=gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://openjade.sourceforge.net/download.html"
+export DOWNLOADURL="http://sourceforge.net/projects/openjade/files/opensp/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/openjade/opensp/$VERSION/OpenSP-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/OpenSP-$VERSION.tar.gz
+cd OpenSP-$VERSION
+## fix missing wideCharMax (version <= 1.5.1)
+#mv include/RangeMap.cxx include/RangeMap.cxx.bak
+#echo "#include \"constant.h\"" > include/RangeMap.cxx
+## fix extra qualification error in InternalInputSource.h (version <= 1.5.1)
+#sed -i.bak -e "s/InternalInputSource::\(asInternalInputSource\)/\1/" include/InternalInputSource.h
+# fix missing realpath in sx/XmlOutputEventHandler.cxx
+sed -i.bak -e "s/_MSC_VER/_WIN32/" sx/XmlOutputEventHandler.cxx
+# fix undefined reference to Win32CodingSystem
+sed -i.bak -e "s/^am_libosp_la_OBJECTS\s*=\s*/&Win32CodingSystem.lo /; s/^libosp_la_SOURCES\s*=\s*/&Win32CodingSystem.cxx /" lib/Makefile.in
+wl-showstatus configure &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-http --enable-xml-messages LDFLAGS="-Wl,--enable-auto-import" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-relocatable CFLAGS="-DWIN32" CXXFLAGS="-std=c++98 -fpermissive -DWIN32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-relocatable --disable-doc-build CXXFLAGS="-std=c++11 -fpermissive" LDFLAGS="-Wl,--enable-auto-import" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-relocatable --enable-http --enable-xml-messages --disable-doc-build --without-included-gettext CXXFLAGS="-std=c++11 -fpermissive" LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ # fix wrapperdot issue
+ sed -i.bak3 -e "s/| \*mingw\*\(.*wrapperdot\)/\1/" libtool &&
+ echo "#define SP_PACKAGE \"OpenSP\"" >> config.h &&
+ echo "#define SP_VERSION \"$VERSION\"" >> config.h &&
+ #echo "#undef SP_DLLEXPORT" >> config.h &&
+ #echo "#define SP_DLLEXPORT __declspec(dllexport)" >> config.h &&
+ #echo "#undef SP_API" >> config.h &&
+ #echo "#define SP_API SP_DLLEXPORT" >> config.h &&
+ wl-showstatus build &&
+ #make -Cnsgmls LDFLAGS="$(pkg-config --libs glib-2.0)" &&
+ make -Clib CXXFLAGS="-std=c++11 -fpermissive -DSP_DLLEXPORT=\"__declspec(dllexport)\" -DSP_API=\"__declspec(dllexport)\" -DWINSOCK" &&
+ make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ # manually copy config.h (needed by openjade)
+ cp -u config.h $INSTALLPREFIX/include/OpenSP/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf OpenSP-$VERSION
+
+
+

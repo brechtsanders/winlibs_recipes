@@ -1,0 +1,120 @@
+export NAME="glslang"
+export STATUS=
+export URL=https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/
+#export URL=https://github.com/KhronosGroup/glslang
+export BASENAME=glslang
+export DESCRIPTION="Khronos-reference front end for GLSL/ESSL, partial front end for HLSL, and a SPIR-V generator."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=7.13.3496
+#export VERSIONDATE=20191231
+#export VERSION=8.13.3559
+#export VERSIONDATE=20200107
+#export VERSION=8.13.3743
+#export VERSIONDATE=20200427
+####\include\sec_api\stdio_s.h:493:23: error: conflicting declaration of 'int sprintf_s(char*, size_t, const char*, ...)' with 'C' linkage
+####glslang\include\common.h:56:22: note: previous declaration with 'C++' linkage
+#export VERSION=10-11.0.0
+#export VERSIONDATE=20201028
+#export VERSION=11.1.0
+#export VERSIONDATE=20201231
+####spirv-tools not linked - illegal SPIRV may be generated for HLSL
+#export VERSION=11.2.0
+#export VERSIONDATE=20210223
+#export VERSION=11.3.0
+#export VERSIONDATE=20210423
+#export VERSION=11.4.0
+#export VERSIONDATE=20210424
+#export VERSION=11.5.0
+#export VERSIONDATE=20210624
+#export VERSION=11.6.0
+#export VERSIONDATE=20210826
+#export VERSION=11.7.0
+#export VERSIONDATE=20211112
+export VERSION=11.8.0
+export VERSIONDATE=20220203
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+#export OPTIONALDEPENDANCIES=spirv-tools
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/KhronosGroup/glslang/releases"
+export DOWNLOADURL="https://github.com/KhronosGroup/glslang/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/KhronosGroup/glslang/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/KhronosGroup/glslang/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+#patch -ulbf glslang/Public/ShaderLang.h << EOF
+#@@ -47,8 +47,7 @@
+# #define C_DECL __cdecl
+#-//#ifdef SH_EXPORTING
+#-//    #define SH_IMPORT_EXPORT __declspec(dllexport)
+#-//#else
+#-//    #define SH_IMPORT_EXPORT __declspec(dllimport)
+#-//#endif
+#-#define SH_IMPORT_EXPORT
+#+#ifdef SH_EXPORTING
+#+    #define SH_IMPORT_EXPORT __declspec(dllexport)
+#+#else
+#+    #define SH_IMPORT_EXPORT __declspec(dllimport)
+#+#endif
+# #else
+#EOF
+# fix glslang/include/common.h (version >= 8.13.3743 <= 11.7.0)
+patch -ulbf glslang/include/common.h << EOF
+@@ -52,3 +52,3 @@
+
+-#if (defined(_MSC_VER) && _MSC_VER < 1900 /*vs2015*/) || defined MINGW_HAS_SECURE_API
++#if ((defined(_MSC_VER) && _MSC_VER < 1900 /*vs2015*/) || defined MINGW_HAS_SECURE_API) && !defined(__MINGW32__)
+     #include <basetsd.h>
+EOF
+# fix glslang/Public/ShaderLang.h (version >= 10-11.0.0 <= 11.7.0)
+patch -ulbf glslang/Public/ShaderLang.h << EOF
+@@ -703,3 +703,3 @@
+
+-    GLSLANG_EXPORT const TType* getType() const { return type; }
++    inline const TType* getType() const { return type; }
+     GLSLANG_EXPORT int getBinding() const;
+EOF
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_CTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# #-DENABLE_PCH:BOOL=OFF
+# #wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_CTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# #wl-showstatus build-install &&
+# #make -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_OPT:BOOL=ON -DENABLE_HLSL:BOOL=ON -DENABLE_EXCEPTIONS:BOOL=ON -DBUILD_EXTERNAL:BOOL=OFF -DENABLE_CTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DENABLE_PCH:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -GNinja -Wno-dev -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_GLSLANG_BINARIES:BOOL=ON -DENABLE_OPT:BOOL=ON -DENABLE_HLSL:BOOL=ON -DENABLE_RTTI:BOOL=ON -DENABLE_EXCEPTIONS:BOOL=ON -DBUILD_EXTERNAL:BOOL=OFF -DENABLE_CTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DENABLE_PCH:BOOL=OFF -S. -Bbuild_static &&
+ #-DENABLE_PCH:BOOL=OFF
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_OPT:BOOL=ON -DENABLE_HLSL:BOOL=ON -DENABLE_EXCEPTIONS:BOOL=ON -DBUILD_EXTERNAL:BOOL=OFF -DENABLE_CTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DENABLE_PCH:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -GNinja -Wno-dev -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_GLSLANG_BINARIES:BOOL=ON -DENABLE_OPT:BOOL=ON -DENABLE_HLSL:BOOL=ON -DENABLE_RTTI:BOOL=ON -DENABLE_EXCEPTIONS:BOOL=ON -DBUILD_EXTERNAL:BOOL=OFF -DENABLE_CTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DENABLE_PCH:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ # fix missing SPVRemapper.dll (version >= 10-11.0.0)
+ strip build_shared/SPIRV/SPVRemapper.dll &&
+ cp -u build_shared/SPIRV/SPVRemapper.dll $INSTALLPREFIX/bin/ &&
+ # manually copy StandAlone headers (version >= 11.6.0)
+ mkdir -p $INSTALLPREFIX/include/glslang/StandAlone &&
+ cp -u StandAlone/*.h $INSTALLPREFIX/include/glslang/StandAlone/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#spirv-remap --help
+
+
+

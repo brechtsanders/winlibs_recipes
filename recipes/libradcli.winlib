@@ -1,0 +1,120 @@
+export NAME="radcli"
+export STATUS=
+export URL=http://radcli.github.io/radcli/
+export BASENAME=libradcli
+export DESCRIPTION="A simple RADIUS client library"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.2.8
+#export VERSIONDATE=20170922
+#export VERSION=1.2.9
+#export VERSIONDATE=20180120
+#export VERSION=1.2.10
+#export VERSIONDATE=20180509
+#export VERSION=1.2.11
+#export VERSIONDATE=20180914
+####lib/dict.c:(.text+0x90d): undefined reference to `fmemopen'
+#export VERSION=1.2.12
+#export VERSIONDATE=20200912
+export VERSION=1.3.0
+export VERSIONDATE=20201112
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libnettle,gnutls
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/radcli/radcli/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/radcli/radcli/releases/download/$VERSION/radcli-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/radcli/radcli/releases/download/radcli_$(echo $VERSION|tr . _)/radcli-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/radcli/radcli/releases/download/$VERSION/radcli-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/radcli/radcli/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/radcli-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd radcli-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet
+cat > winfix/sys/socket.h << EOF
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#include <winsock2.h>
+#include <ws2tcpip.h>
+EOF
+touch winfix/netdb.h winfix/syslog.h winfix/netinet/in.h
+# fix missing poll.h in lib/sendserver.c
+patch -ulbf lib/sendserver.c << EOF
+@@ -14,2 +14,7 @@
+
++#ifdef _WIN32
++#define _WIN32_WINNT 0x0600
++#include <winsock2.h>
++#define poll WSAPoll
++#endif
+ #include <includes.h>
+@@ -17,3 +22,5 @@
+ #include <pathnames.h>
++#ifndef _WIN32
+ #include <poll.h>
++#endif
+ #include "util.h"
+EOF
+# fix src/common.h
+patch -ulbf src/common.h << EOF
+@@ -12,3 +12,5 @@
+
++#ifndef _WIN32
+ char *rc_getstr (rc_handle *rh, char const *prompt, int do_echo);
++#endif
+ char * rc_fgetln(FILE *fp, size_t *len);
+
+EOF
+mv src/common.c src/common.c.bak &&
+sed -e "s/^\(#ifndef \)_MSC_VER\b/\1_WIN32/" src/common.c.bak > src/common.c
+# fix missing syslog
+mv lib/util.h lib/util.h.bak &&
+sed -e "s/^\(#ifdef \)_MSC_VER\b\(.*\)$/\1_WIN32\2\n#define openlog(...)/" lib/util.h.bak > lib/util.h
+patch -ulbf include/radcli/radcli.h << EOF
+@@ -649,3 +649,8 @@
+  * been using rc_log() */
++#ifdef _WIN32
++#define openlog(...)
++#define rc_log(...)
++#else
+ #define rc_log syslog
++#endif
+
+EOF
+## fix missing inet_pton in lib/avpair.c (also needs -Wl,--enable-stdcall-fixup)
+#mv lib/avpair.c lib/avpair.c.bak &&
+#sed -e "s/inet_pton/InetPtonA/g" lib/avpair.c.bak > lib/avpair.c
+# workaround missing fmemopen in lib/dict.c (will cause rc_read_dictionary_from_buffer to fail) (version >= 1.2.11)
+mv lib/dict.c lib/dict.c.bak &&
+echo "#define fmemopen(buf,size,mode) NULL" > lib/dict.c &&
+cat lib/dict.c.bak >> lib/dict.c
+# fix missing files (version >= 1.3.0)
+touch config.rpath
+# fix installing DLLs (version <= 1.2.12)
+#sed -i.bak -e "s/\.so/.dll/g; s/libradcli\.dll/..\/bin\/libradcli-4.dll/" lib/Makefile.in
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-legacy-compat --with-nettle --with-tls CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-legacy-compat --with-nettle --with-tls CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix DLL install location
+ sed -i.bak -e "s/\.so/.dll/g; s/libradcli\.dll/..\/bin\/libradcli\*.dll/" lib/Makefile &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ #make check &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf radcli-$VERSION
+####replaces older freeradius-client
+
+
+

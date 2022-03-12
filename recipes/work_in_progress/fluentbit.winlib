@@ -1,0 +1,176 @@
+export NAME="Fluent Bit"
+export STATUS=
+export URL=https://github.com/fluent/fluent-bit
+export BASENAME=fluentbit
+export DESCRIPTION="Fluent Bit is a fast Log Processor and Forwarder for Linux, Windows, Embedded Linux, MacOS and BSD family operating systems. It's part of the Graduated Fluentd Ecosystem and a CNCF sub-project. Fluent Bit allows to collect log events or metrics from different sources, process them and deliver them to different backends such as Fluentd, Elasticsearch, Splunk, DataDog, Kafka, New Relic, Azure services, AWS services, Google services, NATS, InfluxDB or any custom HTTP end-point. Fluent Bit comes with full SQL Stream Processing capabilities: data manipulation and analytics using SQL queries."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.7.2
+#export VERSIONDATE=20210307
+#export VERSION=1.7.3
+#export VERSIONDATE=20210406
+#export VERSION=1.7.4
+#export VERSIONDATE=20210420
+#export VERSION=1.7.5
+#export VERSIONDATE=20210514
+#export VERSION=1.7.6
+#export VERSIONDATE=20210521
+#export VERSION=1.7.7
+#export VERSIONDATE=20210527
+#export VERSION=1.7.8
+#export VERSIONDATE=20210603
+#export VERSION=1.7.9
+#export VERSIONDATE=20210619
+#export VERSION=1.8.0
+#export VERSIONDATE=20210708
+#export VERSION=1.8.1
+#export VERSIONDATE=20210709
+#export VERSION=1.8.2
+#export VERSIONDATE=20210721
+#export VERSION=1.8.3
+#export VERSIONDATE=20210731
+#export VERSION=1.8.4
+#export VERSIONDATE=20210819
+#export VERSION=1.8.5
+#export VERSIONDATE=20210828
+#export VERSION=1.8.6
+#export VERSIONDATE=20210901
+#export VERSION=1.8.7
+#export VERSIONDATE=20210918
+#export VERSION=1.8.8
+#export VERSIONDATE=20211009
+#export VERSION=1.8.9
+#export VERSIONDATE=20211029
+#export VERSION=1.8.10
+#export VERSIONDATE=20211120
+#export VERSION=1.8.11
+#export VERSIONDATE=20211211
+#export VERSION=1.8.12
+#export VERSIONDATE=20220128
+export VERSION=1.8.13
+export VERSIONDATE=20220303
+####lib/monkey/mk_core/mk_rconf.c:27:10: fatal error: glob.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/fluent/fluent-bit/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/fluent/fluent-bit/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd fluent-bit-$VERSION
+# fix missing socklen_t in include/fluent-bit/flb_network.h
+mv include/fluent-bit/flb_network.h include/fluent-bit/flb_network.h.bak &&
+echo "#include <winsock2.h>" > include/fluent-bit/flb_network.h &&
+echo "#include <ws2tcpip.h>" >> include/fluent-bit/flb_network.h &&
+cat include/fluent-bit/flb_network.h.bak >> include/fluent-bit/flb_network.h
+# fix redefinition of usleep() in include/fluent-bit/flb_compat.h
+patch -ulbf include/fluent-bit/flb_compat.h << EOF
+@@ -125,2 +125,3 @@
+
++#ifndef __MINGW64_VERSION_MAJOR
+ static inline int usleep(LONGLONG usec)
+@@ -130,2 +131,3 @@
+ }
++#endif
+ #else
+EOF
+# fix redefinition of struct timespec in lib/monkey/include/monkey/mk_core/external/winpthreads.h
+patch -ulbf lib/monkey/include/monkey/mk_core/external/winpthreads.h << EOF
+@@ -103,3 +103,3 @@
+ /* Windows doesn't have this, so declare it ourselves. */
+-#if (_MSC_VER < 1900)
++#if (_MSC_VER < 1900) && !defined(__MINGW32__)
+ struct timespec
+EOF
+# fix redefinition of mode_t in lib/chunkio/include/chunkio/chunkio_compat.h
+patch -ulbf lib/chunkio/include/chunkio/chunkio_compat.h << EOF
+@@ -40,3 +40,5 @@
+ typedef SSIZE_T ssize_t;
++#ifndef __MINGW32__
+ typedef unsigned mode_t;
++#endif
+
+EOF
+# fix missing fts.h in lib/chunkio/src/cio_utils.c
+sed -i.bak -e "s/_MSC_VER/_WIN32/" lib/chunkio/src/cio_utils.c
+# fix redefinition of strtok_r() in lib/monkey/mk_core/deps/libevent/evdns.c
+mv lib/monkey/mk_core/deps/libevent/evdns.c lib/monkey/mk_core/deps/libevent/evdns.c.bak &&
+echo "#define EVENT__HAVE_STRTOK_R" > lib/monkey/mk_core/deps/libevent/evdns.c &&
+cat lib/monkey/mk_core/deps/libevent/evdns.c.bak >> lib/monkey/mk_core/deps/libevent/evdns.c
+# fix lib/msgpack-c/include/msgpack/sysdep.h (version >= 1.7.6)
+sed -i.bak2 -e "s/defined(_MSC_VER) && _MSC_VER <= 1800/(&) \&\& \!defined(__MINGW32__)/" lib/msgpack-c/include/msgpack/sysdep.h
+# fix use of _MSC_VER instead of _WIN32 (version >= 1.7.6)
+sed -i.bak -e "s/\(ifn*def \|defined(\)_MSC_VER/\1_WIN32/" $(find -name '*.h' -or -name '*.h.in' -or -name '*.c')
+# fix lib/monkey/include/monkey/mk_core/mk_string.h (version >= 1.7.6)
+patch -ulbf lib/monkey/include/monkey/mk_core/mk_string.h << EOF
+@@ -28,3 +28,3 @@
+
+-#if defined(_WIN32) || defined(_WIN64)
++#if (defined(_WIN32) || defined(_WIN64)) && !defined(__MINGW32__)
+   #define snprintf _snprintf
+EOF
+# fix missing AI_NUMERICSERV in src/flb_network.c (version >= 1.7.6)
+mv src/flb_network.c src/flb_network.c.bak
+cat > src/flb_network.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat src/flb_network.c.bak >> src/flb_network.c
+## fix missing __int64 in lib/luajit-*/src/host/minilua.c (version >= 1.8.7)
+#patch -ulbf lib/luajit-*/src/host/minilua.c << EOF
+#@@ -24,3 +24,6 @@
+# ******************************************************************************/
+#-#ifdef _MSC_VER
+#+#ifdef __MINGW32__
+#+#include <stdint.h>
+#+typedef int64_t U64;
+#+#elif defined(_WIN32)
+# typedef unsigned __int64 U64;
+#EOF
+# fix lib/luajit-2.1.0-1e66d0f/src/host/minilua.c (version >= 1.8.9)
+patch -ulbf lib/luajit-2.1.0-1e66d0f/src/host/minilua.c << EOF
+@@ -24,7 +24,4 @@
+ ******************************************************************************/
+-#ifdef _MSC_VER
+-typedef unsigned __int64 U64;
+-#else
+-typedef unsigned long long U64;
+-#endif
++#include <stdint.h>
++typedef uint64_t U64;
+ int _CRT_glob = 0;
+EOF
+# fix invalid /W2 compiler flag (version >= 1.7.3)
+sed -i.bak -e "s?/W[0-9]*??" src/CMakeLists.txt plugins/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVENT_STAGE_NAME:STRING=release -DENABLE_ZLIB_SUPPORT:BOOL=ON -DFLB_DEBUG:BOOL=OFF -DFLB_BACKTRACE:BOOL=OFF -DFLB_COVERAGE:BOOL=OFF -DFLB_EXAMPLES:BOOL=OFF -DEVENT__DISABLE_BENCHMARK:STRING=OFF -DENABLE_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVENT_STAGE_NAME:STRING=release -DENABLE_ZLIB_SUPPORT:BOOL=ON -DLIBEVENT_LIBRARIES:STRING="event;event_extra" -DFLB_SQLDB:BOOL=OFF -DFLB_DEBUG:BOOL=OFF -DFLB_BACKTRACE:BOOL=OFF -DFLB_COVERAGE:BOOL=OFF -DFLB_EXAMPLES:BOOL=OFF -DEVENT__DISABLE_BENCHMARK:STRING=ON -DEVENT__DISABLE_REGRESS:STRING=ON -DENABLE_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVENT_STAGE_NAME:STRING=release -DENABLE_ZLIB_SUPPORT:BOOL=ON -DLIBEVENT_LIBRARIES:STRING="event;event_extra" -DFLB_SQLDB:BOOL=OFF -DFLB_LUAJIT:BOOL=OFF -DFLB_FILTER_LUA:BOOL=OFF -DFLB_IN_SYSLOG:BOOL=OFF -DFLB_OUT_SYSLOG:BOOL=OFF -DFLB_DEBUG:BOOL=OFF -DFLB_BACKTRACE:BOOL=OFF -DFLB_COVERAGE:BOOL=OFF -DFLB_EXAMPLES:BOOL=OFF -DEVENT__DISABLE_BENCHMARK:STRING=ON -DEVENT__DISABLE_REGRESS:STRING=ON -DENABLE_TESTING:BOOL=OFF -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ #-DFLB_FILTER_LUA:BOOL=OFF -DFLB_LUAJIT:BOOL=OFF 
+ #-DFLB_RELEASE:BOOL=ON 
+ #-DEVENT__DISABLE_THREAD_SUPPORT:STRING=OFF 
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+    echo OK
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVENT_STAGE_NAME:STRING=release -DENABLE_ZLIB_SUPPORT:BOOL=ON -DFLB_DEBUG:BOOL=OFF -DFLB_BACKTRACE:BOOL=OFF -DFLB_COVERAGE:BOOL=OFF -DFLB_EXAMPLES:BOOL=OFF -DEVENT__DISABLE_BENCHMARK:STRING=OFF -DENABLE_TESTING:BOOL=OFF -S. -Bbuild_win &&
+# #sed -i.bak -e "s/\$(MAKE)/make/g" build_win/build.ninja &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf fluent-bit-$VERSION
+
+
+

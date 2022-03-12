@@ -1,0 +1,185 @@
+export NAME="libgnome-keyring"
+export STATUS=
+export URL=http://www.gnome.org/projects/libgnome-keyring
+export BASENAME=libgnome-keyring
+export DESCRIPTION="The GNOME Keyring Manager was a user interface for the GNOME Keyring. As of GNOME 2.22 it is deprecated and replaced entirely with Seahorse."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=3.0.0
+#export VERSIONDATE=20110404
+#export VERSION=3.0.1
+#export VERSIONDATE=20110425
+#export VERSION=3.0.2
+#export VERSIONDATE=20110522
+#export VERSION=3.0.3
+#export VERSIONDATE=20110527
+#export VERSION=3.1.1
+#export VERSIONDATE=20110509
+#export VERSION=3.1.4
+#export VERSIONDATE=20110725
+#export VERSION=3.2.0
+#export VERSIONDATE=20110926
+#export VERSION=3.2.2
+#export VERSIONDATE=20111114
+#export VERSION=3.3.3
+#export VERSIONDATE=20111219
+#export VERSION=3.3.4
+#export VERSIONDATE=20120117
+#export VERSION=3.3.5
+#export VERSIONDATE=20120204
+#export VERSION=3.3.91
+#export VERSIONDATE=20120309
+#export VERSION=3.3.92
+#export VERSIONDATE=20120319
+#export VERSION=3.4.0
+#export VERSIONDATE=20120326
+#export VERSION=3.4.1
+#export VERSIONDATE=20120416
+#export VERSION=3.5.3
+#export VERSIONDATE=20120625
+#export VERSION=3.5.4
+#export VERSIONDATE=20120809
+#export VERSION=3.5.6
+#export VERSIONDATE=20120824
+#export VERSION=3.6.0
+#export VERSIONDATE=20120927
+#export VERSION=3.7.2
+#export VERSIONDATE=20121122
+#export VERSION=3.7.5
+#export VERSIONDATE=20130204
+#export VERSION=3.8.0
+#export VERSIONDATE=20130325
+#export VERSION=3.9.1
+#export VERSIONDATE=20130501
+#export VERSION=3.10.0
+#export VERSIONDATE=20130924
+#export VERSION=3.10.1
+#export VERSIONDATE=20131017
+export VERSION=3.12.0
+export VERSIONDATE=20140323
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,libgcrypt,dbus
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/libgnome-keyring/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix mman stuff in egg/egg-secure-memory.c
+patch -ulbf egg/egg-secure-memory.c << EOF
+--- egg/egg-secure-memory.c  2011-06-08 10:00:06 +0200
++++ egg/egg-secure-memory.c  2011-11-14 20:40:40 +0100
+@@ -34,3 +34,7 @@
+ #include <sys/types.h>
++#ifndef __MINGW32__
+ #include <sys/mman.h>
++#else
++#include <windows.h>
++#endif
+ #include <stddef.h>
+@@ -186,2 +190,3 @@
+        if (pool == NULL) {
++#ifndef __MINGW32__
+                len = getpagesize () * 2;
+@@ -190,2 +195,8 @@
+                        return NULL;
++#else
++               SYSTEM_INFO sysinfo;
++               GetSystemInfo(&sysinfo);
++               len = sysinfo.dwPageSize * 2;
++               pages = VirtualAlloc(NULL, len, 0, PAGE_READWRITE);
++#endif
+
+@@ -217,3 +228,7 @@
+
++#ifndef __MINGW32__
+        return memset (item, 0, sizeof (Item));
++#else
++       return item;
++#endif
+ }
+@@ -251,3 +266,7 @@
+
++#ifndef __MINGW32__
+                munmap (pool, pool->length);
++#else
++               VirtualFree (pool, 0, MEM_RELEASE);
++#endif
+                return;
+EOF
+# fix library/gnome-keyring.c
+patch -ulbf library/gnome-keyring.c << EOF
+--- library/gnome-keyring.c  2011-10-20 17:00:14 +0200
++++ library/gnome-keyring.c  2011-11-14 20:45:34 +0100
+@@ -47,4 +47,6 @@
+ #include <sys/types.h>
++#ifndef __MINGW32__
+ #include <sys/socket.h>
+ #include <sys/uio.h>
++#endif
+ #include <stdarg.h>
+EOF
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+# fix missing sleep and kill in library/tests/test-keyrings.c
+mv library/tests/test-keyrings.c library/tests/test-keyrings.c.bak
+cat > library/tests/test-keyrings.c << EOF
+#include "gkr-misc.h"
+#include <windows.h>
+#define sleep(t) _sleep((t) * 1000)
+static int kill (GPid pid, int sig)
+{
+ BOOL status;
+ HANDLE hProcess;
+ if ((hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, (DWORD)pid)) == NULL || hProcess == INVALID_HANDLE_VALUE)
+  return -1;
+ status = TerminateProcess(hProcess, ~0);
+ CloseHandle(hProcess);
+ return (status ? 0 : -1);
+}
+EOF
+cat library/tests/test-keyrings.c.bak >> library/tests/test-keyrings.c
+# fix missing kill and pipe in library/tests/mock-service.c (version >= 3.3.5)
+mv library/tests/mock-service.c library/tests/mock-service.c.bak
+cat > library/tests/mock-service.c << EOF
+#include "gkr-misc.h"
+#include <windows.h>
+#include <fcntl.h>
+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+static int kill (GPid pid, int sig)
+{
+ BOOL status;
+ HANDLE hProcess;
+ if ((hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, (DWORD)pid)) == NULL || hProcess == INVALID_HANDLE_VALUE)
+  return -1;
+ status = TerminateProcess(hProcess, ~0);
+ CloseHandle(hProcess);
+ return (status ? 0 : -1);
+}
+EOF
+cat library/tests/mock-service.c.bak >> library/tests/mock-service.c
+#make check
+wl-showstatus configure &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #PYTHONPATH=$MINGWPREFIX/lib/gobject-introspection make install-strip INTROSPECTION_SCANNER="$PYDIR/python.exe $(which g-ir-scanner)" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

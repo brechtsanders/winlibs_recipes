@@ -1,0 +1,82 @@
+export NAME="Revision Control System (RCS)"
+export STATUS=
+export URL=https://www.gnu.org/software/rcs/
+export BASENAME=rcs
+export DESCRIPTION="The Revision Control System (RCS) manages multiple revisions of files.  RCS automates the storing, retrieval, logging, identification, and merging of revisions.  RCS is useful for text that is revised frequently, including source code, programs, documentation, graphics, papers, and form letters."
+export CATEGORY=office
+export TYPE=application
+#export VERSION=5.9.4
+#export VERSIONDATE=20160211
+####configure: error: Could not find absolute name of original ed program: ed
+#export VERSION=5.10.0
+#export VERSIONDATE=20201020
+export VERSION=5.10.1
+export VERSIONDATE=20220203
+####configure: error: Could not find a sane line-by-line differences program (tried: gdiff rdiff diff)
+wl-showstatus --package-version
+export DEPENDANCIES=ed,libdiff,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/rcs/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/rcs/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/rcs/$BASENAME-$VERSION.tar.lz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+tar --lzip -xf $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.lz
+cd $BASENAME-$VERSION
+# fix missing signal stuff in src/b-isr.c (version >= 5.10.0)
+attrib -r src/b-isr.c
+patch -ulbf src/b-isr.c << EOF
+@@ -42,4 +42,6 @@
+ {
++#ifdef SIGCHLD
+   if (BAD_WAIT_IF_SIGCHLD_IGNORED)
+     signal (SIGCHLD, SIG_DFL);
++#endif
+ }
+@@ -187,2 +189,5 @@
+           act.sa_sigaction = catchsigaction;
++#ifndef SA_SIGINFO
++#define SA_SIGINFO 0
++#endif
+           act.sa_flags |= SA_SIGINFO | SA_ONSTACK;
+@@ -239,9 +244,19 @@
+           {
++#ifdef SIGHUP
+             SIGHUP,
++#endif
+             SIGINT,
++#ifdef SIGQUIT
+             SIGQUIT,
++#endif
++#ifdef SIGPIPE
+             SIGPIPE,
++#endif
+             SIGTERM,
++#ifdef SIGXCPU
+             SIGXCPU,
++#endif
++#ifdef SIGXFSZ
+             SIGXFSZ,
++#endif
+           };
+EOF
+# fix detection of diff
+sed -i.bak -e "s/^\(sane_diff=\)no/\1yes/" configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-mmap --disable-suid --enable-threads=windows --enable-threads DIFF=$(which diff.exe) CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-mmap --disable-suid --enable-threads=windows --enable-threads DIFF=$(which diff.exe) CFLAGS="-I$MINGWPREFIX/include/mman-win32" &&
+ wl-showstatus build-install &&
+ #make install-strip LIBS="-Wl,--as-needed -lmman" &&
+ make install-strip LIBS="-Wl,--as-needed -lmman -lbcrypt" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: to be tested if it works, probably broken by the missing signal stuff
+
+
+

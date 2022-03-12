@@ -1,0 +1,158 @@
+export NAME="libxfce4util"
+export STATUS=
+export URL=https://gitlab.xfce.org/xfce/libxfce4util
+#export URL=https://github.com/xfce-mirror/libxfce4util
+export BASENAME=libxfce4util
+export DESCRIPTION="libxfce4util is used to share commonly used non-GTK+ utilities among the Xfce applications."
+export CATEGORY=
+export TYPE=library
+#export VERSION=4.16.0
+#export VERSIONDATE=20201223
+#export VERSION=4.17.0
+#export VERSIONDATE=20210627
+#export VERSION=4.17.1
+#export VERSIONDATE=20210719
+export VERSION=4.17.2
+export VERSIONDATE=20220222
+wl-showstatus --package-version
+export DEPENDANCIES=glib2
+#export DEPENDANCIES=glib2,gobject-introspection,vala
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=xfce4-dev-tools
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://gitlab.xfce.org/xfce/libxfce4util/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.xfce.org/xfce/libxfce4util/-/archive/libxfce4util-$VERSION/libxfce4util-libxfce4util-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/libxfce4util-libxfce4util-$VERSION.tar.bz2
+cd libxfce4util-libxfce4util-$VERSION
+# fix libxfce4util/xfce-fileutils.c (version >= 4.16.0)
+patch -ulbf libxfce4util/xfce-fileutils.c << EOF
+@@ -129,3 +129,7 @@
+
++#ifdef _WIN32
++      if (mkdir (path) < 0)
++#else
+       if (mkdir (path, last ? mode : S_IRWXU | S_IRWXG | S_IRWXO) < 0)
++#endif
+         {
+EOF
+# fix libxfce4util/xfce-kiosk.c (version >= 4.16.0)
+patch -ulbf libxfce4util/xfce-kiosk.c << EOF
+@@ -277,2 +277,6 @@
+ {
++#ifdef _WIN32
++  g_warning ("Kiosk not supported on Windows, all kiosk protected features will be disabled for you.");
++  return;
++#else
+   struct passwd *pw;
+@@ -361,2 +365,3 @@
+   G_UNLOCK (kiosk_lock);
++#endif
+ }
+EOF
+# fix libxfce4util/xfce-posix-signal-handler.c (version >= 4.16.0)
+patch -ulbf libxfce4util/xfce-posix-signal-handler.c << EOF
+@@ -66,5 +66,7 @@
+     XfcePosixSignalHandler handler;
+     gpointer user_data;
++#ifndef _WIN32
+     struct sigaction old_sa;
++#endif
+ } XfcePosixSignalHandlerData;
+
+@@ -82,5 +84,7 @@
+         return;
+
++#ifndef _WIN32
+     sigaction(hdata->signal_id, &hdata->old_sa, NULL);
++#endif
+     g_free(hdata);
+ }
+@@ -91,4 +95,7 @@
+                                   gpointer data)
+ {
++#ifdef _WIN32
++    return FALSE;
++#else
+     gint signal_id = 0;
+     GError *error = NULL;
+@@ -115,4 +122,5 @@
+
+     return TRUE;
++#endif
+ }
+
+@@ -137,4 +145,7 @@
+ xfce_posix_signal_handler_init(GError **error)
+ {
++#ifdef _WIN32
++    return FALSE;
++#else
+     if(G_UNLIKELY(__inited))
+         return TRUE;
+@@ -160,4 +171,5 @@
+     __inited = TRUE;
+     return TRUE;
++#endif
+ }
+
+@@ -210,4 +222,7 @@
+                                       GError **error)
+ {
++#ifdef _WIN32
++    return FALSE;
++#else
+     XfcePosixSignalHandlerData *hdata;
+     struct sigaction sa;
+@@ -251,4 +266,5 @@
+
+     return TRUE;
++#endif
+ }
+
+EOF
+# fix missing readlink in libxfce4util/xfce-rc-simple.c (version >= 4.16.0)
+patch -ulbf libxfce4util/xfce-rc-simple.c << EOF
+@@ -711,4 +711,6 @@
+       /* support rc file being a symlink: see bug #14698 */
++#ifndef _WIN32
+       if (readlink (simple->filename, buf, sizeof (buf)-1) != -1)
+         filename = buf;
++#endif
+
+EOF
+# fix backslash issues in libxfce4util/xfce-resource.c (version >= 4.16.0)
+mv libxfce4util/xfce-resource.c libxfce4util/xfce-resource.c.bak
+cat > libxfce4util/xfce-resource.c << EOF
+#undef DEFAULT_XDG_DATA_DIRS
+#undef DEFAULT_XDG_CONFIG_DIRS
+#define DEFAULT_XDG_DATA_DIRS ""
+#define DEFAULT_XDG_CONFIG_DIRS ""
+EOF
+cat libxfce4util/xfce-resource.c.bak >> libxfce4util/xfce-resource.c
+# fix docs/Makefile.am
+sed -i.bak -e "s/\(EXTRA_DIST\s*\)+=/\1=/" docs/Makefile.am
+# fix missing files
+touch gtk-doc.make
+cp configure.ac.in configure.ac
+wl-showstatus configure &&
+ # fix missing po/Makefile.in.in
+ intltoolize -f -c &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --disable-introspection --disable-vala &&
+ # fix missing libxfce4util-aliasdef.c
+ sed -i.bak -e "s/^#\(\(libxfce4util-aliasdef\.c\|libxfce4util-alias\.h\):\)/\1/; s/#\(.*> \(libxfce4util-aliasdef\.c\|libxfce4util-alias\.h\)\)$/\1/" libxfce4util/Makefile &&
+ wl-showstatus build &&
+ make -Clibxfce4util libxfce4util-alias.h libxfce4util-aliasdef.c &&
+ ( make || ( echo "all:" > po/Makefile && echo "install:" >> po/Makefile && echo "install-strip:" >> po/Makefile && make )) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libxfce4util-libxfce4util-$VERSION
+
+
+

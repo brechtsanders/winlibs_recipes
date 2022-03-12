@@ -1,0 +1,122 @@
+export NAME="lwmqtt"
+export STATUS=
+export URL=https://github.com/256dpi/lwmqtt
+export BASENAME=lwmqtt
+export DESCRIPTION="The "Light Weight MQTT" library implements a MQTT 3.1.1 client that is optimized to be used in embedded and constraint systems. It can be used with any operating system and network stack and only requires a handful of callbacks for a full integration. The project is derived from the Paho MQTT Embeded C, gomqtt and mosquitto project."
+export CATEGORY=
+export TYPE=library
+export VERSION=0.7.0
+export VERSIONDATE=20220217
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/256dpi/lwmqtt/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/256dpi/lwmqtt/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/os/unix.c (version >= 0.7.0)
+patch -ulbf src/os/unix.c << EOF
+@@ -1,8 +1,38 @@
++#ifdef _WIN32
++#include <winsock2.h>
++#include <wspiapi.h>
++#else
+ #include <arpa/inet.h>
++#endif
+ #include <errno.h>
+ #include <memory.h>
++#ifndef _WIN32
+ #include <netdb.h>
++#endif
+ #include <stdlib.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <unistd.h>
++#ifdef _WIN32
++#define timeradd(a, b, result)                          \\
++  do {                                                  \\
++    (result)->tv_sec = (a)->tv_sec + (b)->tv_sec;       \\
++    (result)->tv_usec = (a)->tv_usec + (b)->tv_usec;    \\
++    if ((result)->tv_usec >= 1000000)                   \\
++      {                                                 \\
++        ++(result)->tv_sec;                             \\
++        (result)->tv_usec -= 1000000;                   \\
++      }                                                 \\
++  } while (0)
++#define timersub(a, b, result)                          \\
++  do {                                                  \\
++    (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;       \\
++    (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;    \\
++    if ((result)->tv_usec < 0) {                        \\
++      --(result)->tv_sec;                               \\
++      (result)->tv_usec += 1000000;                     \\
++    }                                                   \\
++  } while (0)
++#endif
+
+@@ -114,3 +144,10 @@
+   // get the available bytes on the socket
++#ifdef _WIN32
++  unsigned long l;
++  int rc = ioctlsocket(network->socket, FIONREAD, &l);
++  if (rc == 0)
++    *available = l;
++#else
+   int rc = ioctl(network->socket, FIONREAD, available);
++#endif
+   if (rc < 0) {
+@@ -153,3 +190,7 @@
+   // read from socket
++#ifdef _WIN32
++  int bytes = (int)recv(n->socket, (char*)buffer, len, 0);
++#else
+   int bytes = (int)recv(n->socket, buffer, len, 0);
++#endif
+   if (bytes < 0 && errno != EAGAIN) {
+@@ -181,3 +222,7 @@
+   // write to socket
++#ifdef _WIN32
++  int bytes = (int)send(n->socket, (char*)buffer, len, 0);
++#else
+   int bytes = (int)send(n->socket, buffer, len, 0);
++#endif
+   if (bytes < 0 && errno != EAGAIN) {
+EOF
+# skip gtest/googletest subdirectory
+sed -i.bak -e "s?^.*gtest/googletest?#&?" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/*.dll &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_static/*.a build_shared/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

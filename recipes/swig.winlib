@@ -1,0 +1,121 @@
+export NAME="SWIG"
+export STATUS=
+export URL=http://www.swig.org/
+export BASENAME=swig
+export DESCRIPTION="SWIG is a software development tool that connects programs written in C and C++ with a variety of high-level programming languages. SWIG is used with different types of target languages including common scripting languages such as Perl, PHP, Python, Tcl and Ruby. The list of supported languages also includes non-scripting languages such as C#, Common Lisp (CLISP, Allegro CL, CFFI, UFFI), Go language, Java, Lua, Modula-3, OCAML, Octave and R. Also several interpreted and compiled Scheme implementations (Guile, MzScheme, Chicken) are supported. SWIG is most commonly used to create high-level interpreted or compiled programming environments, user interfaces, and as a tool for testing and prototyping C/C++ software. SWIG is typically used to parse C/C++ interfaces and generate the 'glue code' required for the above target languages to call into the C/C++ code. SWIG can also export its parse tree in the form of XML and Lisp s-expressions."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=2.0.1
+#export VERSIONDATE=20101107
+#export VERSION=2.0.3
+#export VERSIONDATE=20110330
+#export VERSION=2.0.4
+#export VERSIONDATE=20110522
+#export VERSION=2.0.5
+#export VERSIONDATE=20120420
+#export VERSION=2.0.6
+#export VERSIONDATE=20120430
+#export VERSION=2.0.7
+#export VERSIONDATE=20120526
+#export VERSION=2.0.8
+#export VERSIONDATE=20120824
+#export VERSION=2.0.9
+#export VERSIONDATE=20121216
+#export VERSION=2.0.10
+#export VERSIONDATE=20130528
+#export VERSION=2.0.11
+#export VERSIONDATE=20130916
+#export VERSION=2.0.12
+#export VERSIONDATE=20140210
+#export VERSION=3.0.0
+#export VERSIONDATE=20140317
+#export VERSION=3.0.1
+#export VERSIONDATE=20140528
+#export VERSION=3.0.2
+#export VERSIONDATE=20140605
+#export VERSION=3.0.3
+#export VERSIONDATE=20141231
+#export VERSION=3.0.4
+#export VERSIONDATE=20150115
+#export VERSION=3.0.5
+#export VERSIONDATE=20150201
+#export VERSION=3.0.6
+#export VERSIONDATE=20150706
+#export VERSION=3.0.7
+#export VERSIONDATE=20150811
+#export VERSION=3.0.8
+#export VERSIONDATE=20160101
+#export VERSION=3.0.9
+#export VERSIONDATE=20160530
+#export VERSION=3.0.10
+#export VERSIONDATE=20160612
+#export VERSION=3.0.11
+#export VERSIONDATE=20161230
+#export VERSION=3.0.12
+#export VERSIONDATE=20170128
+#export VERSION=4.0.0
+#export VERSIONDATE=20190429
+#export VERSION=4.0.1
+#export VERSIONDATE=20190821
+export VERSION=4.0.2
+export VERSIONDATE=20200609
+wl-showstatus --package-version
+export DEPENDANCIES=pcre
+export OPTIONALDEPENDANCIES=lua,tcl,ruby,guile
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://sourceforge.net/projects/swig/files"
+export DOWNLOADURL="http://sourceforge.net/projects/swig/files/swig/ swig-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/swig/swig/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix swig -swiglib output in Source/Modules/main.cxx (version >= 3.0.12)
+patch -ulbf Source/Modules/main.cxx << EOF
+@@ -586,5 +586,6 @@
+       } else if (strcmp(argv[i], "-swiglib") == 0) {
+-       Printf(stdout, "%s\\n", SwigLib);
+        if (SwigLibWinUnix)
+          Printf(stdout, "%s\\n", SwigLibWinUnix);
++       else
++         Printf(stdout, "%s\\n", SwigLib);
+        SWIG_exit(EXIT_SUCCESS);
+@@ -932,10 +933,8 @@
+     if (!(GetModuleFileName(0, buf, MAX_PATH) == 0 || (p = strrchr(buf, '\\\\')) == 0)) {
+       *(p + 1) = '\\0';
+-      SwigLib = NewStringf("%sLib", buf); // Native windows installation path
++      SwigLib = NewStringf("%s..\\\\share\\\\swig\\\\$VERSION", buf); // Native windows installation path
+     } else {
+-      SwigLib = NewStringf("");        // Unexpected error
++      SwigLib = NewString(Len(SWIG_LIB_WIN_UNIX) > 0 ? SWIG_LIB_WIN_UNIX : "");
+     }
+-    if (Len(SWIG_LIB_WIN_UNIX) > 0)
+-      SwigLibWinUnix = NewString(SWIG_LIB_WIN_UNIX); // Unix installation path using a drive letter (for msys/mingw)
+ #else
+     SwigLib = NewString(SWIG_LIB);
+EOF
+## fix errors: ::swprintf/::vswprintf has not been declared, see also: http://sourceforge.net/tracker/index.php?func=detail&aid=2373234&group_id=2435&atid=102435
+#mv Source/Makefile Source/Makefile.bak
+#sed -e "s/-ansi -pedantic//" Source/Makefile.bak > Source/Makefile
+# fix missing off64_t
+mv configure configure.bak
+sed -e "s/-ansi -pedantic//" configure.bak > configure
+# use GUILE_LOAD_PATH to fix: ERROR: Unable to find file "ice-9/boot-9.scm" in load path
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+GUILE_LOAD_PATH=`ls -d1 $MINGWPREFIX/share/guile/*|tail -n1` ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus build-install &&
+ make install &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#export SWIG_LIB=$MINGWPREFIX/share/swig/`swig -version|sed -n -e "s/^.*Version \([0-9.]*.*\)$/\1/p"`
+# See also: http://sourceforge.net/projects/swig/files/swigwin/
+
+
+

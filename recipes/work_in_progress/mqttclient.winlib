@@ -1,0 +1,115 @@
+export NAME="mqttclient"
+export STATUS=
+export URL=https://github.com/jiejieTop/mqttclient
+export BASENAME=mqttclient
+export DESCRIPTION="A high-performance, high-stability, cross-platform MQTT client, developed based on the socket API, can be used on embedded devices (FreeRTOS/LiteOS/RT-Thread/TencentOS tiny), Linux, Windows, Mac"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.1.0
+export VERSIONDATE=20220217
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/jiejieTop/mqttclient/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/jiejieTop/mqttclient/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix platform/linux/platform_net_socket.h (version >= 1.1.0)
+patch -ulbf platform/linux/platform_net_socket.h << EOF
+@@ -10,5 +10,11 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <wspiapi.h>
++#else
+ #include <sys/socket.h>
++#endif
+ #include <sys/param.h>
+ #include <sys/time.h>
++#ifndef _WIN32
+ #include <sys/select.h>
+@@ -18,2 +24,3 @@
+ #include <netdb.h>
++#endif
+ #include <stdio.h>
+EOF
+# fix platform/linux/platform_net_socket.c (version >= 1.1.0)
+patch -ulbf platform/linux/platform_net_socket.c << EOF
+@@ -111,3 +111,8 @@
+ {
++#ifdef _WIN32
++    unsigned long flags = 0;
++    ioctlsocket(fd, FIONBIO, &flags);
++#else
+     return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, F_GETFL) & ~O_NONBLOCK);
++#endif
+ }
+@@ -116,3 +121,8 @@
+ {
++#ifdef _WIN32
++    unsigned long flags = 1;
++    ioctlsocket(fd, FIONBIO, &flags);
++#else
+     return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, F_GETFL) | O_NONBLOCK);
++#endif
+ }
+EOF
+# fix platform/linux/platform_timer.c (version >= 1.1.0)
+patch -ulbf platform/linux/platform_timer.c << EOF
+@@ -9,2 +9,23 @@
+ #include "platform_timer.h"
++#ifdef _WIN32
++#define timeradd(a, b, result)                          \\
++  do {                                                  \\
++    (result)->tv_sec = (a)->tv_sec + (b)->tv_sec;       \\
++    (result)->tv_usec = (a)->tv_usec + (b)->tv_usec;    \\
++    if ((result)->tv_usec >= 1000000)                   \\
++      {                                                 \\
++        ++(result)->tv_sec;                             \\
++        (result)->tv_usec -= 1000000;                   \\
++      }                                                 \\
++  } while (0)
++#define timersub(a, b, result)                          \\
++  do {                                                  \\
++    (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;       \\
++    (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;    \\
++    if ((result)->tv_usec < 0) {                        \\
++      --(result)->tv_sec;                               \\
++      (result)->tv_usec += 1000000;                     \\
++    }                                                   \\
++  } while (0)
++#endif
+ 
+EOF
+# also allow building shared libraries
+sed -i.bak -e "s/^set(CMAKE_LIB_TYPE \"STATIC\")/#&/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DINSTALL_MBEDTLS_HEADERS:BOOL=OFF -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINSTALL_MBEDTLS_HEADERS:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

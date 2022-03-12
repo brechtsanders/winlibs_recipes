@@ -1,0 +1,127 @@
+export NAME="libstatgrab"
+export STATUS=
+#export URL=http://www.i-scream.org/libstatgrab/
+export URL=https://libstatgrab.org/
+export BASENAME=libstatgrab
+export DESCRIPTION="libstatgrab is a library that provides cross platform access to statistics about the system on which it's run. It's written in C and presents a selection of useful interfaces which can be used to access key system statistics. The current list of statistics includes CPU usage, memory utilisation, disk usage, process counts, network traffic, disk I/O, and more."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=0.91
+#export VERSIONDATE=20141115
+#export VERSION=0.92
+#export VERSIONDATE=20190717
+export VERSION=0.92.1
+export VERSIONDATE=20190729
+wl-showstatus --package-version
+export DEPENDANCIES=ncurses
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LGPL
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://ftp.i-scream.org/pub/i-scream/libstatgrab/"
+export DOWNLOADURL="https://github.com/libstatgrab/libstatgrab/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.i-scream.org/pub/i-scream/libstatgrab/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/libstatgrab/libstatgrab/releases/download/LIBSTATGRAB_$(echo $VERSION|tr . _)/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# remove include lm.h from src/libstatgrab/tools.h
+mv src/libstatgrab/tools.h src/libstatgrab/tools.h.bak
+sed -e "s/lm\.h/lmwksta.h/" src/libstatgrab/tools.h.bak > src/libstatgrab/tools.h
+# remove include lm.h from src/libstatgrab/os_info.c
+mv src/libstatgrab/os_info.c src/libstatgrab/os_info.c.bak
+sed -e "s/lm\.h/lmwksta.h/" src/libstatgrab/os_info.c.bak > src/libstatgrab/os_info.c
+# fix missing NERR_Success in src/libstatgrab/user_stats.c (version >= 0.92)
+mv src/libstatgrab/user_stats.c src/libstatgrab/user_stats.c.bak &&
+echo "#include <lmerr.h>" > src/libstatgrab/user_stats.c &&
+cat src/libstatgrab/user_stats.c.bak >> src/libstatgrab/user_stats.c
+# fix src/libstatgrab/globals.c (version >= 0.92)
+patch -ulbf src/libstatgrab/globals.c << EOF
+@@ -83,2 +83,5 @@
+
++# if defined(ENABLE_THREADS)
++static unsigned initialized = 0;
++# endif
+ # if defined(HAVE_PTHREAD)
+@@ -96,3 +99,2 @@
+ static size_t num_required_locks = 0;
+-static unsigned initialized = 0;
+
+@@ -226,4 +228,4 @@
+ #if defined(ENABLE_THREADS)
+-# if defined(HAVE_PTHREAD)
+        char *glob_buf;
++# if defined(HAVE_PTHREAD)
+        while( NULL != ( glob_buf = pthread_getspecific(glob_key) ) )
+EOF
+# fix src/saidar/saidar.c (version >= 0.92)
+patch -ulbf src/saidar/saidar.c << EOF
+@@ -31,3 +31,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <unistd.h>
+@@ -37,3 +39,5 @@
+ #include <statgrab.h>
++#ifndef _WIN32
+ #include <sys/times.h>
++#endif
+ #include <limits.h>
+@@ -592,2 +596,3 @@
+ sig_winch_handler(int dummy) {
++#ifndef _WIN32
+        (void)dummy;
+@@ -595,2 +600,3 @@
+        signal(SIGWINCH, sig_winch_handler);
++#endif
+ }
+@@ -871,3 +877,5 @@
+
++#ifndef _WIN32
+        signal(SIGWINCH, sig_winch_handler);
++#endif
+        initscr();
+EOF
+# fix src/libstatgrab/disk_stats.c (version >= 0.92)
+patch -ulbf src/libstatgrab/disk_stats.c << EOF
+@@ -1037,2 +1037,3 @@
+
++#ifdef S_ISLNK
+                while( ( -1 != lstat(fs_ptr[num_fs].device_canonical, &statbuf)
+) && S_ISLNK(statbuf.st_mode) ) {
+@@ -1050,2 +1051,3 @@
+                }
++#endif
+                TRACE_LOG_FMT("disk", "\\"%s\\" is not a symlink", fs_ptr[num_fs].device_canonical);
+EOF
+# fix src/libstatgrab/statgrab.h.in (version >= 0.92)
+patch -ulbf src/libstatgrab/statgrab.h.in << EOF
+@@ -34,3 +34,3 @@
+
+-#if @WITH_VISIBILITY_SUPPORT@
++#if @WITH_VISIBILITY_SUPPORT@ && defined(DLL_EXPORT)
+ #define __sg_export @SG_EXPORT@
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --disable-static &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-thread-support --with-ncurses &&
+ wl-showstatus build &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

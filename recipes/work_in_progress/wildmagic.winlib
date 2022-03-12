@@ -1,0 +1,52 @@
+export NAME="Wild Magic Engine"
+export STATUS=
+export URL=https://www.geometrictools.com/
+export BASENAME=wildmagic
+export DESCRIPTION="libraries for mathematics, physics, numerical methods"
+export CATEGORY=math,science
+export TYPE=library
+export VERSION=5.17
+export VERSIONDATE=20181115
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://www.geometrictools.com/Downloads/Downloads.html WildMagic"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.geometrictools.com/Downloads/WildMagic$(echo $VERSION|sed -e "s/\./p/").zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/WildMagic$(echo $VERSION|sed -e "s/\./p/").zip -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION/GeometricTools/WildMagic5
+# fix missing -lGL and -lGLU
+sed -i.bak -e "s/-lGL -lGLU/-lopengl32 -lglu32/" */makeapp.wm5
+# don't create softlinks
+sed -i.bak -e "s/ln -sf/#&/" $(grep -l "^\s*ln -sf" */makefile.wm5)
+# create .dll files instead of .so files
+sed -i.bak -e "s/\.so\.\$(RELVER)/.dll/; s/-Wl,-soname,\([^ ]*\)\.so\.\$(SOVER)/-Wl,--out-implib,\1.dll.a -Wl,--output-def,\1.def/" $(grep -l "\.so".* */makeprj.wm5)
+# don't define __LINUX__
+sed -i.bak2 -e "s/-D__LINUX__/-D__WINDOWS__/" $(grep -l "D__LINUX" $(find -name '*.wm5'))
+wl-showstatus build &&
+ # fix dllexport
+ for L in Core Mathematics Imagics Physics Graphics; do
+  #sed -i.bak3 -e "s/-D__WINDOWS__/& -DWM5_$(echo $L | tr "[:lower:]" "[:upper:]")_DLL_EXPORT/" Lib$L/makeprj.wm5
+  sed -i.bak3 -e "s/-D__WINDOWS__/& -DWM5_$(echo $L | tr "[:lower:]" "[:upper:]")_DLL_EXPORT/" $(grep -l "D__WINDOWS__" $(find Lib$L -name '*.wm5'))
+ done &&
+ make -CLibCore -fmakefile.wm5 CFG=Release CC=g++ &&
+ make -CLibMathematics -fmakefile.wm5 CFG=Release CC=g++ &&
+ make -CLibImagics -fmakefile.wm5 CFG=Release CC=g++ &&
+ make -CLibPhysics -fmakefile.wm5 CFG=Release CC=g++ &&
+ make -CLibGraphics -fmakefile.wm5 CFG=Release CC=g++ &&
+ make -CLibApplications -fmakefile.wm5 CFG=Release CC=g++ &&
+ #gcc -shared -s -mwindows -o SDK/Library/Release/Wm5Core.dll SDK/Library/Release/libWm5Core.a -Wl,--out-implib,SDK/Library/Release/libWm5Core.dll.a -Wl,--output-def,SDK/Library/Release/Wm5Core.def &&
+ #make -f makefile.wm5 CFG=Release CC=g++ &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build and install DLLs
+
+
+

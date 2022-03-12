@@ -1,0 +1,42 @@
+export NAME="qrupdate"
+export STATUS=
+export URL=https://sourceforge.net/projects/qrupdate/
+export BASENAME=qrupdate
+export DESCRIPTION="qrupdate is a Fortran library for fast updates of QR and Cholesky decompositions."
+export CATEGORY=math
+export TYPE=library
+export VERSION=1.1.2
+export VERSIONDATE=20210627
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/qrupdate/files/qrupdate/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/qrupdate/qrupdate/1.2/$BASENAME-1.1.2.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/qrupdate/qrupdate/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/Makefile for building and installing DLL
+cat >> src/Makefile << EOF
+../libqrupdate.dll: \$(OBJS)
+$(echo -e '\t')\$(FC) \$(FFLAGS) -shared -o \$@ -Wl,--out-implib,\$@.a -Wl,--output-def,\$@.def \$(OBJS) \$(BLAS) \$(LAPACK)
+install-lib.dll:
+$(echo -e '\t')install -D -m644 ../libqrupdate.dll.a \$(DESTDIR)\$(PREFIX)/\$(LIBDIR)/libqrupdate.dll.a
+$(echo -e '\t')install -D -m644 ../libqrupdate.dll.def \$(DESTDIR)\$(PREFIX)/\$(LIBDIR)/libqrupdate.def
+$(echo -e '\t')install -D -m644 ../libqrupdate.dll \$(DESTDIR)\$(PREFIX)/bin/libqrupdate.dll
+EOF
+# avoid conflict with install make target
+mv INSTALL INSTALL.txt
+wl-showstatus build-install &&
+ make install SOEXT=.dll FFLAGS="-fimplicit-none -O3 -funroll-loops -I$MINGWPREFIX/share/lapack/include" BLAS="-L$MINGWPREFIX/share/lapack/lib -lblas" LAPACK="-L$MINGWPREFIX/share/lapack/lib -llapack" PREFIX=$INSTALLPREFIX &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,120 @@
+export NAME="S-Lang"
+export URL=http://www.s-lang.org/
+export BASENAME=slang
+export DESCRIPTION="S-Lang is a multi-platform programmer's library designed to allow a developer to create robust multi-platform software. It provides facilities required by interactive applications such as display/screen management, keyboard input, keymaps, and so on. The most exciting feature of the library is the slang interpreter that may be easily embedded into a program to make it extensible."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=2.1.3
+#export VERSION=2.1.4
+#export VERSION=2.2.2
+#export VERSIONDATE=20100225
+#export VERSION=2.2.3
+#export VERSIONDATE=20110118
+export VERSION=2.2.4
+export VERSIONDATE=20110620
+wl-showstatus --package-version
+export DEPENDANCIES=readline,oniguruma,pcre,libpng,zlib,libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="ftp://space.mit.edu/pub/davis/slang/"
+export DOWNLOADURL="http://ftp.ntua.gr/pub/lang/slang/slang/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://space.mit.edu/pub/davis/slang/v`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.ntua.gr/pub/lang/slang/slang/v`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+#$COMSPEC /c mkfiles\\m32init.bat
+#mingw32-make
+## avoid error "two or more data types in declaration specifiers" in sys/types.h (version <= 2.1.4)
+#mv src/slinclud.h src/slinclud.h.bak
+#cat > src/slinclud.h << EOF
+##include <sys/stat.h>
+##define _NO_OLDNAMES
+##include <sys/types.h>
+##undef _NO_OLDNAMES
+#EOF
+## fix missing types (version <= 2.1.4)
+#cat src/slinclud.h.bak >> src/slinclud.h
+#mv slsh/slsh.c slsh/slsh.c.bak
+#echo "#include <sys/types.h>" > slsh/slsh.c
+#cat slsh/slsh.c.bak >> slsh/slsh.c
+#mv slsh/readline.c slsh/readline.c.bak
+#echo "#include <sys/types.h>" > slsh/readline.c
+#cat slsh/readline.c.bak >> slsh/readline.c
+#mv modules/rand-module.c modules/rand-module.c.bak
+#echo "#include <sys/types.h>" > modules/rand-module.c
+#cat modules/rand-module.c.bak >> modules/rand-module.c
+# fix missing definition of HANDLE in src/slang.h (version >= 2.2.4)
+patch -ulbf src/slang.h << EOF
+--- src/slang.h  2011-04-11 04:37:08 +0200
++++ src/slang.h  2013-12-02 23:21:50 +0100
+@@ -1381,8 +1381,3 @@
+ # if defined(__WIN32__)
+-/* I do not want to include windows.h just to get the typedef for HANDLE.
+- * Make this conditional upon the inclusion of windows.h.
+- */
+-#  ifdef WINVER
+-SL_EXTERN HANDLE SLw32_Hstdin;
+-#  endif
++#  include <windows.h>
+ # endif
+EOF
+# fix DllMain in src/slcommon.c (version >= 2.2.4)
+patch -ulbf src/slcommon.c << EOF
+--- src/slcommon.c  2011-04-11 04:37:08 +0200
++++ src/slcommon.c  2013-12-02 23:25:38 +0100
+@@ -360,3 +360,3 @@
+
+-BOOL WINAPI DllMain(HANDLE hInstance,DWORD dwReason,LPVOID lpParam)
++BOOL WINAPI DllMain(HINSTANCE hInstance,DWORD dwReason,LPVOID lpParam)
+ {
+EOF
+#$COMSPEC /c "mkfiles\m32init.bat"
+## the supplied src/mkfiles/mkmake.exe is a 16-bit MS-DOS executable, this won't run on 64-bit platforms, run the following command to recompile this if you have an existing slang library
+## avoid default 16-bit MS-DOS application src/mkfiles/mkmake.exe by rebuilding it
+#gcc src/mkfiles/mkmake.c -lslang -o src/mkfiles/mkmake.exe
+# fix configure for ncurses versions newer than version 5
+sed -i.bak -e "s/ncurses5-config/basename $(ls -1 /custombuilt/bin/ncurses*-config)/" configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --with-readline=gnu --with-terminfo=uwin --with-pcre=$MINGWPREFIX --with-onig=$MINGWPREFIX --with-png=$MINGWPREFIX --with-z=$MINGWPREFIX --with-iconv=$MINGWPREFIX CFLAGS="-DWIN32 -DMINGW32" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --with-readline=gnu --with-terminfo=uwin --with-pcre=$MINGWPREFIX --with-onig=$MINGWPREFIX --with-png=$MINGWPREFIX --with-z=$MINGWPREFIX --with-iconv=$MINGWPREFIX CFLAGS="-DWIN32 -DMINGW32" LDFLAGS="-Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --with-readline=slang --with-terminfo=uwin --with-pcre=$MINGWPREFIX --with-onig=$MINGWPREFIX --with-png=$MINGWPREFIX --with-z=$MINGWPREFIX --with-iconv=$MINGWPREFIX CFLAGS="-DWIN32 -DMINGW32" LDFLAGS="-Wl,-no-undefined" &&
+ cp src/sysconf.h src/config.h &&
+ wl-showstatus build &&
+ gcc -Isrc -osrc/mkfiles/mkmake.exe src/mkfiles/mkmake.c src/slcommon.c src/slerr.c src/slstring.c src/slwcwidth.c src/slprepr.c src/slmisc.c src/slutf8.c src/slupper.c src/sllower.c &&
+ rm -f src/config.h &&
+ env MAKEFLAGS=-j1 sh mkfiles/build.sh -j1 WIN32 MINGW32 DLL &&
+ wl-showstatus install &&
+ pexports src/gw32objs/libslang.dll > libslang.def &&
+ dlltool.exe -D src/gw32objs/libslang.dll -d libslang.def -l libslang.dll.a &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+ #cp -f src/slang.h $INSTALLPREFIX/include/ &&
+ cp -f src/slang.h src/slcurses.h $INSTALLPREFIX/include/ &&
+ cp -f src/gw32objs/libslang.a $INSTALLPREFIX/lib/ &&
+ cp -f libslang.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f slang.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ cp -f src/gw32objs/libslang.dll slsh/gw32objs/slsh.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####error: src/mkfiles/mkmake.exe is a 16-bit MS-DOS application
+#mkdir -p src/sys
+#touch src/sys/ioctl.h
+#gcc -Isrc -osrc/mkfiles/mkmake.exe src/mkfiles/mkmake.c src/slcommon.c src/slerr.c src/slstring.c src/slwcwidth.c src/slprepr.c src/slmisc.c src/slutf8.c src/slupper.c src/sllower.c
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --with-readline=gnu --with-terminfo=uwin CFLAGS="-DWIN32 -DMINGW32" &&
+# make install &&
+#    echo OK
+####While not required, it is recommended that you install the following libraries and reconfigure so that the corresponding modules can be built:
+####   pcre oniguruma png z
+#make -f mkfiles/makefile.m32 &&
+#    echo OK
+####src/gw32objs/slrline.o:slrline.c:(.text+0xc2a): undefined reference to `SLtt_initialize'
+####src/gw32objs/slrline.o:slrline.c:(.text+0x161c): undefined reference to `_pSLtt_init_cmdline_mode'
+####src/gw32objs/slrline.o:slrline.c:(.text+0x17db): undefined reference to `_pSLtt_cmdline_mode_reset'
+####src/gw32objs/slrline.o:slrline.c:(.text+0x2821): undefined reference to `_pSLtt_cmdline_mode_reset'
+
+
+

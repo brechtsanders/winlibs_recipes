@@ -1,0 +1,337 @@
+export NAME="sane-backends"
+export STATUS=
+export URL=http://www.sane-project.org/
+export BASENAME=sane-backends
+export DESCRIPTION="SANE stands for \"Scanner Access Now Easy\" and is an application programming interface (API) that provides standardized access to any raster image scanner hardware (flatbed scanner, hand-held scanner, video- and still-cameras, frame-grabbers, etc.)."
+export CATEGORY=hardware
+export TYPE=library
+#export VERSION=1.0.19
+#export VERSION=1.0.20
+#export VERSION=1.0.21
+#export VERSION=1.0.22
+#export VERSIONDATE=20110214
+####/mingw/bin/install: cannot stat `.libs/libsane-net-1.dll': No such file or directory
+#export VERSION=1.0.23
+#export VERSIONDATE=20121024
+#export VERSION=1.0.24
+#export VERSIONDATE=20131001
+#export VERSION=1.0.25
+#export VERSIONDATE=20151004
+####sanei/sanei_thread.c:516:23: error: invalid operands to binary != (have 'SANE_Pid' and 'pthread_t')
+export VERSION=1.0.27
+export VERSIONDATE=20170523
+#export VERSION=1.0.29
+#export VERSIONDATE=20200409
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libusb
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://gd.tuwien.ac.at/hci/sane/"
+#export DOWNLOADURL="http://alioth.debian.org/frs/?group_id=30186"
+#export DOWNLOADURL="http://ftp3.sane-project.org/pub/sane/"
+export DOWNLOADURL="https://gitlab.com/sane-project/backends/-/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://gd.tuwien.ac.at/hci/sane/sane-backends-$VERSION/sane-backends-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://alioth.debian.org/frs/download.php/3026/sane-backends-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://ftp3.sane-project.org/pub/sane/sane-backends-$VERSION/sane-backends-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL="https://alioth.debian.org/frs/download.php/3752/sane-backends-1.0.23.tar.gz.1 https://alioth.debian.org/frs/download.php/3753/sane-backends-1.0.23.tar.gz.2 https://alioth.debian.org/frs/download.php/3754/sane-backends-1.0.23.tar.gz.3"
+#export DOWNLOADSOURCEURL="https://alioth.debian.org/frs/download.php/file/3958/sane-backends-1.0.24.tar.gz"
+#export DOWNLOADSOURCEURL="https://alioth.debian.org/frs/download.php/file/4146/sane-backends-1.0.25.tar.gz"
+#export DOWNLOADSOURCEURL="https://alioth.debian.org/frs/download.php/file/4224/sane-backends-1.0.27.tar.gz"
+export DOWNLOADSOURCEURL="https://gitlab.com/sane-project/backends/uploads/54f858b20a364fc35d820df935a86478/sane-backends-1.0.29.tar.gz"
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/sane-backends-$VERSION.tar.gz
+#mv sane-backends-1.0.20 sane-backends-$VERSION
+#cat $TARBALLDIR/$BASENAME/sane-backends-$VERSION.tar.gz.1 $TARBALLDIR/$BASENAME/sane-backends-$VERSION.tar.gz.2 $TARBALLDIR/$BASENAME/sane-backends-$VERSION.tar.gz.3 | tar xz
+cd sane-backends-$VERSION
+# fix missing files
+mkdir sys netinet arpa
+echo "#include <winsock2.h>" > sys/socket.h
+touch netinet/in.h
+touch arpa/inet.h
+touch sys/ioctl.h
+touch sys/wait.h
+touch netdb.h
+cat > pwd.h << EOF
+typedef int uid_t;
+#define getpwnam(username) NULL
+EOF
+cat > grp.h << EOF
+typedef int gid_t;
+#define getgrent() NULL
+#define setgrent() NULL
+EOF
+# create dummy syslog.h
+cat > syslog.h << EOF
+#define LOG_DEBUG   7    //debug-level messages
+#define LOG_DAEMON   (3<<3)    //system daemons
+#define LOG_PID    0x01    //log the pid with each message
+#define LOG_CONS   0x02    //log on the console if errors in sending
+static void openlog (const char *ident, int option, int facility) {}
+static void syslog (int priority, const char *format, ...) {}
+static void closelog (void) {}
+EOF
+## fix sanei/sanei_usb.c
+#patch -ulbf sanei/sanei_usb.c << EOF
+#--- sanei/sanei_usb.c   Fri Nov 16 09:46:32 2007
+#+++ sanei/sanei_usb.c   Thu Jun 19 15:30:26 2008
+#@@ -1048,2 +1048,3 @@
+#        }
+#+/*
+#       flag = fcntl (devices[devcount].fd, F_GETFD);
+#@@ -1055,2 +1056,3 @@
+#        }
+#+*/
+#     }
+#EOF
+
+#patch -ulbf sanei/sanei_thread.c << EOF
+#--- sanei/sanei_thread.c  Thu Dec 11 14:35:40 2008
+#+++ sanei/sanei_thread.c  Thu Dec 11 15:04:34 2008
+#@@ -126,4 +126,11 @@
+# #else
+#+#ifdef __MINGW32__
+#+       HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+#+       BOOL success = TerminateProcess(hProcess, 0);
+#+       CloseHandle(hProcess);
+#+       return (success ? 0 : -1);
+#+#else
+#        return pthread_cancel((pthread_t)pid);
+# #endif
+#+#endif
+# #elif defined HAVE_OS2_H
+#@@ -309,2 +316,3 @@
+# {
+#+#ifndef __MINGW32__
+#        struct sigaction act;
+#@@ -322,2 +330,3 @@
+#        }
+#+#endif
+# }
+#@@ -355,4 +364,5 @@
+# #ifdef USE_PTHREAD
+#-       struct sigaction act;
+#        pthread_t thread;
+#+#ifndef __MINGW32__
+#+       struct sigaction act;
+# 
+#@@ -370,3 +380,3 @@
+#        }
+#-
+#+#endif
+#        td.func      = func;
+#@@ -382,4 +392,6 @@
+# 
+#+#ifndef __MINGW32__
+#        DBG( 2, "pthread_create() created thread %d\\n", (int)thread );
+#-       return (int)thread;
+#+#endif
+#+       /////return (int)thread;
+# #else
+#@@ -410,3 +422,3 @@
+#        DBG(2, "sanei_thread_sendsig() %d to thread(id=%d)\\n", sig, pid);
+#-       return pthread_kill((pthread_t)pid, sig );
+#+       /////return pthread_kill((pthread_t)pid, sig );
+# #else
+#@@ -429,4 +441,7 @@
+# 
+#+#ifndef __MINGW32__
+#        DBG(2, "sanei_thread_waitpid() - %d\\n", pid);
+#+#endif
+# #ifdef USE_PTHREAD
+#+#ifndef __MINGW32__
+#        result = pthread_join((pthread_t)pid, (void*)&ls );
+#@@ -448,2 +463,3 @@
+#        pthread_detach((pthread_t)pid);
+#+#endif
+#        if (status)
+#EOF
+# fix backend/net.c
+patch -ulbf backend/net.c << EOF
+--- backend/net.c   Sat Oct 27 11:07:28 2007
++++ backend/net.c   Thu Jun 19 17:33:03 2008
+@@ -450,3 +450,8 @@
+                                        SANEI_NET_PROTOCOL_VERSION);
++#if defined(__WIN32__)
++  char usernamebuf[64];
++  GetUserName(req.username = usernamebuf, sizeof(usernamebuf));
++#else
+   req.username = getlogin ();
++#endif
+   DBG (2, "connect_dev: net_init (user=%s, local version=%d.%d.%d)\\n",
+@@ -1872,3 +1877,8 @@
+          /* turn off non-blocking I/O (s->data will be closed anyhow): */
++#if defined(__WIN32__)
++         unsigned long flags = 0;
++         ioctlsocket(s->data, FIONBIO, &flags);
++#else
+          fcntl (s->data, F_SETFL, 0);
++#endif
+ 
+@@ -2026,3 +2036,8 @@
+ 
++#if defined(__WIN32__)
++  unsigned long flags = ~0;
++  if (ioctlsocket(s->data, FIONBIO, &flags) != 0)
++#else
+   if (fcntl (s->data, F_SETFL, non_blocking ? O_NONBLOCK : 0) < 0)
++#endif
+     {
+EOF
+# fix lib/sigprocmask.c (version <= 1.0.19)
+#mv lib/sigprocmask.c lib/sigprocmask.c.bak
+#sed -e "s/^\( *\)\(.*= *sig.*\)$/\1\/\/\2/" lib/sigprocmask.c.bak > lib/sigprocmask.c
+
+#patch -ulbf frontend/scanimage.c << EOF
+#--- frontend/scanimage.c  Sat Dec 29 22:36:25 2007
+#+++ frontend/scanimage.c  Wed Mar  4 20:24:44 2009
+#@@ -145,3 +145,3 @@
+# {
+#-  char tmp[3 + 128 + SANE_MAX_USERNAME_LEN + SANE_MAX_PASSWORD_LEN], *wipe;
+#+  char tmp[3 + 128 + SANE_MAX_USERNAME_LEN + SANE_MAX_PASSWORD_LEN];
+#   unsigned char md5digest[16];
+#@@ -280,4 +280,6 @@
+#     {
+#+/*
+#       strcpy (password, (wipe = getpass ("Enter password: ")));
+#       memset (wipe, 0, strlen (password));
+#+*/    fgets (password, SANE_MAX_PASSWORD_LEN, stdin);
+#     }
+#@@ -2111,5 +2113,5 @@
+# 
+#-  signal (SIGHUP, sighandler);
+#+  //signal (SIGHUP, sighandler);
+#   signal (SIGINT, sighandler);
+#-  signal (SIGPIPE, sighandler);
+#+  //signal (SIGPIPE, sighandler);
+#   signal (SIGTERM, sighandler);
+#EOF
+# fix frontend/saned.c (version <= 1.0.19)
+#patch -ulbf frontend/saned.c << EOF
+#--- frontend/saned.c  Sun Apr  9 12:07:18 2006
+#+++ frontend/saned.c  Wed Mar  4 20:32:28 2009
+#@@ -258,4 +258,4 @@
+# {
+#-  if (!debug)
+#-    alarm (3600);
+#+//  if (!debug)
+#+//    alarm (3600);
+# }
+#@@ -2001,3 +2001,8 @@
+#              }
+#+#ifdef __WIN32__
+#+           unsigned long flags = 1;
+#+           ioctlsocket (data_fd, FIONBIO, &flags);
+#+#else
+#            fcntl (data_fd, F_SETFL, 1);      /* set non-blocking */
+#+#endif
+#            shutdown (data_fd, 0);
+#@@ -2400,4 +2405,4 @@
+# 
+#-  signal (SIGALRM, quit);
+#-  signal (SIGPIPE, quit);
+#+  //signal (SIGALRM, quit);
+#+  //signal (SIGPIPE, quit);
+#EOF
+## fix missing getuid
+#mv tools/sane-find-scanner.c tools/sane-find-scanner.c.bak
+#echo "#define getuid() 0" > tools/sane-find-scanner.c
+#cat tools/sane-find-scanner.c.bak >> tools/sane-find-scanner.c
+# fix sanei/sanei_thread.c (version >= 1.0.25)
+patch -ulbf sanei/sanei_thread.c << EOF
+--- sanei/sanei_thread.c  2016-10-06 02:02:58.000000000 +0200
++++ sanei/sanei_thread.c  2017-05-23 10:15:16.048529500 +0200
+@@ -512,3 +512,3 @@
+        if ( EDEADLK == rc ) {
+-               if ( (pthread_t)pid != pthread_self() ) {
++               if (  pthread_equal((pthread_t)pid, pthread_self()) ) {
+                        /* call detach in any case to make sure that the thread resources
+EOF
+# fix missing u_int32_t in lib/inet_pton.c (version >= 1.0.27)
+mv lib/inet_pton.c lib/inet_pton.c.bak &&
+echo "#include <stdint.h>" > lib/inet_pton.c &&
+sed -e "s/u_\(int[0-9]*_t\)/u\1/" lib/inet_pton.c.bak >> lib/inet_pton.c
+## fix sanei/sanei_init_debug.c (version >= 1.0.29)
+#patch -ulbf sanei/sanei_init_debug.c << EOF
+#@@ -120,3 +120,3 @@
+#   return S_ISSOCK(sbuf.st_mode);
+#-#elif defined (S_IFMT) && defined(S_IFMT)
+#+#elif defined (S_IFMT) && defined(S_IFSOCK)
+#   return (sbuf.st_mode & S_IFMT) == S_IFSOCK;
+#@@ -137,2 +137,3 @@
+#        {
+#+#ifdef HAVE_VSYSLOG
+#          msg = (char *)malloc (sizeof(char) * (strlen(be) + strlen(fmt) + 4));
+#@@ -149,2 +150,3 @@
+#            }
+#+#endif
+#        }
+#EOF
+## fix backend/dll.c (version >= 1.0.29)
+#patch -ulbf backend/dll.c << EOF
+#@@ -816,3 +816,3 @@
+#   char dlldir[PATH_MAX];
+#-  char conffile[PATH_MAX + strlen("/") + NAME_MAX];
+#+  char conffile[PATH_MAX];
+#   size_t len, plen;
+#EOF
+# avoid making doc, tools and po directories
+cat > doc/Makefile.in << EOF
+all:
+depend:
+links:
+generate:
+install:
+EOF
+cp doc/Makefile.in tools/Makefile.in
+cp doc/Makefile.in po/Makefile.in
+## fix .exe install problem in frontend/Makefile (version <= 1.0.19)
+#mv frontend/Makefile.in frontend/Makefile.in.bak
+#sed -e "s/\(\$(INSTALL_PROGRAM) \$\${program}\)/\1.exe/g" frontend/Makefile.in.bak > frontend/Makefile.in
+## define some missing defines (version <= 1.0.19)
+#cat >> include/sane/sanei_debug.h << EOF
+##define MSG_WAITALL 0
+##define MSG_DONTWAIT 0
+#EOF
+## fix config file (version <= 1.0.19)
+#mv include/sane/config.h.in include/sane/config.h.in.bak
+#cat > include/sane/config.h.in << EOF
+##include <stddef.h>
+##include <wchar.h>
+##include <winsock2.h>
+##define USE WIN32_INTERFACE
+#//#define HAVE_USLEEP
+#EOF
+#cat include/sane/config.h.in.bak >> include/sane/config.h.in
+#touch config.h
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-fork-process --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend CFLAGS="-I`pwd`"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend CFLAGS="-I`pwd`" LDFLAGS="-lws2_32"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --disable-fork-process --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend CFLAGS="-I`pwd`" LDFLAGS="-lws2_32"
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend CFLAGS="-I`pwd` -DUSE_PTHREAD" LDFLAGS="-lws2_32 -lpthread" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend CFLAGS="-I`pwd` -DUSE_PTHREAD" LDFLAGS="-lws2_32 -lpthread" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend CFLAGS="-I`pwd` -DUSE_PTHREAD" LDFLAGS="-lws2_32 -lpthread -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend CFLAGS="-I`pwd` -DUSE_PTHREAD" LDFLAGS="-lws2_32 -lpthread -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-libusb --disable-ipv6 --disable-local-backends --enable-pnm-backend --disable-dependency-tracking CFLAGS="-I`pwd` -DUSE_PTHREAD" LDFLAGS="-lws2_32 -lpthread -Wl,-no-undefined" &&
+ wl-showstatus build &&
+ #make libsane_la_DEPENDENCIES= &&
+ make -C sanei && make -C lib && make -C backend &&
+ wl-showstatus build-install &&
+ ( ( make all && make install-strip ) || ( make -Csanei install-strip && make -Clib install-strip && make -Cbackend install-strip ) ) &&
+ if [ -f $INSTALLPREFIX/bin/scanimage ]; then
+  mv $INSTALLPREFIX/bin/scanimage $INSTALLPREFIX/bin/scanimage.exe
+ fi &&
+ rm -rf $INSTALLPREFIX/sbin $INSTALLPREFIX/share &&
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ cp -u tools/sane-backends.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf sane-backends-$VERSION
+####To do: build on 64-bit
+
+
+

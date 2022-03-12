@@ -1,0 +1,73 @@
+export NAME="Sofia-SIP"
+export STATUS=
+export URL=http://sofia-sip.sourceforge.net/
+export BASENAME=sofia-sip
+export DESCRIPTION="Sofia-SIP is an open-source SIP User-Agent library, compliant with the IETF RFC3261 specification."
+export CATEGORY=audio,communication
+export TYPE=library
+#export VERSION=1.12.8
+#export VERSION=1.12.10
+export VERSION=1.12.11
+export VERSIONDATE=20110312
+####libsofia-sip-ua/su/su_select_port.c:55:2: error: #error winsock select() not supported yet
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,pthreads,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/sofia-sip/files/ sofia-sip-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/sofia-sip/sofia-sip-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/sofia-sip-$VERSION.tar.gz
+cd sofia-sip-$VERSION
+# fix for library name pthreadVC2
+mv configure configure.bak
+sed -e "s?-L..(top_srcdir)/win32/pthread -lpthreadVC2?-lpthread?" configure.bak > configure
+# fix to use su_win32_port.c instead of su_port.c
+mv libsofia-sip-ua/su/su_port.c libsofia-sip-ua/su/su_port.c.bak
+mv libsofia-sip-ua/su/su_win32_port.c libsofia-sip-ua/su/su_port.c
+## fix for missing O_* defines in libsofia-sip-ua/nua/test_init.c (version <= 1.12.8)
+#mv libsofia-sip-ua/nua/test_init.c libsofia-sip-ua/nua/test_init.c.bak
+#echo "#include <fcntl.h>" > libsofia-sip-ua/nua/test_init.c
+#cat libsofia-sip-ua/nua/test_init.c.bak >> libsofia-sip-ua/nua/test_init.c
+# don't build utils
+mv utils/Makefile.in utils/Makefile.in.bak
+cat > utils/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# fix invalid -mno-cygwin in configure
+mv configure configure.bak
+sed -e "s/-mno-cygwin//" configure.bak > configure
+####configure: error: "printf cannot handle 64-bit integers"
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-stun
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-stun CFLAGS="-DIN_LIBSOFIA_SIP_UA" LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-stun CFLAGS="-DIN_LIBSOFIA_SIP_UA" LIBS="-Wl,-no-undefined -Wl,--as-needed -lws2_32" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix for printing 64-bit values, existing gai_strerror and avoiding fcntl
+ mv config.h config.h.bak &&
+ #sed -e "s/%ll/%I64/g; s?^\(#define *HAVE_FCNTL_H\)?//\1?" config.h.bak > config.h
+ sed -e "s/%ll/%I64/g" config.h.bak > config.h &&
+ echo "#define HAVE_GAI_STRERROR 1" >> config.h &&
+ echo "#define R_OK 4" >> config.h &&
+ # fix missing getaddrinfo
+ echo "#define _WIN32_WINNT 0x0501" >> config.h &&
+ echo "#include <winsock2.h>" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf sofia-sip-$VERSION
+#To do: build DLL
+
+
+

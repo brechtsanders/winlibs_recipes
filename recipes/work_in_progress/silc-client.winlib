@@ -1,0 +1,247 @@
+export NAME="SILC Client"
+export STATUS=
+export URL=http://www.silcnet.org/client.html
+export BASENAME=silc-client
+export DESCRIPTION="SILC Client is the program used to connect to the SILC network. SILC Client is a full featured SILC conferencing client and supports sending and receiving of practically any kind of messages in addition of normal test messages, including multimedia messages like images, video and audio messages. SILC Client enables secured session with the SILC server and secured private and channel messages. It supports passphrase authentication and public key authentication based on digital signatures, and can be used to exchange public keys with other users in the network. Secure file transfer makes it possible to transfer files between users peer to peer."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=1.1.8
+#export VERSIONDATE=20101121
+export VERSION=1.1.11
+export VERSIONDATE=20141025
+####apps/irssi/src/core/log.c:101:15: error: storage size of 'lock' isn't known  struct flock lock;
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,pcre,termcap
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://www.silcnet.org/software/download/client/"
+#export DOWNLOADURL="http://www.silcnet.org/client.html"
+#export DOWNLOADURL="https://silc.github.io/client.html"
+export DOWNLOADURL="http://sourceforge.net/projects/silc/files/silc/client/sources/"
+#export DOWNLOADURL="https://github.com/silc/silc/releases silc.client."
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.silcnet.org/download/client/sources/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/silc/silc/client/sources/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing win32-compat.h
+cat > apps/irssi/win32-compat.h << EOF
+#include <winsock2.h>
+//#include <fcntl.h>
+EOF
+# fix missing SOCKET in lib/silcutil/silctypes.h
+patch -ulbf lib/silcutil/silctypes.h << EOF
+@@ -273,3 +273,3 @@
+  */
+-#if defined(SILC_UNIX)
++#if defined(SILC_UNIX) || defined(__MINGW32__)
+ typedef int SilcSocket;
+EOF
+# fix missing GWL_USERDATA in lib/silcutil/win32/silcwin32schedule.c (version >= 1.1.11)
+patch -ulbf lib/silcutil/win32/silcwin32schedule.c << EOF
+@@ -21,2 +21,5 @@
+ #include "silc.h"
++#ifdef _WIN64
++#define GWL_USERDATA GWLP_USERDATA
++#endif
+
+EOF
+## fix missing struct flock in apps/irssi/src/core/log.c (version >= 1.1.11)
+#patch -ulbf apps/irssi/src/core/log.c << EOF
+#@@ -100,3 +100,5 @@
+#        char *dir;
+#+#ifdef F_SETLK
+#        struct flock lock;
+#+#endif
+#
+#@@ -128,2 +130,3 @@
+#        }
+#+#ifdef F_SETLK
+#         memset(&lock, 0, sizeof(lock));
+#@@ -137,2 +140,3 @@
+#        }
+#+#endif
+#        lseek(log->handle, 0, SEEK_END);
+#@@ -151,3 +155,5 @@
+# {
+#+#ifdef F_SETLK
+#        struct flock lock;
+#+#endif
+#
+#@@ -164,2 +170,3 @@
+#
+#+#ifdef F_SETLK
+#         memset(&lock, 0, sizeof(lock));
+#@@ -167,2 +174,3 @@
+#        fcntl(log->handle, F_SETLK, &lock);
+#+#endif
+#
+#EOF
+## fix missing unix sockets in apps/irssi/src/core/network.c (version >= 1.1.11)
+#patch -ulbf apps/irssi/src/core/network.c << EOF
+#@@ -23,3 +23,5 @@
+#
+#+#ifndef _WIN32
+# #include <sys/un.h>
+#+#endif
+#
+#@@ -227,2 +229,5 @@
+# {
+#+#ifdef _WIN32
+#+       return NULL;
+#+#else
+#        struct sockaddr_un sa;
+#@@ -255,2 +260,3 @@
+#        return g_io_channel_new(handle);
+#+#endif
+# }
+#EOF
+## fix apps/irssi/src/silc/core/clientutil.c (version >= 1.1.11)
+#patch -ulbf apps/irssi/src/silc/core/clientutil.c << EOF
+#@@ -168,4 +168,9 @@
+#     if (errno == ENOENT) {
+#+#ifdef _WIN32
+#+      if (1) {
+#+	if ((mkdir(filename)) == -1) {
+#+#else
+#       if (pw->pw_uid == geteuid()) {
+# 	if ((mkdir(filename, 0755)) == -1) {
+#+#endif
+# 	  fprintf(stderr, "Couldn't create \`%s' directory\\n", filename);
+#@@ -184,2 +189,3 @@
+# 
+#+#ifndef _WIN32
+#     /* Check the owner of the dir */
+#@@ -190,2 +196,3 @@
+#     }
+#+#endif
+# 
+#@@ -209,4 +216,9 @@
+#     if (errno == ENOENT) {
+#+#ifdef _WIN32
+#+      if (1) {
+#+	if ((mkdir(servfilename)) == -1) {
+#+#else
+#       if (pw->pw_uid == geteuid()) {
+# 	if ((mkdir(servfilename, 0755)) == -1) {
+#+#endif
+# 	  fprintf(stderr, "Couldn't create \`%s' directory\\n", servfilename);
+#@@ -231,4 +243,9 @@
+#     if (errno == ENOENT) {
+#+#ifdef _WIN32
+#+      if (1) {
+#+	if ((mkdir(clientfilename)) == -1) {
+#+#else
+#       if (pw->pw_uid == geteuid()) {
+# 	if ((mkdir(clientfilename, 0755)) == -1) {
+#+#endif
+# 	  fprintf(stderr, "Couldn't create \`%s' directory\\n", clientfilename);
+#@@ -253,4 +270,9 @@
+#     if (errno == ENOENT) {
+#+#ifdef _WIN32
+#+      if (1) {
+#+	if ((mkdir(friendsfilename)) == -1) {
+#+#else
+#       if (pw->pw_uid == geteuid()) {
+# 	if ((mkdir(friendsfilename, 0755)) == -1) {
+#+#endif
+# 	  fprintf(stderr, "Couldn't create \`%s' directory\\n", friendsfilename);
+#@@ -294,2 +316,3 @@
+#   /* Check the owner of the public key */
+#+#ifndef _WIN32
+#   if (st.st_uid != 0 && st.st_uid != pw->pw_uid) {
+#@@ -298,2 +321,3 @@
+#   }
+#+#endif
+# 
+#@@ -316,2 +340,3 @@
+#   /* Check the owner of the private key */
+#+#ifndef _WIN32
+#   if (st.st_uid != 0 && st.st_uid != pw->pw_uid) {
+#@@ -320,2 +345,3 @@
+#   }
+#+#endif
+# 
+#EOF
+## fix apps/irssi/src/silc/core/silc-queries.c (version >= 1.1.11)
+#patch -ulbf apps/irssi/src/silc/core/silc-queries.c << EOF
+#@@ -987,3 +987,5 @@
+#   struct stat st;
+#+#ifndef _WIN32
+#   struct passwd *pw;
+#+#endif
+#   unsigned char filename[256], filename2[256], *fingerprint = NULL, *tmp;
+#@@ -998,2 +1000,3 @@
+#
+#+#ifndef _WIN32
+#     pw = getpwuid(getuid());
+#@@ -1001,2 +1004,3 @@
+#       goto out;
+#+#endif
+#
+#@@ -1019,4 +1023,9 @@
+#       if (errno == ENOENT) {
+#+#ifdef _WIN32
+#+       if (1) {
+#+         if ((mkdir(filename)) == -1) {
+#+#else
+#        if (pw->pw_uid == geteuid()) {
+#          if ((mkdir(filename, 0755)) == -1) {
+#+#endif
+#            silc_say_error("Couldn't create \`%s' directory",
+#EOF
+# fix missing dllexport in lib/silcutil/silcfsm.h
+sed -i.bak -e "s/^[^(]*\bsilc_fsm_.*([^\\]*$/DLLAPI &/" lib/silcutil/silcfsm.h
+# fix missing dllexport in lib/silccore/silccommand.h
+sed -i.bak -e "s/^[^(]*\bsilc_command_.*([^\\]*$/DLLAPI &/" lib/silccore/silccommand.h
+# fix missing dllexport in lib/silcutil/silcmutex.h
+sed -i.bak -e "s/^[^(]*\bsilc_mutex_.*([^\\]*$/DLLAPI &/" lib/silcutil/silcmutex.h
+# fix missing dllexport
+for F in fsm command mutex packet status hmac cipher argument id; do
+ sed -i.bak -e "s/^[^(]*\bsilc_$F_.*([^\\]*$/DLLAPI &/" lib/*/silc$F.h
+done
+sed -i.bak -e "s/^[^(]*\bsilc_.*([^\\]*$/DLLAPI &/" lib/silcutil/silcmemory.h lib/silcapputil/silcapputil.h lib/silcutil/silcmutex.h
+# fix includes/silcwin32.h (version >= 1.1.11)
+patch -ulbf includes/silcwin32.h << EOF
+@@ -43,4 +43,8 @@
+ #ifndef DLL
+-#ifndef _LIB
++#if !defined(_LIB) && !defined(STATIC)
++#if defined(BUILDING_SILC_CLIENT_DLL) && defined(DLL_EXPORT)
++#define DLLAPI __declspec(dllexport)
++#else
+ #define DLLAPI __declspec(dllimport)
++#endif
+ #else
+EOF
+## fix missing lib/silcutil/symbian source directory
+#sed -i.bak -e "s/^SUBDIRS=symbian/#&/" lib/silcutil/Makefile.am
+# remove -mno-cygwin compiler option
+#sed -i.bak -e "s/-mno-cygwin//" configure.ac
+sed -i.bak -e "s/-mno-cygwin//" configure
+# fix for building .DLL files
+#echo "AC_LIBTOOL_WIN32_DLL" >> configure.ac
+wl-showstatus configure &&
+ #mkdir -p m4 &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ PKG_CONFIG=$(which pkg-config) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-win32 --without-silc-plugin --without-perl CFLAGS="-DWIN32 -DBUILDING_SILC_CLIENT_DLL" LDFLAGS="-Wl,--as-needed -lpcreposix" &&
+ #LDFLAGS="-Wl,--as-needed -lws2_32" 
+ # fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak3 -e "s/^func_lalib_unsafe_p ()/DUMMY_&/; s/func_lalib_unsafe_p/func_lalib_p/" libtool &&
+ ( make install-strip || ( make -Clib install-strip && make -Cincludes install-strip )) &&
+    echo OK
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

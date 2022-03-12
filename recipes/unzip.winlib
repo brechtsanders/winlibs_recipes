@@ -1,0 +1,50 @@
+export NAME="UnZip"
+export STATUS=
+export URL=http://www.info-zip.org/UnZip.html
+export BASENAME=unzip
+export DESCRIPTION="UnZip is an extraction utility for archives compressed in .zip format (also called \"zipfiles\"). Although highly compatible both with PKWARE's PKZIP and PKUNZIP utilities for MS-DOS and with Info-ZIP's own Zip program, our primary objectives have been portability and non-MSDOS functionality."
+export CATEGORY=compression
+export TYPE=application
+export VERSION=6.0
+export VERSIONDATE=20101214
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="ftp://ftp.info-zip.org/pub/infozip/src/ unzip"
+export DOWNLOADURL="http://sourceforge.net/projects/infozip/files/UnZip%206.x%20%28latest%29/UnZip%206.0/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.info-zip.org/pub/infozip/src/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tgz
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/infozip/UnZip%20$(echo $VERSION|sed -e "s/^\([0-9]*\.\).*$/\1x/")%20%28latest%29/UnZip%20$VERSION/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tgz
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tar.gz
+cd $BASENAME$(echo $VERSION|sed -e "s/\.//g")
+# fix error: unzpriv.h:1844:16: error: expected identifier or '(' before numeric constant
+sed -i.bak -e "s/^#define\s\s*CR\s\s*13/static const char CR = 13;/" unzpriv.h
+# fix __G issues
+for F in win32/win32.c win32/nt.c; do
+ mv $F $F.bak &&
+ echo "#include <immintrin.h>" > $F &&
+ cat $F.bak >> $F
+done
+wl-showstatus build &&
+if ( echo $RUNPLATFORM | grep -qv x86_64 ); then
+ #make -f win32/makefile.gcc
+ make -f win32/Makefile.gcc
+else
+ make -f win32/makefile.gcc CC_CPU_OPT= NOASM=1
+ #make -f win32/Makefile.gcc CC_CPU_OPT= NOASM=1 NOCRC_OPT=1
+fi &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME$(echo $VERSION|sed -e "s/\.//g")
+####See also: https://github.com/madler/unzip/releases
+
+
+

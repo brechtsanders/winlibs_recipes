@@ -1,0 +1,53 @@
+export NAME="libinstpatch"
+export STATUS=
+export URL=https://github.com/swami/libinstpatch
+export BASENAME=libinstpatch
+export DESCRIPTION="Instrument file software library"
+export CATEGORY=audio
+export TYPE=library
+export VERSION=1.1.6
+export VERSIONDATE=20210520
+wl-showstatus --package-version
+export DEPENDANCIES=
+#export DEPENDANCIES=gobject-introspection
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/swami/libinstpatch/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/swami/libinstpatch/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix CMakeLists.txt (version >= 1.1.6)
+patch -ulbf CMakeLists.txt << EOF
+@@ -46,3 +46,3 @@
+ # Initialize the library directory name suffix.
+-if ( CMAKE_SIZEOF_VOID_P EQUAL 8 )
++if ( CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT MINGW)
+   set ( _init_lib_suffix "64" )
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DINTROSPECTION_ENABLED:BOOL=OFF -DGTKDOC_ENABLED:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DINTROSPECTION_ENABLED:BOOL=ON -DGTKDOC_ENABLED:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINTROSPECTION_ENABLED:BOOL=OFF -DGTKDOC_ENABLED:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINTROSPECTION_ENABLED:BOOL=ON -DGTKDOC_ENABLED:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ # fix execution of Python scripts
+ sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(glib-genmarshal\)\( \)?\1\2$(cygpath -w $PYDIR/python.exe|sed -e "s?\\\\?&&?g") \3\4\5?" build_*/build.ninja &&
+ #sed -i.bak -e "s?^[^ ]*g-ir-scanner?$(cygpath -w $PYDIR/python.exe|sed -e "s?\\\\?&&?g") &?" build_*/libinstpatch/CMakeFiles/*.bat &&
+ wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ PKG_CONFIG= ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ #PKG_CONFIG= ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

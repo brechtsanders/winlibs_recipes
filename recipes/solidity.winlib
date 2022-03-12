@@ -1,0 +1,112 @@
+export NAME="Solidity"
+export STATUS=
+export URL=https://soliditylang.org/
+#export URL=https://github.com/ethereum/solidity/
+export BASENAME=solidity
+export DESCRIPTION="Solidity, the Contract-Oriented Programming Language"
+export CATEGORY=development
+export TYPE=application
+export VERSION=0.8.3
+export VERSIONDATE=20210329
+#export VERSION=0.8.4
+#export VERSIONDATE=20210422
+#export VERSION=0.8.5
+#export VERSIONDATE=20210610
+####src/lib_json/CMakeFiles/jsoncpp_lib.dir/compiler_depend.make:4: *** multiple target patterns.  Stop.
+####ninja: error: build.ninja:67: bad $-escape (literal $ must be written as $$)
+#export VERSION=0.8.6
+#export VERSIONDATE=20210622
+#export VERSION=0.8.7
+#export VERSIONDATE=20210811
+#export VERSION=0.8.8
+#export VERSIONDATE=20210928
+#export VERSION=0.8.9
+#export VERSIONDATE=20210930
+#export VERSION=0.8.10
+#export VERSIONDATE=20211109
+#export VERSION=0.8.11
+#export VERSIONDATE=20211220
+#export VERSION=0.8.12
+#export VERSIONDATE=20220216
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,boost,z3,range-v3
+export OPTIONALDEPENDANCIES=
+#export OPTIONALDEPENDANCIES=solc,cvc4
+export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/ethereum/solidity/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/ethereum/solidity/releases/download/v$VERSION/solidity_$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/ethereum/solidity/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/solidity_$VERSION.tar.gz
+cd solidity_$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+# fix type conversion issue in libsolutil/CommonIO.cpp (version >= 0.8.3)
+patch -ulbf libsolutil/CommonIO.cpp << EOF
+@@ -92,3 +92,3 @@
+                GetConsoleMode(m_stdin, &m_oldMode);
+-               SetConsoleMode(m_stdin, m_oldMode & (~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT)));
++               SetConsoleMode(m_stdin, m_oldMode & (~(unsigned long)(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT)));
+        }
+EOF
+# fix for GCC 11 in liblangutil/SourceLocation.h (version >= 0.8.3)
+mv liblangutil/SourceLocation.h liblangutil/SourceLocation.h.bak &&
+echo "#include <limits>" > liblangutil/SourceLocation.h &&
+cat liblangutil/SourceLocation.h.bak >> liblangutil/SourceLocation.h
+# disable stack protector
+sed -i.bak -e "s/^.*fstack-protector/#&/" cmake/EthCompilerSettings.cmake
+# don't treat warnings as errors
+sed -i.bak -e "s/add_compile_options(\(-Wall\|-Wextra\))/#&/" cmake/EthCompilerSettings.cmake
+# skip building tests
+sed -i.bak -e "s/add_subdirectory(test)/#&/" CMakeLists.txt
+## avoid unescaped colon issue in cmake/EthCompilerSettings.cmake (version >= 0.8.4)
+#patch -ulbf cmake/EthCompilerSettings.cmake << EOF
+#@@ -56,5 +56,2 @@
+#
+#-       eth_add_cxx_compiler_flag_if_supported(
+#-               \$<\$<COMPILE_LANGUAGE:CXX>:-Wextra-semi>
+#-       )
+#        eth_add_cxx_compiler_flag_if_supported(-Wfinal-dtor-non-final-class)
+#EOF
+## ignore missing commit hash in cmake/scripts/buildinfo.cmake (version >= 0.8.7)
+#patch -ulbf cmake/scripts/buildinfo.cmake << EOF
+#@@ -51,3 +51,3 @@
+# if (NOT SOL_COMMIT_HASH)
+#-       message(FATAL_ERROR "Unable to determine commit hash. Either compile from within git repository or "
+#+       message(WARNING "Unable to determine commit hash. Either compile from within git repository or "
+#                "supply a file called commit_hash.txt")
+#@@ -55,3 +55,3 @@
+# if (NOT SOL_COMMIT_HASH MATCHES [a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9])
+#-    message(FATAL_ERROR "Malformed commit hash \\"\${SOL_COMMIT_HASH}\\". It has to consist of exactly 8 hex digits.")
+#+    message(WARNING "Malformed commit hash \\"\${SOL_COMMIT_HASH}\\". It has to consist of exactly 8 hex digits.")
+# endif()
+#EOF
+## work around missing hash
+#echo "00000000" > commit_hash.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=conversion" -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DSTRICT_Z3_VERSION:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=conversion" -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DCCACHE:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCOVERAGE:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DCCACHE:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DFETCHCONTENT_QUIET:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCOVERAGE:BOOL=OFF -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf solidity_$VERSION
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DSTRICT_Z3_VERSION:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=conversion" -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf solidity_$VERSION
+
+
+

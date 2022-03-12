@@ -1,0 +1,90 @@
+export NAME="libunique"
+export STATUS=
+export URL=http://live.gnome.org/LibUnique
+export BASENAME=libunique
+export DESCRIPTION="Unique is a library for writing single instance application. If you launch a single instance application twice, the second instance will either just quit or will send a message to the running instance."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=1.0.8
+#export VERSION=1.1.6
+#export VERSIONDATE=20110209
+####./uniquebackend.c:234: error: passing argument 1 of 'XGetWindowProperty' from incompatible pointer type
+####E:\Prog\MinGW-mSys\mingw32\include/X11/Xlib.h:2683: note: expected 'struct Display *' but argument is of type 'struct GdkScreen *'
+#export DEPENDANCIES=libx11,gtk2,glib2
+#export VERSION=3.0.0
+#export VERSIONDATE=20110405
+export VERSION=3.0.2
+export VERSIONDATE=20120116
+####gspawn-win32-helper-console.exe crashes
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk3,libx11,dbus
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2.1
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/libunique/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/libunique/`echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/"`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix missing sys/socket.h (version <= 1.0.8)
+#mkdir -p sys
+#echo "#include <winsock2.h>" > sys/socket.h
+#cat > sys/un.h << EOF
+#struct sockaddr_un
+#{
+#  short          sun_family;
+#  unsigned short sun_port;
+#  struct         in_addr sun_addr;
+#  char           sun_path[108-2-4]; 
+#};
+#EOF
+## fix missing gdk/gdkx.h (version <= 1.0.8)
+#mkdir -p gdk
+#cat > gdk/gdkx.h << EOF
+##include <windows.h>
+##include <X11/Xlib.h>
+##include <gdk/gdkwin32.h>
+##define GDK_WINDOW_XID(dw) (int)GDK_WINDOW_HWND(dw)
+##define GDK_DISPLAY_XDISPLAY(d) gdk_display_get_default_screen(d)
+##define gdk_x11_get_xatom_by_name_for_display(d,n) GDK_ROOT_WINDOW()
+##define gdk_x11_display_get_startup_notification_id(d) 0
+#EOF
+## fix missing geteuid and fsync in unique/bacon/uniquebackend-bacon.c (version <= 1.0.8)
+#mv unique/bacon/uniquebackend-bacon.c unique/bacon/uniquebackend-bacon.c.bak
+#cat > unique/bacon/uniquebackend-bacon.c << EOF
+##define geteuid() 0
+##define fsync(fd) _commit(fd)
+##define S_ISSOCK(f) 0
+#EOF
+#cat unique/bacon/uniquebackend-bacon.c.bak >> unique/bacon/uniquebackend-bacon.c
+## fix unique/bacon/uniquefactory-bacon.c (version >= 1.1.2) (version <= 1.0.8)
+#mv unique/bacon/uniquefactory-bacon.c unique/bacon/uniquefactory-bacon.c.bak
+#sed -e "s/unsigned \(int len;\)/\1/" unique/bacon/uniquefactory-bacon.c.bak > unique/bacon/uniquefactory-bacon.c
+# remove G_DISABLE_DEPRECATED from unique/Makefile
+mv unique/Makefile.in unique/Makefile.in.bak
+sed -e "s/-DG_DISABLE_DEPRECATED//" unique/Makefile.in.bak > unique/Makefile.in
+mv unique/Makefile.am unique/Makefile.am.bak
+sed -e "s/-DG_DISABLE_DEPRECATED//" unique/Makefile.am.bak > unique/Makefile.am
+# skip making tests
+cat > tests/Makefile.in << EOF
+all:
+install:
+EOF
+# fix gtk+-x11 in configure (version >= 3.0.0)
+mv configure configure.bak
+sed -e "s/gtk+-x11/gtk+-win32/g" configure.bak > configure
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-debug=no --enable-bacon=no LDFLAGS="-lws2_32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --enable-debug=no --disable-bacon --enable-introspection=no LDFLAGS="-lws2_32 -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --enable-debug=no --disable-bacon --enable-introspection=no LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --enable-debug=no --enable-dbus --disable-bacon --enable-introspection=no LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ PATH=$PYDIR:$PATH ( make install-strip || ( rm unique/dbus/uniquebackend-bindings.h unique/dbus/uniquebackend-glue.h && make install-strip ) ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

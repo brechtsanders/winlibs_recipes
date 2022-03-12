@@ -1,0 +1,60 @@
+export NAME="MQTT-C"
+export STATUS=
+export URL=https://liambindle.ca/MQTT-C/
+#export URL=https://github.com/LiamBindle/MQTT-C
+export BASENAME=mqtt-c
+export DESCRIPTION="A portable MQTT C client for embedded systems and PCs alike."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.1.5
+export VERSIONDATE=20220217
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/LiamBindle/MQTT-C/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/LiamBindle/MQTT-C/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix include/mqtt.h (version >= 1.1.5)
+patch -ulbf include/mqtt.h << EOF
+@@ -3,2 +3,4 @@
+
++#include <stdint.h>
++
+ /*
+EOF
+# fix include/mqtt_pal.h (version >= 1.1.5)
+patch -ulbf include/mqtt_pal.h << EOF
+@@ -120,3 +120,3 @@
+     #endif
+-#elif defined(_MSC_VER)
++#elif defined(_WIN32)
+     #include <limits.h>
+EOF
+# also allow building shared library
+sed -i.bak -e "s/^\(add_library(.*\) STATIC/\1/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMQTT_C_OpenSSL_SUPPORT:BOOL=ON -DMQTT_C_EXAMPLES:BOOL=OFF -DMQTT_C_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMQTT_C_OpenSSL_SUPPORT:BOOL=ON -DMQTT_C_EXAMPLES:BOOL=OFF -DMQTT_C_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -lcrypto/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,148 @@
+export NAME="wget"
+export STATUS=
+export URL=http://www.gnu.org/software/wget/
+export BASENAME=wget
+export DESCRIPTION="GNU Wget is a free software package for retrieving files using HTTP, HTTPS and FTP, the most widely-used Internet protocols. It is a non-interactive commandline tool, so it may easily be called from scripts, cron jobs, terminals without X-Windows support, etc."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.12
+#export VERSIONDATE=20101212
+#export DEPENDANCIES=openssl,libiconv,libidn,gettext
+#export VERSION=1.13.4
+#export VERSIONDATE=20110918
+####mswindows.o:mswindows.c:(.text+0x0): multiple definition of `xsleep'
+####mswindows.o:mswindows.c:(.text+0x0): first defined here
+#export VERSION=1.14
+#export VERSIONDATE=20120806
+#export VERSION=1.15
+#export VERSIONDATE=20140120
+#export VERSION=1.16
+#export VERSIONDATE=20141027
+####src/sysdep.h:166:21: fatal error: fnmatch.h: No such file or directory
+#export VERSION=1.16.1
+#export VERSIONDATE=20141208
+####src/warc.c:612:3: error: unknown type name 'uuid_t'
+####src/utils.c:68:21: fatal error: termios.h: No such file or directory
+####src/iri.o:iri.c:(.text+0x2e): undefined reference to `strcasestr'
+####lib/libgnu.a(regex.o):regex.c:(.text+0x45f7): undefined reference to `nl_langinfo'
+#export VERSION=1.16.2
+#export VERSIONDATE=20150228
+#export VERSION=1.16.3
+#export VERSIONDATE=20150310
+#export VERSION=1.17
+#export VERSIONDATE=20151115
+####src/hsts.c:505:22: error: 'LOCK_EX' undeclared (first use in this function)
+#export VERSION=1.17.1
+#export VERSIONDATE=20151212
+#export VERSION=1.18
+#export VERSIONDATE=20160610
+#export VERSION=1.19
+#export VERSIONDATE=20170203
+#export VERSION=1.19.1
+#export VERSIONDATE=20170212
+#export VERSION=1.19.2
+#export VERSIONDATE=20171027
+#export VERSION=1.19.3
+#export VERSIONDATE=20180120
+#export VERSION=1.19.4
+#export VERSIONDATE=20180121
+#export VERSION=1.19.5
+#export VERSIONDATE=20180507
+#export VERSION=1.20
+#export VERSIONDATE=20181130
+#export VERSION=1.20.1
+#export VERSIONDATE=20181227
+#export VERSION=1.20.2
+#export VERSIONDATE=20190402
+#export VERSION=1.20.3
+#export VERSIONDATE=20190405
+#export VERSION=1.21
+#export VERSIONDATE=20210101
+#export VERSION=1.21.1
+#export VERSIONDATE=20210109
+#export VERSION=1.21.2
+#export VERSIONDATE=20210908
+export VERSION=1.21.3
+export VERSIONDATE=20220227
+####lib/wctype.h:460:24: fatal error: crtdefs.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=gnutls,libiconv,libidn,gettext,pcre,zlib
+export OPTIONALDEPENDANCIES=libpsl
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/wget/ wget-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/wget/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/wget/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/wget/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix strerror in src/mswindows.h
+patch -ulbf src/mswindows.h << EOF
+--- src/mswindows.h  2009-09-04 18:31:54 +0200
++++ src/mswindows.h  2010-12-12 13:53:00 +0100
+@@ -165,2 +165,3 @@
+ #ifndef INHIBIT_WRAP
++# undef strerror
+ # define strerror windows_strerror
+EOF
+# fix missing IN6_ARE_ADDR_EQUAL in src/host.c on 64-bit
+mv src/host.c src/host.c.bak
+#echo '#define IN6_ARE_ADDR_EQUAL(a,b) (!memcmp((const void*)(a), (const void*)(b), sizeof (struct in6_addr)))' > src/host.c
+cat > src/host.c << EOF
+//#include <ws2tcpip.h>
+//#ifndef IN6_ARE_ADDR_EQUAL
+#define IN6_ARE_ADDR_EQUAL(a,b) (!memcmp((const void*)(a), (const void*)(b), sizeof (struct in6_addr)))
+//#endif
+EOF
+cat src/host.c.bak >> src/host.c
+## fix invalid cdecl in lib/msvc-inval.c
+#mv lib/msvc-inval.c lib/msvc-inval.c.bak
+#sed -e "s/\(cdecl\)/__\1/" lib/msvc-inval.c.bak > lib/msvc-inval.c
+## fix missing uuid/uuid.h (version >= 1.16.1)
+#mkdir -p winfix/uuid
+#cat > winfix/uuid/uuid.h << EOF
+#//#include <windows.h>
+##include <rpc.h>
+##define uuid_generate(uuid) UuidCreate(&uuid)
+#//#define uuid_generate_random(uuid) UuidCreate(&uuid)
+##define uuid_unparse(uuid,uuid_string) { UCHAR* buf = NULL; UuidToString(&uuid, &buf); strcpy(uuid_string, (char*)buf); RpcStringFree(&buf); }
+#EOF
+## fix missing termios.h (version >= 1.16.1)
+#touch winfix/termios.h
+# fix Windows build
+sed -i.bak -e "s/^\(wget_OBJECTS *=.*\)/\1 mswindows.o/; s/^\(wget_LDADD *=.*\)/\1 -lws2_32/" src/Makefile.in
+#sed -i.bak -e "s/^\(wget_OBJECTS *=.*\)/\1 mswindows.o/; s/^\(wget_LDADD *=.*\)/\1 -Wl,--as-needed -lws2_32 -lrpcrt4/" src/Makefile.in
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DWINDOWS" LDFLAGS="-lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DWINDOWS" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls CFLAGS="-DWINDOWS" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls --enable-threads=windows --without-libpth-prefix --without-included-regex CFLAGS="-DWINDOWS" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32" LIBS="-Wl,--as-needed -lpcreposix" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls --enable-threads=windows --disable-ipv6 CFLAGS="-DWINDOWS -I$(pwd)/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls --enable-threads=windows CFLAGS="-DWINDOWS -I$(pwd)/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls --enable-threads=windows CFLAGS="-DWINDOWS -I$(pwd)/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32 -lrpcrt4" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls --enable-threads=windows CFLAGS="-DWINDOWS -I$(pwd)/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32 -lrpcrt4" LIBS="-lbcrypt" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl=gnutls --enable-threads=windows PYTHON=$PYDIR/python.exe CFLAGS="-DWINDOWS -I$(pwd)/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lws2_32 -lrpcrt4" &&
+ wl-showstatus build-install &&
+ echo "#undef HAVE_DECL_H_ERRNO" >> src/config.h &&
+ echo "#define HAVE_DECL_H_ERRNO 1" >> src/config.h &&
+ echo "#undef HAVE_USLEEP" >> src/config.h &&
+ echo "#undef HAVE_SYMLINK" >> src/config.h &&
+ # fix missing _set_invalid_parameter_handler/_ftelli64
+ echo "#undef HAVE_MSVC_INVALID_PARAMETER_HANDLER" >> src/config.h &&
+ echo "#undef HAVE__FTELLI64" >> src/config.h &&
+ ## fix langinfo problems in lib/nl_langinfo.c (version >= 1.16.1)
+ #echo "#define REPLACE_NL_LANGINFO 1" >> src/config.h &&
+ #echo "#undef HAVE_NL_LANGINFO" >> src/config.h &&
+ ( make install-strip || make -j1 install-strip ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

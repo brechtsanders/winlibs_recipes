@@ -1,0 +1,84 @@
+export NAME="riemann-c-client"
+export STATUS=
+export URL=https://github.com/algernon/riemann-c-client
+export BASENAME=riemann-c-client
+export DESCRIPTION="A C client library for the Riemann monitoring system."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.9.1
+#export VERSIONDATE=20170117
+#export VERSION=1.10.0
+#export VERSIONDATE=20170610
+#export VERSION=1.10.1
+#export VERSIONDATE=20170613
+#export VERSION=1.10.2
+#export VERSIONDATE=20170819
+#export VERSION=1.10.3
+#export VERSIONDATE=20180820
+####lib/riemann/client.c:18:24: fatal error: netinet/in.h: No such file or directory
+#export VERSION=1.10.4
+#export VERSIONDATE=20181213
+export VERSION=1.10.5
+export VERSIONDATE=20210926
+wl-showstatus --package-version
+export DEPENDANCIES=protobuf-c
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/algernon/riemann-c-client/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/algernon/riemann-c-client/releases/download/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://github.com/algernon/riemann-c-client/archive/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+cd riemann-c-client-riemann-c-client-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/netdb.h
+touch winfix/netinet/in.h winfix/arpa/inet.h
+# fix already defined stdin in in src/cmd-send.c (version >= 1.10.4)
+patch -ulbf src/cmd-send.c << EOF
+@@ -140,3 +140,3 @@
+   } tls = {NULL, NULL, NULL, NULL};
+-  int stdin = 0;
++  int use_stdin = 0;
+
+@@ -265,3 +265,3 @@
+         case '0':
+-          stdin = 1;
++          use_stdin = 1;
+           break;
+@@ -314,3 +314,3 @@
+
+-  if (stdin)
++  if (use_stdin)
+     {
+EOF
+## fix invalid --c_out=
+#sed -i.bak -e "s/protoc-c \(.*\)-I[^ ]*/protoc-gen-c.exe \1/; s/--c_out=/--cpp_out=/g" Makefile
+# fix protoc-c issue
+sed -i.bak -e "s/protoc-c/protoc/" Makefile.am
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix .symver assembler errors
+ echo "#undef HAVE_VERSIONING" >> lib/riemann/platform.h &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf riemann-c-client-riemann-c-client-$VERSION
+####See also: http://riemann.io/clients.html
+####See also: https://github.com/gkos/riemann-c-client
+
+
+

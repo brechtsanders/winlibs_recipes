@@ -1,0 +1,153 @@
+export NAME="cryptlib"
+export STATUS=
+export URL=https://www.cs.auckland.ac.nz/~pgut001/cryptlib/
+export BASENAME=cryptlib
+export DESCRIPTION="cryptlib is a powerful security toolkit that allows even inexperienced crypto programmers to easily add encryption and authentication services to their software. The high-level interface provides anyone with the ability to add strong security capabilities to an application in as little as half an hour, without needing to know any of the low-level details that make the encryption or authentication work. Because of this, cryptlib dramatically reduces the cost involved in adding security to new or existing applications."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=3.4.3
+#export VERSIONDATE=20161230
+#export VERSION=3.4.3.1
+#export VERSIONDATE=20170916
+#export VERSION=3.4.4
+#export VERSIONDATE=20180110
+#export VERSION=3.4.4.1
+#export VERSIONDATE=20180822
+#export VERSION=3.4.5
+#export VERSIONDATE=20190309
+export VERSION=3.4.6
+export VERSIONDATE=20211119
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="GPL/Commercial"
+#export DOWNLOADURL="https://www.cs.auckland.ac.nz/~pgut001/cryptlib/ cl"
+export DOWNLOADURL="https://www.cs.auckland.ac.nz/~pgut001/cryptlib/download.html cl"
+#export DOWNLOADURL="ftp://ftp.franken.de/pub/crypt/cryptlib/ cl"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.franken.de/pub/crypt/cryptlib/cl$(echo $VERSION|sed -e "s/\.//g").zip
+#export DOWNLOADSOURCEURL=http://www.cypherpunks.to/~peter/cl$(echo $VERSION|sed -e "s/\.//g").zip
+#export DOWNLOADSOURCEURL=ftp://ftp.franken.de/pub/crypt/cryptlib/cl$(echo $VERSION|sed -e "s/\.//g").zip
+export DOWNLOADSOURCEURL=https://cryptlib-release.s3-ap-southeast-1.amazonaws.com/cryptlib$(echo $VERSION|sed -e "s/\.//g").zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#unzip -oq $TARBALLDIR/$BASENAME/cl$(echo $VERSION|sed -e "s/\.//g").zip -d$BASENAME-$VERSION
+unzip -oq $TARBALLDIR/$BASENAME/cryptlib$(echo $VERSION|sed -e "s/\.//g").zip -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION
+# fix missing VC_LT_2010/IsWindowsXPOrGreater in io/file.c
+mv io/file.c io/file.c.bak &&
+cat > io/file.c << EOF
+#define VC_LT_2010(ver) (ver > 1600)
+//#include <minwindef.h>
+//#include <versionhelpers.h>
+#include <sysinfoapi.h>
+inline int IsWindowsXPOrGreater ()
+{
+  DWORD dwVersion = GetVersion();
+  return ((LOBYTE(LOWORD(dwVersion)) > 5 || (LOBYTE(LOWORD(dwVersion)) == 5 && HIBYTE(LOWORD(dwVersion)) >= 1)) ? 1 : 0);
+}
+EOF
+cat io/file.c.bak >> io/file.c
+# fix missing VC_LT_2010/IsWindowsXPOrGreater in misc/os_spec.c
+mv misc/os_spec.c misc/os_spec.c.bak
+cat > misc/os_spec.c << EOF
+#define VC_LT_2010(ver) (ver > 1600)
+//#include <minwindef.h>
+//#include <versionhelpers.h>
+#include <sysinfoapi.h>
+inline int IsWindowsXPOrGreater ()
+{
+  DWORD dwVersion = GetVersion();
+  return ((LOBYTE(LOWORD(dwVersion)) > 5 || (LOBYTE(LOWORD(dwVersion)) == 5 && HIBYTE(LOWORD(dwVersion)) >= 1)) ? 1 : 0);
+}
+EOF
+cat misc/os_spec.c.bak >> misc/os_spec.c
+# fix obsolete lm.h in random/win32.c (version >= 3.4.3.1)
+####error lm.h is deprecated, please use levmar.h instead!
+sed -i.orig -e "s/#include <lm\.h>/#include <lmerr.h>\n#include <lmsname.h>/" random/win32.c
+## fix missing endian.h in misc/os_spec.h (version = 3.4.4)
+#patch -ulbf misc/os_spec.h << EOF
+#@@ -948,4 +948,6 @@
+#   #elif defined( __NetBSD__ )
+#        #include <sys/endian.h>
+#+  #elif defined( __MINGW32__ )
+#+       #define DATA_LITTLEENDIAN
+#   #else
+#        #include <endian.h>
+#EOF
+# fix missing endian.h (version >= 3.4.5)
+mkdir -p winfix
+echo "#define DATA_LITTLEENDIAN" > winfix/endian.h
+# fix test/ssh.c (version >= 3.4.3.1)
+patch -ulbf test/ssh.c << EOF
+@@ -20 +20 @@
+-  #elif !defined( __WIN64__ ) defined( _M_X64 )
++  #elif !defined( __WIN64__ ) && defined( _M_X64 )
+EOF
+# fix test/certs.c (version >= 3.4.3.1)
+patch -ulbf test/certs.c << EOF
+@@ -20 +20 @@
+-  #elif !defined( __WIN64__ ) defined( _M_X64 )
++  #elif !defined( __WIN64__ ) && defined( _M_X64 )
+EOF
+# fix redefinition of ptrdiff_t in zlib/zutil.h (version >= 3.4.3.1)
+patch -ulbf zlib/zutil.h << EOF
+@@ -35,3 +35,3 @@
+
+-#if defined( Z_SOLO ) && !defined( _M_X64 )
++#if defined( Z_SOLO ) && !defined( _M_X64 ) && !defined(__MINGW32__)
+    typedef long ptrdiff_t;  /* guess -- will be caught if guess is wrong */
+EOF
+# fix error: missing binary operator before token "defined" in test/ssl.c (version >= 3.4.4.1)
+patch -ulbf test/ssl.c << EOF
+@@ -20 +20 @@
+-  #elif !defined( __WIN64__ ) defined( _M_X64 )
++  #elif !defined( __WIN64__ ) || defined( _M_X64 )
+EOF
+# fix misc/int_api.c (version >= 3.4.5)
+patch -ulbf misc/int_api.c << EOF
+@@ -699,3 +699,9 @@
+        {
++#ifdef __MINGW32__
++       static time_t intervalStartTime = 0;
++       if (intervalStartTime == 0)
++               intervalStartTime = CURRENT_TIME_VALUE;
++#else
+        static time_t intervalStartTime = CURRENT_TIME_VALUE;
++#endif
+        static int failures = 0;
+EOF
+# fix test/test.h (version >= 3.4.5)
+patch -ulbf test/test.h << EOF
+@@ -310,3 +310,3 @@
+        #define __WIN32__
+-  #elif !defined( __WIN64__ ) defined( _M_X64 )
++  #elif !defined( __WIN64__ ) && defined( _M_X64 )
+        #define __WIN64__
+EOF
+# generate .def file
+echo "EXPORTS" > exports.def &&
+sed -n -e "s/^C_RET \(crypt[^ (]*\).*$/\1/p" cryptlib.h >> exports.def &&
+sed -n -e "s/^AES_RETURN \([aA][eE][sS][^ (]*\).*$/\1/p" crypt/aes.h >> exports.def &&
+wl-showstatus build &&
+ #make CC=gcc MINGW32_NT-5.1 &&
+ #gcc -shared -s -mwindows -def crypt32.def -o cryptlib.dll libcl.a -Wl,--out-implib,libcl.dll.a --enable-stdcall-fixup -Wl,--as-needed -lnetapi32 &&
+ #make CC=gcc MINGW32_NT-6.1 &&
+ make CC="gcc -I$(pwd)/winfix" MINGW32_NT-6.1 &&
+ #dlltool -Dcl$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi).dll -dcrypt32.def -llibcl.dll.a &&
+ dlltool -Dcl$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi).dll -dexports.def -llibcl.dll.a &&
+ #gcc -shared -s -mwindows -def exports.def -o cl$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi).dll libcl.a -Wl,--out-implib,libcl.dll.a -lws2_32 -lnetapi32 &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/include/cryptlib &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ #cp -f cryptlib.dll $INSTALLPREFIX/bin/ &&
+ cp -f cl$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi).dll $INSTALLPREFIX/bin/ &&
+ cp -f *.h $INSTALLPREFIX/include/cryptlib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

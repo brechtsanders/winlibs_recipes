@@ -1,0 +1,64 @@
+export NAME="libgssapi"
+export STATUS=
+export URL=http://cblfs.cross-lfs.org/index.php/Libgssapi
+export BASENAME=libgssapi
+export DESCRIPTION="This library exports a gssapi interface, but doesn't implement any gssapi mechanisms itself; instead it calls gssapi routines in other libraries, depending on the mechanism."
+export CATEGORY=security
+export TYPE=library
+export VERSION=0.11
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=libdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://www.citi.umich.edu/projects/nfsv4/linux/libgssapi/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.citi.umich.edu/projects/nfsv4/linux/libgssapi/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# create dummy syslog.h
+mkdir win32fix
+cat > win32fix/syslog.h << EOF
+#define LOG_ERR 3
+static void syslog (int priority, const char *format, ...) {}
+EOF
+# fix krb5_gss_initialize error in src/g_initialize.c
+patch -ulbf src/g_initialize.c << EOF
+--- src/g_initialize.c  2006-06-22 21:13:12 +0200
++++ src/g_initialize.c  2010-10-23 20:59:28 +0200
+@@ -158,4 +158,6 @@
+     linux_initialize();
+
++#elif defined(WIN32)
++
+ #else
+     {
+EOF
+# fix missing win-mac.h
+#touch src/win-mac.h
+mv src/gssglue/gssapi/gssapi.h.in src/gssglue/gssapi/gssapi.h.in.bak
+grep -v "win-mac.h" src/gssglue/gssapi/gssapi.h.in.bak > src/gssglue/gssapi/gssapi.h.in
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" LDFLAGS="-Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/win32fix -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Superseded by gss
+
+
+

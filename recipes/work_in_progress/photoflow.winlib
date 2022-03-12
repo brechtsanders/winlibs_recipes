@@ -1,0 +1,131 @@
+export NAME="PhotoFlow"
+export STATUS=
+export URL=http://aferrero2707.github.io/PhotoFlow/
+#export URL=https://github.com/aferrero2707/PhotoFlow
+export BASENAME=photoflow
+export DESCRIPTION="A fully non-destructive photo retouching program providing a complete layer-based workflow including RAW image development."
+export CATEGORY=graphics
+export TYPE=application
+export VERSION=0.2.8
+export VERSIONDATE=20210610
+wl-showstatus --package-version
+export DEPENDANCIES=libvips,zlib,libjpeg,libpng,libtiff,expat,pugixml,libexif,exiv2,lensfun,lcms2,openexr,liborc,libsigcplusplus2,pixman,pango,glib2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/aferrero2707/PhotoFlow/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/aferrero2707/PhotoFlow/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd PhotoFlow-$VERSION
+# fix src/base/pftypes.hh (version >= 0.2.8)
+patch -ulbf src/base/pftypes.hh << EOF
+@@ -34,2 +34,3 @@
+ #include <vips/vips.h>
++#include <vips/vips7compat.h>
+
+EOF
+# fix src/vips/gmic/vips_gmic.cpp (version >= 0.2.8)
+patch -ulbf src/vips/gmic/vips_gmic.cpp << EOF
+@@ -34,2 +34,3 @@
+ #include <vips/vips.h>
++#include <vips/vips7compat.h>
+ #include <vips/dispatch.h>
+EOF
+# fix src/vips/lensfun.cc (version >= 0.2.8)
+patch -ulbf src/vips/lensfun.cc << EOF
+@@ -59,2 +59,4 @@
+
++#include <vips/vips.h>
++#include <vips/vips7compat.h>
+ #include <vips/dispatch.h>
+EOF
+# fix src/vips/clone_stamp.cc (version >= 0.2.8)
+patch -ulbf src/vips/clone_stamp.cc << EOF
+@@ -50,2 +50,4 @@
+
++#include <vips/vips.h>
++#include <vips/vips7compat.h>
+ #include <vips/dispatch.h>
+EOF
+# fix src/vips/layer.cc (version >= 0.2.8)
+patch -ulbf src/vips/layer.cc << EOF
+@@ -50,2 +50,4 @@
+
++#include <vips/vips.h>
++#include <vips/vips7compat.h>
+ #include <vips/dispatch.h>
+# fix src/vips/perspective.cc (version >= 0.2.8)
+patch -ulbf src/vips/perspective.cc << EOF
+@@ -50,2 +50,4 @@
+
++#include <vips/vips.h>
++#include <vips/vips7compat.h>
+ #include <vips/dispatch.h>
+EOF
+# fix src/vips/sinkscreen_pf.c (version >= 0.2.8)
+patch -ulbf src/vips/sinkscreen_pf.c << EOF
+@@ -71,2 +71,3 @@
+ #include <vips/vips.h>
++#include <vips/vips7compat.h>
+ #include <vips/thread.h>
+EOF
+# fix missing std::cerr in src/base/exif_data.cc (version >= 0.2.8)
+mv src/base/exif_data.cc src/base/exif_data.cc.bak &&
+echo "#include <iostream>" > src/base/exif_data.cc &&
+cat src/base/exif_data.cc.bak >> src/base/exif_data.cc
+# fix missing exiv2/xmp.hpp in src/base/exif_data.hh (version >= 0.2.8)
+patch -ulbf src/base/exif_data.hh << EOF
+@@ -43,3 +43,3 @@
+ #include <exiv2/easyaccess.hpp>
+-#include <exiv2/xmp.hpp>
++#include <exiv2/xmp_exiv2.hpp>
+ #include <exiv2/error.hpp>
+EOF
+# fix missing vips/cimg_funcs.h in src/operations/denoise.cc (version >= 0.2.8)
+patch -ulbf src/operations/denoise.cc << EOF
+@@ -29,3 +29,3 @@
+
+-#include <vips/cimg_funcs.h>
++#include <vips/vips.h>
+
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DBUNDLED_EXIV2:BOOL=OFF -DBUNDLED_LENSFUN:BOOL=OFF -DBUILD_TOOLS:BOOL=ON -DBUILD_BENCHMARKING:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_CXX_FLAGS:STRING="-fpermissive -Wno-error=attributes" -S. -Bbuild_win &&
+ sed -i.bak -e "s/-Wlarger-than=32768//" build_win/build.ninja &&
+ sed -i.bak2 -e "s/-ltre_regex//g" build_win/build.ninja &&
+ #wl-showstatus build &&
+ #make -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf PhotoFlow-$VERSION
+
+
+

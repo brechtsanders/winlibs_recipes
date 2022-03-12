@@ -1,0 +1,77 @@
+export NAME="liba52"
+export STATUS=
+export URL=http://liba52.sourceforge.net/
+export BASENAME=liba52
+export DESCRIPTION="liba52 is a free library for decoding ATSC A/52 streams. The A/52 standard is used in a variety of applications, including digital television and DVD. It is also known as AC-3."
+export CATEGORY=audio,codec
+export TYPE=library
+export VERSION=0.7.4
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://sourceforge.net/project/showfiles.php?group_id=8658&g=1 a52dec-"
+export DOWNLOADURL="http://liba52.sourceforge.net/downloads.html a52dec-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://liba52.sourceforge.net/files/a52dec-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/a52dec-$VERSION.tar.gz
+cd a52dec-$VERSION
+# fix missing WinMain
+cat >> liba52/parse.c << EOF
+#include <windows.h>
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) { return main(__argc, __argv); }
+EOF
+## fix missing _argc/_argv on 64-bit
+#mv liba52/parse.c liba52/parse.c.bak &&
+#sed -e "s/_arg/__arg/g" liba52/parse.c.bak > liba52/parse.c
+# fix duplicate strcasecmp/imaxabs (version >= 0.7.4)
+for F in liba52/*.c; do
+ mv $F $F.bak &&
+ echo "#include <inttypes.h>" > $F
+ echo "#include <string.h>" >> $F
+ cat $F.bak >> $F
+done
+# fix missing _mkgmtime32 (version >= 0.7.4)
+for F in src/*.c; do
+ mv $F $F.bak &&
+ echo "#include <time.h>" > $F
+ echo "#include <malloc.h>" >> $F
+ cat $F.bak >> $F
+done
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# mkdir -p m4 &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi &&
+#make check
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-oss --disable-solaris-audio --disable-al-audio --disable-win LDFLAGS="-Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lmingwex" &&
+ # fix exporting too many symbols
+ mv libtool libtool.bak &&
+ sed -e "s/\(soname-def *\)>/\1| grep a52_ >/" -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix invalid -mcpu compiler parameter
+ for F in */Makefile; do
+  mv $F $F.bak &&
+  sed -e "s/-mcpu=[^ ]*//; s/-lm//" $F.bak > $F
+ done &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip LIBS="-Wl,--allow-multiple-definition -Wl,--as-needed -lmingwex -L$(pwd)/liba52/.libs -la52.dll" || ( make -Cliba52 install-strip && make -Cinclude install-strip )) &&
+ ( ls -1 $INSTALLPREFIX/lib/*.dll && (
+  mkdir -p $INSTALLPREFIX/bin &&
+  mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+  ( cp -f $(pwd)/liba52/.libs/liba52.dll.a $INSTALLPREFIX/lib/ || dlltool -D$INSTALLPREFIX/bin/liba52*.dll -l$INSTALLPREFIX/lib/liba52.dll.a )
+ ) || true ) &&
+ sed -i -e "s/\(library_names='lib.*\)-[0-9]*\(\.dll\)\('\)/\1\2.a\3/" $INSTALLPREFIX/lib/liba52.la &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf a52dec-$VERSION
+
+
+

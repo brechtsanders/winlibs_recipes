@@ -1,0 +1,97 @@
+export NAME="yaSSL"
+export STATUS=
+export URL=http://www.yassl.com/
+export BASENAME=yassl
+export DESCRIPTION="The CyaSSL embedded SSL library is a lightweight, portable, C-language-based SSL/TLS library targeted at IoT, embedded, and RTOS environments primarily because of its size, speed, and feature set. It works seamlessly in desktop, enterprise, and cloud environments as well. CyaSSL supports industry standards up to the current TLS 1.2 and DTLS 1.2, is up to 20 times smaller than OpenSSL, offers a simple API, an OpenSSL compatibility layer, OCSP and CRL support, is backed by the robust wolfCrypt cryptography library, and much more."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=2.3.7
+#export VERSIONDATE=20150203
+#export VERSION=2.3.8
+#export VERSIONDATE=20150919
+#export VERSION=2.3.9
+#export VERSIONDATE=20151203
+#export VERSION=2.3.9b
+#export VERSIONDATE=20160406
+#export VERSION=2.4.0
+#export VERSIONDATE=20160524
+export VERSION=2.4.2
+export VERSIONDATE=20160928
+####testsuite/test.hpp:459:20: error: 'sub' was not declared in this scope
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://yassl.com/yaSSL/download/downloadMoreForm.php"
+#export DOWNLOADURL="https://www.wolfssl.com/products/yassl/"
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=
+wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip
+cd $BASENAME-$VERSION
+# fix redefinition of __cxa_pure_virtual in taocrypt/include/runtime.hpp
+patch -ulbf taocrypt/include/runtime.hpp << EOF
+--- taocrypt/include/runtime.hpp  2015-02-03 21:11:26.000000000 +0100
++++ taocrypt/include/runtime.hpp  2015-02-03 21:11:36.000000000 +0100
+@@ -51,7 +51,7 @@
+ #endif // __sun
+
+
+-#if defined(__GNUC__) && !(defined(__ICC) || defined(__INTEL_COMPILER))
++#if defined(__GNUC__) && !(defined(__ICC) || defined(__INTEL_COMPILER)) && !defined(__MINGW32__)
+
+ #if __GNUC__ > 2
+
+EOF
+# fix missing pthread_self in src/yassl_int.cpp
+patch -ulbf src/yassl_int.cpp << EOF
+--- src/yassl_int.cpp  2014-12-09 23:23:02.000000000 +0100
++++ src/yassl_int.cpp  2015-02-03 21:19:56.000000000 +0100
+@@ -1729,3 +1729,3 @@
+ {
+-#ifndef _POSIX_THREADS
++#if !defined(_POSIX_THREADS) || defined(__MINGW32__)
+     return GetCurrentThreadId();
+EOF
+# fix already defined max in src/ssl.cpp
+mv taocrypt/include/integer.hpp taocrypt/include/integer.hpp.bak
+cat > taocrypt/include/integer.hpp << EOF
+#undef max
+EOF
+cat taocrypt/include/integer.hpp.bak >> taocrypt/include/integer.hpp
+# skip making testsuite (version >= 2.3.9b)
+cat > testsuite/Makefile.in << EOF
+all:
+install:
+install-strip:
+clean:
+EOF
+# skip making examples (version >= 2.3.9b)
+cat > examples/Makefile.in << EOF
+all:
+install:
+install-strip:
+clean:
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus build-install &&
+ #mkdir -p $INSTALLPREFIX/lib &&
+ #make install-strip &&
+ make -Ctaocrypt install-strip &&
+ make -Csrc install-strip &&
+ mkdir -p $INSTALLPREFIX/include/yassl &&
+ cp -rf include/* $INSTALLPREFIX/include/yassl/ &&
+ rm -f $INSTALLPREFIX/bin/benchmark.exe  $INSTALLPREFIX/bin/test.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

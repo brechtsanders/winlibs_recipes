@@ -1,0 +1,116 @@
+export NAME="pwgen"
+export STATUS=
+export URL=http://sourceforge.net/projects/pwgen/
+export BASENAME=pwgen
+export DESCRIPTION="Pwgen is a small, GPL'ed password generator which creates passwords which can be easily memorized by a human."
+export CATEGORY=security
+export TYPE=application
+#export VERSION=2.06
+#export VERSIONDATE=20111212
+#export VERSION=2.07
+#export VERSIONDATE=20141028
+export VERSION=2.08
+export VERSIONDATE=20170816
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sourceforge.net/projects/pwgen/files/pwgen/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/pwgen/pwgen/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix randnum.c (version <= 2.07)
+#patch -ulbf randnum.c << EOF
+#--- randnum.c  2014-11-16 10:15:06.000000000 +0100
+#+++ randnum.c  2014-11-16 10:28:12.000000000 +0100
+#@@ -22,6 +22,10 @@
+# extern double drand48(void);
+# #endif
+#
+#+#ifdef __MINGW32__
+#+static int seeded = 0;
+#+#define random rand
+#+#else
+# static int get_random_fd(void);
+#
+# /* Borrowed/adapted from e2fsprogs's UUID generation code */
+#@@ -38,6 +42,7 @@
+#        }
+#        return fd;
+# }
+#+#endif
+#
+# /*
+#  * Generate a random number n, where 0 <= n < max_num, using
+#@@ -46,6 +51,7 @@
+# int pw_random_number(max_num)
+#        int max_num;
+# {
+#+#ifndef __MINGW32__
+#        int i, fd = get_random_fd();
+#        int lose_counter = 0, nbytes;
+#        unsigned int rand_num;
+#@@ -75,4 +81,11 @@
+#
+#        fprintf(stderr, "No entropy available!\n");
+#        exit(1);
+#+#else
+#+        if (!seeded) {
+#+                srand(time(NULL));
+#+                seeded = 1;
+#+        }
+#+       return (((unsigned long)rand() * (unsigned long)max_num + (unsigned long)max_num / 2) / RAND_MAX);
+#+#endif
+# }
+#
+#EOF
+# fix randnum.c (version >= 2.08)
+patch -ulbf randnum.c << EOF
+@@ -23,4 +23,8 @@
+ #endif
+
++#ifdef __MINGW32__
++static int seeded = 0;
++#define random rand
++#else
+ static int get_random_fd(void);
+
+@@ -39,4 +43,5 @@
+        return fd;
+ }
++#endif
+
+ /*
+@@ -47,4 +52,5 @@
+        int max_num;
+ {
++#ifndef __MINGW32__
+        unsigned int rand_num;
+        int i, fd = get_random_fd();
+@@ -75,3 +81,10 @@
+        fprintf(stderr, "No entropy available!\n");
+        exit(1);
++#else
++        if (!seeded) {
++                srand(time(NULL));
++                seeded = 1;
++        }
++       return (((unsigned long)rand() * (unsigned long)max_num + (unsigned long)max_num / 2) / RAND_MAX);
++#endif
+ }
+
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

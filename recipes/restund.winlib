@@ -1,0 +1,78 @@
+export NAME="Restund"
+export STATUS=
+#export URL=http://creytiv.com/restund.html
+export URL=https://github.com/wireapp/restund
+export BASENAME=restund
+export DESCRIPTION="Restund is a modular and flexible STUN and TURN Server, with IPv4 and IPv6 support."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.4.12
+#export VERSIONDATE=20170215
+export VERSION=0.4.16
+export VERSIONDATE=20210924
+wl-showstatus --package-version
+export DEPENDANCIES=libre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=docs/COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://creytiv.com/pub/"
+#export DOWNLOADURL="https://github.com/otalk/restund/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://creytiv.com/pub/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/wireapp/restund/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix installation when not building modules because of static build
+patch -ulbf Makefile << EOF
+@@ -121,3 +121,5 @@
+        @mkdir -p \$(DESTDIR)\$(MOD_PATH)
++ifeq (\$(STATIC),)
+        \$(INSTALL) -m 0644 \$(MOD_BINS) \$(DESTDIR)\$(MOD_PATH)
++endif
+        @mkdir -p \$(DESTDIR)\$(DATADIR)/munin/plugins
+EOF
+# fix src/main.c (version >= 0.4.16)
+patch -ulbf src/main.c << EOF
+@@ -12,3 +12,5 @@
+ #endif
++#ifndef _WIN32
+ #include <sys/resource.h>
++#endif
+ #include <pthread.h>
+@@ -205,2 +207,3 @@
+
++#ifndef _WIN32
+        struct rlimit limits;
+@@ -217,2 +220,3 @@
+        }
++#endif
+
+EOF
+# fix modules/zrest/zrest.c (version >= 0.4.16)
+patch -ulbf modules/zrest/zrest.c << EOF
+@@ -66,2 +66,5 @@
+ {
++#ifndef SHA512_DIGEST_LENGTH
++#define SHA512_DIGEST_LENGTH 64
++#endif
+        uint8_t digest[SHA512_DIGEST_LENGTH];
+EOF
+wl-showstatus build-install &&
+ #make install CC="gcc -I$MINGWPREFIX/include/re -I$(pwd)/include" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk LIBS="-Wl,--as-needed -lre -lws2_32" PREFIX=$INSTALLPREFIX &&
+ #make src/static.c OS=win32 CROSS_COMPILE= &&
+ ( make install CC="gcc -I$MINGWPREFIX/include/re -I$(pwd)/include" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk LIBS="-Wl,--as-needed -leay32 -lre -lws2_32" PREFIX=$INSTALLPREFIX || (
+  # fix src/static.c (version >= 0.4.16)
+  sed -i.bak -e "s/^extern \(const struct mod_export exports_zrest;\)/\1/" src/static.c &&
+  make install CC="gcc -I$MINGWPREFIX/include/re -I$(pwd)/include" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk LIBS="-Wl,--as-needed -leay32 -lre -lws2_32" PREFIX=$INSTALLPREFIX 
+ )) &&
+ strip $INSTALLPREFIX/sbin/*.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

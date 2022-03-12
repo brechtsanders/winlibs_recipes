@@ -1,0 +1,133 @@
+export NAME="libnl"
+export STATUS=
+#export URL=http://www.carisma.slowglass.com/~tgr/libnl/
+export URL=http://www.infradead.org/~tgr/libnl/
+export BASENAME=libnl1
+export DESCRIPTION="The libnl suite is a collection of libraries providing APIs to netlink protocol based Linux kernel interfaces."
+export CATEGORY=network
+export TYPE=library
+export VERSION=1.1.4
+export VERSIONDATE=20130827
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://www.carisma.slowglass.com/~tgr/libnl/files/"
+export DOWNLOADURL="https://www.infradead.org/~tgr/libnl/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.carisma.slowglass.com/~tgr/libnl/files/libnl-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://www.infradead.org/~tgr/libnl/files/libnl-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/libnl-$VERSION.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd libnl-$VERSION
+mkdir -p winfix/sys winfix/arpa winfix/linux winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <sys/types.h>" > winfix/linux/types.h
+touch winfix/arpa/inet.h winfix/netdb.h winfix/sys/poll.h
+# fix include/netlink-local.h
+patch -ulbf include/netlink-local.h << EOF
+@@ -25,3 +25,7 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
++#endif
+ #include <inttypes.h>
+@@ -30,4 +34,6 @@
+
++#ifndef _WIN32
+ #include <arpa/inet.h>
+ #include <netdb.h>
++#endif
+
+@@ -353,2 +359,3 @@
+
++#undef min
+ #define min(x,y) ({ \\
+@@ -359,2 +366,3 @@
+
++#undef max
+ #define max(x,y) ({ \\
+EOF
+# fix include/linux/netlink.h
+patch -ulbf include/linux/netlink.h << EOF
+@@ -3,3 +3,7 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <linux/socket.h> /* for sa_family_t */
++#endif
+ #include <linux/types.h>
+EOF
+# fix src/utils.h
+patch -ulbf src/utils.h << EOF
+@@ -22,3 +22,7 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
++#endif
+
+EOF
+# fix lib/utils.c
+patch -ulbf lib/utils.c << EOF
+@@ -19,3 +19,8 @@
+ #include <netlink/utils.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <linux/socket.h>
++#endif
+
+EOF
+# fix __uNN and __sNN types
+for F in include/linux/*.h; do
+ mv $F $F.bak &&
+ sed -e "s/u_int\([0-9]\+\)_t/uint\1_t/g; s/__s\([0-9]\+\)/int\1_t/g" $F.bak > $F
+done
+# fix __uNN and __sNN types
+for F in include/linux/netfilter/*.h; do
+ mv $F $F.bak &&
+ sed -e "s/u_int\([0-9]\+\)_t/uint\1_t/g" $F.bak > $F
+done
+  ./configure --help
+  head COPYING* LICENSE*
+  ls -l COPYING* LICENSE*
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/winfix" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm -f CMakeCache.txt &&
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf libnl-$VERSION
+
+
+

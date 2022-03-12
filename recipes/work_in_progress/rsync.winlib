@@ -1,0 +1,169 @@
+export NAME="rsync"
+export STATUS=
+export URL=http://rsync.samba.org/
+export BASENAME=rsync
+export DESCRIPTION="rsync is an open source utility that provides fast incremental file transfer."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=3.0.3
+#export VERSION=3.0.5
+#export VERSION=3.0.6
+#export VERSION=3.0.7
+#export VERSIONDATE=
+#export VERSION=3.0.8
+#export VERSIONDATE=20110327
+#export VERSION=3.0.9
+#export VERSIONDATE=20110924
+#export VERSION=3.1.0
+#export VERSIONDATE=20130929
+#export VERSION=3.1.1
+#export VERSIONDATE=20140623
+#export VERSION=3.1.2
+#export VERSIONDATE=20151222
+#export VERSION=3.1.3
+#export VERSIONDATE=20180129
+#export VERSION=3.2.0
+#export VERSIONDATE=20200620
+#export VERSION=3.2.1
+#export VERSIONDATE=20200623
+#export VERSION=3.2.2
+#export VERSIONDATE=20200705
+export VERSION=3.2.3
+export VERSIONDATE=20200807
+####./proto.h:152: error: conflicting types for 'read_varlong'
+####io.h:33: note: previous implicit declaration of 'read_varlong' was here
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://rsync.samba.org/ftp/rsync/src/"
+#export DOWNLOADURL="https://download.samba.org/pub/rsync/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://rsync.samba.org/ftp/rsync/src/rsync-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/rsync-$VERSION.tar.gz
+cd rsync-$VERSION
+
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+cat > winfix/sys/socket.h << EOF
+#include <winsock2.h>
+typedef int socklen_t;
+EOF
+touch winfix/pwd.h winfix/grp.h winfix/netinet/in.h winfix/arpa/inet.h
+cat > winfix/syslog.h << EOF
+EOF
+
+mv rsync.h rsync.h.bak
+cat > rsync.h << EOF
+#include <stdint.h>
+typedef int32_t int32;
+typedef int64_t int64;
+typedef unsigned char uchar;
+#define S_ISUID 0
+#define S_ISGID 0
+EOF
+cat rsync.h.bak >> rsync.h
+
+#patch -ulbf proto.h << EOF
+#--- proto.h  2011-03-26 22:26:46 +0100
+#+++ proto.h  2011-05-25 20:47:32 +0200
+#@@ -151,4 +151,4 @@
+# int32 read_varint(int f);
+#-int64 read_varlong(int f, uchar min_bytes);
+#-int64 read_longint(int f);
+#+//int64 read_varlong(int f, uchar min_bytes);
+#+//int64 read_longint(int f);
+# void read_buf(int f, char *buf, size_t len);
+#@@ -161,6 +161,6 @@
+# void write_shortint(int f, unsigned short x);
+#-void write_int(int f, int32 x);
+#-void write_varint(int f, int32 x);
+#-void write_varlong(int f, int64 x, uchar min_bytes);
+#-void write_longint(int f, int64 x);
+#+//void write_int(int f, int32 x);
+#+//void write_varint(int f, int32 x);
+#+//void write_varlong(int f, int64 x, uchar min_bytes);
+#+//void write_longint(int f, int64 x);
+# void write_buf(int f, const char *buf, size_t len);
+#EOF
+
+mv io.h io.h.bak
+cat > io.h << EOF
+#ifndef __DEFINED_RSYNC_IO
+#define __DEFINED_RSYNC_IO
+#include_next <io.h>
+EOF
+cat io.h.bak >> io.h
+echo "#endif" >> io.h
+
+# fix cleanup.c (version >= 3.1.3)
+patch -ulbf cleanup.c << EOF
+@@ -107,4 +107,8 @@
+
++#ifdef SIGUSR1
+        SIGACTION(SIGUSR1, SIG_IGN);
++#endif
++#ifdef SIGUSR2
+        SIGACTION(SIGUSR2, SIG_IGN);
++#endif
+
+EOF
+
+# fix io.c (version >= 3.1.3)
+patch -ulbf io.c << EOF
+@@ -1698,2 +1698,3 @@
+
++#ifndef __MINGW32__
+ unsigned short read_shortint(int f)
+@@ -1810,2 +1811,3 @@
+ }
++#endif
+
+@@ -1996,2 +1998,3 @@
+
++#ifndef __MINGW32__
+ void write_shortint(int f, unsigned short x)
+@@ -2088,2 +2091,3 @@
+ }
++#endif
+
+EOF
+
+# fix mkproto.pl (version >= 3.1.3)
+patch -ulbf mkproto.pl << EOF
+@@ -30,3 +30,3 @@
+        \$protos .= "\$ret\$func(\$arg);\\n";
+-    } elsif (/^static|^extern/ || /[;]/ || !/^[A-Za-z][A-Za-z0-9_]* /) {
++    } elsif (/^static|^extern/ || /[;]/ || !/^[A-Za-z][A-Za-z0-9_]* / || /(read|write)_(int|varint|varlong|longint)/) {
+        ;
+EOF
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ipv6 CFLAGS="-I$(pwd)/winfix" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ipv6 --disable-simd CFLAGS="-I$(pwd)/winfix" &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION
+cd ..
+
+
+#mv proto.h proto.h.bak
+#sed -e "s/\([( ]\)\(stat_x\)/\1struct \2/" proto.h.bak > proto.h
+
+cat > fixtypes.h << EOF
+#ifndef INCLUDE_FIXTYPES_H
+#define INCLUDE_FIXTYPES_H
+#include <stdint.h>
+typedef int32_t int32;
+typedef int64_t int64;
+typedef uint8_t uchar;
+#endif
+EOF
+
+
+

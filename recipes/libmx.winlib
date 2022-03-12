@@ -1,0 +1,155 @@
+export NAME="libmx"
+export STATUS=
+export URL=http://lostsidedead.com/mx/
+export BASENAME=libmx
+export DESCRIPTION="libmx is a 2D/3D C++ library built on top of SDL and other technologies used to create 2D/3D multimedia applications. It works for Mac OS X, Windows, and Linux."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=1.01
+#export VERSIONDATE=20110510
+#export VERSION=1.2.0
+#export VERSIONDATE=20110718
+####mx/mx-create-image-cache.c:397:16: error: 'struct dirent' has no member named 'd_type'
+####mx/mx-create-image-cache.c:397:28: error: 'DT_DIR' undeclared (first use in this function)
+#export VERSION=1.2.1
+#export VERSIONDATE=20110801
+#export VERSION=1.3.0
+#export VERSIONDATE=20110730
+#export VERSION=1.3.1
+#export VERSIONDATE=20110831
+#export VERSION=1.3.2
+#export VERSIONDATE=20110930
+#export VERSION=1.4.0
+#export VERSIONDATE=20111012
+#export VERSION=1.4.1
+#export VERSIONDATE=20111028
+####mx/mx-entry.c:1067: error: 'Display' undeclared (first use in this function)
+#export VERSION=1.4.2
+#export VERSIONDATE=20120131
+#export VERSION=1.4.3
+#export VERSIONDATE=20120305
+#export VERSION=1.4.4
+#export VERSIONDATE=20120402
+#export VERSION=1.4.5
+#export VERSIONDATE=20120331
+#export VERSION=1.4.6
+#export VERSIONDATE=20120508
+export VERSION=1.4.7
+export VERSIONDATE=20170906
+####/include/clutter-1.0/clutter/clutter-paint-nodes.h:77: error: expected ')' before '*' token
+#export VERSION=1.99.1
+#export VERSIONDATE=20120202
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,gettext,gdk-pixbuf,clutter,dbus-glib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LIB
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://lostsidedead.com/svn/listing.php?repname=haze&path=%2Ftrunk%2Flibmx%2F"
+#export DOWNLOADURL="http://lostsidedead.biz/mx/"
+#export DOWNLOADURL="http://source.clutter-project.org/sources/mx/ mx-"
+export DOWNLOADURL="https://src.fedoraproject.org/repo/pkgs/libmx/ mx-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://lostsidedead.biz/mx/mx-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://source.clutter-project.org/sources/mx/`echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/"`/mx-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://source.clutter-project.org/sources/mx/`echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/"`/mx-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://src.fedoraproject.org/repo/pkgs/libmx/mx-1.4.7.tar.xz/19b1e4918a5ae6d014fc0dab2bb3d0a1/mx-1.4.7.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/mx-$VERSION.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/mx-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/mx-$VERSION.tar.xz
+cd mx-$VERSION
+## fix missing sysconf in mx/mx-image.c (version <= 1.3.0)
+#mv mx/mx-image.c mx/mx-image.c.bak
+#cat > mx/mx-image.c << EOF
+##include <windows.h>
+##define _SC_NPROCESSORS_ONLN 0
+#unsigned int sysconf (int item)
+#{
+# SYSTEM_INFO sysInfo;
+# GetSystemInfo(&sysInfo);
+# return sysInfo.dwNumberOfProcessors;
+#}
+#EOF
+#cat mx/mx-image.c.bak >> mx/mx-image.c
+## fix missing d_type/DT_DIR/DT_REG in mx/mx-create-image-cache.c (version <= 1.3.0)
+#patch -ulbf mx/mx-create-image-cache.c << EOF
+#--- mx/mx-create-image-cache.c  2011-05-18 12:36:18 +0200
+#+++ mx/mx-create-image-cache.c  2011-07-18 13:03:14 +0200
+#@@ -378,2 +378,27 @@
+#
+#+#ifdef __MINGW32__
+#+#include <sys/stat.h>
+#+int is_directory (const char* path, const char* dirname)
+#+{
+#+       int result;
+#+  if (!path || !*path)
+#+    return -1;
+#+  if (!dirname || !*dirname)
+#+    return -1;
+#+  char* p = (char*)malloc(strlen(path) + strlen(dirname) + 4);
+#+  strcpy(p, path);
+#+       strcat(p, "/");
+#+       strcat(p, dirname);
+#+       strcat(p, "/.");
+#+  struct stat statbuf;
+#+#ifdef __MINGW32__
+#+  result = (stat(p, &statbuf) == 0 && statbuf.st_size == 0 ? 1 : 0);
+#+#else
+#+  result = (stat(p, &statbuf) == 0 ? 1 : 0);
+#+#endif
+#+  free(p);
+#+  return result;
+#+}
+#+#endif
+#+
+# static void makecache(char *directory,
+#@@ -396,3 +421,7 @@
+#         continue;
+#+#ifdef __MINGW32__
+#+      if (is_directory(directory, entry->d_name) && recurse) {
+#+#else
+#       if (entry->d_type == DT_DIR && recurse) {
+#+#endif
+#           char newdir[2*PATH_MAX];
+#@@ -400,2 +429,5 @@
+#           makecache(newdir, recurse);
+#+#ifdef __MINGW32__
+#+      } else {
+#+#else
+#         }
+#@@ -403,2 +435,3 @@
+#       if (entry->d_type == DT_REG) {
+#+#endif
+#           char fullpath[2*PATH_MAX];
+#EOF
+# fix missing GLushort in mx/mx-deform-texture.c (version >= 1.4.6)
+mv mx/mx-deform-texture.c mx/mx-deform-texture.c.bak
+echo "#include <GL/glew.h>" > mx/mx-deform-texture.c
+cat mx/mx-deform-texture.c.bak >> mx/mx-deform-texture.c
+# fix missing GLfloat in mx/mx-texture-frame.c (version >= 1.4.6)
+mv mx/mx-texture-frame.c mx/mx-texture-frame.c.bak
+echo "#include <GL/glew.h>" > mx/mx-texture-frame.c
+cat mx/mx-texture-frame.c.bak >> mx/mx-texture-frame.c
+wl-showstatus configure &&
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-winsys=none --enable-introspection=no --enable-debug=no LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-winsys=none --enable-introspection=no --enable-debug=no LDFLAGS="-Wl,-no-undefined" &&
+#PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-winsys=none --enable-introspection=no --enable-debug=no --without-dbus PKG_CONFIG=`which pkg-config` CFLAGS="`$PKG_CONFIG --cflags glib-2.0`" LDFLAGS="-Wl,-no-undefined" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-winsys=none --enable-introspection=no --enable-debug=no --without-dbus PKG_CONFIG=`which pkg-config` CFLAGS="`$PKG_CONFIG --cflags glib-2.0`" LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #( make install-strip || make -j1 install-strip GLIB_MKENUMS=glib-mkenums GLIB_GENMARSHAL=glib-genmarshal ) &&
+ ( PATH=$PYDIR:$PATH make install-strip || PATH=$PYDIR:$PATH make -j1 install-strip GLIB_MKENUMS=glib-mkenums GLIB_GENMARSHAL=glib-genmarshal ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mx-$VERSION
+
+
+

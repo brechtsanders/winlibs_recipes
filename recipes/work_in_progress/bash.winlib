@@ -1,0 +1,460 @@
+export NAME="bash"
+export STATUS=
+export URL=http://www.gnu.org/software/bash/
+export BASENAME=bash
+export DESCRIPTION="Bash is the shell, or command language interpreter, that will appear in the GNU operating system. Bash is an sh-compatible shell that incorporates useful features from the Korn shell (ksh) and C shell (csh). It is intended to conform to the IEEE POSIX P1003.2/ISO 9945.2 Shell and Tools standard. It offers functional improvements over sh for both programming and interactive use. In addition, most sh scripts can be run by Bash without modification."
+export CATEGORY=
+export TYPE=library
+#export VERSION=4.2
+#export VERSIONDATE=20111208
+#export VERSION=4.3
+#export VERSIONDATE=20140226
+#export VERSION=4.3.30
+#export VERSIONDATE=20141107
+#export VERSION=4.4
+#export VERSIONDATE=20160916
+#export VERSION=4.4.12
+#export VERSIONDATE=20171014
+#export VERSION=4.4.18
+#export VERSIONDATE=20180131
+#export VERSION=5.0
+#export VERSIONDATE=20190108
+#export VERSION=5.1
+#export VERSIONDATE=20201207
+#export VERSION=5.1.8
+#export VERSIONDATE=20210616
+export VERSION=5.1.16
+export VERSIONDATE=20220105
+#export VERSION=5.2-alpha
+#export VERSIONDATE=20220121
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libiconv,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/bash/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/bash/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+cat > pwd.h << EOF
+//typedef int uid_t;
+//#define geteuid() 0
+//#define getpwuid(uid) 0
+struct passwd {
+  char *pw_dir;
+  char *pw_name;
+  char *pw_shell;
+};
+EOF
+# fix shell.c
+mv shell.c shell.c.bak
+cat > shell.c << EOF
+#include <windows.h>
+#define HAVE_GETHOSTNAME
+EOF
+cat shell.c.bak >> shell.c
+# fix include/filecntl.h
+#patch -ulbf include/filecntl.h << EOF
+#--- include/filecntl.h  2011-01-02 21:29:32 +0100
+#+++ include/filecntl.h  2011-12-08 22:15:00 +0100
+#@@ -32,4 +32,9 @@
+#
+#+#ifdef __MINGW32__
+#+#define SET_CLOSE_ON_EXEC(fd)  SetHandleInformation((HANDLE)_get_osfhandle(fd), HANDLE_FLAG_INHERIT, 0)
+#+#define SET_OPEN_ON_EXEC(fd)   SetHandleInformation((HANDLE)_get_osfhandle(fd), HANDLE_FLAG_INHERIT, 1)
+#+#else
+# #define SET_CLOSE_ON_EXEC(fd)  (fcntl ((fd), F_SETFD, FD_CLOEXEC))
+# #define SET_OPEN_ON_EXEC(fd)   (fcntl ((fd), F_SETFD, FD_NCLOEXEC))
+#+#endif
+#
+#EOF
+patch -ulbf include/filecntl.h << EOF
+--- include/filecntl.h  2011-01-02 21:29:32 +0100
++++ include/filecntl.h  2011-12-08 22:53:48 +0100
+@@ -32,4 +32,9 @@
+
++#ifdef __MINGW32__
++#define SET_CLOSE_ON_EXEC(fd)  _set_close_on_exec(fd)
++#define SET_OPEN_ON_EXEC(fd)   _set_open_on_exec(fd)
++#else
+ #define SET_CLOSE_ON_EXEC(fd)  (fcntl ((fd), F_SETFD, FD_CLOEXEC))
+ #define SET_OPEN_ON_EXEC(fd)   (fcntl ((fd), F_SETFD, FD_NCLOEXEC))
++#endif
+
+EOF
+#cat >> builtins/common.c << EOF
+##include <windows.h>
+#void _set_close_on_exec (int fd)
+#{
+#  SetHandleInformation ((HANDLE)_get_osfhandle(fd), HANDLE_FLAG_INHERIT, 0);
+#}
+#void _set_open_on_exec(int fd)
+#{
+#  SetHandleInformation ((HANDLE)_get_osfhandle(fd), HANDLE_FLAG_INHERIT, 1);
+#}
+#EOF
+# fix eval.c
+patch -ulbf eval.c << EOF
+--- eval.c  2009-01-04 20:32:26 +0100
++++ eval.c  2011-12-08 22:24:36 +0100
+@@ -246,8 +246,9 @@
+   set_current_prompt_level (1);
+   global_command = (COMMAND *)NULL;
+
+   /* Only do timeouts if interactive. */
++#ifndef __MINGW32__
+   tmout_var = (SHELL_VAR *)NULL;
+   tmout_len = 0;
+   old_alrm = (SigHandler *)NULL;
+
+@@ -264,18 +265,21 @@
+              alarm (tmout_len);
+            }
+        }
+     }
++#endif
+
+   QUIT;
+
+   current_command_line_count = 0;
+   result = parse_command ();
+
++#ifndef __MINGW32__
+   if (interactive && tmout_var && (tmout_len > 0))
+     {
+       alarm(0);
+       set_signal_handler (SIGALRM, old_alrm);
+     }
++#endif
+
+   return (result);
+ }
+
+EOF
+# fix builtins/mkbuiltins.c
+patch -ulbf builtins/mkbuiltins.c << EOF
+--- builtins/mkbuiltins.c  2011-02-11 16:43:26 +0100
++++ builtins/mkbuiltins.c  2011-12-08 22:28:46 +0100
+@@ -1514,3 +1514,7 @@
+
++#ifdef __MINGW32__
++  i = mkdir ("helpfiles");
++#else
+   i = mkdir ("helpfiles", 0777);
++#endif
+   if (i < 0 && errno != EEXIST)
+EOF
+# fix input.c
+patch -ulbf input.c << EOF
+--- input.c  2011-01-02 21:58:58 +0100
++++ input.c  2011-12-09 21:53:34 +0100
+@@ -195,4 +195,6 @@
+     bp->b_flag |= B_UNBUFF;
++#ifndef __MINGW32__
+   if (O_TEXT && (fcntl (fd, F_GETFL) & O_TEXT) != 0)
+     bp->b_flag |= O_TEXT;
++#endif
+   return (bp);
+@@ -255,2 +257,3 @@
+      using for input, so we can reinitialize it later. */
++#ifndef __MINGW32__
+   nfd = (new_fd == -1) ? fcntl (fd, F_DUPFD, 10) : new_fd;
+@@ -259,2 +262,5 @@
+       if (fcntl (fd, F_GETFD, 0) == 0)
++#else
++    {
++#endif
+        sys_error (_("cannot allocate new file descriptor for bash input from fd %d"), fd);
+EOF
+# fix findcmd.c
+mv findcmd.c findcmd.c.bak
+cat > findcmd.c << EOF
+#define S_IRGRP 0
+#define S_IXGRP 0
+#define S_IXOTH 0
+#define S_IROTH 0
+EOF
+cat findcmd.c.bak >> findcmd.c
+# fix test.c
+mv test.c test.c.bak
+cat > test.c << EOF
+#define S_ISGID 0
+#define S_ISUID 0
+EOF
+cat test.c.bak >> test.c
+# fix execute_cmd.c
+patch -ulbf execute_cmd.c << EOF
+--- execute_cmd.c  2011-02-09 23:32:26 +0100
++++ execute_cmd.c  2011-12-09 16:35:08 +0100
+@@ -1234,3 +1234,3 @@
+       before.tv_usec = 0;
+-#else
++#elif defined (HAVE_TIMES)
+       before.tms_utime = before.tms_stime = before.tms_cutime = before.tms_cstime = 0;
+@@ -1319,3 +1319,3 @@
+   int result;
+-  volatile COMMAND *tcom;
++  COMMAND *tcom;
+
+@@ -2204,3 +2204,7 @@
+      current shell environment. */
+-  if (lastpipe_opt && job_control == 0 && asynchronous == 0 && pipe_out == NO_PIPE && prev > 0)
++  if (lastpipe_opt &&
++#if defined (JOB_CONTROL)
++           job_control == 0 &&
++#endif
++                       asynchronous == 0 && pipe_out == NO_PIPE && prev > 0)
+     {
+@@ -4138,4 +4142,4 @@
+   ARRAY *funcname_a;
+-  volatile ARRAY *bash_source_a;
+-  volatile ARRAY *bash_lineno_a;
++  ARRAY *bash_source_a;
++  ARRAY *bash_lineno_a;
+ #endif
+@@ -4588,4 +4592,6 @@
+       set_signal_ignored (SIGINT);
++#if !defined (__MINGW32__)
+       set_signal_handler (SIGQUIT, SIG_IGN);
+       set_signal_ignored (SIGQUIT);
++#endif
+     }
+EOF
+# fix sig.c
+patch -ulbf sig.c << EOF
+--- sig.c  2010-11-23 14:21:22 +0100
++++ sig.c  2011-12-09 16:37:14 +0100
+@@ -314,3 +314,5 @@
+   /* And, some signals that are specifically ignored by the shell. */
++#if !defined (__MINGW32__)
+   set_signal_handler (SIGQUIT, SIG_IGN);
++#endif
+
+EOF
+# fix general.c
+patch -ulbf general.c << EOF
+--- general.c  2010-12-12 21:06:28 +0100
++++ general.c  2011-12-09 17:21:36 +0100
+@@ -44,4 +44,8 @@
+ #include <tilde/tilde.h>
+
++#if defined (__MINGW32__) && !defined (FIONBIO)
++#define FIONBIO (0x80000000|(4<<16)|(ord('f')<<8)|126)
++#endif
++
+ #if !defined (errno)
+ extern int errno;
+@@ -330,4 +334,5 @@
+      int fd;
+ {
++#if !defined (__MINGW32__)
+   int flags, bflags;
+
+@@ -354,7 +359,12 @@
+
+   return 0;
++#else
++  int flags = 1;
++  return ioctl(fd, FIONBIO, &flags);
++#endif
+ }
+
+ /* Return 1 if file descriptor FD is valid; 0 otherwise. */
++#if !defined (__MINGW32__)
+ int
+ sh_validfd (fd)
+@@ -363,4 +373,5 @@
+   return (fcntl (fd, F_GETFD, 0) >= 0);
+ }
++#endif
+
+ int
+@@ -453,4 +464,5 @@
+     nfds = maxfd;
+
++#if !defined (__MINGW32__)
+   for (nfds--; check_new && nfds > 3; nfds--)
+     if (fcntl (nfds, F_GETFD, &ignore) == -1)
+@@ -463,4 +475,5 @@
+       return (script_fd);
+     }
++#endif
+
+   /* OK, we didn't find one less than our artificial maximum; return the
+EOF
+# fix trap.c
+patch -ulbf trap.c << EOF
+--- trap.c  2011-02-11 16:35:16 +0100
++++ trap.c  2011-12-09 21:06:14 +0100
+@@ -168,4 +168,6 @@
+
++#if !defined (__MINGW32__)
+   GETORIGSIG (SIGQUIT);
+   sigmodes[SIGQUIT] |= SIG_SPECIAL;
++#endif
+
+EOF
+# fix redir.c
+patch -ulbf redir.c << EOF
+--- redir.c  2011-01-02 22:00:32 +0100
++++ redir.c  2011-12-09 21:39:34 +0100
+@@ -517,3 +517,3 @@
+     {
+-#if !defined (HAVE_DEV_FD)
++#if !defined (HAVE_DEV_FD) && !defined (__MINGW32__)
+     case RF_DEVFD:
+@@ -529,3 +529,3 @@
+
+-#if !defined (HAVE_DEV_STDIN)
++#if !defined (HAVE_DEV_STDIN) && !defined (__MINGW32__)
+     case RF_DEVSTDIN:
+@@ -651,2 +651,3 @@
+ {
++#if !defined (__MINGW32__)
+   int clexec;
+@@ -656,2 +657,3 @@
+     return 0;
++#endif
+   return 1;
+@@ -814,2 +816,3 @@
+            {
++#if !defined (__MINGW32__)
+              redirector = fcntl (fd, F_DUPFD, SHELL_FD_BASE);          /* XXX try this for now */
+@@ -817,2 +820,3 @@
+              if (redirector < 0)
++#endif
+                sys_error (_("redirection error: cannot duplicate fd"));
+@@ -824,2 +828,3 @@
+              /* Only setup to undo it if the thing to undo is active. */
++#if !defined (__MINGW32__)
+              if ((fd != redirector) && (fcntl (redirector, F_GETFD, 0) != -1))
+@@ -827,2 +832,3 @@
+              else
++#endif
+                r = add_undo_close_redirect (redirector);
+@@ -926,2 +932,3 @@
+            {
++#if !defined (__MINGW32__)
+              redirector = fcntl (fd, F_DUPFD, SHELL_FD_BASE);          /* XXX try this for now */
+@@ -929,2 +936,3 @@
+              if (redirector < 0)
++#endif
+                sys_error (_("redirection error: cannot duplicate fd"));
+@@ -938,2 +946,3 @@
+                  /* Only setup to undo it if the thing to undo is active. */
++#if !defined (__MINGW32__)
+                  if ((fd != redirector) && (fcntl (redirector, F_GETFD, 0) != -1))
+@@ -941,2 +950,3 @@
+                  else
++#endif
+                    r = add_undo_close_redirect (redirector);
+@@ -989,2 +999,3 @@
+         {
++#if !defined (__MINGW32__)
+          redirector = fcntl (redir_fd, F_DUPFD, SHELL_FD_BASE);        /* XXX try this for now */
+@@ -992,2 +1003,3 @@
+          if (redirector < 0)
++#endif
+            sys_error (_("redirection error: cannot duplicate fd"));
+@@ -1001,2 +1013,3 @@
+              /* Only setup to undo it if the thing to undo is active. */
++#if !defined (__MINGW32__)
+              if (fcntl (redirector, F_GETFD, 0) != -1)
+@@ -1004,2 +1017,3 @@
+              else
++#endif
+                r = add_undo_close_redirect (redirector);
+@@ -1040,2 +1054,3 @@
+                set_it () */
++#if !defined (__MINGW32__)
+ #if 0
+@@ -1047,2 +1062,3 @@
+ #endif
++#endif
+            SET_CLOSE_ON_EXEC (redirector);
+@@ -1080,2 +1096,3 @@
+          r = 0;
++#if !defined (__MINGW32__)
+          if ((flags & RX_UNDOABLE) && (fcntl (redirector, F_GETFD, 0) != -1))
+@@ -1085,2 +1102,3 @@
+            }
++#endif
+
+@@ -1129,2 +1147,3 @@
+
++#if !defined (__MINGW32__)
+   new_fd = fcntl (fd, F_DUPFD, (fdbase < SHELL_FD_BASE) ? SHELL_FD_BASE : fdbase+1);
+@@ -1132,2 +1151,3 @@
+     new_fd = fcntl (fd, F_DUPFD, SHELL_FD_BASE);
++#endif
+
+@@ -1139,3 +1159,7 @@
+
++#if !defined (__MINGW32__)
+   clexec_flag = fcntl (fd, F_GETFD, 0);
++#else
++  clexec_flag = 0;
++#endif
+
+EOF
+# fix nojobs.c
+patch -ulbf nojobs.c << EOF
+--- nojobs.c  2010-07-05 21:58:08 +0200
++++ nojobs.c  2011-12-09 21:49:54 +0100
+@@ -41,3 +41,5 @@
+ /* Need to include this up here for *_TTY_DRIVER definitions. */
++#if !defined (__MINGW32__)
+ #include "shtty.h"
++#endif
+
+@@ -259,3 +261,3 @@
+
+-#if defined (COPROCESS_SUPPORT)
++#if defined (COPROCESS_SUPPORT) && !defined (__MINGW32__)
+   coproc_pidchk (pid, status);
+@@ -803,3 +805,3 @@
+
+-#if !defined (DONT_REPORT_SIGPIPE)
++#if !defined (DONT_REPORT_SIGPIPE) || defined (__MINGW32__)
+   if ((WIFSTOPPED (status) == 0) && WIFSIGNALED (status) &&
+@@ -846,3 +848,5 @@
+
++#if !defined (__MINGW32__)
+ static TTYSTRUCT shell_tty_info;
++#endif
+ static int got_tty_state;
+@@ -852,2 +856,3 @@
+ {
++#if !defined (__MINGW32__)
+   int tty;
+@@ -862,2 +867,3 @@
+     }
++#endif
+ }
+@@ -875,3 +881,5 @@
+        return 0;
++#if !defined (__MINGW32__)
+       ttsetattr (tty, &shell_tty_info);
++#endif
+     }
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-readline &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-curses --enable-readline --disable-nls --enable-alias --enable-arith-for-command --enable-array-variables --enable-brace-expansion --enable-casemod-attributes --enable-casemod-expansions --enable-command-timing --enable-help-builtin --enable-history --enable-job-control --enable-multibyte --enable-prompt-string-decoding &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm CMakeCache.txt &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

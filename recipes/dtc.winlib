@@ -1,0 +1,67 @@
+export NAME="DTC and LIBFDT"
+export STATUS=
+export URL=https://github.com/dgibson/dtc
+export BASENAME=dtc
+export DESCRIPTION="The source tree contains the Device Tree Compiler (dtc) toolchain for working with device tree source and binary files and also libfdt, a utility library for reading and manipulating the binary format."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=1.5.1
+#export VERSIONDATE=20200215
+#export VERSION=1.6.0
+#export VERSIONDATE=20200304
+export VERSION=1.6.1
+export VERSIONDATE=20210608
+wl-showstatus --package-version
+export DEPENDANCIES=fnmatch-win32
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=README.license
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/dgibson/dtc/releases"
+export DOWNLOADURL="https://github.com/dgibson/dtc/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/dgibson/dtc/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/dgibson/dtc/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing invalid %zd format in util.h
+#patch -ulbf util.h << EOF
+#@@ -53 +53 @@
+#-               die("realloc() failed (len=%zd)\n", len);
+#+               die("realloc() failed (len=%lu)\n", (unsigned long)len);
+#EOF
+## fix Makefile (version >= 1.6.1)
+#patch -ulbf Makefile << EOF
+#@@ -259,3 +259,3 @@
+#        @\$(VECHO) LD \$@
+#-       \$(LINK.c) -o \$@ \$^
+#+       \$(LINK.c) -o \$@ \$^ -Wl,--as-needed -lfnmatch
+#
+#EOF
+#wl-showstatus build-install &&
+# make version_gen.h &&
+# CC=gcc make install PREFIX=$INSTALLPREFIX HOSTOS=msys CC=gcc SHAREDLIB_EXT=dll SHAREDLIB_LDFLAGS="-shared -s -Wl,--version-script=\$(LIBFDT_version) -Wl,--out-implib,libfdt.dll.a -Wl,-soname," EXTRA_CFLAGS="-I$MINGWPREFIX/include/fnmatch -Wno-error=format -Wno-error=format-extra-args -Wno-error=pointer-to-int-cast -Wno-error=int-to-pointer-cast" SHAREDLIB_CFLAGS= PYTHON=$PYDIR/python.exe &&
+# cp -f libfdt.dll.a $INSTALLPREFIX/lib &&
+# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# rm -f $INSTALLPREFIX/lib/*.dll.[0-9]* &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: fix all the suppressed errors
+# skip building tests
+sed -i.bak -e "s/^\(\s*\)\(subdir('tests')\)/\1#\2/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib PATH=$PYDIR:$PATH $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dpython=disabled -Dc_args="-I$(cygpath -m $MINGWPREFIX/include/fnmatch) -Wno-error=format -Wno-error=format-extra-args -Wno-error=pointer-to-int-cast -Wno-error=int-to-pointer-cast" . build_both &&
+ # add linker flag
+ sed -i.bak -e "s/\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lfnmatch\"/" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,102 @@
+export NAME="quvi"
+export STATUS=
+export URL=http://quvi.sourceforge.net/
+export BASENAME=quvi
+export DESCRIPTION="quvi is a command line tool for parsing Adobe Flash media stream URLs. It supports many websites including YouTube and Dailymotion. "
+export CATEGORY=multimedia
+export TYPE=library,application
+#export VERSION=0.2.16
+#export VERSIONDATE=20110525
+#export VERSION=0.2.16.4
+#export VERSIONDATE=20111129
+#export VERSION=0.2.16.5
+#export VERSIONDATE=20120301
+#export VERSION=0.2.16.6
+#export VERSIONDATE=20120328
+#export VERSION=0.2.17
+#export VERSIONDATE=20110618
+#export VERSION=0.2.18
+#export VERSIONDATE=20110719
+#export VERSION=0.2.19
+#export VERSIONDATE=20110805
+#export DEPENDANCIES=lua,libcurl,libiconv
+#export VERSION=0.4.0
+#export VERSIONDATE=20111006
+#export VERSION=0.4.2
+#export VERSIONDATE=20120328
+export VERSION=0.9.5
+export VERSIONDATE=20150329
+wl-showstatus --package-version
+export DEPENDANCIES=libquvi,libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/quvi/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/quvi/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/quvi/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/quvi/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/quvi/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/quvi/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing sigaction in src/sig.h (version >= 0.9.5)
+mv src/sig.h src/sig.h.bak
+cat > src/sig.h << EOF
+#ifdef __MINGW32__
+struct sigaction {
+  void* sa_handler;
+};
+#endif
+EOF
+cat src/sig.h.bak >> src/sig.h
+# fix src/sig.c (version >= 0.9.5)
+patch -ulbf src/sig.c << EOF
+--- src/sig.c  2013-06-19 17:06:19.000000000 +0200
++++ src/sig.c  2015-03-29 21:43:04.047865000 +0200
+@@ -22,3 +22,5 @@
+
++#ifndef __MINGW32__
+ #include <sys/ioctl.h>
++#endif
+ #include <glib/gstdio.h>
+@@ -37,2 +39,3 @@
+ {
++#ifndef __MINGW32__
+   san->sa_handler = _sigwinch;
+@@ -45,2 +48,3 @@
+     sigaction(SIGWINCH, san, NULL);
++#endif
+ }
+@@ -49,4 +53,6 @@
+ {
++#ifndef __MINGW32__
+   if (sao->sa_handler != SIG_IGN)
+     sigaction(SIGWINCH, sao, NULL);
++#endif
+ }
+@@ -55,2 +61,5 @@
+ {
++#ifdef __MINGW32__
++  return (0);
++#else
+   struct winsize w;
+@@ -59,2 +68,3 @@
+   return (w.ws_col);
++#endif
+ }
+EOF
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --enable-nsfw &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-nsfw &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

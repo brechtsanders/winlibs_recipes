@@ -1,0 +1,113 @@
+export NAME="pigz"
+export STATUS=
+export URL=http://www.zlib.net/pigz/
+export BASENAME=pigz
+export DESCRIPTION="A parallel implementation of gzip for modern multi-processor, multi-core machines"
+export CATEGORY=compression
+export TYPE=application
+#export VERSION=2.2.5
+#export VERSIONDATE=20130122
+#export VERSION=2.3
+#export VERSIONDATE=20130304
+#export VERSION=2.3.1
+#export VERSIONDATE=20131010
+#export VERSION=2.3.2
+#export VERSIONDATE=20150124
+#export VERSION=2.3.3
+#export VERSIONDATE=20150125
+####pigz.o:pigz.c:(.text+0xb510): undefined reference to `lstat'
+#export VERSION=2.3.4
+#export VERSIONDATE=20161004
+#export VERSION=2.4
+#export VERSIONDATE=20171228
+#export VERSION=2.5
+#export VERSIONDATE=20210124
+#export VERSION=2.6
+#export VERSIONDATE=20210206
+export VERSION=2.7
+export VERSIONDATE=20220116
+####pigz.c:(.text+0xc516): undefined reference to `fsync'
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://www.zlib.net/pigz/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.zlib.net/pigz/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix pigz.c (version <= 2.3.1)
+patch -ulbf pigz.c << EOF
+--- pigz.c  2012-07-28 22:08:32 +0200
++++ pigz.c  2013-01-22 11:21:00 +0100
+@@ -315,2 +315,7 @@
+ #endif
++#ifdef __MINGW32__
++#define lstat(path, sb) stat((path), (sb))
++#define chown(toname,uid,gid) 0
++#define utimes(file,times) NULL
++#endif
+
+@@ -3033,3 +3038,5 @@
+         if ((st.st_mode & S_IFMT) != S_IFREG &&
++#ifndef _WIN32
+             (st.st_mode & S_IFMT) != S_IFLNK &&
++#endif
+             (st.st_mode & S_IFMT) != S_IFDIR) {
+@@ -3038,2 +3045,3 @@
+         }
++#ifndef _WIN32
+         if ((st.st_mode & S_IFMT) == S_IFLNK && !force && !pipeout) {
+@@ -3042,2 +3050,3 @@
+         }
++#endif
+         if ((st.st_mode & S_IFMT) == S_IFDIR && !recurse) {
+EOF
+## fix pigz.c (version >= 2.3.2)
+#patch -ulbf pigz.c << EOF
+#--- pigz.c  2015-01-24 15:59:40 +0100
+#+++ pigz.c  2015-01-24 17:41:28 +0100
+#@@ -324,2 +324,5 @@
+# #include <errno.h>      /* errno, EEXIST */
+#+#ifndef EFTYPE
+#+#define EFTYPE EINVAL
+#+#endif
+# #include <assert.h>     /* assert() */
+#@@ -3471,3 +3474,5 @@
+#         if ((st.st_mode & S_IFMT) != S_IFREG &&
+#+#ifdef S_IFLNK
+#             (st.st_mode & S_IFMT) != S_IFLNK &&
+#+#endif
+#             (st.st_mode & S_IFMT) != S_IFDIR) {
+#@@ -3476,2 +3481,3 @@
+#         }
+#+#ifdef S_IFLNK
+#         if ((st.st_mode & S_IFMT) == S_IFLNK && !g.force && !g.pipeout) {
+#@@ -3480,2 +3486,3 @@
+#         }
+#+#endif
+#         if ((st.st_mode & S_IFMT) == S_IFDIR && !g.recurse) {
+#EOF
+# fix missing fsync in pigz.c (version >= 2.4)
+mv pigz.c pigz.c.bak &&
+echo "#define fsync(fd) _commit(fd)" > pigz.c &&
+cat pigz.c.bak >> pigz.c
+# avoid soft link, use copy instead
+mv Makefile Makefile.bak
+#sed -e "s/ln -f/cp -f/" Makefile.bak > Makefile
+sed -e "s/ln -f/cp -f/; s/\(\$(LDFLAGS)\) \(.*\) \(-lm\)/\2 \1 \3/" Makefile.bak > Makefile
+wl-showstatus build &&
+ make CC=gcc &&
+ #make CC="gcc -fpermissive" &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

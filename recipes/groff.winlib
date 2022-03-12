@@ -1,0 +1,107 @@
+export NAME="groff"
+export STATUS=
+export URL=http://www.gnu.org/software/groff/
+export BASENAME=groff
+export DESCRIPTION="The groff (GNU troff) software is a typesetting package which reads plain text mixed with formatting commands and produces formatted output."
+export CATEGORY=fileformat
+export TYPE=application
+#export VERSION=1.21
+#export VERSIONDATE=20120116
+####make[2]: execvp: install-info: Bad file number
+#export VERSION=1.22.1
+#export VERSIONDATE=20121230
+#export VERSION=1.22.2
+#export VERSIONDATE=20130207
+#export VERSION=1.22.2
+#export VERSIONDATE=20141104
+#export VERSION=1.22.3
+#export VERSIONDATE=20150420
+####src/libs/gnulib/lib/wctype.h:58:1: error: '_GL_INLINE_HEADER_BEGIN' does not name a type
+export VERSION=1.22.4
+export VERSIONDATE=20181224
+wl-showstatus --package-version
+#export DEPENDANCIES=libiconv
+export DEPENDANCIES=libiconv,uchardet,gnu-ghostscript,netpbm,psutils
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/groff/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/groff/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## clear read-only attribute (version <= 1.22.2)
+#$COMSPEC /C "attrib -R /S /D ."
+## fix missing wcwidth in src/libs/libgroff/font.cpp (version <= 1.22.3)
+#mv src/libs/libgroff/font.cpp src/libs/libgroff/font.cpp.bak
+#echo "#define wcwidth(wc) ((wc) == 0 ? 0 : iswprint (wc) ? 1 : -1)" > src/libs/libgroff/font.cpp
+##echo "#include \"wchar.h\"" >> src/libs/libgroff/font.cpp
+##echo "#include <stdint.h>" >> src/libs/libgroff/font.cpp
+##echo "#include \"../config.h\"" >> src/libs/libgroff/font.cpp
+#cat src/libs/libgroff/font.cpp.bak >> src/libs/libgroff/font.cpp
+# fix invalid definition of wcwidth in src/libs/gnulib/lib/wchar.in.h (version >= 1.22.2)
+patch -ulbf src/libs/gnulib/lib/wchar.in.h << EOF
+--- src/libs/gnulib/lib/wchar.in.h  2013-02-07 13:06:12 +0100
++++ src/libs/gnulib/lib/wchar.in.h  2014-11-06 21:13:12 +0100
+@@ -438,5 +438,5 @@
+ _GL_CXXALIAS_RPL (wcwidth, int, (wchar_t));
+ # else
+-#  if !@HAVE_DECL_WCWIDTH@
++#  if !@HAVE_DECL_WCWIDTH@ && !defined(__MINGW32__)
+ /* wcwidth exists but is not declared.  */
+ _GL_FUNCDECL_SYS (wcwidth, int, (wchar_t) _GL_ATTRIBUTE_PURE);
+EOF
+# fix src/include/symbol.h for 64-bit (version >= 1.22.2)
+patch -ulbf src/include/symbol.h << EOF
+--- src/include/symbol.h  2013-02-07 13:06:06.000000000 +0100
++++ src/include/symbol.h  2014-11-06 21:27:04.000000000 +0100
+@@ -20,2 +20,4 @@
+
++//#include <stdint.h>
++
+ #define DONT_STORE 1
+@@ -33,3 +35,3 @@
+   symbol();
+-  unsigned long hash() const;
++  uintptr_t hash() const;
+   int operator ==(symbol) const;
+@@ -59,5 +61,5 @@
+
+-inline unsigned long symbol::hash() const
++inline uintptr_t symbol::hash() const
+ {
+-  return (unsigned long)s;
++  return (uintptr_t)s;
+ }
+EOF
+# fix missing _GL_INLINE_HEADER_BEGIN/_GL_INLINE_HEADER_END in src/libs/gnulib/lib/wctype.in.h for 64-bit (version >= 1.22.2)
+mv src/libs/gnulib/lib/wctype.in.h src/libs/gnulib/lib/wctype.in.h.bak
+cat > src/libs/gnulib/lib/wctype.in.h << EOF
+#ifndef _GL_INLINE_HEADER_BEGIN
+#include "../config.h"
+#endif
+EOF
+cat src/libs/gnulib/lib/wctype.in.h.bak >> src/libs/gnulib/lib/wctype.in.h
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --without-x &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --without-x --without-doc &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --with-alt-gs=gs.exe --with-uchardet --without-x --without-doc &&
+ wl-showstatus build &&
+ # build without access to console to prevent hanging
+ echo "" | make | cat &&
+ wl-showstatus build-install &&
+ #( make all install || make -j1 all install ) &&
+ #make all install INSTALL_INFO="$(which install-info)" &&
+ ( make all install INSTALL_INFO=/bin/install-info.exe || make -j1 all install INSTALL_INFO=/bin/install-info.exe ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####groff -mandoc -Tascii < $MINGWPREFIX/share/man/man7/groff.7
+####groff -mandoc -Tutf8 < $MINGWPREFIX/share/man/man1/grotty.1
+####groff -mandoc -Tutf8 < $MINGWPREFIX/share/man/man1/grotty.1
+####troff -mandoc -Tascii < $MINGWPREFIX/share/man/man1/troff.1 | grotty
+
+
+

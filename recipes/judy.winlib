@@ -1,0 +1,83 @@
+export NAME="Judy"
+export STATUS=
+export URL=http://judy.sourceforge.net/
+export BASENAME=judy
+export DESCRIPTION="Judy is a general purpose dynamic array implemented as a C callable library. Judy's speed and memory usage are typically better than other data storage models and improves with very large data sets."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=1.0.4
+export VERSION=1.0.5
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2.1
+#export DOWNLOADURL="http://sourceforge.net/projects/judy/files/ Judy-"
+export DOWNLOADURL="http://sourceforge.net/projects/judy/files/judy/ Judy-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://kent.dl.sourceforge.net/sourceforge/judy/Judy-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/Judy-$VERSION.tar.gz
+cd judy-$VERSION
+# fix src/Judy.h for 64-bit
+patch -ulbf src/Judy.h << EOF
+--- src/Judy.h  2007-05-14 19:02:16 +0200
++++ src/Judy.h  2012-02-12 20:32:36 +0100
+@@ -93,4 +93,8 @@
+ #define _WORD_T
++#if defined(_WIN64)
++typedef unsigned long long   Word_t, * PWord_t;  // expect 32-bit or 64-bit words.
++#else
+ typedef unsigned long    Word_t, * PWord_t;  // expect 32-bit or 64-bit words.
+ #endif
++#endif
+
+EOF
+# fix src/JudyCommon/JudyPrivate.h for 64-bit
+mv src/JudyCommon/JudyPrivate.h src/JudyCommon/JudyPrivate.h.bak
+sed -e "s/\(1[0UL]*L\)/\1L/g" src/JudyCommon/JudyPrivate.h.bak > src/JudyCommon/JudyPrivate.h
+#patch -ulbf src/JudyCommon/JudyPrivate.h << EOF
+#--- src/JudyCommon/JudyPrivate.h  2005-02-15 22:06:08 +0100
+#+++ src/JudyCommon/JudyPrivate.h  2012-02-12 20:39:42 +0100
+#@@ -412,4 +412,9 @@
+#
+#+#if defined(_WIN64)
+#+#define JU_LEASTBYTESMASK(BYTES) \
+#+        ((0x100ULL << (cJU_BITSPERBYTE * ((BYTES) - 1))) - 1)
+#+#else
+# #define JU_LEASTBYTESMASK(BYTES) \
+#         ((0x100UL << (cJU_BITSPERBYTE * ((BYTES) - 1))) - 1)
+#+#endif
+#
+#@@ -803,4 +808,9 @@
+#
+#+#if defined(_WIN64)
+#+#define JU_BITPOSMASKB(BITNUM) (1LL << ((BITNUM) % cJU_BITSPERSUBEXPB))
+#+#define JU_BITPOSMASKL(BITNUM) (1LL << ((BITNUM) % cJU_BITSPERSUBEXPL))
+#+#else
+# #define JU_BITPOSMASKB(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPB))
+# #define JU_BITPOSMASKL(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPL))
+#+#endif
+#
+#EOF
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+fi
+#make check
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make -j1 install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf judy-$VERSION
+
+
+

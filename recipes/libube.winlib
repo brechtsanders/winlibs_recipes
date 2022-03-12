@@ -1,0 +1,113 @@
+export NAME="libube"
+export STATUS=
+export URL=https://github.com/pgarner/libube
+export BASENAME=libube
+export DESCRIPTION="Lube greases the wheels of C++"
+export CATEGORY=development
+export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20170503
+####Cannot find source file: kissfft/tools/kiss_fftr.c
+####lube/var.cpp:14:10: fatal error: execinfo.h: No such file or directory
+#export VERSION=1.0
+#export VERSIONDATE=20201224
+export VERSION=1.0.1
+export VERSIONDATE=20201226
+####lube/var.cpp:14:10: fatal error: execinfo.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=kissfft,qt,boost
+export OPTIONALDEPENDANCIES=qwt,libsndfile,expat,libcurl,openblas,libdl
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/pgarner/libube/releases"
+export DOWNLOADURL="https://github.com/pgarner/libube/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/pgarner/libube/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/pgarner/libube/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/pgarner/libube/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing files (version < 1.0)
+#mkdir -p kissfft/tools
+#touch kissfft/kiss_fft.c kissfft/tools/kiss_fftr.c
+## avoid backtrace stuff in lube/var.cpp (version = 1.0)
+#patch -ulbf lube/var.cpp << EOF
+#@@ -12,5 +12,7 @@
+# #include <cstdarg>
+# #include <stdexcept>
+#+#ifndef _WIN32
+# #include <execinfo.h>
+#+#endif
+# #include <cxxabi.h>
+#
+#@@ -1537,4 +1539,5 @@
+# void error::backTrace(std::ostream& iStream)
+# {
+#+#ifndef _WIN32
+#     // Backtrace of more than a screenfull is probably not useful
+#     const int cBTSize = 64;
+#@@ -1591,4 +1594,5 @@
+#     free(buffer);
+#     free(symbol);
+#+#endif
+# }
+#
+#EOF
+## fix issues with wide boost::filesystem::path on Windows lube/path.cpp (version = 1.0)
+#####error: invalid conversion from 'const value_type*' {aka 'const wchar_t*'} to 'int' [-fpermissive]
+#patch -ulbf lube/path.cpp << EOF
+#@@ -52,5 +52,5 @@
+#     var val;
+#-    val[2] = iPath.extension().c_str();
+#-    val[1] = iPath.stem().c_str();
+#-    val[0] = iPath.parent_path().c_str();
+#+    val[2] = iPath.extension().string().c_str();
+#+    val[1] = iPath.stem().string().c_str();
+#+    val[0] = iPath.parent_path().string().c_str();
+#     return val;
+#@@ -66,3 +66,3 @@
+#     for (fs::directory_iterator it(mPath); it != end; it++)
+#-        dir[it->path().c_str()] = iVal ? bits(it->path()) : nil;
+#+        dir[it->path().string().c_str()] = iVal ? bits(it->path()) : nil;
+#     return dir;
+#@@ -78,3 +78,3 @@
+#     {
+#-        dir[mPath.c_str()] = iVal ? bits(mPath) : nil;
+#+        dir[mPath.string().c_str()] = iVal ? bits(mPath) : nil;
+#         return dir;
+#@@ -84,3 +84,3 @@
+#     for (fs::recursive_directory_iterator it(mPath); it != end; it++)
+#-        dir[it->path().c_str()] = iVal ? bits(it->path()) : nil;
+#+        dir[it->path().string().c_str()] = iVal ? bits(it->path()) : nil;
+#     return dir;
+#@@ -102,5 +102,5 @@
+#         if (fs::is_directory(*it))
+#-            dir[it->path().filename().c_str()] = tree(*it);
+#+            dir[it->path().filename().string().c_str()] = tree(*it);
+#         else
+#-            dir[it->path().filename().c_str()] = nil;
+#+            dir[it->path().filename().string().c_str()] = nil;
+#
+#EOF
+## don't abort on warnings (version <= 1.0)
+#sed -i.bak -e "s/-Wall -Werror//" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_STATIC:BOOL=OFF -DQWT_LIBRARY:PATH=$MINGWPREFIX/qt/lib -DQWT_INCLUDE_DIR:PATH=$MINGWPREFIX/qt/include -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -S. -Bbuild_win &&
+ USE_STATIC=ON PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ # fix missing version in .pc file
+ sed -i -e "s/^Version: $/&$VERSION/" $INSTALLPREFIX/lib/pkgconfig/libube.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Reported version 1.0 fixes at: https://github.com/pgarner/libube/issues/1
+
+
+

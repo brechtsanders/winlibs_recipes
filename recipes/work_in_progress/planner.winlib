@@ -1,0 +1,87 @@
+export NAME="planner"
+export STATUS=
+export URL=http://live.gnome.org/Planner
+export BASENAME=planner
+export DESCRIPTION="Planner is the GNOME project management tool. Its goal is to be an easy-to-use no-nonsense cross-platform project management application."
+export CATEGORY=office
+export TYPE=library
+#export VERSION=0.14.4
+#export VERSIONDATE=20101008
+#export VERSION=0.14.5
+export VERSIONDATE=20110712
+export VERSION=0.14.6
+#export VERSIONDATE=20120117
+####No package 'libgnomeui-2.0' found
+####configure: error: Couldn't find scrollkeeper-config. Please install the scrollkeeper package
+wl-showstatus --package-version
+export DEPENDANCIES=libart,atk,pango,cairo,libxml2,libxslt,gconf,gtk2,libglade,glib2,libgnome,libgnomecanvas,libgnomeui,gnome-vfs,gettext,plibc
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=scrollkeeper
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/planner/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix error: /include/w32api/objidl.h:95: error: expected identifieror '(' before string constant
+patch -ulbf libplanner/mrp-time.c << EOF
+--- libplanner/mrp-time.c  2010-11-26 11:33:36 +0100
++++ libplanner/mrp-time.c  2010-11-26 11:33:42 +0100
+@@ -31,2 +31,3 @@
+ #else
++#undef DATADIR
+ #include <windows.h>
+EOF
+# fix missing F_TLOCK/F_ULOCK in libegg/recent-files/egg-recent-model.c
+mv libegg/recent-files/egg-recent-model.c libegg/recent-files/egg-recent-model.c.bak
+cat > libegg/recent-files/egg-recent-model.c << EOF
+#include <sys/locking.h>
+#define lockf _locking
+#define F_ULOCK _LK_UNLCK /* Unlock locked sections. */
+#define F_LOCK  _LK_LOCK  /* Lock a section for exclusive use. */
+#define F_TLOCK _LK_NBLCK /* Test and lock a section for exclusive use */
+#define F_TEST  _LK_RLCK  /* Test section for locks by other processes. */
+EOF
+cat libegg/recent-files/egg-recent-model.c.bak >> libegg/recent-files/egg-recent-model.c
+# fix error: libegg/recent-files/egg-recent-util.c:131: undefined reference to `gethostname'
+mv libegg/recent-files/egg-recent-util.c libegg/recent-files/egg-recent-util.c.bak
+echo "#include <winsock2.h>" > libegg/recent-files/egg-recent-util.c
+cat libegg/recent-files/egg-recent-util.c.bak >> libegg/recent-files/egg-recent-util.c
+# skip making docs
+cat > docs/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# skip scrollkeeper error in configure
+patch -ulbf configure << EOF
+--- configure  2009-04-15 18:54:22 +0200
++++ configure  2010-11-26 10:33:48 +0100
+@@ -14366,3 +14366,3 @@
+ \$as_echo "\$as_me: error: Couldn't find scrollkeeper-config. Please install the scrollkeeper package" >&2;}
+-   { (exit 1); exit 1; }; }
++   }
+ fi
+EOF
+wl-showstatus configure &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-glibtest --disable-python LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-glibtest --disable-python --disable-update-mimedb LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-glibtest --disable-python --disable-update-mimedb LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ ( make install-strip || make install-strip LIBS="-lgtk-win32-2.0 -lplanner-1" ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+# To do: make icon path relative (currently $INSTALLPREFIX/share/planner/images)
+
+
+

@@ -1,0 +1,280 @@
+#export NAME="GeoIP Update"
+#export STATUS=
+#export URL=http://dev.maxmind.com/geoip/geoipupdate/
+#export BASENAME=geoipupdate
+#export DESCRIPTION="Automatic updates for GeoIP2 and GeoIP legacy databases"
+#export CATEGORY=geo
+#export TYPE=application
+##export VERSION=2.0.0
+##export VERSIONDATE=20140227
+##export VERSION=2.0.1
+##export VERSIONDATE=20140503
+##export VERSION=2.0.2
+##export VERSIONDATE=20140723
+##export VERSION=2.1.0
+##export VERSIONDATE=20141107
+##export VERSION=2.2.1
+##export VERSIONDATE=20150226
+#####geoipupdate.exe: Bad file number
+##export VERSION=2.2.2
+##export VERSIONDATE=20160122
+##export VERSION=2.3.1
+##export VERSIONDATE=20160105
+#####bin/geoipupdate.c:626:40: error: 'O_DIRECTORY' undeclared (first use in this function)
+##export VERSION=2.4.0
+##export VERSIONDATE=20170526
+##export VERSION=2.5.0
+##export VERSIONDATE=20171031
+#####bin/geoipupdate.c:420:18: error: storage size of 'fl' isn't known     struct flock fl;
+##export VERSION=3.0.0
+##export VERSIONDATE=20180814
+##export VERSION=3.0.1
+##export VERSIONDATE=20180815
+##export VERSION=3.1.0
+##export VERSIONDATE=20180817
+#####<command-line>:0:9: error: expected identifier or '(' before string constant
+#####bin/geoipupdate.c:423:18: error: storage size of 'fl' isn't known
+#export VERSION=3.1.1
+#export VERSIONDATE=20180911
+#wl-showstatus --package-version
+#export DEPENDANCIES=libcurl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+##export VERSION=4.0.0
+##export VERSIONDATE=20190115
+##export VERSION=4.0.1
+##export VERSIONDATE=20190118
+##export VERSION=4.0.2
+##export VERSIONDATE=20190119
+##export VERSION=4.0.3
+##export VERSIONDATE=20190608
+##export VERSION=4.0.4
+##export VERSIONDATE=20190831
+##export VERSION=4.0.6
+##export VERSIONDATE=20190914
+##export VERSION=4.1.4
+##export VERSIONDATE=20191108
+##export VERSION=4.1.5
+##export VERSIONDATE=20191109
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/maxmind/geoipupdate/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/maxmind/geoipupdate/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=https://github.com/maxmind/geoipupdate/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+##tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+### fix directory sync in bin/geoipupdate.c (version >= 2.2.2 <= 3.1.0)
+##patch -ulbf bin/geoipupdate.c << EOF
+##--- bin/geoipupdate.c  2016-01-22 07:51:13.667952400 +0100
+##+++ bin/geoipupdate.c  2016-01-22 07:57:05.936716300 +0100
+##@@ -625,2 +625,3 @@
+##     // fsync directory to ensure the rename is durable
+##+#ifndef _WIN32
+##     int dirfd = open(gu->database_dir, O_DIRECTORY);
+##@@ -634,2 +635,3 @@
+##             strerror(errno));
+##+#endif
+##
+##EOF
+## fix directory sync in bin/geoipupdate.c (version >= 3.1.1)
+#patch -ulbf bin/geoipupdate.c << EOF
+#@@ -209,3 +242,3 @@
+#     char *p = fgets(*linep, *linecapp, stream);
+#-    return p == NULL ? -1 : strlen(p);
+#+    return p == NULL ? -1 : (ssize_t)strlen(p);
+# #else
+#@@ -400,2 +433,3 @@
+#     int fd = -1;
+#+#ifndef _WIN32
+#     struct flock fl;
+#@@ -404,2 +438,3 @@
+#     memset(&fl, 0, sizeof(struct flock));
+#+#endif
+#
+#@@ -410,3 +445,7 @@
+#
+#+#ifdef _WIN32
+#+    fd = open(gu->lock_file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | O_EXCL);
+#+#else
+#     fd = open(gu->lock_file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+#+#endif
+#     if (fd == -1) {
+#@@ -419,2 +458,5 @@
+#
+#+#ifdef _WIN32
+#+    return 0;
+#+#else
+#     fl.l_type = F_WRLCK;
+#@@ -448,2 +490,3 @@
+#     return 1;
+#+#endif
+# }
+#@@ -881,2 +924,3 @@
+#     // fsync directory to ensure the rename is durable
+#+#ifndef _WIN32
+#     int dirfd = open(gu->database_dir, O_DIRECTORY);
+#@@ -894,2 +938,3 @@
+#             strerror(errno));
+#+#endif
+#
+#EOF
+## fix missing vasprintf/strtok_r and already defined ERROR in bin/geoipupdate.c
+#mv bin/geoipupdate.c bin/geoipupdate.c.bak
+#cat > bin/geoipupdate.c << EOF
+##include <stdlib.h>
+##include <stdio.h>
+##include <stdarg.h>
+##undef DATADIR
+##include <winsock2.h>
+#int vasprintf (char **strp, const char *fmt, va_list ap)
+#{
+#  va_list args;
+#  int len;
+#  va_copy (args, ap);
+#  len = vsnprintf (NULL, 0, fmt, args);
+#  va_end (args);
+#  char *str = malloc (len + 1);
+#  if (str != NULL) {
+#    va_copy (args, ap);
+#    vsprintf (str, fmt, args);
+#    va_end (args);
+#  } else {
+#    len = -1;
+#  }
+#  *strp = str;
+#  return len;
+#}
+##define strtok_r(_s,_sep,_lasts) (*(_lasts) = strtok((_s), (_sep)))
+#/* fix error: expected identifier or '(' before string constant */
+##undef VERSION
+##undef PACKAGE_NAME
+##undef PACKAGE_STRING
+##undef DATADIR
+##undef LT_OBJDIR
+##include <windows.h>
+##define VERSION "$VERSION"
+##define PACKAGE_NAME "geoipupdate"
+##define PACKAGE_STRING PACKAGE_NAME " " VERSION
+#EOF
+#sed -e "s/ERROR/MYERROR/g" bin/geoipupdate.c.bak >> bin/geoipupdate.c
+## fix missing strnlen in bin/geoipupdate.c (except for 64-bit) (version >= 2.2.2)
+#if ( echo $RUNPLATFORM | grep -qv x86_64 ) && ( ! gcc --version | grep -q "MinGW-W64" ); then
+#mv bin/geoipupdate.c bin/geoipupdate.c.bak2
+#cat > bin/geoipupdate.c << EOF
+#int strnlen (const char* s, int maxlen) 
+#{
+#  int i;
+#  for (i = 0; i < maxlen; i++)
+#    if (s[i] == '\0')
+#      return i;
+#  return -1;
+#}
+#EOF
+#cat bin/geoipupdate.c.bak2 >> bin/geoipupdate.c
+#fi
+## fix bin/geoipupdate_s.c
+#mv bin/geoipupdate_s.c bin/geoipupdate_s.c.bak
+#cat > bin/geoipupdate_s.c << EOF
+##undef SYSCONFDIR
+##undef DATADIR
+##include <winsock2.h>
+##include <windows.h>
+##define SYSCONFDIR "$INSTALLPREFIX/etc"
+##define DATADIR "$INSTALLPREFIX/share/GeoIP"
+#EOF
+#cat bin/geoipupdate_s.c.bak >> bin/geoipupdate_s.c
+## fix bin/product_s.c
+#mv bin/product_s.c bin/product_s.c.bak
+#cat > bin/product_s.c << EOF
+##undef DATADIR
+##include <winsock2.h>
+##include <windows.h>
+##define DATADIR "$INSTALLPREFIX/share/GeoIP"
+#EOF
+#cat bin/product_s.c.bak >> bin/product_s.c
+## fix bin/edition_s.c (version <= 3.2.0)
+#mv bin/edition_s.c bin/edition_s.c.bak
+#cat > bin/edition_s.c << EOF
+##undef DATADIR
+##include <winsock2.h>
+#EOF
+#cat bin/edition_s.c.bak >> bin/edition_s.c
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lmingwex" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# wl-showstatus build-install &&
+# make install-strip install_sh="$(pwd)/install-sh" &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: use relative paths for SYSCONFDIR and DATADIR
+
+
+
+export NAME="GeoIP Update"
+export STATUS=
+export URL=http://dev.maxmind.com/geoip/geoipupdate/
+export BASENAME=geoipupdate
+export DESCRIPTION="Automatic updates for GeoIP2 and GeoIP legacy databases"
+export CATEGORY=geo
+export TYPE=application
+#export VERSION=4.2.0
+#export VERSIONDATE=20200221
+#####Can't exec "pandoc": No such file or directory at dev-bin/make-man-pages.pl line 32.
+#export VERSION=4.2.2
+#export VERSIONDATE=20200222
+#export VERSION=4.3.0
+#export VERSIONDATE=20200417
+#export VERSION=4.4.0
+#export VERSIONDATE=20201029
+#export VERSION=4.5.0
+#export VERSIONDATE=20201029
+#export VERSION=4.6.0
+#export VERSIONDATE=20201215
+#export VERSION=4.7.0
+#export VERSIONDATE=20210417
+#export VERSION=4.7.1
+#export VERSIONDATE=20210420
+#export VERSION=4.8.0
+#export VERSIONDATE=20210721
+export VERSION=4.9.0
+export VERSIONDATE=20220216
+wl-showstatus --package-version
+export DEPENDANCIES=libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=go
+#export BUILDDEPENDANCIES=go,pandoc
+export LICENSEFILE=LICENSE-MIT
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/maxmind/geoipupdate/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/maxmind/geoipupdate/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus build &&
+ (
+  GOROOT=$MINGWPREFIX/go PATH=$MINGWPREFIX/go/bin:$PATH make OS=Windows_NT BUILDDIR=build ||
+  GOROOT=$MINGWPREFIX/go PATH=$MINGWPREFIX/go/bin:$PATH make OS=Windows_NT BUILDDIR=build build/GeoIP.conf build/GeoIP.conf
+ ) &&
+ ## Note: strip seems to break the executable file(s)
+ #strip build/*.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/etc &&
+ cp -f build/*.exe $INSTALLPREFIX/bin/ &&
+ cp -f build/*.conf $INSTALLPREFIX/etc/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: use relative paths for SYSCONFDIR and DATADIR
+
+
+

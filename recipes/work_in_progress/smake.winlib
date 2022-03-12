@@ -1,0 +1,149 @@
+export NAME="smake"
+export STATUS=
+#export URL=http://cdrecord.berlios.de/private/smake.html
+export URL=http://s-make.sf.net/
+export BASENAME=smake
+export DESCRIPTION="Smake is a highly portable make program with automake features."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=1.2.1
+#export VERSIONDATE=20110504
+#export VERSION=1.2.2
+#export VERSIONDATE=20121228
+#export VERSION=1.2.3
+#export VERSIONDATE=20130201
+#export DEPENDANCIES=
+####archconf.o:archconf.c:(.text+0x87): undefined reference to `_uname'
+#export VERSION=1.2.4
+#export VERSIONDATE=20140520
+####uname.o:uname.c:(.text+0x88): undefined reference to `strlcat'
+####uname.o:uname.c:(.text+0x9e): undefined reference to `gethostname'
+export VERSION=1.2.5
+export VERSIONDATE=20170315
+wl-showstatus --package-version
+export DEPENDANCIES=libstrl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="ftp://ftp.berlios.de/pub/smake/"
+#export DOWNLOADURL="http://ftp.berlios.de/pub/smake/"
+export DOWNLOADURL="https://sourceforge.net/projects/s-make/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.berlios.de/pub/smake/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp.berlios.de/pub/smake/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/s-make/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix missing uname in smake/archconf.c
+#attrib -r smake/archconf.c
+#patch -ulbf smake/archconf.c << EOF
+#--- smake/archconf.c  2011-08-04 20:13:42 +0200
+#+++ smake/archconf.c  2012-12-28 21:08:00 +0100
+#@@ -74,3 +74,10 @@
+#  */
+#-#if    defined(HAVE_UNAME) || defined(__MINGW32__) || defined(_MSC_VER)
+#+#if    defined(__MINGW32__)
+#+LOCAL BOOL
+#+do_uname()
+#+{
+#+       errmsg("Cannot get host arch (uname) in Windows.\n");
+#+       return (FALSE);
+#+}
+#+#elif  defined(HAVE_UNAME) || defined(__MINGW32__) || defined(_MSC_VER)
+# #include <schily/utsname.h>
+#EOF
+## fix redefinition of read in psmake/include/schily/unistd.h (version >= 1.2.4)
+#attrib -r psmake/include/schily/unistd.h
+#patch -ulbf psmake/include/schily/unistd.h << EOF
+#--- psmake/include/schily/unistd.h  2013-04-24 23:17:04.000000000 +0200
+#+++ psmake/include/schily/unistd.h  2014-08-06 11:45:58.000000000 +0200
+#@@ -131,4 +131,7 @@
+# #endif
+#
+#+#ifdef __MINGW32__
+#+#include <unistd.h>
+#+#else
+# #if    !defined(HAVE_UNISTD_H) || !defined(_POSIX_VERSION)
+# /*
+#@@ -160,4 +163,5 @@
+# #endif
+# #endif
+#+#endif
+#
+# #if !defined(HAVE_PIPE) && defined(HAVE__PIPE) && defined(HAVE_IO_H)
+#EOF
+## fix redefinition of read in include/schily/unistd.h (version >= 1.2.4)
+#attrib -r include/schily/unistd.h
+#patch -ulbf include/schily/unistd.h << EOF
+#--- include/schily/unistd.h  2013-04-24 23:17:04.000000000 +0200
+#+++ include/schily/unistd.h  2014-08-06 09:33:20.000000000 +0200
+#@@ -136,5 +136,5 @@
+#  * It is not clear whether we should have prototyped definitions.
+#  */
+#-#ifndef        _MSC_VER
+#+#ifdef _MSC_VER
+# /*
+#  * MS C comes with broken prototypes in wrong header files (in our case, the
+#EOF
+# fix missing strlcat and gethostname in psmake/uname.c (version >= 1.2.4)
+attrib -r psmake/uname.c
+mv psmake/uname.c psmake/uname.c.bak
+cat > psmake/uname.c << EOF
+#include <winsock2.h>
+#define strlcat(dst,src,dstlen) strcat(dst,src)
+EOF
+cat psmake/uname.c.bak >> psmake/uname.c
+# fix missing strlcat and gethostname in lib/uname.c (version >= 1.2.4)
+attrib -r lib/uname.c
+mv lib/uname.c lib/uname.c.bak
+cat > lib/uname.c << EOF
+#include <winsock2.h>
+#define strlcat(dst,src,dstlen) strcat(dst,src)
+EOF
+cat lib/uname.c.bak >> lib/uname.c
+
+#for F in $(grep -rl "echo *>" *); do
+# mv $F $F.bak
+# sed -s "s/\(echo\)\( *>\)/\1.\2/" $F.bak > $F
+#done
+#mkdir -p incs/i386-mingw32_nt-gcc
+#make
+#cp -f RULES/rules.cnf incs/i386-mingw32_nt-gcc/
+#touch incs/i386-mingw32_nt-gcc/rules.cnf
+#cp -f psmake/rules.cnf incs/i386-mingw32_nt-gcc/
+#cp -f RULES/rules.cnf incs/i386-mingw32_nt-gcc/
+#wl-showstatus build &&
+#make &&
+##make LDFLAGS="-lstrl" &&
+##make LDFLAGS="-Wl,--as-needed -lws2_32" &&
+#cd psmake &&
+#gcc -o smake make.o readfile.o parse.o update.o rules.o archconf.o job.o memory.o astoi.o astoll.o comerr.o error.o eaccess.o format.o getexecpath.o jsprintf.o jssnprintf.o saveargs.o seterrno.o strcatl.o strlcpy.o strncpy.o streql.o getargs.o geterrno.o movebytes.o fillbytes.o raisecond.o rename.o searchinpath.o uname.o file_raise.o fileopen.o fcons.o cvmod.o flag.o flush.o dat.o filewrite.o fileread.o fileseek.o niread.o niwrite.o -Wl,--as-needed -lws2_32 &&
+#cd ..
+#cp -f RULES/os-mingw32_nt.id RULES/os-win32.id
+#cp -f RULES/i686-mingw32_nt-gcc.rul RULES/amd64-mingw32_nt-gcc.rul
+#cp -f RULES/i686-mingw32_nt-gcc.rul RULES/amd64-mingw32_nt-gcc.rul
+#echo '#!/bin/sh' > umask
+#echo 'umask $*' >> umask
+#PATH=$PATH:$(pwd) psmake/smake.exe &&
+#mingw32-make.exe -j1
+wl-showstatus configure &&
+ cd autoconf &&
+ ./autoconf &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ cd .. &&
+ wl-showstatus build &&
+ cd psmake &&
+ sed -e "s/\(\$CC.*\)\(\$LDFLAGS\)\(.*\)$/\1\3 \2/" MAKE-sh > myMAKE-sh &&
+ LDFLAGS="-Wl,--as-needed -lws2_32" ./myMAKE-sh &&
+ cd .. &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f psmake/smake.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

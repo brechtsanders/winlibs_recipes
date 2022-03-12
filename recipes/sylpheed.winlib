@@ -1,0 +1,71 @@
+export NAME="Sylpheed"
+export STATUS=
+export URL=http://sylpheed.sraoss.jp/en/
+export BASENAME=sylpheed
+export DESCRIPTION="Lightweight and user-friendly e-mail client."
+export CATEGORY=communication
+export TYPE=application,library
+#export VERSION=3.5.1
+#export VERSIONDATE=20161205
+#export VERSION=3.6.0
+#export VERSIONDATE=20170701
+export VERSION=3.7.0
+export VERSIONDATE=20180131
+####libsylph/utils.c:2125: undefined reference to `g_win32_get_package_installation_directory'
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,gtkspell,pango,cairo,gdk-pixbuf,enchant,dbus-glib,openssl,openldap
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sylpheed.sraoss.jp/en/download.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://sylpheed.sraoss.jp/sylpheed/v$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1/")/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+wl-showstatus configure &&
+# fix redefinition of FolderItem
+mv libsylph/folder.h libsylph/folder.h.bak &&
+cat > libsylph/folder.h << EOF
+#include <windows.h>
+#define Folder SylphFolder
+#define FolderItem SylphFolderItem
+EOF
+cat libsylph/folder.h.bak >> libsylph/folder.h
+# fix missing g_win32_get_package_installation_directory in libsylph/utils.c (version >= 3.6.0)
+patch -ulbf libsylph/utils.c << EOF
+@@ -2124,4 +2124,4 @@
+        if (!startup_dir) {
+-               startup_dir = g_win32_get_package_installation_directory
+-                       (NULL, NULL);
++               startup_dir = g_win32_get_package_installation_directory_of_module
++                       (NULL);
+                if (startup_dir) {
+EOF
+# fix already defined SORT_ASCENDING/SORT_DESCENDING in libsylph/folder.h (version >= 3.7.0)
+patch -ulbf libsylph/folder.h << EOF
+@@ -1 +1,4 @@
++#include <windows.h>
++#define Folder SylphFolder
++#define FolderItem SylphFolderItem
+ /*
+@@ -114,2 +117,4 @@
+ {
++#define SORT_ASCENDING SYLPH_SORT_ASCENDING
++#define SORT_DESCENDING SYLPH_SORT_DESCENDING
+        SORT_ASCENDING,
+EOF
+wl-showstatus configure &&
+ PKG_CONFIG=$(which pkg-config.exe) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-ldap --disable-gpgme --disable-updatecheck &&
+ #PKG_CONFIG=$(which pkg-config.exe) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-ldap --disable-updatecheck &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####sylpheed.exe application crashes
+
+
+

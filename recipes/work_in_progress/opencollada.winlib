@@ -1,0 +1,99 @@
+export NAME="OpenCOLLADA"
+export STATUS=
+export URL=https://github.com/KhronosGroup/OpenCOLLADA
+export BASENAME=opencollada
+export DESCRIPTION="COLLADAMax and COLLADAMaya are new implementation of a 3ds Max or Maya plug-ins to export scene or parts of it to a COLLADA file, released under an MIT-license."
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=1.6.68
+export VERSIONDATE=20210612
+wl-showstatus --package-version
+export DEPENDANCIES=pcre,zlib,libxml2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=README
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/KhronosGroup/OpenCOLLADA/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/KhronosGroup/OpenCOLLADA/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd OpenCOLLADA-$VERSION
+# fix definition of __int64 in common/libBuffer/include/CommonFWriteBufferFlusher.h (version >= 1.6.68)
+patch -ulbf common/libBuffer/include/CommonFWriteBufferFlusher.h << EOF
+@@ -42,3 +42,3 @@
+
+-#if __cplusplus > 199711L
++#if __cplusplus > 199711L && !defined(__MINGW32__)
+ typedef int64_t __int64;
+EOF
+# fix redefinition of pcre in COLLADABaseUtils/include/COLLADABUPcreCompiledPattern.h (version >= 1.6.68)
+patch -ulbf COLLADABaseUtils/include/COLLADABUPcreCompiledPattern.h << EOF
+@@ -16,3 +16,7 @@
+ struct real_pcre;
++#ifdef __MINGW32__
++#include <pcre.h>
++#else
+ typedef struct real_pcre pcre;
++#endif
+
+EOF
+# fix DAEValidator/CMakeLists.txt (version >= 1.6.68)
+patch -ulbf DAEValidator/CMakeLists.txt << EOF
+@@ -93,3 +93,3 @@
+
+-if (WIN32)
++if (MSVC)
+ # C4505: 'function' : unreferenced local function has been removed
+@@ -102,3 +102,3 @@
+ else ()
+-       set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror")
++       set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} -std=c++11")
+ endif ()
+@@ -130,3 +130,3 @@
+
+-if (WIN32 AND \${CMAKE_MAJOR_VERSION}.\${CMAKE_MINOR_VERSION}.\${CMAKE_PATCH_VERSION} GREATER 3.0.1)
++if (MSVC AND \${CMAKE_MAJOR_VERSION}.\${CMAKE_MINOR_VERSION}.\${CMAKE_PATCH_VERSION} GREATER 3.0.1)
+        set(DAEValidatorTestsSources
+@@ -151,3 +151,5 @@
+        )
++       if (MSVC)
+        string(REGEX REPLACE "/Common7/IDE/devenv.com" "/VC" VCINSTALLDIR \${CMAKE_VS_DEVENV_COMMAND})
++       endif ()
+        link_directories(\${VCINSTALLDIR}/UnitTest/lib)
+EOF
+
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_STATIC:BOOL=ON -DUSE_SHARED:BOOL=ON -DUSE_EXPAT:BOOL=ON -DUSE_LIBXML:BOOL=OFF -DCMAKE_VS_DEVENV_COMMAND:STRING=false -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_STATIC:BOOL=ON -DUSE_SHARED:BOOL=ON -DUSE_EXPAT:BOOL=ON -DUSE_LIBXML:BOOL=OFF -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_STATIC:BOOL=ON -DUSE_SHARED:BOOL=ON -DUSE_EXPAT:BOOL=OFF -DUSE_LIBXML:BOOL=ON -S. -Bbuild_win &&
+ # fix missing libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lexpat/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDANCIES=cmake,ninja
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_STATIC:BOOL=ON -DUSE_SHARED:BOOL=OFF -DUSE_LIBXML:BOOL=ON -DUSE_EXPAT:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_STATIC:BOOL=OFF -DUSE_SHARED:BOOL=ON -DUSE_LIBXML:BOOL=ON -DUSE_EXPAT:BOOL=OFF -S. -Bbuild_shared &&
+ ## fix missing libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lexpat/" build_shared/build.ninja &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lz -lxml2/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenCOLLADA-$VERSION
+####TO DO: don't used bundled dependancy libraries (like zlib)
+####TO DO: move static libraries to lib folder
+
+
+

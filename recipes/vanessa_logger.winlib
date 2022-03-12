@@ -1,0 +1,110 @@
+export NAME="vanessa_logger"
+export STATUS=
+export URL=http://www.vergenet.net/linux/vanessa/
+export BASENAME=vanessa_logger
+export DESCRIPTION="Provides a generic logging layer that may be used to log to one or more of syslog, an open file handle or a file name. Though due to to limitations in the implementation of syslog opening multiple syslog loggers doesn't makes sense. Includes the ability to limit which messages will be logged based on priorities."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=0.0.7
+#export VERSION=0.0.8
+#export VERSION=0.0.9
+#export VERSIONDATE=20100608
+export VERSION=0.0.10
+export VERSIONDATE=20100730
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2.1
+export DOWNLOADURL="http://www.vergenet.net/linux/vanessa/download/vanessa_logger/ vanessa_logger-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.vergenet.net/linux/vanessa/download/vanessa_logger/$VERSION/vanessa_logger-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/vanessa_logger-$VERSION.tar.gz
+cd vanessa_logger-$VERSION
+touch netdb.h
+# create a dummy syslog.h
+cat > syslog.h << EOF
+/* dummy syslog.h (e.g. for Windows) which does nothing */
+#ifndef __DUMMY_SYSLOG_H_INCLUDED
+#define __DUMMY_SYSLOG_H_INCLUDED
+/* priorities (these are ordered) */
+#define LOG_EMERG   0    //system is unusable
+#define LOG_ALERT   1    //action must be taken immediately
+#define LOG_CRIT    2    //critical conditions
+#define LOG_ERR     3    //error conditions
+#define LOG_WARNING 4    //warning conditions
+#define LOG_NOTICE  5    //normal but significant condition
+#define LOG_INFO    6    //informational
+#define LOG_DEBUG   7    //debug-level messages
+//#define LOG_PRIMASK 0x07 //mask to extract priority part (internal)
+//#define LOG_PRI(p) ((p) & LOG_PRIMASK)    //extract priority
+//#define LOG_MAKEPRI(fac, pri) (((fac) << 3) | (pri))
+/* facility codes */
+#define LOG_KERN     (0<<3)    //kernel messages
+#define LOG_USER     (1<<3)    //random user-level messages
+#define LOG_MAIL     (2<<3)    //mail system
+#define LOG_DAEMON   (3<<3)    //system daemons
+#define LOG_AUTH     (4<<3)    //security/authorization messages
+#define LOG_SYSLOG   (5<<3)    //messages generated internally by syslogd
+#define LOG_LPR      (6<<3)    //line printer subsystem
+#define LOG_NEWS     (7<<3)    //network news subsystem
+#define LOG_UUCP     (8<<3)    //UUCP subsystem
+#define LOG_CRON     (9<<3)    //clock daemon
+#define LOG_AUTHPRIV (10<<3)   //security/authorization messages (private)
+#define LOG_FTP      (11<<3)   //ftp daemon
+#define LOG_NETINFO    (12<<3) /* NetInfo */
+#define LOG_REMOTEAUTH (13<<3) /* remote authentication/authorization */
+#define LOG_INSTALL    (14<<3) /* installer subsystem */
+#define LOG_RAS        (15<<3) /* Remote Access Service (VPN / PPP) */
+#define LOG_LOCAL0     (16<<3) /* reserved for local use */
+#define LOG_LOCAL1     (17<<3) /* reserved for local use */
+#define LOG_LOCAL2     (18<<3) /* reserved for local use */
+#define LOG_LOCAL3     (19<<3) /* reserved for local use */
+#define LOG_LOCAL4     (20<<3) /* reserved for local use */
+#define LOG_LOCAL5     (21<<3) /* reserved for local use */
+#define LOG_LOCAL6     (22<<3) /* reserved for local use */
+#define LOG_LOCAL7     (23<<3) /* reserved for local use */
+#define LOG_LAUNCHD    (24<<3) /* launchd - general bootstrap daemon */
+#define LOG_NFACILITIES 25 /* current number of facilities */
+/* option flags for openlog */
+#define LOG_PID    0x01    //log the pid with each message
+#define LOG_CONS   0x02    //log on the console if errors in sending
+#define LOG_ODELAY 0x04    //delay open until first syslog() (default)
+#define LOG_NDELAY 0x08    //don't delay open
+#define LOG_NOWAIT 0x10    //don't wait for console forks: DEPRECATED
+#define LOG_PERROR 0x20    //log to stderr as well
+/* functions */
+static void openlog (const char *ident, int option, int facility) {}
+static void syslog (int priority, const char *format, ...) {}
+static void closelog (void) {}
+#endif //__DUMMY_SYSLOG_H_INCLUDED
+#include <winsock2.h>
+EOF
+# avoid use of vsyslog
+patch -ulbf libvanessa_logger/vanessa_logger.c << EOF
+--- libvanessa_logger/vanessa_logger.c  Tue Aug 25 11:31:02 2009
++++ libvanessa_logger/vanessa_logger.c  Tue Aug 25 11:31:24 2009
+@@ -648,4 +648,6 @@
+                case __vanessa_logger_syslog:
++#ifndef __MINGW32__
+                        __vanessa_logger_do_func(vl, priority, prefix, fmt, ap, 
+                                        vsyslog);
++#endif
+                        break;
+EOF
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make -C libvanessa_logger install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf vanessa_logger-$VERSION
+
+
+

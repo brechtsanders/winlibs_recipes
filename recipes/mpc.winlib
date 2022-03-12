@@ -1,0 +1,71 @@
+export NAME="MPC"
+export STATUS=
+#export URL=http://www.multiprecision.org/
+export URL=http://www.multiprecision.org/mpc/
+export BASENAME=mpc
+export DESCRIPTION="MPC is a C library for the arithmetic of complex numbers with arbitrarily high precision and correct rounding of the result."
+export CATEGORY=math
+export TYPE=library
+#export VERSION=0.9
+#export VERSIONDATE=20120529
+#export VERSION=1.0
+#export VERSIONDATE=20120723
+#export VERSION=1.0.1
+#export VERSIONDATE=20120907
+#export VERSION=1.0.2
+#export VERSIONDATE=20140115
+#export VERSION=1.0.3
+#export VERSIONDATE=20150220
+#export VERSION=1.1.0
+#export VERSIONDATE=20180503
+#export VERSION=1.2.0
+#export VERSIONDATE=20200818
+export VERSION=1.2.1
+export VERSIONDATE=20201024
+wl-showstatus --package-version
+export DEPENDANCIES=gmp,mpfr
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING.LIB
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://www.multiprecision.org/index.php?prog=mpc&page=download"
+export DOWNLOADURL="http://www.multiprecision.org/mpc/download.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.multiprecision.org/mpc/download/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/mpc/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix redefinition of mpfr_fmma in src/mul.c when using mpfr 4 or higher (version >= 1.0.3)
+#patch -ulbf src/mul.c << EOF
+#@@ -172,4 +172,5 @@
+#
+#
+#+#define mpfr_fmma MY_mpfr_fmma
+# static int
+# mpfr_fmma (mpfr_ptr z, mpfr_srcptr a, mpfr_srcptr b, mpfr_srcptr c,
+#EOF
+# fix invalid -no-undefined in configure
+mv configure configure.bak
+sed -e "s/ -no-undefined/ -Wl,-no-undefined/" configure.bak > configure
+# fix for building both static and shared library
+mv configure configure.bak2 &&
+sed -e "s/as_fn_error\(.*is not available as a DLL\)/echo\1/" configure.bak2 > configure
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared LDFLAGS="-Wl,--enable-auto-import" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,--enable-auto-import" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix building DLL
+ echo "#define __MPC_WITHIN_MPC 1" >> config.h &&
+ #echo "#define __GMP_LIBGMP_DLL 1" >> config.h &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

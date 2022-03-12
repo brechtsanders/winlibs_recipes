@@ -1,0 +1,100 @@
+export NAME="gperftools (includes tcmalloc)"
+export STATUS=
+export URL=https://github.com/gperftools/gperftools
+export BASENAME=gperftools
+export DESCRIPTION="The fastest malloc we've seen; works particularly well with threads and STL. Also: thread-friendly heap-checker, heap-profiler, and cpu-profiler."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=2.5
+#export VERSIONDATE=20160905
+#export VERSION=2.6
+#export VERSIONDATE=20170705
+#export VERSION=2.6.1
+#export VERSIONDATE=20170710
+#export VERSION=2.6.2
+#export VERSIONDATE=20171201
+#export VERSION=2.6.3
+#export VERSIONDATE=20171210
+#export VERSION=2.7
+#export VERSIONDATE=20180430
+#export VERSION=2.8
+#export VERSIONDATE=20200706
+#export VERSION=2.8.1
+#export VERSIONDATE=20201221
+#export VERSION=2.9.0
+#export VERSIONDATE=20210222
+export VERSION=2.9.1
+export VERSIONDATE=20210303
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/gperftools/gperftools/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/gperftools/gperftools/releases/download/gperftools-$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/gperftools/gperftools/releases/download/gperftools-$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/gperftools/gperftools/releases/download/gperftools-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix already defined struct timespec
+#mv src/windows/port.h src/windows/port.h.bak
+#cat > src/windows/port.h << EOF
+##include <pthread.h>
+##ifndef HAVE_PTHREAD
+##define HAVE_PTHREAD
+##endif
+##define _TIMESPEC_DEFINED
+#EOF
+#cat src/windows/port.h.bak >> src/windows/port.h
+## replace comparing pthreads using == with pthread_equal() in src/thread_cache.cc
+#patch -ulbf src/thread_cache.cc << EOF
+#--- src/thread_cache.cc  2016-03-01 04:36:11.000000000 +0100
+#+++ src/thread_cache.cc  2016-09-06 15:14:51.406148800 +0200
+#@@ -330,3 +330,3 @@
+#     for (ThreadCache* h = thread_heaps_; h != NULL; h = h->next_) {
+#-      if (h->tid_ == me) {
+#+      if (pthread_equal(h->tid_, me)) {
+#         heap = h;
+#EOF
+## fix missing nullptr in src/malloc_extension.cc (version >= 2.6.1)
+#mv src/malloc_extension.cc src/malloc_extension.cc.bak &&
+#sed -e "s/nullptr/NULL/g" src/malloc_extension.cc.bak > src/malloc_extension.cc
+# don't define weak symbols to fix link error: relocation truncated to fit (version >= 2.8.1)
+patch -ulbf src/base/basictypes.h << EOF
+@@ -250,3 +250,7 @@
+ #ifdef HAVE___ATTRIBUTE__
+-# define ATTRIBUTE_WEAK      __attribute__((weak))
++# ifdef _WIN32
++#  define ATTRIBUTE_WEAK
++# else
++#  define ATTRIBUTE_WEAK      __attribute__((weak))
++# endif
+ # define ATTRIBUTE_NOINLINE  __attribute__((noinline))
+EOF
+#patch -ulbf src/libc_override_gcc_and_weak.h << EOF
+#@@ -90,3 +90,7 @@
+#
+#+#ifdef _WIN32
+#+extern "C"
+#+#else
+# extern "C" __attribute__((weak))
+#+#endif
+# int tcmalloc_sized_delete_enabled(void);
+#EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ #C_INCLUDE_PATH=$C_INCLUDE_PATH:$(ls -1d $MINGWDIR/*-w64-mingw32|tail -n1)/include CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$(ls -1d $MINGWDIR/*-w64-mingw32|tail -n1)/include make install-strip &&
+ make install-strip &&
+ #make -j1 check &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

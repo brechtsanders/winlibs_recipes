@@ -1,0 +1,334 @@
+export NAME="slibtool"
+export STATUS=
+export URL=https://github.com/midipix-project/slibtool
+#export URL=https://git.foss21.org/slibtool
+export BASENAME=slibtool
+export DESCRIPTION="a surrogate libtool implementation, written in C"
+export CATEGORY=development
+export TYPE=application
+#export VERSION=0.5.28
+#export VERSIONDATE=20191208
+#export VERSION=0.5.29
+#export VERSIONDATE=20200908
+#export VERSION=0.5.30
+#export VERSIONDATE=20200909
+#export VERSION=0.5.31
+#export VERSIONDATE=20200913
+#export VERSION=0.5.32
+#export VERSIONDATE=20210322
+#export VERSION=0.5.33
+#export VERSIONDATE=20210406
+export VERSION=0.5.34
+export VERSIONDATE=20210512
+wl-showstatus --package-version
+#export DEPENDANCIES=mman-win32
+export DEPENDANCIES=mman-win32,sys_wait_h
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.SLIBTOOL
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/midipix-project/slibtool/packages"
+#export DOWNLOADURL="https://git.foss21.org/slibtool"
+export DOWNLOADURL="https://git.midipix.org/slibtool"
+#export DOWNLOADURL="https://dev.midipix.org/cross/slibtool/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://git.foss21.org/slibtool/snapshot/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://git.midipix.org/slibtool/snapshot/$BASENAME-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://dev.midipix.org/cross/slibtool/archive/v$VERSION/slibtool-v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#tar xfz $TARBALLDIR/$BASENAME/slibtool-v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys
+touch winfix/sys/wait.h winfix/spawn.h
+# avoid missing openat/mkdirat in src/internal/slibtool_mkdir_impl.h
+patch -ulbf src/internal/slibtool_mkdir_impl.h << EOF
+@@ -22,2 +22,5 @@
+ {
++#ifdef _WIN32
++       return ENOENT;
++#else
+        int fdcwd;
+@@ -34,2 +37,3 @@
+        return 0;
++#endif
+ }
+EOF
+# fix missing fork in src/driver/slbt_driver_ctx.c
+patch -ulbf src/driver/slbt_driver_ctx.c << EOF
+@@ -13,3 +13,10 @@
+ #include <spawn.h>
++#ifdef _WIN32
++#include <windows.h>
++#ifndef AT_FDCWD
++#define AT_FDCWD 0
++#endif
++#else
+ #include <sys/wait.h>
++#endif
+
+@@ -545,2 +552,44 @@
+ {
++#ifdef _WIN32
++       char** parg;
++       char* p;
++       unsigned int l;
++       char* cmd;
++       unsigned int cmdlen;
++       PROCESS_INFORMATION procinfo;
++       DWORD exitcode = 0;
++       //determine command line length
++       cmdlen = 0;
++       for (parg = argv; *parg; parg++) {
++               cmdlen += strlen(*parg) + 3;
++       }
++       //contruct command line
++       cmd = (char*)malloc(cmdlen + 1);
++       p = cmd;
++       for (parg = argv; *parg; parg++) {
++               if (parg != argv)
++                       *p++ = ' ';
++               *p++ = '"';
++               l = strlen(*parg);
++               memcpy(p, *parg, l);
++               p += l;
++               *p++ = '"';
++       }
++       *p = 0;
++       //execute command
++       *ecode = 127;
++       if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, NULL, &procinfo)) {
++               fprintf(stderr, "Error executing: %s\n", cmd);
++               free(cmd);
++               _exit(128);
++       }
++       //wait for command to finish
++       WaitForSingleObject(procinfo.hProcess, INFINITE);
++       GetExitCodeProcess(procinfo.hProcess, &exitcode);
++       *ecode = exitcode;
++       //clean up
++       CloseHandle(procinfo.hProcess);
++       CloseHandle(procinfo.hThread);
++       free(cmd);
++#else
+        int     estatus;
+@@ -563,2 +612,3 @@
+        }
++#endif
+ }
+EOF
+# fix src/helper/slbt_dump_machine.c, TO DO: needs proper fix!
+patch -ulbf src/helper/slbt_dump_machine.c << EOF
+@@ -12,8 +12,18 @@
+ #include <stdlib.h>
+ #include <stdbool.h>
++#ifdef _WIN32
++#include <windows.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#ifndef EINVAL
++#define EINVAL 22
++#endif
++#else
+ #include <sys/wait.h>
++#endif
+
+ #include <slibtool/slibtool.h>
++#ifndef _WIN32
+ #include "slibtool_spawn_impl.h"
++#endif
+
+ static void slbt_dump_machine_child(
+@@ -21,4 +31,5 @@
+        int     fd[2])
+ {
++#ifndef _WIN32
+        char *  compiler;
+        char *  argv[3];
+@@ -39,4 +50,5 @@
+                        if (dup2(fd[1],1) == 1)
+                                execvp(program,argv);
++#endif
+
+        _exit(EXIT_FAILURE);
+@@ -48,4 +60,7 @@
+        size_t          buflen)
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        ssize_t ret;
+        pid_t   pid;
+@@ -132,3 +147,4 @@
+        /* all done */
+        return 0;
++#endif
+ }
+
+EOF
+# fix missing readlink in src/internal/slibtool_readlink_impl.h
+patch -ulbf src/internal/slibtool_readlink_impl.h << EOF
+@@ -16,2 +16,5 @@
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        ssize_t ret;
+@@ -26,2 +29,3 @@
+        }
++#endif
+ }
+EOF
+## fix src/internal/slibtool_lconf_impl.c (version <= 0.5.30)
+#patch -ulbf src/internal/slibtool_lconf_impl.c << EOF
+#@@ -55,6 +55,9 @@
+#        fdlconf = openat(fdlconfdir,"libtool",O_RDONLY,0);
+#
+#        while (fdlconf < 0) {
+#+#ifdef _WIN32
+#+               return SLBT_SYSTEM_ERROR(dctx);
+#+#else
+#                fdparent = openat(fdlconfdir,"../",O_DIRECTORY,0);
+#                slbt_lconf_close(fdcwd,fdlconfdir);
+#
+#@@ -74,6 +77,7 @@
+#
+#                fdlconfdir = fdparent;
+#                fdlconf    = openat(fdlconfdir,"libtool",O_RDONLY,0);
+#+#endif
+#        }
+#
+#        slbt_lconf_close(fdcwd,fdlconfdir);
+#
+#EOF
+# fix src/internal/slibtool_lconf_impl.c (version >= 0.5.31)
+patch -ulbf src/internal/slibtool_lconf_impl.c << EOF
+@@ -57,6 +57,9 @@
+        stinode = stcwd.st_ino;
+
+        while (fdlconf < 0) {
++#ifdef _WIN32
++               return SLBT_SYSTEM_ERROR(dctx);
++#else
+                fdparent = openat(fdlconfdir,"../",O_DIRECTORY,0);
+                slbt_lconf_close(fdcwd,fdlconfdir);
+
+@@ -83,6 +86,7 @@
+                fdlconfdir = fdparent;
+                fdlconf    = openat(fdlconfdir,"libtool",O_RDONLY,0);
+                stinode    = stparent.st_ino;
++#endif
+        }
+
+        slbt_lconf_close(fdcwd,fdlconfdir);
+EOF
+# fix src/logic/slbt_exec_link.c
+patch -ulbf src/logic/slbt_exec_link.c << EOF
+@@ -13,2 +13,29 @@
+ #include <sys/stat.h>
++#ifdef _WIN32
++#include <windows.h>
++int openat (int dirfd, const char *pathname, int flags, ...)
++{
++  DWORD l;
++  int result = -1;
++  if (pathname && (l = GetFinalPathNameByHandleA(_get_osfhandle(dirfd), NULL, 0, 0)) > 0) {
++    char* buf;
++    size_t pathnamelen = strlen(pathname);
++    if ((buf = (char*)malloc(l + 1 + pathnamelen)) != NULL) {
++      if (pathname && (l = GetFinalPathNameByHandleA(_get_osfhandle(dirfd), buf, l - 1, 0)) > 0) {
++       va_list argp;
++       va_start(argp, flags);
++       buf[l++] = '\\\\',
++       strcpy(buf + l, pathname);
++       if (flags | O_RDWR == 0)
++         result = open(buf, flags, va_arg(argp, int));
++        else
++         result = open(buf, flags);
++       va_end(argp);
++      }
++      free(buf);
++    }
++  }
++  return result;
++}
++#endif
+
+@@ -406,2 +433,5 @@
+
++#ifndef O_DIRECTORY
++                       *mark = 0;
++#else
+                        if ((fd = openat(fdcwd,ldir,O_DIRECTORY,0)) < 0)
+@@ -410,2 +440,3 @@
+                                close(fd);
++#endif
+
+EOF
+# fix sofort/ccenv/ccenv.sh (version >= 0.5.29)
+patch -ulbf sofort/ccenv/ccenv.sh << EOF
+@@ -915,6 +915,7 @@
+                                > /dev/null                 \\
+                && ccenv_os='mingw'
+        fi
++       echo -n ""
+ }
+
+ ccenv_set_os_macho()
+EOF
+# fix undefined O_DIRECTORY in src/helper/slbt_archive_import.c (version >= 0.5.34)
+patch -ulbf src/helper/slbt_archive_import.c << EOF
+@@ -40,2 +40,5 @@
+        else {
++#ifndef O_DIRECTORY
++#define O_DIRECTORY 0
++#endif
+                if (slbt_realpath(fdat,".",O_DIRECTORY,mricwd,sizeof(mricwd)))
+EOF
+# fix src/helper/slbt_realpath.c (version >= 0.5.34)
+patch -ulbf src/helper/slbt_realpath.c << EOF
+@@ -68,2 +68,5 @@
+
++#ifdef _WIN32
++       return _fullpath(buf,path,buflen) ? 0 : -1;
++#else
+        /* AT_FDCWD */
+@@ -99,2 +102,3 @@
+        }
++#endif
+
+EOF
+# don't use softlinks
+sed -i.bak -e "s/ln -s /cp /" $(grep -l 'ln -s ' $(find -name '*.mk'))
+wl-showstatus configure &&
+ # mkdir -p m4 &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --all-shared --enable-app --enable-frontend &&
+ CC=gcc CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --all-shared --enable-app --enable-frontend &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

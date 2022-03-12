@@ -1,0 +1,199 @@
+export NAME="Iperf"
+export STATUS=
+export URL=http://iperf.sourceforge.net/
+export BASENAME=iperf
+export DESCRIPTION="Iperf was developed by NLANR/DAST as a modern alternative for measuring maximum TCP and UDP bandwidth performance. Iperf allows the tuning of various parameters and UDP characteristics. Iperf reports bandwidth, delay jitter, datagram loss."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=2.0.5
+export VERSIONDATE=20110809
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://sourceforge.net/projects/iperf/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+wl-wait4deps
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/iperf/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix include/Timestamp.hpp
+mv include/Timestamp.hpp include/Timestamp.hpp.bak
+echo "#include <sys/time.h>" > include/Timestamp.hpp
+cat include/Timestamp.hpp.bak >> include/Timestamp.hpp
+# fix compat/delay.cpp
+mv compat/delay.cpp compat/delay.cpp.bak
+cat > compat/delay.cpp << EOF
+#include <windows.h>
+/*
+struct timespec {
+  long tv_sec;
+  long tv_nsec;
+};
+*/
+#include <pthread.h>
+EOF
+if ! gcc --version|grep -q posix; then
+ echo "#define nanosleep(ts,p) (Sleep((ts)->tv_sec * 1000 + (ts)->tv_nsec / 1000000000), 0)" >> compat/delay.cpp
+fi
+cat compat/delay.cpp.bak >> compat/delay.cpp
+# fix src/Client.cpp
+mv src/Client.cpp src/Client.cpp.bak
+cat > src/Client.cpp << EOF
+#include <pthread.h>
+#include <time.h>
+struct itimerval {
+  struct timeval it_interval;
+  struct timeval it_value;
+};
+#define ITIMER_REAL 0
+#define setitimer(which,new,old) -1
+#define ENOBUFS WSAENOBUFS
+EOF
+cat src/Client.cpp.bak >> src/Client.cpp
+# fix src/Listener.cpp
+mv src/Listener.cpp src/Listener.cpp.bak
+echo "#include <sys/time.h>" > src/Listener.cpp
+cat src/Listener.cpp.bak >> src/Listener.cpp
+# fix src/SocketAddr.c
+mv src/SocketAddr.c src/SocketAddr.c.bak
+cat > src/SocketAddr.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+EOF
+cat src/SocketAddr.c.bak >> src/SocketAddr.c
+# fix include/Mutex.h
+mv include/Mutex.h include/Mutex.h.bak
+echo "#include <pthread.h>" > include/Mutex.h
+cat include/Mutex.h.bak >> include/Mutex.h
+# fix src/PerfSocket.cpp
+patch -ulbf src/PerfSocket.cpp << EOF
+--- src/PerfSocket.cpp   2008-03-19 23:23:26 +0100
++++ src/PerfSocket.cpp  2011-09-07 14:55:54 +0200
+@@ -113,3 +113,3 @@
+            int rc = setsockopt( inSettings->mSock, IPPROTO_IP, IP_MULTICAST_TTL,
+-                   (const void*) &val, (Socklen_t) sizeof(val));
++                   (const char*) &val, (Socklen_t) sizeof(val));
+
+@@ -120,3 +120,3 @@
+            int rc = setsockopt( inSettings->mSock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+-                   (const void*) &val, (Socklen_t) sizeof(val));
++                   (const char*) &val, (Socklen_t) sizeof(val));
+            WARN_errno( rc == SOCKET_ERROR, "multicast ttl" );
+EOF
+# fix service.c
+patch -ulbf src/service.c << EOF
+--- src/service.c  2009-01-24 11:52:32 +0100
++++ src/service.c  2011-09-07 15:13:10 +0200
+@@ -44,2 +44,3 @@
+ #include "service.h"
++#include "Thread.h"
+
+@@ -511,3 +512,3 @@
+
+-    thread_Settings* ext_gSettings = new thread_Settings;
++    thread_Settings* ext_gSettings = (thread_Settings*)malloc(sizeof(thread_Settings));
+
+EOF
+# fix src/main.cpp
+mv src/main.cpp src/main.cpp.bak
+sed -e "s/^\(.*SIGALRM.*\)$//" src/main.cpp.bak > src/main.cpp
+# fix missing inet_ntop in src/Settings.cpp (version >= 2.0.5)
+mv src/Settings.cpp src/Settings.cpp.bak
+cat > src/Settings.cpp << EOF
+#include <stdlib.h>
+//#define _WIN32_WINNT 0x0501
+#include <winsock2.h>
+const char* inet_ntop (int af, const void* src, char* dst, int cnt)
+{
+  struct sockaddr_in srcaddr;
+  memset(&srcaddr, 0, sizeof(struct sockaddr_in));
+  memcpy(&(srcaddr.sin_addr), src, sizeof(srcaddr.sin_addr));
+  srcaddr.sin_family = af;
+  if (WSAAddressToString((struct sockaddr*)&srcaddr, sizeof(struct sockaddr_in), 0, dst, (LPDWORD)&cnt) != 0) {
+    //DWORD rv = WSAGetLastError();
+    //fprintf(stderr, "WSAAddressToString() : %d\n",rv);
+    return NULL;
+  }
+  return dst;
+}
+EOF
+cat src/Settings.cpp.bak >> src/Settings.cpp
+# fix redefinition of SIGINT/SIGTERM in include/util.h
+patch -ulbf include/util.h << EOF
+@@ -88,2 +88,5 @@
+ enum {
++#define SIGINT iperf_SIGINT
++#define SIGTERM iperf_SIGTERM
++#define SIGPIPE iperf_SIGPIPE
+     SIGINT,
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LIBS="-Wl,--as-needed -lws2_32 -lpthread" &&
+ echo "#define HAVE_WIN32_THREAD 1" >> config.h &&
+ #sed -i.bak -e "s/^#define bool int/typedef int bool;/" config.h &&
+ sed -i.bak -e "s?^#define bool int?//&?" config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+#define ITIMER_REAL 0
+struct itimerval {
+  struct timeval it_interval;
+  struct timeval it_value;
+};
+
+static HANDLE timerHandle = INVALID_HANDLE_VALUE;
+
+static VOID CALLBACK timer_completion(LPVOID arg, DWORD timeLow, DWORD timeHigh) {
+  //pg_queue_signal(SIGALRM);
+}
+
+/*
+ * Limitations of this implementation:
+ * 
+ * - Does not support setting ovalue
+ * - Does not support interval timer (value->it_interval)
+ * - Only supports ITIMER_REAL
+ */
+int setitimer(int which, const struct itimerval *value, struct itimerval *ovalue) {
+  LARGE_INTEGER dueTime;
+
+  if (which != ITIMER_REAL)
+    return -1;
+
+  if (timerHandle == INVALID_HANDLE_VALUE) {
+    /* First call in this backend, create new timer object */
+    timerHandle = CreateWaitableTimer(NULL, TRUE, NULL);
+    if (timerHandle == NULL)
+      return -1;  //ereport(FATAL, (errmsg_internal("failed to create waitable timer: %i",GetLastError())));
+  }
+  
+  if (value == NULL) {
+    errno = EFAULT;
+    return -1;
+  }
+  if (value->it_value.tv_sec == 0 &&
+    value->it_value.tv_usec == 0) {
+    /* Turn timer off */
+    CancelWaitableTimer(timerHandle);
+    return 0;
+  }
+
+  /* Negative time to SetWaitableTimer means relative time */
+  dueTime.QuadPart = -(value->it_value.tv_usec*10 + value->it_value.tv_sec*10000000L);
+  
+  /* Turn timer on, or change timer */
+  if (!SetWaitableTimer(timerHandle, &dueTime, 0, timer_completion, NULL, FALSE)) 
+    return -1;  //ereport(FATAL, (errmsg_internal("failed to set waitable timer: %i",GetLastError())));
+
+  return 0;
+}
+
+
+

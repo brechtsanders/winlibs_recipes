@@ -1,0 +1,69 @@
+export NAME="LMDB"
+export STATUS=
+export URL=http://symas.com/mdb/
+export BASENAME=lmdb
+export DESCRIPTION="LMDB is a tiny database with some great capabilities"
+export CATEGORY=database
+export TYPE=library
+#export VERSION=0.9.15
+#export VERSIONDATE=20150723
+#export VERSION=0.9.16
+#export VERSIONDATE=20150814
+#export VERSION=0.9.17
+#export VERSIONDATE=20151201
+#export VERSION=0.9.18
+#export VERSIONDATE=20160405
+#export VERSION=0.9.19
+#export VERSIONDATE=20161229
+#export VERSION=0.9.21
+#export VERSIONDATE=20170602
+#export VERSION=0.9.22
+#export VERSIONDATE=20180330
+#export VERSION=0.9.23
+#export VERSIONDATE=20181221
+#export VERSION=0.9.24
+#export VERSIONDATE=20190720
+####mdb.c:3888: undefined reference to `GetFileSizeEx'
+#export VERSION=0.9.28
+#export VERSIONDATE=20210206
+export VERSION=0.9.29
+export VERSIONDATE=20210507
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=libraries/liblmdb/COPYING
+export LICENSEFILE=libraries/liblmdb/LICENSE
+export LICENSETYPE="OpenLDAP Public License"
+#export DOWNLOADURL="https://github.com/LMDB/lmdb/releases LMDB_"
+export DOWNLOADURL="https://github.com/LMDB/lmdb/tags LMDB_"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/LMDB/lmdb/archive/LMDB_$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/LMDB/lmdb/archive/refs/tags/LMDB_$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/LMDB_$VERSION.tar.gz $TARBALLDIR/$BASENAME/lmdb-LMDB_$VERSION.tar.gz | mv $TARBALLDIR/$BASENAME/LMDB_$VERSION $TARBALLDIR/$BASENAME/lmdb-LMDB_$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/lmdb-LMDB_$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/LMDB_$VERSION.tar.gz
+cd lmdb-LMDB_$VERSION
+# fix missing GetFileSizeEx in libraries/liblmdb/mdb.c
+mv libraries/liblmdb/mdb.c libraries/liblmdb/mdb.c.bak &&
+echo "#define _WIN32_WINNT 0x0500" > libraries/liblmdb/mdb.c &&
+cat libraries/liblmdb/mdb.c.bak >> libraries/liblmdb/mdb.c
+# fix building .dll extension for shared library
+sed -i.bak -e "s/\.so/\.dll/g; s/\(-shared\)/\1 -Wl,--out-implib,liblmdb.dll.a/" libraries/liblmdb/Makefile
+# avoid -fPIC (useless on Windows and not supported by clang) in libraries/liblmdb/Makefile
+sed -i.bak2 -e "s/-fPIC//" libraries/liblmdb/Makefile
+wl-showstatus build &&
+ make -Clibraries/liblmdb &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/man/man1 &&
+ make -Clibraries/liblmdb install prefix=$INSTALLPREFIX &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f libraries/liblmdb/*.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lmdb-LMDB_$VERSION
+
+
+

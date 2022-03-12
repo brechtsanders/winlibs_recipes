@@ -1,0 +1,48 @@
+export NAME="WhiteDB"
+export STATUS=
+export URL=http://whitedb.org/
+export BASENAME=whitedb
+export DESCRIPTION="WhiteDB is a lightweight NoSQL database library written in C, operating fully in main memory. There is no server process. Data is read and written directly from/to shared memory, no sockets are used between WhiteDB and the application program."
+export CATEGORY=database
+export TYPE=library
+export VERSION=0.7.3
+export VERSIONDATE=20210827
+wl-showstatus --package-version
+export DEPENDANCIES=libdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/priitj/whitedb/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/priitj/whitedb/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing strnlen_s in Db/dbjson.c (version >= 0.7.3)
+patch -ulbf Db/dbjson.c << EOF
+@@ -61,4 +61,6 @@
+ #define strncpy(d, s, sz) strncpy_s(d, sz+1, s, sz)
++#ifndef __MINGW32__
+ #define strnlen strnlen_s
+ #endif
++#endif
+
+EOF
+# fix DLL filename issue in wgdb.def
+sed -i.bak -e "s/^LIBRARY/;&/" wgdb.def
+# fix linking problem building Examples
+sed -i.bak -e "s?^\(query_LDADD =\)\( [^ ]*\)\( [^ ]*\)?\1\3\2?" Examples/Makefile.in
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --without-python PYTHON=$PYDIR/python.exe CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

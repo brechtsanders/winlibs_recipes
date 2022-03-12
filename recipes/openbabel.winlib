@@ -1,0 +1,85 @@
+export NAME="Open Babel"
+export STATUS=
+export URL=http://openbabel.org/
+export BASENAME=openbabel
+export DESCRIPTION="Open Babel is a chemical toolbox designed to speak the many languages of chemical data. It's an open, collaborative project allowing anyone to search, convert, analyze, or store data from molecular modeling, chemistry, solid-state materials, biochemistry, or related areas."
+export CATEGORY=fileformat,science
+export TYPE=library
+#export VERSION=2.3.0
+#export VERSIONDATE=20110620
+#export VERSION=2.3.1
+#export VERSIONDATE=20111017
+#export VERSION=2.3.2
+#export VERSIONDATE=20121015
+#export VERSION=2.4.0
+#export VERSIONDATE=20150922
+export VERSION=2.4.1
+export VERSIONDATE=20161014
+####CMakeFiles/orcaformat.dir/objects.a(orcaformat.obj):orcaformat.cpp:(.text+0x58c): undefined reference to `_imp__regcomp'
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libinchi
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sourceforge.net/projects/openbabel/files/openbabel/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/openbabel/openbabel/$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/openbabel/openbabel/$VERSION/openbabel-openbabel-$(echo $VERSION|tr . -).tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/openbabel-openbabel-$(echo $VERSION|tr . -).tar.gz
+#cd openbabel-openbabel-$(echo $VERSION|tr . -)
+# fix missing _strdup in include/inchi/ichicomp.h (version >= 2.3.2)
+mv include/inchi/ichicomp.h include/inchi/ichicomp.h.bak
+echo "#include <string.h>" > include/inchi/ichicomp.h
+cat include/inchi/ichicomp.h.bak >> include/inchi/ichicomp.h
+## fix detection of compiler version (version >= 2.4.1)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -241,2 +241,4 @@
+#   exec_program(\${CMAKE_C_COMPILER} ARGS --version OUTPUT_VARIABLE _gcc_version_info)
+#+  string(REGEX REPLACE "\\n.*\$" "" _gcc_version_info "\${_gcc_version_info}")
+#+  string(REGEX REPLACE "^.* " "" _gcc_version_info "\${_gcc_version_info}")
+#   string(REGEX MATCH "[345]\\\\.[0-9]\\\\.[0-9]" _gcc_version "\${_gcc_version_info}")
+#EOF
+# fix detection of compiler version and avoid crating bin/cmake folder (version >= 2.4.1)
+patch -ulbf CMakeLists.txt << EOF
+@@ -51,3 +51,3 @@
+ set(LIB_SUFFIX "" CACHE STRING "Suffix of the directory name, e.g. 64 for lib64")
+-if(UNIX)
++if(UNIX OR MINGW)
+   set(LIB_INSTALL_DIR    "lib\${LIB_SUFFIX}"
+@@ -241,2 +241,4 @@
+   exec_program(\${CMAKE_C_COMPILER} ARGS --version OUTPUT_VARIABLE _gcc_version_info)
++  string(REGEX REPLACE "\\n.*\$" "" _gcc_version_info "\${_gcc_version_info}")
++  string(REGEX REPLACE "^.* " "" _gcc_version_info "\${_gcc_version_info}")
+   string(REGEX MATCH "[345]\\\\.[0-9]\\\\.[0-9]" _gcc_version "\${_gcc_version_info}")
+EOF
+wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=release -DOPENBABEL_USE_SYSTEM_INCHI:BOOL=ON -DENABLE_TESTS:BOOL=OFF . &&
+ wl-showstatus build-install &&
+ ( make install/strip || (
+  mv src/formats/CMakeFiles/gamessukformat.dir/build.make src/formats/CMakeFiles/gamessukformat.dir/build.make.bak &&
+  sed -e "s/\(-ladvapi32\)/\1 -lregex/" src/formats/CMakeFiles/gamessukformat.dir/build.make.bak > src/formats/CMakeFiles/gamessukformat.dir/build.make &&
+  # fix missing -lregex for orcaformat (version >= 2.4.0)
+  echo "-lregex" >> src/formats/CMakeFiles/orcaformat.dir/linklibs.rsp &&
+  make install/strip
+ ) || (
+  mv src/formats/CMakeFiles/gamessukformat.dir/linklibs.rsp src/formats/CMakeFiles/gamessukformat.dir/linklibs.rsp.bak &&
+  sed -e "s/\(-ladvapi32\)/\1 -lregex/" src/formats/CMakeFiles/gamessukformat.dir/linklibs.rsp.bak > src/formats/CMakeFiles/gamessukformat.dir/linklibs.rsp &&
+  make install/strip
+ )) &&
+ make install/strip &&
+ ( mv -f $INSTALLPREFIX/bin/*.a $INSTALLPREFIX/bin/pkgconfig $INSTALLPREFIX/lib/ || true ) &&
+ ( mv -f $INSTALLPREFIX/bin/openbabel/* $INSTALLPREFIX/lib/openbabel/ || true ) &&
+ ( rmdir $INSTALLPREFIX/bin/openbabel || true ) &&
+ ( rm -f $INSTALLPREFIX/bin/libinchi.dll || true ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf openbabel-openbabel-$(echo $VERSION|tr . -)
+
+
+

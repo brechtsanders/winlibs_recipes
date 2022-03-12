@@ -1,0 +1,733 @@
+#export NAME="CPython"
+#export STATUS=
+#export URL=https://www.python.org/
+##export URL=https://github.com/python/cpython
+#export BASENAME=cpython
+#export DESCRIPTION="CPython is the reference implementation of the Python programming language. Written in C and Python, CPython is the default and most widely used implementation of the language."
+#export CATEGORY=development
+#export TYPE=application
+##export VERSION=2.7.18
+##export VERSIONDATE=20200420
+##export VERSION=3.5.10
+##export VERSIONDATE=20200905
+##export VERSION=3.6.11
+##export VERSIONDATE=20200627
+##export VERSION=3.6.12
+##export VERSIONDATE=20200818
+##export VERSION=3.6.13
+##export VERSIONDATE=20210216
+##export VERSION=3.6.14
+##export VERSIONDATE=20210629
+##export VERSION=3.7.8
+##export VERSIONDATE=20200628
+##export VERSION=3.7.9
+##export VERSIONDATE=20200818
+##export VERSION=3.7.10
+##export VERSIONDATE=20210216
+##export VERSION=3.7.11
+##export VERSIONDATE=20210629
+##export VERSION=3.8.2
+##export VERSIONDATE=20200316
+##export VERSION=3.8.3
+##export VERSIONDATE=20200514
+##export VERSION=3.8.4
+##export VERSIONDATE=20200714
+##export VERSION=3.8.5
+##export VERSIONDATE=20200721
+#export VERSION=3.8.6
+#export VERSIONDATE=20200925
+##export VERSION=3.9.0a6
+##export VERSIONDATE=20200429
+##export VERSION=3.9.0b1
+##export VERSIONDATE=20200519
+#wl-showstatus --package-version
+#export DEPENDANCIES=libffi,expat,mpdecimal,openssl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/python/cpython/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/python/cpython/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+### fix missing GetTickCount64 and avoid assertions in Python/pytime.c (version >= 3.8.2)
+##patch -ulbf Python/pytime.c << EOF
+##@@ -1 +1,5 @@
+##+#if _WIN32_WINNT < 0x0600
+##+#undef _WIN32_WINNT
+##+#define _WIN32_WINNT 0x0600
+##+#endif
+## #include "Python.h"
+##@@ -71,3 +75,5 @@
+##     long val;
+##+# ifndef __MINGW32__
+##     Py_BUILD_ASSERT(sizeof(time_t) <= sizeof(long));
+##+# endif
+##     val = PyLong_AsLong(obj);
+##@@ -89,3 +95,5 @@
+## #else
+##+# ifndef __MINGW32__
+##     Py_BUILD_ASSERT(sizeof(time_t) <= sizeof(long));
+##+# endif
+##     return PyLong_FromLong((long)t);
+##EOF
+### fix Modules/posixmodule.c (version >= 3.6.11)
+##patch -ulbf Modules/posixmodule.c << EOF
+##@@ -1 +1,9 @@
+##+#if defined(__MINGW32__) && (!defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601)
+##+#  undef _WIN32_WINNT
+##+#  define _WIN32_WINNT 0x0601
+##+#endif
+##+#ifdef _WIN32
+##+#define uid_t int
+##+#define gid_t int
+##+#endif
+##
+##@@ -166,4 +174,6 @@
+## #else
+##-#ifdef _MSC_VER         /* Microsoft compiler */
+##+#ifdef _WIN32         /* Microsoft compiler */
+##+#ifdef _MSC_VER
+## #define HAVE_GETPPID    1
+##+#endif
+## #define HAVE_GETLOGIN   1
+##@@ -218,3 +228,3 @@
+## #else
+##-#if ( defined(__WATCOMC__) || defined(_MSC_VER) ) && !defined(__QNX__)
+##+#if ( defined(__WATCOMC__) || defined(_WIN32) ) && !defined(__QNX__)
+## extern int mkdir(const char *);
+##@@ -231,3 +241,5 @@
+## #endif
+##+#ifndef __MINGW32__
+## extern int chmod(const char *, mode_t);
+##+#endif
+## /*#ifdef HAVE_FCHMOD
+##@@ -298,3 +310,3 @@
+##
+##-#ifdef _MSC_VER
+##+#ifdef _WIN32
+## #ifdef HAVE_DIRECT_H
+##EOF
+## fix Modules/posixmodule.c (version >= 3.8.2)
+#patch -ulbf Modules/posixmodule.c << EOF
+#@@ -34,3 +34,8 @@
+#       FSCTL_GET_REPARSE_POINT is not exported with WIN32_LEAN_AND_MEAN. */
+#+#  if _WIN32_WINNT < 0x0601
+#+#    undef _WIN32_WINNT
+#+#    define _WIN32_WINNT 0x0601
+#+#  endif
+# #  include <windows.h>
+#+#  include "../Include/osdefs.h"
+# #endif
+#@@ -183,4 +188,6 @@
+# #else
+#-#ifdef _MSC_VER         /* Microsoft compiler */
+#+#ifdef _WIN32         /* Microsoft compiler */
+#+#ifdef _MSC_VER
+# #define HAVE_GETPPID    1
+#+#endif
+# #define HAVE_GETLOGIN   1
+#@@ -294,3 +301,3 @@
+#
+#-#ifdef _MSC_VER
+#+#ifdef _WIN32
+# #ifdef HAVE_DIRECT_H
+#EOF
+## fix Modules/pwdmodule.c (version >= 3.8.2)
+#patch -ulbf Modules/pwdmodule.c << EOF
+#@@ -5,5 +5,7 @@
+# #include "posixmodule.h"
+#
+#+#ifndef _WIN32
+# #include <pwd.h>
+#+#endif
+#
+# #include "clinic/pwdmodule.c.h"
+#@@ -69,4 +71,7 @@
+# mkpwent(struct passwd *p)
+# {
+#+#ifdef _WIN32
+#+    return NULL;
+#+#else
+#     int setIndex = 0;
+#     PyObject *v = PyStructSequence_New(&StructPwdType);
+#@@ -102,4 +107,5 @@
+#
+#     return v;
+#+#endif
+# }
+#
+#@@ -119,4 +125,7 @@
+# /*[clinic end generated code: output=c4ee1d4d429b86c4 input=ae64d507a1c6d3e8]*/
+# {
+#+#ifdef _WIN32
+#+    return NULL;
+#+#else
+#     PyObject *retval = NULL;
+#     uid_t uid;
+#@@ -187,4 +196,5 @@
+# #endif
+#     return retval;
+#+#endif
+# }
+#
+#@@ -204,4 +214,7 @@
+# /*[clinic end generated code: output=359ce1ddeb7a824f input=a6aeb5e3447fb9e0]*/
+# {
+#+#ifdef _WIN32
+#+    return NULL;
+#+#else
+#     char *buf = NULL, *buf2 = NULL, *name_chars;
+#     int nomem = 0;
+#@@ -267,4 +280,5 @@
+#     Py_DECREF(bytes);
+#     return retval;
+#+#endif
+# }
+#
+#EOF
+## fix Py_BUILD_ASSERT issues and missing GetTickCount64 in Python/pytime.c (version >= 3.8.3)
+#mv Python/pytime.c Python/pytime.c.bak
+#cat > Python/pytime.c << EOF
+##if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0600
+##endif
+#EOF
+#sed -e "s/#if SIZEOF_TIME_T == SIZEOF_LONG_LONG/& \|\| defined(_WIN32)/" Python/pytime.c.bak >> Python/pytime.c
+## fix missing GetTickCount64 in Python/thread.c (version >= 3.8.3)
+#mv Python/thread.c Python/thread.c.bak
+#cat > Python/thread.c << EOF
+##if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0600
+##endif
+#EOF
+#cat Python/thread.c.bak >> Python/thread.c
+## use Windows dynamic loading (version >= 3.8.3)
+#mv Python/dynload_shlib.c.bak Python/dynload_shlib.c
+#cp Python/dynload_win.c Python/dynload_shlib.c
+## fix number of parameters to wcstok() and missing wcsncasecmp() in Modules/getpath.c (version >= 3.6.11)
+#patch -ulbf Modules/getpath.c << EOF
+#@@ -286,3 +286,7 @@
+#             Py_ssize_t k;
+#+#ifdef _WIN32
+#+            #define wcstok(s,d,p) wcstok(s,d)
+#+#else
+#             wchar_t * state;
+#+#endif
+#             k = PyUnicode_AsWideChar(decoded,
+#@@ -608,3 +612,3 @@
+#
+#-#if HAVE_READLINK
+#+#if !defined(_WIN32) && defined(HAVE_READLINK)
+#     {
+#EOF
+### fix missing wcsncasecmp() in Modules/getpath.c (version >= 3.8.3)
+##sed -i.bak -e "s/wcsncasecmp/wcsnicmp/; s/#if \(HAVE_READLINK\)/#if \!defined(_WIN32) \&\& defined(\1)/" Modules/getpath.c
+## fix missing PyInit_posix in Modules/config.c (version >= 3.8.3)
+#sed -i.bak -e "s/PyInit_posix/PyInit_nt/" Modules/config.c
+## create main for use with MinGW
+#cat > main2wide.c << EOF
+##include "Python.h"
+##include <windows.h>
+#int main() {
+#  int argcw;
+#  LPWSTR* argvw = CommandLineToArgvW(GetCommandLineW(), &argcw);
+#  int result = Py_Main(argcw, argvw);
+#  LocalFree(argvw);
+#  return result;
+#}
+#EOF
+## use correct getpath.c (version >= 3.8.3)
+#mv Modules/getpath.c Modules/getpath.c.bak &&
+#cat > Modules/getpath.c << EOF
+##ifndef PY3_DLLNAME
+##define PY3_DLLNAME "python3.dll"
+##endif
+##include "../PC/getpathp.c"
+#EOF
+### create Lib/distutils/distutils.cfg
+##cat > Lib/distutils/distutils.cfg << EOF
+##[build]
+##compiler=mingw32
+##[build_ext]
+##compiler=mingw32
+##EOF
+## fix dllexport/dllimport in Include/pyport.h
+#sed -i.bak -e "s/__CYGWIN__/_WIN32/g" Include/pyport.h
+#wl-showstatus configure &&
+## mkdir -p m4 &&
+## autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+##./autogen.sh &&
+##    echo OK
+### fix building DLLs on 64-bit
+##if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+## echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+## autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+##fi
+##INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+##PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+##PYTHON=$PYDIR/python.exe 
+##PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --disable-ipv6 -with-system-expat --with-system-ffi --with-system-libmpdec CFLAGS="-DMS_WINDOWS -DNT_THREADS -I$(pwd)/PC" LDFLAGS="-Wl,--as-needed" LIBS="-lws2_32 -lversion" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --disable-ipv6 -with-system-expat --with-system-ffi --with-system-libmpdec --with-dbmliborder=gdbm CFLAGS="-DMS_WINDOWS $(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo "-DMS_WIN64"; fi) -DWIN32 -DNT_THREADS -I$(pwd)/PC" LDFLAGS="-Wl,--as-needed -Wl,-allow-multiple-definition" LIBS="-lws2_32 -lversion" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --disable-ipv6 -with-system-expat --with-system-ffi --with-system-libmpdec --with-dbmliborder=gdbm CFLAGS="$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo "-DMS_WIN64"; fi) -I$(pwd)/PC" LDFLAGS="-Wl,--as-needed -Wl,-allow-multiple-definition" LIBS="-lws2_32 -lversion" &&
+##-DNDEBUG -DUSE_DL_EXPORT
+# #echo "#define HAVE_DLFCN_H 1" >> PC/pyconfig.h &&
+# #echo "#define HAVE_DLOPEN 1" >> PC/pyconfig.h &&
+# #echo "#define wcsncasecmp wcsnicmp" >> PC/pyconfig.h &&
+# #echo "#undef HAVE_GETPID" >> PC/pyconfig.h &&
+# #echo "#undef HAVE_DECLSPEC_DLL" >> PC/pyconfig.h &&
+# 
+# #echo "#define HAVE_DECLSPEC_DLL" >> pyconfig.h &&
+# #echo "#define MS_WINDOWS" >> pyconfig.h &&
+# #echo "#define MS_WIN32" >> pyconfig.h &&
+# #if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo "#define MS_WIN64" >> pyconfig.h; fi &&
+# #echo "#define NT_THREADS" >> pyconfig.h &&
+# #echo "#define WITH_THREAD" >> pyconfig.h &&
+# #echo "#define USE_SOCKET" >> pyconfig.h &&
+# #echo "#define Py_WINVER 0x0600" >> pyconfig.h &&
+# #echo "#define Py_NTDDI NTDDI_VISTA" >> pyconfig.h &&
+# #echo "#define NTDDI_VERSION Py_NTDDI" >> pyconfig.h &&
+# #echo "#define WINVER Py_WINVER" >> pyconfig.h &&
+# #echo "#define _WIN32_WINNT Py_WINVER" >> pyconfig.h &&
+# 
+# ## fix building DLLs
+# #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# # use Windows files where needed
+# mv -f Modules/config.c Modules/config.c.bak &&
+# cp -f PC/config.c Modules/config.c &&
+# wl-showstatus build &&
+# gcc -c -o winconsoleio.o Modules/_io/winconsoleio.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+# #gcc -c -o dynload_win.o Python/dynload_win.c -IPC -IInclude -DPy_BUILD_CORE -O3 &&
+# gcc -c -o dynload_shlib.o Python/dynload_win.c -IPC -IInclude -DPy_BUILD_CORE -O3 &&
+# gcc -c -o getpathp.o PC/getpathp.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+# gcc -c -o dl_nt.o PC/dl_nt.c -IPC -IInclude -O3 &&
+# gcc -c -o Modules/posixmodule.o Modules/posixmodule.c -IPC -IInclude -IInclude/internal -O3 -D$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo MS_WINDOWS; else echo MS_WIN64; fi) -DNT_THREADS -DPy_BUILD_CORE &&
+# #gcc -c -o empty.o PC/empty.c -O3 &&
+# #gcc -c -o WinMain.o PC/WinMain.c -IPC -IInclude -DwWinMain=WinMain -municode -O3 &&
+# #gcc -c -o python_uwp.o PC/python_uwp.cpp -IPC -IInclude -municode -O3 &&
+# gcc -c -o main2wide.o main2wide.c -IPC -IInclude -municode -DPy_BUILD_CORE -O3 &&
+# #cp PC/python3.def PC/python3.def.bak &&
+# #echo "PyInit_posix=PyInit_nt" >> PC/python3.def &&
+# #echo "_PyImport_FindSharedFuncptrWindows" >> PC/python3.def &&
+# #make BASEMODLIBS="winconsoleio.o dynload_win.o getpathp.o dl_nt.o -Wl,--as-needed -lshlwapi" &&
+# make CFLAGS="-I$(pwd)" BASEMODLIBS="winconsoleio.o getpathp.o dl_nt.o main2wide.o -Wl,--as-needed -lshlwapi -lversion -lws2_32" &&
+# wl-showstatus build-install &&
+# make install &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####-static-libgcc -static-libstdc++ -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive
+
+
+
+
+
+
+
+
+
+
+
+
+export NAME="CPython"
+export STATUS=
+export URL=https://www.python.org/
+#export URL=https://github.com/python/cpython
+export BASENAME=cpython
+export DESCRIPTION="CPython is the reference implementation of the Python programming language. Written in C and Python, CPython is the default and most widely used implementation of the language."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=3.6.15
+#export VERSIONDATE=20210905
+#export VERSION=3.7.12
+#export VERSIONDATE=20210905
+#export VERSION=3.8.5
+#export VERSIONDATE=20200721
+#export VERSION=3.8.6
+#export VERSIONDATE=20200925
+#export VERSION=3.8.7
+#export VERSIONDATE=20201222
+#export VERSION=3.8.8
+#export VERSIONDATE=20210219
+#export VERSION=3.8.9
+#export VERSIONDATE=20210403
+#export VERSION=3.8.10
+#export VERSIONDATE=20210504
+#export VERSION=3.8.11
+#export VERSIONDATE=20210628
+#export VERSION=3.8.12
+#export VERSIONDATE=20210831
+#export VERSION=3.9.0
+#export VERSIONDATE=20201006
+#export VERSION=3.9.1
+#export VERSIONDATE=20201208
+#export VERSION=3.9.2
+#export VERSIONDATE=20210219
+#export VERSION=3.9.3
+#export VERSIONDATE=20210403
+#export VERSION=3.9.4
+#export VERSIONDATE=20210405
+#export VERSION=3.9.5
+#export VERSIONDATE=20210504
+#export VERSION=3.9.6
+#export VERSIONDATE=20210628
+#export VERSION=3.9.7
+#export VERSIONDATE=20210831
+#export VERSION=3.10.0a2
+#export VERSIONDATE=20201104
+#export VERSION=3.10.0a3
+#export VERSIONDATE=20201208
+#export VERSION=3.10.0a5
+#export VERSIONDATE=20210203
+#export VERSION=3.10.0b1
+#export VERSIONDATE=20210504
+#export VERSION=3.10.0
+#export VERSIONDATE=20211005
+export VERSION=3.10.2
+export VERSIONDATE=20220122
+#export VERSION=3.11.0a1
+#export VERSIONDATE=20211006
+#export VERSION=3.11.0a5
+#export VERSIONDATE=20220204
+wl-showstatus --package-version
+export DEPENDANCIES=libffi,expat,mpdecimal,openssl
+#zlib,libbz2,sqlite3,ncurses,readline,gdbm,tcl,tk
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/python/cpython/releases"
+export DOWNLOADURL="https://github.com/python/cpython/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/python/cpython/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/python/cpython/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# create main for use with MinGW
+cat > main2wide.c << EOF
+#include "Python.h"
+#include <windows.h>
+int main() {
+  int argcw;
+  LPWSTR* argvw = CommandLineToArgvW(GetCommandLineW(), &argcw);
+  int result = Py_Main(argcw, argvw);
+  LocalFree(argvw);
+  return result;
+}
+EOF
+# fix missing GetTickCount64 in Python/thread.c
+mv Python/thread.c Python/thread.c.bak
+cat > Python/thread.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat Python/thread.c.bak >> Python/thread.c
+# fix missing GetTickCount64 in Python/pytime.c
+patch -ulbf Python/pytime.c << EOF
+@@ -1 +1,5 @@
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
+ #include "Python.h"
+@@ -66,3 +70,3 @@
+ {
+-#if SIZEOF_TIME_T == SIZEOF_LONG_LONG
++#if SIZEOF_TIME_T >= SIZEOF_LONG
+     long long val;
+@@ -86,3 +90,3 @@
+ {
+-#if SIZEOF_TIME_T == SIZEOF_LONG_LONG
++#if SIZEOF_TIME_T >= SIZEOF_LONG
+     return PyLong_FromLongLong((long long)t);
+EOF
+# fix Modules/pwdmodule.c (version >= 3.8.3)
+patch -ulbf Modules/pwdmodule.c << EOF
+@@ -5,5 +5,7 @@
+ #include "posixmodule.h"
+
++#ifndef _WIN32
+ #include <pwd.h>
++#endif
+
+ #include "clinic/pwdmodule.c.h"
+@@ -69,4 +71,7 @@
+ mkpwent(struct passwd *p)
+ {
++#ifdef _WIN32
++    return NULL;
++#else
+     int setIndex = 0;
+     PyObject *v = PyStructSequence_New(&StructPwdType);
+@@ -102,4 +107,5 @@
+
+     return v;
++#endif
+ }
+
+@@ -119,4 +125,7 @@
+ /*[clinic end generated code: output=c4ee1d4d429b86c4 input=ae64d507a1c6d3e8]*/
+ {
++#ifdef _WIN32
++    return NULL;
++#else
+     PyObject *retval = NULL;
+     uid_t uid;
+@@ -187,4 +196,5 @@
+ #endif
+     return retval;
++#endif
+ }
+
+@@ -204,4 +214,7 @@
+ /*[clinic end generated code: output=359ce1ddeb7a824f input=a6aeb5e3447fb9e0]*/
+ {
++#ifdef _WIN32
++    return NULL;
++#else
+     char *buf = NULL, *buf2 = NULL, *name_chars;
+     int nomem = 0;
+@@ -267,4 +280,5 @@
+     Py_DECREF(bytes);
+     return retval;
++#endif
+ }
+
+EOF
+# use correct getpath.c
+mv Modules/getpath.c Modules/getpath.c.bak &&
+cat > Modules/getpath.c << EOF
+#ifndef PY3_DLLNAME
+#define PY3_DLLNAME "python3.dll"
+#endif
+#include "../PC/getpathp.c"
+EOF
+# use correct dynload_*.c
+mv Python/dynload_shlib.c Python/dynload_shlib.c.bak &&
+cat > Python/dynload_shlib.c << EOF
+#include "dynload_win.c"
+EOF
+## use correct *module.c
+#mv Modules/posixmodule.c Modules/posixmodule.bak &&
+#cat > Modules/posixmodule.c << EOF
+##include "../PC/msvcrtmodule.c"
+#EOF
+# fix missing ALL_PROCESSOR_GROUPS and ALTSEP in Modules/posixmodule.c (version >= 3.8.3)
+mv Modules/posixmodule.c Modules/posixmodule.c.bak
+cat > Modules/posixmodule.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
+#include "Include/osdefs.h"
+#include <process.h>
+#define HAVE_WEXECV 1
+EOF
+sed -e "s/_MSC_VER/_WIN32/; s/^#ifdef \(HAVE_FORK\|HAVE_TTYNAME\)$/#if defined(\1) \&\& \!defined(_WIN32)/; s/\(#if defined(MS_WINDOWS)\) \&\& \!defined(HAVE_OPENDIR)/\1/" Modules/posixmodule.c.bak >> Modules/posixmodule.c
+# fix missing PyInit_posix in Modules/config.c (version >= 3.8.3)
+sed -i.bak -e "s/PyInit_posix/PyInit_nt/" Modules/config.c
+# fix Python/fileutils.c (version >= 3.9.1)
+patch -ulbf Python/fileutils.c << EOF
+@@ -2074,3 +2074,5 @@
+ #define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, NULL)
+-#else /* MS_WINDOWS */
++#elif defined(__MINGW32__)
++#define GET_LOCALE_STRING(ATTR) PyUnicode_FromWideChar(lc->ATTR, -1)
++#else
+ /* Use _W_* fields of Windows strcut lconv */
+EOF
+# fix Modules/_localemodule.c (version >= 3.9.1)
+patch -ulbf Modules/_localemodule.c << EOF
+@@ -183,3 +183,5 @@
+ #define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, NULL)
+-#else  /* MS_WINDOWS */
++#elif defined(__MINGW32__)
++#define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, -1)
++#else
+ /* Use _W_* fields of Windows struct lconv */
+@@ -255,3 +257,5 @@
+
+-#ifdef MS_WINDOWS
++#ifdef __MINGW32__
++#define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, -1)
++#elif defined(MS_WINDOWS)
+ /* Use _W_* fields of Windows struct lconv */
+EOF
+
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-optimizations --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --with-dbmliborder=gdbm CFLAGS="-DMS_WINDOWS $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DMS_WIN64"; fi) -DNT_THREADS -I$(pwd)/PC" LDFLAGS="-Wl,-allow-multiple-definition -Wl,--as-needed -lws2_32 -lversion" &&
+# cd .. &&
+# # use Windows files where needed
+# mv -f build_static/Modules/config.c build_static/Modules/config.c.bak &&
+# cp -f PC/config.c build_static/Modules/config.c &&
+# wl-showstatus build &&
+# make -Cbuild_static CFLAGS="-I$(pwd)/PC -I$(pwd)" &&
+#    echo OK
+#
+# wl-showstatus configure &&
+# cd build_shared &&
+# ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --with-dbmliborder=gdbm CFLAGS="-DMS_WINDOWS $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DMS_WIN64"; fi) -DNT_THREADS -I$(pwd)/PC" LDFLAGS="-Wl,-allow-multiple-definition -Wl,--as-needed -lws2_32 -lversion" &&
+# cd .. &&
+# echo "#define HAVE_DECLSPEC_DLL" >> build_shared/pyconfig.h &&
+# # use Windows files where needed
+# mv -f build_shared/Modules/config.c build_shared/Modules/config.c.bak &&
+# cp -f PC/config.c build_shared/Modules/config.c &&
+# wl-showstatus build &&
+# gcc -c -o winconsoleio.o Modules/_io/winconsoleio.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+# gcc -c -o dynload_shlib.o Python/dynload_win.c -IPC -IInclude -DPy_BUILD_CORE -O3 &&
+# #gcc -c -o getpathp.o PC/getpathp.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+# gcc -c -o dl_nt.o PC/dl_nt.c -IPC -IInclude -DPy_BUILD_CORE -DMS_DLL_ID="\"$VERSION\"" -O3 &&
+# #gcc -c -o config.o PC/config.c -IPC -IInclude -DPy_ENABLE_SHARED -DPy_BUILD_CORE -O3 &&
+# #gcc -c -o frozen_dllmain.o PC/frozen_dllmain.c -IPC -IInclude -DPy_ENABLE_SHARED -DPy_BUILD_CORE -O3 &&
+# #gcc -c -o Modules/posixmodule.o PC/msvcrtmodule.c -IPC -IInclude -IInclude/internal -O3 -D$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo MS_WINDOWS; else echo MS_WIN64; fi) -DNT_THREADS -DPy_BUILD_CORE &&
+# gcc -c -o main2wide.o main2wide.c -IPC -IInclude -municode -DPy_BUILD_CORE -O3 &&
+# make -Cbuild_shared libpython$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/").dll.a DLLLIBRARY=python$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/").dll LDSHARED="gcc -shared" CFLAGS="-DPy_ENABLE_SHARED -DPy_BUILD_CORE -I$(pwd)" BASEMODLIBS="winconsoleio.o dl_nt.o main2wide.o -Wl,--as-needed -lshlwapi -lversion -lws2_32" &&
+# make -Cbuild_shared libpython$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/").a CFLAGS="-DPy_ENABLE_SHARED -DPy_BUILD_CORE -I$(pwd)" BASEMODLIBS="winconsoleio.o dl_nt.o main2wide.o -Wl,--as-needed -lshlwapi -lversion -lws2_32" &&
+# make -Cbuild_shared CFLAGS="-I$(pwd)" BASEMODLIBS="winconsoleio.o dl_nt.o main2wide.o -Wl,--as-needed -lshlwapi -lversion -lws2_32 -lmincore" &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install &&
+#    echo OK
+
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-optimizations --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --with-dbmliborder=gdbm CFLAGS="-DMS_WINDOWS $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DMS_WIN64"; fi) -I$(pwd)/PC" LDFLAGS="-Wl,-allow-multiple-definition -Wl,--as-needed -lws2_32 -lversion" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --with-dbmliborder=gdbm CFLAGS="-DMS_WINDOWS $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DMS_WIN64"; fi) -I$(pwd)/PC" LDFLAGS="-Wl,-allow-multiple-definition -Wl,--as-needed -lws2_32 -lversion" &&
+ echo "#define HAVE_DECLSPEC_DLL" >> pyconfig.h &&
+ # use Windows files where needed
+ mv -f Modules/config.c Modules/config.c.bak &&
+ cp -f PC/config.c Modules/config.c &&
+ wl-showstatus build &&
+ gcc -c -o winconsoleio.o Modules/_io/winconsoleio.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+ gcc -c -o dynload_shlib.o Python/dynload_win.c -IPC -IInclude -DPy_BUILD_CORE -O3 &&
+ #gcc -c -o getpathp.o PC/getpathp.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+ gcc -c -o dl_nt.o PC/dl_nt.c -IPC -IInclude -DPy_BUILD_CORE -DMS_DLL_ID="\"$VERSION\"" -O3 &&
+ #gcc -c -o config.o PC/config.c -IPC -IInclude -DPy_ENABLE_SHARED -DPy_BUILD_CORE -O3 &&
+ #gcc -c -o frozen_dllmain.o PC/frozen_dllmain.c -IPC -IInclude -DPy_ENABLE_SHARED -DPy_BUILD_CORE -O3 &&
+ #gcc -c -o Modules/posixmodule.o PC/msvcrtmodule.c -IPC -IInclude -IInclude/internal -O3 -D$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo MS_WINDOWS; else echo MS_WIN64; fi) -DNT_THREADS -DPy_BUILD_CORE &&
+ gcc -c -o main2wide.o main2wide.c -IPC -IInclude -municode -DPy_BUILD_CORE -O3 &&
+ make libpython$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/").dll.a DLLLIBRARY=python$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/").dll LDSHARED="gcc -shared" CFLAGS="-DPy_ENABLE_SHARED -DPy_BUILD_CORE -I$(pwd)" BASEMODLIBS="winconsoleio.o dl_nt.o main2wide.o -Wl,--as-needed -lshlwapi -lversion -lws2_32" &&
+ make libpython$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/").a CFLAGS="-DPy_ENABLE_SHARED -DPy_BUILD_CORE -I$(pwd)" BASEMODLIBS="winconsoleio.o dl_nt.o main2wide.o -Wl,--as-needed -lshlwapi -lversion -lws2_32" &&
+ make CFLAGS="-I$(pwd)" BASEMODLIBS="winconsoleio.o dl_nt.o main2wide.o -Wl,--as-needed -lshlwapi -lversion -lws2_32 -lmincore" &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+
+
+#mv pyconfig.h pyconfig.h.bak &&
+#cp PC/pyconfig.h pyconfig.h
+
+#mv Python/frozen.c Python/frozen.c.bak &&
+#cp PC/frozen_dllmain.c Python/frozen.c
+
+
+
+#### MSYS2 patches: https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-python
+# apply patches from MSYS2, see also: https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-python
+svn --non-interactive --force --trust-server-cert checkout https://github.com/msys2/MINGW-packages/trunk/mingw-w64-python
+cat mingw-w64-python/*.patch | patch -ulbf -N -p1
+# fix missing is_cygpty()
+sed -i.bak -e "s/ || is_cygpty(self->fd)//" Objects/fileobject.c
+sed -i.bak -e "s/ || is_cygpty((int)fileno(fp))//" Python/pylifecycle.c
+sed -i.bak -e "s/ || is_cygpty(fileno(stdin))//" Modules/main.c
+sed -i.bak -e "s/ || is_cygpty(fd)//" Python/bltinmodule.c
+sed -i.bak -e "s/ || is_cygpty(self->fd)//" Modules/_io/fileio.c
+sed -i.bak -e "s/ || is_cygpty(fd)//" Python/fileutils.c
+mv Python/iscygpty.c Python/iscygpty.c.bak &&
+touch Python/iscygpty.c
+# fix Python/fileutils.c (version >= 3.9.1)
+patch -ulbf Python/fileutils.c << EOF
+@@ -2074,3 +2074,5 @@
+ #define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, NULL)
+-#else /* MS_WINDOWS */
++#elif defined(__MINGW32__)
++#define GET_LOCALE_STRING(ATTR) PyUnicode_FromWideChar(lc->ATTR, -1)
++#else
+ /* Use _W_* fields of Windows strcut lconv */
+EOF
+# use correct dynload_*.c
+mv Python/dynload_shlib.c Python/dynload_shlib.c.bak &&
+cat > Python/dynload_shlib.c << EOF
+#include "dynload_win.c"
+EOF
+# use correct getpath.c
+mv Modules/getpath.c Modules/getpath.c.bak &&
+cat > Modules/getpath.c << EOF
+#ifndef PY3_DLLNAME
+#define PY3_DLLNAME "python3.dll"
+#endif
+#include "../PC/getpathp.c"
+EOF
+# fix missing PY3_DLLNAME in Python/pathconfig.c (version >= 3.10.0)
+mv Python/pathconfig.c Python/pathconfig.c.bak &&
+cat > Python/pathconfig.c << EOF
+#ifndef PY3_DLLNAME
+#define PY3_DLLNAME "python3.dll"
+#endif
+EOF
+cat Python/pathconfig.c.bak >> Python/pathconfig.c
+# fix Modules/_localemodule.c (version >= 3.9.1)
+patch -ulbf Modules/_localemodule.c << EOF
+@@ -183,3 +183,5 @@
+ #define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, NULL)
+-#else  /* MS_WINDOWS */
++#elif defined(__MINGW32__)
++#define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, -1)
++#else
+ /* Use _W_* fields of Windows struct lconv */
+@@ -255,3 +257,5 @@
+
+-#ifdef MS_WINDOWS
++#ifdef __MINGW32__
++#define GET_LOCALE_STRING(ATTR) PyUnicode_DecodeLocale(lc->ATTR, -1)
++#elif defined(MS_WINDOWS)
+ /* Use _W_* fields of Windows struct lconv */
+EOF
+## fix Include/osmodule.h (version >= 3.9.5)
+#patch -ulbf Include/osmodule.h << EOF
+#@@ -9,5 +9,3 @@
+#
+#-#if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 >= 0x03060000
+# PyAPI_FUNC(PyObject *) PyOS_FSPath(PyObject *path);
+#-#endif
+#
+#EOF
+# don't enable --coverage
+sed -i.bak -e "s/--coverage//" Makefile.pre.in
+# fix missing @PYTHON_OBJS_FROZENMAIN@
+sed -i.bak2 -e "s/@PYTHON_OBJS_FROZENMAIN@//" Makefile.pre.in
+# wl-showstatus configure &&
+mkdir -p build_shared &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --with-dbmliborder=gdbm CC=$(which gcc.exe) CFLAGS="-D_WIN32_WINNT=0x0601 -DMS_WINDOWS $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DMS_WIN64"; fi) -DNT_THREADS -I$(pwd)/../PC" LDFLAGS="-Wl,-allow-multiple-definition -Wl,--as-needed" LIBS="-lshlwapi -lversion -lws2_32 -lmincore" &&
+ cd .. &&
+ # use Windows files where needed
+ cp -u PC/config.c build_shared/Modules/config.c &&
+ touch build_shared/Modules/Setup.config &&
+ wl-showstatus build-install &&
+ gcc -c -o build_shared/dl_nt.o PC/dl_nt.c -IPC -IInclude -DPy_BUILD_CORE -DMS_DLL_ID="\"$VERSION\"" -O3 &&
+ gcc -c -o build_shared/winconsoleio.o Modules/_io/winconsoleio.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+ #gcc -c -o build_shared/posixmodule.o Modules/posixmodule.c -IPC -IInclude -IInclude/internal -DMS_WINDOWS -DPy_BUILD_CORE -D_WIN32_WINNT=0x0601 -DSEP="L'/'" -DALTSEP="L'\\\\'" -O3 &&
+ gcc -c -o build_shared/Modules/posixmodule.o Modules/posixmodule.c -IPC -IInclude -IInclude/internal -I. -DMS_WINDOWS -DPy_BUILD_CORE -D_WIN32_WINNT=0x0601 -O3 &&
+ #gcc -c -o build_shared/msvcrtmodule.o PC/msvcrtmodule.c -IPC -IInclude -IInclude/internal -DPy_BUILD_CORE -O3 &&
+ make -Cbuild_shared install BASEMODLIBS="dl_nt.o winconsoleio.o -Wl,--as-needed -lshlwapi -lversion -lws2_32 -lmincore" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,95 @@
+export NAME="CCV"
+export STATUS=
+export URL=http://libccv.org/
+export BASENAME=libccv
+export DESCRIPTION="A Modern Computer Vision Library"
+export CATEGORY=graphics,dataprocessing
+export TYPE=library
+export VERSION=stable
+export VERSIONDATE=20161102
+wl-showstatus --package-version
+#export DEPENDANCIES=gsl,ffmpeg2,fftw,tesseract-ocr,libjpeg,libpng
+export DEPENDANCIES=gsl,liblinear,libav,fftw,tesseract-ocr,libjpeg,libpng
+####ccv.h:20:20: fatal error: alloca.h: No such file or directory
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/liuliu/ccv/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/liuliu/ccv/tarball/$VERSION
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+mv $TARBALLDIR/$BASENAME/$VERSION $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd liuliu-ccv-*
+# fix missing alloca.h in lib/ccv.h
+patch -ulbf lib/ccv.h << EOF
+--- lib/ccv.h  2016-04-13 05:05:57.000000000 +0200
++++ lib/ccv.h  2016-11-02 13:27:53.234288900 +0100
+@@ -18,3 +18,3 @@
+ #include <assert.h>
+-#if !defined(__OpenBSD__) && !defined(__FreeBSD__)
++#if !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(_WIN32)
+ #include <alloca.h>
+EOF
+# fix missing arpa/inet.h in lib/3rdparty/sha1/sha1.c
+patch -ulbf lib/3rdparty/sha1/sha1.c << EOF
+--- lib/3rdparty/sha1/sha1.c  2016-04-13 05:05:57.000000000 +0200
++++ lib/3rdparty/sha1/sha1.c  2016-11-02 13:31:23.080547700 +0100
+@@ -10,3 +10,8 @@
+ #include <string.h>
++#if defined(_WIN32)
++#include <stdint.h>
++#include <winsock2.h>
++#else
+ #include <arpa/inet.h>
++#endif
+
+EOF
+# fix missing alloca.h in lib/3rdparty/sfmt/SFMT.c
+patch -ulbf lib/3rdparty/sfmt/SFMT.c << EOF
+--- lib/3rdparty/sfmt/SFMT.c  2016-04-13 05:05:57.000000000 +0200
++++ lib/3rdparty/sfmt/SFMT.c  2016-11-02 13:34:25.784883300 +0100
+@@ -340,4 +340,6 @@
+  */
+-#if !defined(__OpenBSD__) && !defined(__FreeBSD__)
++#if !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(_WIN32)
+ #include <alloca.h>
++#else
++#include <malloc.h>
+ #endif
+EOF
+wl-showstatus configure &&
+ cd lib &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/libav/include" LDFLAGS="-L$MINGWPREFIX/libav/lib" &&
+ cd .. &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build &&
+ #make -Clib &&
+ make -Clib libccv.a &&
+ #make -C../serve &&
+ #wl-showstatus build-install &&
+ #make -Clib install-strip &&
+ echo "LIBRARY ccv.dll" > libccv.def &&
+ echo "EXPORTS" >> libccv.def &&
+ #nm -f posix --defined-only -p lib/libccv.a | sed -n "s/^_*\(ccv_[^ ]*\) T.*$/\1/p" >> libccv.def &&
+ nm -f posix --defined-only -p lib/libccv.a | sed -n "s/^_*\(ccv_[^ ]*\) T.*$/\1/p" | grep -v "^ccv_sort_32f$" >> libccv.def &&
+ #gcc -shared -s -mwindows -def libccv.def -Wl,--out-implib,libccv.dll.a -o ccv.dll lib/libccv.a -lws2_32 -ljpeg -lpng -lpthread -lgsl -lfftw3 &&
+ gcc -shared -s -mwindows -def libccv.def -Wl,--out-implib,libccv.dll.a -o ccv.dll lib/libccv.a -lws2_32 -ljpeg -lpng -lpthread -lgsl -llinear -lfftw3 -lfftw3f &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include $INSTALLPREFIX/bin &&
+ cp -f lib/libccv.a $INSTALLPREFIX/lib/ &&
+ cp -f libccv.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f ccv.dll $INSTALLPREFIX/bin/ &&
+ cp lib/cc*.h $INSTALLPREFIX/include &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf liuliu-ccv-*
+####To do: build DLL
+
+
+

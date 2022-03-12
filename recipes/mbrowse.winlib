@@ -1,0 +1,198 @@
+#export NAME="Mbrowse"
+#export STATUS=
+##export URL=http://www.kill-9.org/mbrowse/
+#export URL=http://sourceforge.net/projects/mbrowse/
+#export BASENAME=mbrowse
+#export DESCRIPTION=
+#export CATEGORY=application
+#export TYPE=library
+#export VERSION=0.3.1
+#export VERSIONDATE=
+#wl-showstatus --package-version
+#export DEPENDANCIES=glib2,gtk2,pcre,netsnmp
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+#export DOWNLOADURL="http://sourceforge.net/projects/mbrowse/files/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.kill-9.org/mbrowse/$BASENAME-$VERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fixes for problems with checking snmplib version and missing gtk-config
+#mv configure configure.bak
+#sed -e "s/NetSnmpVersionInfo/netsnmp_get_version()/; s/\(\$GTK_CONFIG.*\)--version/\1--modversion/; s/bzero\(( *&s *\),/memset\1,0,/" configure.bak > configure
+## create dummy netinet/in.h which includes winsock2.h
+#mkdir -p win32fix/netinet win32fix/net win32fix/arpa
+#cat > win32fix/netinet/in.h << EOF
+##include <winsock2.h>
+##define EADDRINUSE WSAEADDRINUSE
+##define EPFNOSUPPORT WSAEPFNOSUPPORT
+##define EAFNOSUPPORT WSAEAFNOSUPPORT
+##define ECONNRESET WSAECONNRESET
+##define EWOULDBLOCK WSAEWOULDBLOCK
+#EOF
+## patch to initialize winsock at startup
+#patch -u -l src/main.c << EOF
+#--- src/main.c  Sat Aug 10 02:20:42 2002
+#+++ src/main.c  Wed Feb 13 10:21:09 2008
+#@@ -29,6 +29,10 @@
+# 
+# int main(int argc, char **argv) {
+# 
+#+#ifdef __WIN32__
+#+  static WSADATA wsaData;
+#+  if (WSAStartup(MAKEWORD(1, 0), &wsaData)) exit(1);
+#+#endif
+#   int ch;
+# 
+#   gtk_init (&argc, &argv);
+#@@ -58,4 +62,7 @@
+#   load_config();
+#   gtk_main();
+#   return(EXIT_SUCCESS);
+#+#ifdef __WIN32__
+#+  WSACleanup();
+#+#endif
+# }
+#EOF
+## fix case label with nothing following it in src/snmpstuff.c
+#patch -u -l src/snmpstuff.c << EOF
+#--- src/snmpstuff.c Fri Jun 21 13:45:18 2002
+#+++ src/snmpstuff.c Wed Feb 13 09:17:32 2008
+#@@ -360,6 +360,7 @@
+#       case TYPE_NETADDR:
+#       case TYPE_OTHER:
+#       default:
+#+       break;
+#     }
+#   }
+#   if (type == 0) {
+#EOF
+## fix for gtk_menu_bar_set_shadow_type which no longer exists
+#mv src/interface.c src/interface.c.bak
+#echo "#define gtk_menu_bar_set_shadow_type(o,t)" > src/interface.c
+#cat src/interface.c.bak >> src/interface.c
+##ln -s $MINGWPREFIX/bin/libintl-8.dll $MINGWPREFIX/bin/intl.dll
+##ln -s $MINGWPREFIX/bin/libpng12-0.dll $MINGWPREFIX/bin/libpng13.dll
+### test application
+##MIBDIRS=$MINGWPREFIX/share/snmp/mibs src/mbrowse.exe
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix -I$MINGWPREFIX/include/gtk-2.0 -I$MINGWPREFIX/lib/gtk-2.0/include -I$MINGWPREFIX/include/pango-1.0 -I$MINGWPREFIX/include/cairo -I$MINGWPREFIX/include/atk-1.0 -DGTK_WINDOW_DIALOG=GTK_TYPE_DIALOG -DGTK_ENABLE_BROKEN" GTK_CONFIG="$PKG_CONFIG gtk+-2.0" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-snmp-prefix=$MINGWPREFIX CFLAGS="-I`pwd`/win32fix -I$MINGWPREFIX/include/gtk-2.0 -I$MINGWPREFIX/lib/gtk-2.0/include -I$MINGWPREFIX/include/pango-1.0 -I$MINGWPREFIX/include/cairo -I$MINGWPREFIX/include/atk-1.0 -DGTK_WINDOW_DIALOG=GTK_TYPE_DIALOG -DGTK_ENABLE_BROKEN" GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import" LIBS="-lcrypto" &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="Mbrowse"
+export STATUS=
+export URL=http://sourceforge.net/projects/mbrowse/
+export BASENAME=mbrowse
+export DESCRIPTION="A graphical SNMP MIB browser based on GTK+ and Net-SNMP"
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=0.4.2
+#export VERSIONDATE=20101124
+export VERSION=0.4.3
+export VERSIONDATE=20110128
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,pcre,netsnmp,gdk-pixbuf,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=netpbm
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sourceforge.net/projects/mbrowse/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/mbrowse/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix winsock.h/winsock2.h problems in src/main.c
+#mv src/main.c src/main.c.bak &&
+#echo "#include <winsock2.h>" > src/main.c &&
+#cat src/main.c.bak >> src/main.c
+# fix src/icons.h (version >= 0.4.3)
+patch -ulbf src/icons.h << EOF
+@@ -25,4 +25,4 @@
+ static const char * leaf_xpm[] = {
+-"16 16 7 1",
+-".     c None",
++"16 16 6 1",
++"       c None",
+ "+     c #000000",
+@@ -50,4 +50,4 @@
+ static const char * folder_xpm[] = {
+-"16 16 6 1",
+-".     c None",
++"16 16 5 1",
++"       c None",
+ "+     c #000000",
+@@ -59,3 +59,3 @@
+ " +@@@@+         ",
+-"+@@@@@@++++++++.",
++"+@@@@@@++++++++ ",
+ "+#############+\$",
+@@ -69,3 +69,3 @@
+ "+++++++++++++++\$",
+-".\$\$\$\$\$\$\$\$\$\$\$\$\$\$\$",
++" \$\$\$\$\$\$\$\$\$\$\$\$\$\$\$",
+ "                ",
+EOF
+# export icons to Windows .ico format
+( echo "I=0"; sed -e "s/\\$/\\\\\$/g; s?^\(static \)const ?I=\$(expr \$I + 1)\necho \"Icon\$I.ico ICON DISCARDABLE \\\\\"\$I.ico\\\\\"\"\n( xpmtoppm | ppmtowinicon ) > \$I.ico << EOF\n/* XPM */\n\1?; s/;$/&\nEOF/" src/icons.h ) | sh > windows_icons.rc &&
+windres windows_icons.rc -O coff -o windows_icons.o 
+# fix configure script
+patch -ulbf configure << EOF
+--- configure  2010-11-18 12:46:06 +0100
++++ configure  2010-11-24 14:51:00 +0100
+@@ -5647,3 +5647,3 @@
+         struct snmp_session s;
+-       bzero( &s, sizeof( struct snmp_session));
++       memset( &s, 0, sizeof( struct snmp_session));
+        snmp_open(&s);
+@@ -5701,3 +5701,3 @@
+
+-          bzero(&s, sizeof( struct snmp_session));
++          memset(&s, 0, sizeof( struct snmp_session));
+           snmp_open(&s);
+@@ -5894,3 +5894,3 @@
+
+-  if test x\$PKG_CONFIG != xno ; then
++  if test x"\$PKG_CONFIG" != x"no" ; then
+     if pkg-config --atleast-pkgconfig-version 0.7 ; then
+@@ -5910,3 +5910,3 @@
+
+-  if test x\$PKG_CONFIG != xno ; then
++  if test x"\$PKG_CONFIG" != x"no" ; then
+     ## don't try to run the test against uninstalled libtool libs
+EOF
+## test application
+#MIBDIRS=$MINGWPREFIX/share/snmp/mibs src/mbrowse.exe
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-snmp-prefix=$MINGWPREFIX CFLAGS="-I`pwd`/win32fix -I$MINGWPREFIX/include/gtk-2.0 -I$MINGWPREFIX/lib/gtk-2.0/include -I$MINGWPREFIX/include/pango-1.0 -I$MINGWPREFIX/include/cairo -I$MINGWPREFIX/include/atk-1.0 -DGTK_WINDOW_DIALOG=GTK_TYPE_DIALOG -DGTK_ENABLE_BROKEN" GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import" LIBS="-lcrypto" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-snmp-prefix=$MINGWPREFIX --disable-gtktest CFLAGS="-I`pwd`/win32fix -I$MINGWPREFIX/include/gtk-2.0 -I$MINGWPREFIX/lib/gtk-2.0/include -I$MINGWPREFIX/include/pango-1.0 -I$MINGWPREFIX/include/cairo -I$MINGWPREFIX/include/atk-1.0 -DGTK_WINDOW_DIALOG=GTK_TYPE_DIALOG -DGTK_ENABLE_BROKEN" GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import" LIBS="-Wl,--as-needed -lcrypto" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-snmp-prefix=$MINGWPREFIX --disable-gtktest GTK_CONFIG="$PKG_CONFIG gtk+-2.0" CFLAGS="-fcommon -I$(pwd)/win32fix -I$MINGWPREFIX/include/gtk-2.0 -I$MINGWPREFIX/lib/gtk-2.0/include -I$MINGWPREFIX/include/pango-1.0 -I$MINGWPREFIX/include/cairo -I$MINGWPREFIX/include/atk-1.0 -DGTK_WINDOW_DIALOG=GTK_TYPE_DIALOG -DGTK_ENABLE_BROKEN" LDFLAGS="-Wl,--enable-auto-import" LIBS="-Wl,--as-needed -lcrypto" &&
+ #CFLAGS="-DGLIB_STATIC_COMPILATION -DGOBJECT_STATIC_COMPILATION" 
+ wl-showstatus build-install &&
+ make install-strip LDFLAGS="$(pwd)/windows_icons.o -s -mwindows" &&
+ # build additional program that shows warnings/errors on console
+ make -Csrc mbrowse_c.exe EXEEXT="_c.exe" LDFLAGS="$(pwd)/windows_icons.o -s -mconsole" &&
+ ## build static version
+ #make -Csrc mbrowse_s.exe EXEEXT="_s.exe" LDFLAGS="$(pwd)/windows_icons.o --static -s -mwindows -Wl,--as-needed" mbrowse_LDADD="-Wl,--allow-multiple-definition $(pkg-config --define-prefix --static --libs gtk+-2.0 gtk+-win32-2.0 gdk-win32-2.0) -lnetsnmp -Wl,--as-needed -lws2_32 -ladvapi32 -lpcreposix" &&
+ cp -f src/mbrowse_c.exe $INSTALLPREFIX/bin &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# for static version: sed -i.orig -e "s/-no-undefined/-static/g" src/Makefile
+#MIBDIRS=$MINGWPREFIX/share/snmp/mibs MIBS=all mbrowse
+
+
+
+## create standalone package
+#mkdir -p mbrowse/bin mbrowse/share/snmp/mibs mbrowse/etc/net-snmp/mib_indexes &&
+#copypedeps -r $MINGWPREFIX/bin/mbrowse.exe mbrowse/bin/ &&
+#cp -rf $MINGWPREFIX/share/snmp/mibs/* mbrowse/share/snmp/mibs/

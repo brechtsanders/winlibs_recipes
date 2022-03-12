@@ -1,0 +1,135 @@
+export NAME="Intel(R) Embree"
+export STATUS=
+export URL=https://www.embree.org/
+export BASENAME=embree
+export DESCRIPTION="Intel(R) Embree is a collection of high-performance ray tracing kernels, developed at Intel."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=3.6.1
+#export VERSIONDATE=20200108
+#export VERSION=3.12.1
+#export VERSIONDATE=20201026
+#export VERSION=3.12.2
+#export VERSIONDATE=20210125
+#export VERSION=3.13.0
+#export VERSIONDATE=20210508
+#export VERSION=3.13.1
+#export VERSIONDATE=20210814
+#export VERSION=3.13.2
+#export VERSIONDATE=20211029
+export VERSION=3.13.3
+export VERSIONDATE=20220211
+wl-showstatus --package-version
+export DEPENDANCIES=tbb
+#export DEPENDANCIES=tbb,ispc
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=Apache
+#export DOWNLOADURL="https://www.embree.org/downloads.html"
+export DOWNLOADURL="https://github.com/embree/embree/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/embree/embree/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix common/sys/intrinsics.h (version >= 3.12.1)
+patch -ulbf common/sys/intrinsics.h << EOF
+@@ -32,3 +32,5 @@
+ #if defined(__WIN32__)
++#  ifndef NOMINMAX
+ #  define NOMINMAX
++#  endif
+ #  include <windows.h>
+EOF
+# fix common/math/math.h (version >= 3.12.1)
+patch -ulbf common/math/math.h << EOF
+@@ -15,3 +15,3 @@
+ #if defined(__WIN32__)
+-#if (__MSV_VER <= 1700)
++#if (__MSV_VER <= 1700) && !defined(__MINGW32__)
+ namespace std
+@@ -42,3 +42,3 @@
+
+-#if defined(__WIN32__)
++#if defined(__WIN32__) && !defined(__MINGW32__)
+   __forceinline bool finite ( const float x ) { return _finite(x) != 0; }
+@@ -88,3 +88,3 @@
+
+-#if defined(__WIN32__) && (__MSC_VER <= 1700)
++#if defined(__WIN32__) && (__MSC_VER <= 1700) && !defined(__MINGW32__)
+   __forceinline float nextafter(float x, float y) { if ((x<y) == (x>0)) return
+x*(1.1f+float(ulp)); else return x*(0.9f-float(ulp)); }
+EOF
+# fix common/sys/sysinfo.cpp (version >= 3.12.1)
+patch -ulbf common/sys/sysinfo.cpp << EOF
+@@ -235,3 +235,3 @@
+   {
+-#if defined (__WIN32__)
++#if defined (__WIN32__) && !defined(__MINGW32__)
+     int64_t xcr0 = 0; // int64_t is workaround for compiler bug under VS2013, Win32
+EOF
+# fix common/sys/thread.cpp (version >= 3.12.1)
+mv common/sys/thread.cpp common/sys/thread.cpp.bak
+cat > common/sys/thread.cpp << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
+EOF
+cat common/sys/thread.cpp.bak >> common/sys/thread.cpp
+# fix common/sys/condition.cpp (version >= 3.12.1)
+mv common/sys/condition.cpp common/sys/condition.cpp.bak
+cat > common/sys/condition.cpp << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
+EOF
+cat common/sys/condition.cpp.bak >> common/sys/condition.cpp
+# fix common/sys/library.cpp (version >= 3.12.1)
+patch -ulbf common/sys/library.cpp << EOF
+@@ -29,3 +29,3 @@
+   void* getSymbol(lib_t lib, const std::string& sym) {
+-    return GetProcAddress(HMODULE(lib),sym.c_str());
++    return (void*)GetProcAddress(HMODULE(lib),sym.c_str());
+   }
+EOF
+# fix CMakeLists.txt for MinGW
+patch -ulbf CMakeLists.txt << EOF
+@@ -199,2 +199,4 @@
+     INCLUDE (intel)
++  ELSEIF(MINGW)
++    INCLUDE (gnu)
+   ELSE()
+EOF
+# fix issue with UTF-16 kernels/embree.rc
+mv kernels/embree.rc kernels/embree.rc.bak &&
+iconv -f UTF-16 -t UTF-8 < kernels/embree.rc.bak > kernels/embree.rc
+# avoid invalid -z linker flag
+sed -i.bak -e "s/-z [a-z]*//g" common/cmake/gnu.cmake
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEMBREE_ISPC_SUPPORT:BOOL=OFF -DEMBREE_TUTORIALS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+# #wl-showstatus build &&
+# #make -Cbuild_win &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+#    echo OK
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEMBREE_ISPC_SUPPORT:BOOL=OFF -DEMBREE_TUTORIALS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEMBREE_ISPC_SUPPORT:BOOL=ON -DEMBREE_TUTORIALS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lpsapi/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: ispc support -DEMBREE_ISPC_SUPPORT:BOOL=ON
+####TO DO: build static library
+
+
+

@@ -1,0 +1,93 @@
+export NAME="XML Security Library"
+export STATUS=
+export URL=http://www.aleksey.com/xmlsec/
+export BASENAME=xmlsec1
+export DESCRIPTION="XML Security Library is a C library based on LibXML2. The library supports major XML security standards: * XML Signature * XML Encryption * Canonical XML (part of the LibXML2) * Exclusive Canonical XML (part of the LibXML2)"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.2.18
+#export VERSIONDATE=20130111
+#export VERSION=1.2.19
+#export VERSIONDATE=20130325
+#export VERSION=1.2.20
+#export VERSIONDATE=20140528
+#export VERSION=1.2.21
+#export VERSIONDATE=20160412
+#export VERSION=1.2.22
+#export VERSIONDATE=20160420
+#export VERSION=1.2.23
+#export VERSIONDATE=20161017
+#export DEPENDANCIES=libxml2,libxslt,openssl,gnutls,libgcrypt,libltdl
+#export VERSION=1.2.24
+#export VERSIONDATE=20170420
+####apps/xmlsec.c:1342: undefined reference to `_imp__xmlSecOpenSSLTransformHmacSha1GetKlass'
+#export VERSION=1.2.25
+#export VERSIONDATE=20170912
+####last working version if CryptImportPublicKeyInfoEx2 is missing
+#export VERSION=1.2.26
+#export VERSIONDATE=20180606
+#export VERSION=1.2.27
+#export VERSIONDATE=20181023
+#export VERSION=1.2.28
+#export VERSIONDATE=20190417
+####src/mscng/certkeys.c:787: undefined reference to `BCryptExportKey@28'
+#export VERSION=1.2.29
+#export VERSIONDATE=20191016
+#export VERSION=1.2.30
+#export VERSIONDATE=20200422
+#export VERSION=1.2.31
+#export VERSIONDATE=20201030
+#export VERSION=1.2.32
+#export VERSIONDATE=20210422
+export VERSION=1.2.33
+export VERSIONDATE=20211025
+####src/mscng/certkeys.c:60: undefined reference to `CryptImportPublicKeyInfoEx2'
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2,libxslt,gnutls,openssl,nss,nspr,libgcrypt,libltdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=MIT
+export DOWNLOADURL="http://www.aleksey.com/xmlsec/download.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.aleksey.com/xmlsec/download/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix conflicting  in src/openssl/openssl_compat.h (version >= 1.2.25)
+mv src/openssl/openssl_compat.h src/openssl/openssl_compat.h.bak
+cat > src/openssl/openssl_compat.h << EOF
+#ifdef X509_NAME
+#undef X509_NAME
+#endif
+EOF
+cat src/openssl/openssl_compat.h.bak >> src/openssl/openssl_compat.h
+# fix missing CryptImportPublicKeyInfoEx2 in src/mscng/certkeys.c (version >= 1.2.28)
+mv src/mscng/certkeys.c src/mscng/certkeys.c.bak &&
+echo '#if !defined(NTDDI_VERSION) || NTDDI_VERSION < 0x06000000' > src/mscng/certkeys.c &&
+echo "#undef NTDDI_VERSION" >> src/mscng/certkeys.c &&
+echo "#define NTDDI_VERSION 0x06000000" >> src/mscng/certkeys.c &&
+echo "#endif" >> src/mscng/certkeys.c &&
+cat src/mscng/certkeys.c.bak >> src/mscng/certkeys.c
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lgcrypt" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-soap --disable-mscrypto --disable-mscng LDFLAGS="-Wl,--as-needed -lgcrypt" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-soap LDFLAGS="-Wl,--as-needed -lgcrypt -lcrypt32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-soap LDFLAGS="-Wl,--as-needed -lgcrypt" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-soap --with-gnutls --with-openssl --with-nss --with-gcrypt LDFLAGS="-Wl,--as-needed -lgcrypt" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ # fix absolute paths in xmlsec1-config
+ sed -i.bak -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/xmlsec1-config &&
+ rm -f $INSTALLPREFIX/bin/xmlsec1-config.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,92 @@
+export NAME="gLabels"
+export STATUS=
+export URL=http://www.glabels.org/
+export BASENAME=glabels
+export DESCRIPTION="gLabels is a program for creating labels and business cards for the GNOME desktop environment. It is designed to work with various laser/ink-jet peel-off label and business card sheets that you'll find at most office supply stores."
+export CATEGORY=
+export TYPE=library
+#export VERSION=2.3.0
+#export VERSIONDATE=
+#export VERSION=2.3.1
+#export VERSIONDATE=20110106
+####Requested 'glib-2.0 >= 2.27.2' but version of GLib is 2.26.1
+####No package 'gtk+-3.0' found
+####Requested 'librsvg-2.0 >= 2.32.0' but version of librsvg is 2.26.3
+#export VERSION=3.0.0
+#export VERSIONDATE=20110517
+#export VERSION=3.0.1
+#export VERSIONDATE=20120918
+#export VERSION=3.2.0
+#export VERSIONDATE=20131029
+####libglabels/lgl-db.c:336: undefined reference to `g_type_check_instance_cast'
+#export VERSION=3.2.1
+#export VERSIONDATE=20141110
+#export VERSION=3.4.0
+#export VERSIONDATE=20160424
+export VERSION=3.4.1
+export VERSIONDATE=20180428
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,glib2,librsvg,pango,libxml2,libqrencode,zint,gnome-doc-utils
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+export BUILDDEPENDANCIES=desktop-file-utils
+export LICENSEFILE=COPYING
+#export LICENSETYPE="GPL/LGPL"
+export LICENSETYPE="GPL"
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/glabels/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/glabels/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/glabels/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# use relative paths (version >= 3.4.1)
+sed -i.bak -e "s?\(g_build_filename\s*(\)LIBGLABELS_CONFIG_DIR,?\1__argv[0], \"../../share\", \"$(sed -ne "s/^LIBGLABELS_BRANCH=//p" configure)\",?; s?\(g_build_filename\s*(\)GLABELS_DATA_DIR,?\1__argv[0], \"../../share\", \"$(sed -ne "s/^GLABELS_BRANCH=//p" configure)\",?" $(grep -l "g_build_filename.*_DIR" $(find -name '*.c'))
+
+## use relative path in libglabels/lgl-db.c (version >= 3.4.1)
+#patch -ulbf libglabels/lgl-db.c << EOF
+#@@ -44,3 +44,7 @@
+# /* Data system and user data directories.  (must free w/ g_free()) */
+#+#ifdef _WIN32
+#+#define SYSTEM_CONFIG_DIR     g_build_filename (__argv[0], "../../share", "libglabels-3.0", "templates", NULL)
+#+#else
+# #define SYSTEM_CONFIG_DIR     g_build_filename (LIBGLABELS_CONFIG_DIR, "templates", NULL)
+#+#endif
+# #define USER_CONFIG_DIR       g_build_filename (g_get_user_config_dir (), "libglabels", "templates" , NULL)
+#EOF
+
+# skip making help
+cat > help/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+## fix problem detecting GNU gettext tools on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# mv configure configure.bak
+# sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+#fi
+wl-showstatus configure &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-update-mimedb LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-update-mimedb LDFLAGS="-Wl,-no-undefined" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-update-mimedb  --disable-update-desktopdb LDFLAGS="-Wl,-no-undefined" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PATH=$PATH:$PERLDIR/../c/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-update-mimedb  --disable-update-desktopdb LDFLAGS="-Wl,-no-undefined" &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PATH=$PATH:$PERLDIR/../c/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-fcommon" LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PERLDIR/../c/bin make install-strip UPDATE_DESKTOP_DATABASE="`which update-desktop-database`" &&
+ PATH=$PYDIR:$PATH:$PERLDIR/../c/bin make install-strip UPDATE_DESKTOP_DATABASE="`which update-desktop-database`" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####make install-data-hook
+####make[5]: Entering directory `/home/win32/glabels-2.3.1/glabels-2.3.0/data/mime'
+####"/home/win32/glabels-2.3.1/inst_glabels-2.3.0/share/mime"
+####/bin/sh: /home/win32/glabels-2.3.1/inst_glabels-2.3.0/share/mime: is a directory
+####glib-compile-schemas.exe $MINGWPREFIX/share/glib-2.0/schemas
+####GDK_PIXBUF_MODULE_FILE=$MINGWPREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache GDK_PIXBUF_MODULEDIR=$MINGWPREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders glabels-3.exe
+
+
+

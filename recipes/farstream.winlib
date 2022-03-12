@@ -1,0 +1,100 @@
+export NAME="Farstream"
+export STATUS=
+export URL=http://www.freedesktop.org/wiki/Software/Farstream/
+export BASENAME=farstream
+export DESCRIPTION="The Farstream (formerly Farsight) project is an effort to create a framework to deal with all known audio/video conferencing protocols. On one side it offers a generic API that makes it possible to write plugins for different streaming protocols, on the other side it offers an API for clients to use those plugins."
+export CATEGORY=audio,video,communication
+export TYPE=library
+#export VERSION=0.2.3
+#export VERSIONDATE=20140122
+#export VERSION=0.2.4
+#export VERSIONDATE=20140506
+#export VERSION=0.2.5.1
+#export VERSIONDATE=20141010
+#export VERSION=0.2.6
+#export VERSIONDATE=20141010
+#export VERSION=0.2.7
+#export VERSIONDATE=20150129
+#export VERSION=0.2.8
+#export VERSIONDATE=20160311
+export VERSION=0.2.9
+export VERSIONDATE=20200312
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gstreamer,gst-plugins-base,libnice,libxml2,gettext,zlib,pthreads,gupnp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://freedesktop.org/software/farstream/releases/farstream/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://freedesktop.org/software/farstream/releases/farstream/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/arpa winfix/netinet winfix/sys
+touch winfix/arpa/inet.h winfix/fcntl.h winfix/netinet/in.h
+cat > winfix/sys/socket.h << EOF
+#include <winsock2.h>
+#include <ws2tcpip.h>
+EOF
+# fix gst/fsmsnconference/fs-msn-connection.c
+patch -ulbf gst/fsmsnconference/fs-msn-connection.c << EOF
+--- gst/fsmsnconference/fs-msn-connection.c  2013-03-26 18:12:18 +0100
++++ gst/fsmsnconference/fs-msn-connection.c  2014-01-22 15:06:16 +0100
+@@ -49,2 +49,8 @@
+
++#ifdef __MINGW32__
++#define strerror_r(errno,buf,buflen) { strncpy(buf, strerror(errno), buflen - 1); buf[buflen - 1] = 0; }
++#define EADDRINUSE WSAEADDRINUSE
++#define EINPROGRESS WSAEINPROGRESS
++#endif
++
+ /* Signals */
+@@ -471,2 +477,5 @@
+   gchar *session_id;
++#ifdef __MINGW32__
++  unsigned long flags;
++#endif
+
+@@ -487,3 +496,8 @@
+   // set non-blocking mode
++#ifndef __MINGW32__
+   fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
++#else
++  flags = 1;
++  ioctlsocket(fd, FIONBIO, &flags);
++#endif
+   for (;;) {
+@@ -590,2 +604,5 @@
+   struct sockaddr_in theiraddr;
++#ifdef __MINGW32__
++  unsigned long flags;
++#endif
+   memset(&theiraddr, 0, sizeof(theiraddr));
+@@ -603,3 +620,8 @@
+   // set non-blocking mode
++#ifndef __MINGW32__
+   fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
++#else
++  flags = 1;
++  ioctlsocket(fd, FIONBIO, &flags);
++#endif
+
+EOF
+wl-showstatus configure &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #PYTHON=$PYDIR/python.exe PATH=$PYDIR:$PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-introspection=no CFLAGS="-I$(pwd)/winfix" &&
+ PYTHON=$PYDIR/python.exe PATH=$PYDIR:$PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-introspection=no CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build-install &&
+ # fix error: stray '\' in program
+ #make -Cfarstream fs-enumtypes.c && sed -i.bak -e "s/^\\\\#/#/g" farstream/fs-enumtypes.c &&
+ PATH=$PYDIR:$PATH make -Cfarstream fs-enumtypes.c && sed -i.bak -e "s/^\\\\#/#/g" farstream/fs-enumtypes.c &&
+ #make install-strip &&
+ PATH=$PYDIR:$PATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

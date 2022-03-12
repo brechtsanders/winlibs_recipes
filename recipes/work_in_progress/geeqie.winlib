@@ -1,0 +1,216 @@
+export NAME="Geeqie"
+export STATUS=
+export URL=https://www.mankier.com/1/geeqie
+export BASENAME=geeqie
+export DESCRIPTION="GTK based multiformat image viewer"
+export CATEGORY=graphics
+export TYPE=application
+#export VERSION=1.5
+#export VERSIONDATE=20200829
+#export VERSION=1.5.1
+#export VERSIONDATE=20201103
+#export VERSION=1.6
+#export VERSIONDATE=20201103
+#export VERSION=1.7.1
+#export VERSIONDATE=20220117
+export VERSION=1.7.2
+export VERSIONDATE=20220125
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,gtk3,libjpeg,libtiff,clutter,clutter-gtk,libchamplain,lua,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/BestImageViewer/geeqie/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/BestImageViewer/geeqie/releases/download/v$VERSION/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://github.com/BestImageViewer/geeqie/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix
+cat > winfix/pwd.h << EOF
+EOF
+cat > winfix/grp.h << EOF
+EOF
+# fix src/ui_fileops.c (version >= 1.5)
+patch -ulbf src/ui_fileops.c << EOF
+@@ -317,2 +317,5 @@
+ {
++#ifdef _WIN32
++       return FALSE;
++#else
+        gchar *sl;
+@@ -326,2 +329,3 @@
+        return ret;
++#endif
+ }
+@@ -351,2 +355,5 @@
+ {
++#ifdef _WIN32
++       return FALSE;
++#else
+        struct stat st;
+@@ -354,2 +361,3 @@
+        return (lstat_utf8(s, &st) && S_ISLNK(st.st_mode));
++#endif
+ }
+@@ -427,2 +435,5 @@
+ {
++#ifdef _WIN32
++       return FALSE;
++#else
+        gchar *sl;
+@@ -442,2 +453,3 @@
+        return ret;
++#endif
+ }
+@@ -452,3 +464,7 @@
+        sl = path_from_utf8(s);
++#ifdef _WIN32
++       ret = (mkdir(sl) == 0);
++#else
+        ret = (mkdir(sl, mode) == 0);
++#endif
+        g_free(sl);
+@@ -492,2 +508,5 @@
+                        {
++#ifdef _WIN32
++                       ret = FALSE;
++#else
+                        ret = chown(tl, st.st_uid, st.st_gid);
+@@ -502,2 +521,3 @@
+                         }
++#endif
+                        }
+@@ -553,2 +573,3 @@
+        * realpath() instead. */
++#ifndef _WIN32
+        struct stat st;
+@@ -609,2 +630,3 @@
+        orig_copy:
++#endif
+
+EOF
+# fix src/ui_fileops.c (version >= 1.6)
+patch -ulbf src/ui_fileops.c << EOF
+@@ -346,3 +346,7 @@
+        sl = path_from_utf8(s);
++#ifdef _WIN32
++       ret = (stat(sl, st) == 0);
++#else
+        ret = (lstat(sl, st) == 0);
++#endif
+        g_free(sl);
+EOF
+# fix src/ui_misc.c (version >= 1.5)
+patch -ulbf src/ui_misc.c << EOF
+@@ -38,3 +38,6 @@
+
++#ifdef _WIN32
++#else
+ #include <langinfo.h>
++#endif
+
+@@ -1049,2 +1052,3 @@
+
++#ifndef _WIN32
+        date_format = nl_langinfo(D_FMT);
+@@ -1073,2 +1077,3 @@
+        else
++#endif
+                {
+EOF
+# fix missing strndup in src/ui_utildlg.c (version >= 1.5)
+mv src/ui_utildlg.c src/ui_utildlg.c.bak
+cat > src/ui_utildlg.c << EOF
+#include <stdlib.h>
+#include <string.h>
+char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+EOF
+cat src/ui_utildlg.c.bak >> src/ui_utildlg.c
+# fix src/pan-view/pan-util.c (version >= 1.5)
+patch -ulbf src/pan-view/pan-util.c << EOF
+@@ -21,2 +21,6 @@
+
++#ifdef _WIN32
++#define _POSIX_THREAD_SAFE_FUNCTIONS
++#include <time.h>
++#endif
+ #include "pan-util.h"
+@@ -101,3 +105,5 @@
+                case PAN_DATE_LENGTH_MONTH:
+-#if __GLIBC_PREREQ(2, 27)
++#ifdef _WIN32
++                       format = "%B %Y";
++#elif __GLIBC_PREREQ(2, 27)
+                        format = "%OB %Y";
+@@ -150,2 +156,5 @@
+ {
++#ifdef _WIN32
++       return FALSE;
++#else
+        gchar *sl;
+@@ -197,2 +206,3 @@
+        return ret;
++#endif
+ }
+@@ -201,4 +211,5 @@
+ {
+-       struct stat st;
+        const gchar *n;
++#ifndef _WIN32
++       struct stat st;
+
+@@ -215,2 +226,3 @@
+        if (S_ISLNK(st.st_mode) && (ignore_symlinks || pan_is_link_loop(s))) return TRUE;
++#endif
+
+EOF
+# fix src/exif-common.c (version >= 1.7.1)
+patch -ulbf src/exif-common.c << EOF
+@@ -1161,5 +1161,11 @@
+
++#ifdef S_ISUID
+        if (m & S_ISUID) mb |= 4;
++#endif
++#ifdef S_ISGID
+        if (m & S_ISGID) mb |= 2;
++#endif
++#ifdef S_ISVTX
+        if (m & S_ISVTX) mb |= 1;
++#endif
+
+EOF
+## fix missing po/Makefile.in.in
+#sed -i.bak -e "s?\(po/Makefile\).in\b?\1?" configure.ac &&
+#touch po/Makefile.in.in
+# don't abort on warnings
+sed -i.bak -e "s/-Werror//" configure.ac
+wl-showstatus configure &&
+ intltoolize -f -c &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-gtk3 --disable-doxygen-doc CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

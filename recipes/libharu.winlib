@@ -1,0 +1,100 @@
+#export NAME="libHaru"
+#export STATUS=
+#export URL=http://www.libharu.org/
+#export BASENAME=libharu
+#export DESCRIPTION="libHaru is a free, cross platform, open source library for generating PDF files."
+#export CATEGORY=graphics,fileformat
+#export TYPE=library
+##export VERSION=2.1.0
+##export VERSION=2.2.0
+##export VERSIONDATE=20101012
+#export VERSION=2.2.1
+#export VERSIONDATE=20101122
+#wl-showstatus --package-version
+#export DEPENDANCIES=zlib,libpng
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=README
+#export LICENSETYPE="ZLIB/LIBPNG License"
+##export DOWNLOADURL="http://libharu.org/files/ libharu-"
+#export DOWNLOADURL="http://libharu.org/ RELEASE_"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://libharu.org/files/$BASENAME-$VERSION.tar.bz2
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#cd $BASENAME-$VERSION
+## fix invalid access to png_const_inforp members and missing memmove in src/hpdf_image_png.c
+#mv src/hpdf_image_png.c src/hpdf_image_png.c.bak
+#echo "#include <string.h>" > src/hpdf_image_png.c
+#sed -e "s/info_ptr->\(width\|height\)/png_get_image_\1(png_ptr, info_ptr)/g; s/info_ptr->\(bit_depth\|color_type\)/png_get_\1(png_ptr, info_ptr)/g" src/hpdf_image_png.c.bak >> src/hpdf_image_png.c
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-zlib=$MINGWPREFIX --with-png=$MINGWPREFIX &&
+# wl-showstatus build-install &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="libHaru"
+export STATUS=
+export URL=http://www.libharu.org/
+export BASENAME=libharu
+export DESCRIPTION="libHaru is a free, cross platform, open source library for generating PDF files."
+export CATEGORY=graphics,fileformat
+export TYPE=library
+export VERSION=2.3.0
+export VERSIONDATE=20150628
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libpng
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=README
+export LICENSETYPE="ZLIB/LIBPNG License"
+export DOWNLOADURL="http://libharu.org/ RELEASE_"
+#export DOWNLOADURL="https://github.com/libharu/libharu/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/libharu/libharu/archive/RELEASE_$(echo $VERSION|tr . _).zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/RELEASE_$(echo $VERSION|tr . _).zip $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip
+wl-wait4deps
+#unzip -oq $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip
+unzip -oq $TARBALLDIR/$BASENAME/RELEASE_$(echo $VERSION|tr . _).zip
+cd libharu-RELEASE_$(echo $VERSION|tr . _)
+## fix dllimport/dllexport issue
+#patch -ulbf include/hpdf.h << EOF
+#@@ -30,2 +30,5 @@
+# #    else
+#+#      ifdef _WIN32
+#+#        define HPDF_EXPORT(A)  __declspec(dllimport) A
+#+#      else
+# #        ifdef HPDF_SHARED_MAKE
+#@@ -33,2 +36,3 @@
+# #        endif /* HPDF_SHARED_MAKE */
+#+#      endif
+# #    endif /* HPDF_DLL_MAKE_CDECL */
+#EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBHPDF_SHARED:BOOL=ON -DLIBHPDF_STATIC:BOOL=ON -S. -Bbuild_win &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBHPDF_SHARED:BOOL=ON -DLIBHPDF_STATIC:BOOL=ON -DLIBHPDF_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ rm -f $INSTALLPREFIX/lib/libz*.a $INSTALLPREFIX/lib/libpng*.a &&
+ cp -u $INSTALLPREFIX/lib/libhpdfs.a $INSTALLPREFIX/lib/libhpdf.a &&
+ # fix missing exports
+ echo "EXPORTS" > build_win/libhpdf.def &&
+ #pexports build_win/src/libhpdf.dll | sed -e "s/@[0-9]*$//" > build_win/libhpdf.def &&
+ sed -ne "s/^\(HPDF_[^ ]*\) *(.*$/\1/p" include/hpdf.h | grep -v "^HPDF_EXPORT" >> build_win/libhpdf.def &&
+ sed -ne "s/^\(HPDF_Dict_[^ (]*\).*$/\1/p" include/hpdf_objects.h >> build_win/libhpdf.def &&
+ gcc -shared -s -mwindows -def build_win/libhpdf.def -o $INSTALLPREFIX/bin/libhpdf.dll $INSTALLPREFIX/lib/libhpdfs.a -Wl,--out-implib,$INSTALLPREFIX/lib/libhpdf.dll.a -lz -lpng &&
+ rm -f $INSTALLPREFIX/README $INSTALLPREFIX/INSTALL $INSTALLPREFIX/CHANGES &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libharu-RELEASE_$(echo $VERSION|tr . _)
+
+
+

@@ -1,0 +1,71 @@
+export NAME="hipSYCL"
+export STATUS=
+export URL=https://github.com/illuhad/hipSYCL/
+export BASENAME=hipsycl
+export DESCRIPTION="hipSYCL is a modern SYCL implementation targeting CPUs and GPUs, with a focus on leveraging existing toolchains such as CUDA or HIP. hipSYCL currently targets the following devices: any CPU via OpenMP, NVIDIA GPUs via CUDA, AMD GPUs via HIP/ROCm"
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.9.0
+#export VERSIONDATE=20210225
+#export VERSION=0.9.1
+#export VERSIONDATE=20210330
+export VERSION=0.9.2
+export VERSIONDATE=20220215
+wl-showstatus --package-version
+export DEPENDANCIES=boost
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/illuhad/hipSYCL/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/illuhad/hipSYCL/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix src/runtime/omp/omp_allocator.cpp (version = 0.9.0)
+#patch -ulbf src/runtime/omp/omp_allocator.cpp << EOF
+#@@ -48,2 +48,4 @@
+#   return aligned_alloc(min_alignment, size_bytes);
+#+#elif defined(__MINGW32__)
+#+  return _aligned_malloc(min_alignment, size_bytes);
+# #else
+#EOF
+# fix include/hipSYCL/runtime/backend_loader.hpp (version >= 0.9.1)
+####bug reported: https://github.com/illuhad/hipSYCL/issues/519
+patch -ulbf include/hipSYCL/runtime/backend_loader.hpp << EOF
+@@ -42,3 +42,3 @@
+ #else
+-#define HIPSYCL_PLUGIN_API_EXPORT __declspec(dllexport) extern "C"
++#define HIPSYCL_PLUGIN_API_EXPORT extern "C" __declspec(dllexport)
+ #endif
+EOF
+## fix CMakeLists.txt (version = 0.9.0)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -195,3 +195,3 @@
+#
+#-if(WIN32)
+#+if(MSVC)
+#   set(HIPSYCL_INSTALL_CMAKE_DIR
+#@@ -207,3 +207,3 @@
+#
+#-install(PROGRAMS bin/syclcc DESTINATION bin)
+#+#install(PROGRAMS bin/syclcc DESTINATION bin)
+# install(PROGRAMS bin/syclcc-clang DESTINATION bin)
+#EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ # fix missing python3
+ sed -i -e "s/^\(#\!.*python\)3/\1/" $(grep -l "^#\!.*python3" $INSTALLPREFIX/bin/*) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: add CUDA support
+####TO DO: test if it works
+
+
+

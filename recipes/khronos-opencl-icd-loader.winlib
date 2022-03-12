@@ -1,0 +1,166 @@
+export NAME="OpenCL-ICD-Loader"
+export STATUS=
+export URL=https://github.com/KhronosGroup/OpenCL-ICD-Loader
+export BASENAME=khronos-opencl-icd-loader
+export DESCRIPTION="Khronos OpenCL Installable Client Driver (ICD) Loader"
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20161126
+#export VERSION=2020.03.13
+#export VERSIONDATE=20200314
+#export VERSION=2020.06.16
+#export VERSIONDATE=20200618
+#export VERSION=2020.12.18
+#export VERSIONDATE=20201219
+#export VERSION=2021.04.29
+#export VERSIONDATE=20210430
+#export VERSION=2021.06.30
+#export VERSIONDATE=20210701
+export VERSION=2022.01.04
+export VERSIONDATE=20220105
+####undefined reference to `InitOnceExecuteOnce'
+wl-showstatus --package-version
+export DEPENDANCIES=khronos-opencl-headers
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=LICENSE.txt
+#export LICENSETYPE=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/KhronosGroup/OpenCL-ICD-Loader/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd OpenCL-ICD-Loader-$VERSION
+# fix missing InitOnceExecuteOnce in icd_windows.c
+mv icd_windows.c icd_windows.c.bak &&
+echo "#define _WIN32_WINNT 0x0600" > icd_windows.c
+cat icd_windows.c.bak >> icd_windows.c
+## fix missing DEVPROPTYPE/CM_GETIDLIST_FILTER_PRESENT/CM_GETIDLIST_FILTER_CLASS in icd_windows_hkr.c
+#mv icd_windows_hkr.c icd_windows_hkr.c.bak
+#cat > icd_windows_hkr.c << EOF
+##if _WIN32_WINNT < 0x0600
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0600
+##endif
+##ifdef __MINGW32__
+##define CM_GETIDLIST_FILTER_PRESENT            0x00000100
+##define CM_GETIDLIST_FILTER_CLASS              0x00000200
+##endif
+##define INITGUID
+##include <windows.h>
+##include <setupapi.h>
+##include <devpropdef.h>
+#DEFINE_DEVPROPKEY(DEVPKEY_Device_ClassGuid,              0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0, 10);
+#EOF
+#cat icd_windows_hkr.c.bak >> icd_windows_hkr.c
+# fix missing DEVPROPTYPE/CM_GETIDLIST_FILTER_PRESENT/CM_GETIDLIST_FILTER_CLASS in loader/windows/icd_windows_hkr.c
+mv loader/windows/icd_windows_hkr.c loader/windows/icd_windows_hkr.c.bak
+cat > loader/windows/icd_windows_hkr.c << EOF
+#if _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#ifdef __MINGW32__
+#define CM_GETIDLIST_FILTER_PRESENT            0x00000100
+#define CM_GETIDLIST_FILTER_CLASS              0x00000200
+#endif
+#define INITGUID
+#include <windows.h>
+#include <setupapi.h>
+#include <devpropdef.h>
+#include <cfgmgr32.h>
+//#if defined (__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR == 9
+CMAPI CONFIGRET WINAPI CM_Get_DevNode_PropertyW(DEVINST dnDevInst, const DEVPROPKEY *PropertyKey, DEVPROPTYPE *PropertyType, PBYTE PropertyBuffer, PULONG PropertyBufferSize, ULONG ulFlags);
+//#endif
+#if defined (__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR < 8
+DEFINE_DEVPROPKEY(DEVPKEY_Device_ClassGuid,              0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0, 10);
+#endif
+EOF
+cat loader/windows/icd_windows_hkr.c.bak >>  loader/windows/icd_windows_hkr.c
+# fix missing InitOnceExecuteOnce in loader/windows/icd_windows.c
+mv loader/windows/icd_windows.c loader/windows/icd_windows.c.bak
+cat > loader/windows/icd_windows.c << EOF
+#if _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat loader/windows/icd_windows.c.bak >> loader/windows/icd_windows.c
+# fix loader/windows/icd_windows_apppackage.cpp (version >= 2020.06.16)
+patch -ulbf loader/windows/icd_windows_apppackage.cpp << EOF
+@@ -36,3 +36,5 @@
+
++#ifndef __MINGW32__
+ #include <windows.management.deployment.h>
++#endif
+ #include <wrl/client.h>
+@@ -60,2 +62,6 @@
+ {
++#ifdef __MINGW32__
++    KHR_ICD_TRACE("Not implemented\\n");
++    return false;
++#else
+     HRESULT hrInit = Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
+@@ -176,2 +182,3 @@
+     return false;
++#endif
+ }
+EOF
+## fix to also buid static libraries
+#sed -i.bak -e "s/^\(\s*add_library\s*(\s*\)\([^ ]*\)\(\s*SHARED\)\(.*)\s*\)$/\1\2\3\4\n\1\2_static STATIC\4\nset_target_properties(\2_static PROPERTIES OUTPUT_NAME \2)/" $(grep -l add_library $(find -name CMakeLists.txt))
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOPENCL_ICD_LOADER_REQUIRE_WDK:BOOL=OFF . &&
+# echo " -Wl,--enable-stdcall-fixup" >> CMakeFiles/OpenCL.dir/linklibs.rsp &&
+# wl-showstatus build &&
+# make &&
+# wl-showstatus build-install &&
+# ( make install || make install/strip ) &&
+#    echo OK
+## fix CMakeLists.txt (version = 2020.03.13)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -80,2 +80,3 @@
+# if (WIN32)
+#+    set_target_properties (OpenCL PROPERTIES LINK_FLAGS "-Wl,--enable-stdcall-fixup")
+#     target_link_libraries (OpenCL cfgmgr32.lib)
+#EOF
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR:PATH=$MINGWPREFIX/include -DOPENCL_ICD_LOADER_REQUIRE_WDK:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOPENCL_ICD_LOADER_HEADERS_DIR:PATH=$MINGWPREFIX/include -DOPENCL_ICD_LOADER_REQUIRE_WDK:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+# #sed -i.bak -e "s?\(-DNDEBUG\) \(../loader/windows/OpenCL.def\)?\1 -Wl,--leading-underscore -def \2?" build_shared/CMakeFiles/OpenCL.dir/build.make &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenCL-ICD-Loader-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOPENCL_ICD_LOADER_HEADERS_DIR:PATH=$MINGWPREFIX/include -DOPENCL_ICD_LOADER_REQUIRE_WDK:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOPENCL_ICD_LOADER_HEADERS_DIR:PATH=$MINGWPREFIX/include -DOPENCL_ICD_LOADER_REQUIRE_WDK:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ #-DCMAKE_CXX_FLAGS:STRING="-DCL_API_ENTRY=\"__declspec(dllexport)\"" &&
+ ## fix building shared DLL
+ ##sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcfgmgr32/" build_shared/build.ninja &&
+ ##sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcfgmgr32/; s?\(LINK_FLAGS\s*=\s*\)\(\.\.\\\\loader\\\\windows\\\\OpenCL\.def\)?\1-Wl,--add-stdcall-alias -Wl,--kill-at \2?" build_shared/build.ninja &&
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcfgmgr32/; s?\(LINK_FLAGS\s*=\s*\)\(\.\.\\\\loader\\\\windows\\\\OpenCL\.def\)?\1-Wl,--add-stdcall-alias -Wl,--enable-stdcall-fixup \2?" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ #( echo "EXPORTS" && nm -f posix --defined-only -p build_static/libOpenCL.a | sed -ne "s/^\(_*cl[^ ]*\) T .*$/\1/p" | sed -e "s/^\(_\)\(cl.*\)@[0-9]*$/&\n\1\2=&\n\2=&/" ) > loader/windows/OpenCL_with_aliases.def &&
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #gcc -shared -s -mwindows -def loader/windows/OpenCL_with_aliases.def -o $INSTALLPREFIX/bin/libOpenCL.dll build_static/libOpenCL.a -Wl,--compat-implib -Wl,--kill-at -Wl,--no-leading-underscore -Wl,--out-implib,$INSTALLPREFIX/lib/libOpenCL.dll.a -lcfgmgr32  -lruntimeobject  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenCL-ICD-Loader-$VERSION
+
+
+

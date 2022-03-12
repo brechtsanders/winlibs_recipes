@@ -1,0 +1,156 @@
+export NAME="pfstools"
+export STATUS=
+export URL=http://pfstools.sourceforge.net/
+export BASENAME=pfstools
+export DESCRIPTION="pfstools package is a set of command line programs for reading, writing and manipulating high-dynamic range (HDR) images and video frames."
+export CATEGORY=graphics,fileformat
+export TYPE=library,application
+#export VERSION=1.8.5
+#export VERSIONDATE=20130513
+#export VERSION=1.9.0
+#export VERSIONDATE=20140918
+#export VERSION=1.9.1
+#export VERSIONDATE=20141013
+#export DEPENDANCIES=openexr,libtiff,imagemagick,gdal
+#export VERSION=2.0.0
+#export VERSIONDATE=20141207
+####src/pfsoutexr.o:pfsoutexr.cpp:(.text+0x731): undefined reference to `Imf_2_0::Header::Header(int, int, float, Imath_2_2::Vec2<float> const&, float, Imf_2_0::LineOrder, Imf_2_0::Compression)'
+####src/fileformat/exrio.o:exrio.cpp:(.text+0x694): undefined reference to `Imf_2_0::RgbaOutputFile::RgbaOutputFile(char const*, int, int, Imf_2_0::RgbaChannels, float, Imath_2_2::Vec2<float>, float, Imf_2_0::LineOrder, Imf_2_0::Compression, int)'
+#export VERSION=2.0.1
+#export VERSIONDATE=20150207
+#export VERSION=2.0.2
+#export VERSIONDATE=20150312
+#export VERSION=2.0.3
+#export VERSIONDATE=20150429
+####You should manually point CMake variable OpenCV_DIR to your build of OpenCV library.
+#export VERSION=2.0.4
+#export VERSIONDATE=20150515
+#export VERSION=2.0.5
+#export VERSIONDATE=20160528
+#export VERSION=2.0.6
+#export VERSIONDATE=20170315
+####src/camera/pfsalign.cpp:46:42: fatal error: opencv2/nonfree/features2d.hpp: No such file or directory
+#export VERSION=2.1.0
+#export VERSIONDATE=20171114
+export VERSION=2.2.0
+export VERSIONDATE=20210812
+####src/fileformat/pfsinimgmagick.cpp:135:60: error: cannot convert 'const Quantum* {aka const short unsigned int*}' to 'const PixelPacket* {aka const MagickCore::_PixelPacket*}' in initialization
+wl-showstatus --package-version
+export DEPENDANCIES=openexr,libtiff,gdal
+export OPTIONALDEPENDANCIES=qt,imagemagick,matlab,fftw,gsl,netpbm,opencv,freeglut
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/pfstools/files/pfstools/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/pfstools/pfstools/$VERSION/pfstools-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/pfstools/pfstools/$VERSION/pfstools-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/pfstools-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/pfstools-$VERSION.tgz
+cd pfstools-$VERSION
+
+# use configure (version < 2.0.0)
+### fix building DLLs on 64-bit
+##if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+## echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+## autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+##fi
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-opengl LDFLAGS="-Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-opengl &&
+# wl-showstatus build-install &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pfstools-$VERSION
+
+# fix missing bzero in src/tmo/mantiuk06/contrast_domain.cpp (version >= 2.0.0)
+mv src/tmo/mantiuk06/contrast_domain.cpp src/tmo/mantiuk06/contrast_domain.cpp.bak
+echo "#define bzero(b,len) memset(b, 0, len)" > src/tmo/mantiuk06/contrast_domain.cpp
+cat src/tmo/mantiuk06/contrast_domain.cpp.bak >> src/tmo/mantiuk06/contrast_domain.cpp
+# fix missing strtok_r in src/tmo/mantiuk08/pfstmo_mantiuk08.cpp (version >= 2.0.0)
+mv src/tmo/mantiuk08/pfstmo_mantiuk08.cpp src/tmo/mantiuk08/pfstmo_mantiuk08.cpp.bak
+echo "#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))" > src/tmo/mantiuk08/pfstmo_mantiuk08.cpp
+cat src/tmo/mantiuk08/pfstmo_mantiuk08.cpp.bak >> src/tmo/mantiuk08/pfstmo_mantiuk08.cpp
+# fix missing clock() in src/tmo/ferradans11/tmo_ferradans11.cpp (version >= 2.0.1)
+mv src/tmo/ferradans11/tmo_ferradans11.cpp src/tmo/ferradans11/tmo_ferradans11.cpp.bak
+echo "#include <time.h>" > src/tmo/ferradans11/tmo_ferradans11.cpp
+cat src/tmo/ferradans11/tmo_ferradans11.cpp.bak >> src/tmo/ferradans11/tmo_ferradans11.cpp
+# fix missing opencv2/nonfree/features2d.hpp in src/camera/pfsalign.cpp
+mv src/camera/pfsalign.cpp src/camera/pfsalign.cpp.bak &&
+sed -e "s?\(opencv2/\)nonfree/?\1?g" src/camera/pfsalign.cpp.bak > src/camera/pfsalign.cpp
+## fix missing matte/QuantumDepth/Magick::PixelPacket in src/fileformat/pfsinimgmagick.cpp (version >= 2.1.0)
+#mv src/fileformat/pfsinimgmagick.cpp src/fileformat/pfsinimgmagick.cpp.bak &&
+#sed -e "s/matte/alpha/; s/QuantumDepth/MAGICKCORE_QUANTUM_DEPTH/; s/Magick::\(PixelPacket\)/MagickCore::\1/" src/fileformat/pfsinimgmagick.cpp.bak > src/fileformat/pfsinimgmagick.cpp
+# fix src/fileformat/pfsinimgmagick.cpp for ImageMagick 7 (version >= 2.1.0)
+patch src/fileformat/pfsinimgmagick.cpp << EOF
+@@ -36,2 +36,3 @@
+ #define PROG_NAME "pfsinimgmagick"
++using namespace Magick;
+
+@@ -116,3 +117,3 @@
+     VERBOSE_STR << "input image gamma:  " << imImage.gamma() << std::endl;
+-    bool hasAlpha = imImage.matte();
++    bool hasAlpha = imImage.alpha();
+     if( hasAlpha )
+@@ -131,5 +132,5 @@
+     int pixInd = 0;
+-    const float maxValue = (float)(1<<QuantumDepth) - 1;
++    const float maxValue = (float)QuantumRange;
+     for( int r = 0; r < imImage.rows(); r++ ) {
+-      const Magick::PixelPacket *pixels =
++      const Magick::Quantum *pixels =
+         imImage.getConstPixels( 0, r, imImage.columns(), 1 );
+@@ -137,8 +138,9 @@
+       for( int c = 0; c < imImage.columns(); c++ ) {
+-        (*X)(pixInd) = (float)pixels[c].red / maxValue;
+-        (*Y)(pixInd) = (float)pixels[c].green / maxValue;
+-        (*Z)(pixInd) = (float)pixels[c].blue / maxValue;
++        (*X)(pixInd) = (float)MagickCore::GetPixelRed(imImage.image(), pixels) / maxValue;
++        (*Y)(pixInd) = (float)MagickCore::GetPixelGreen(imImage.image(), pixels) / maxValue;
++        (*Z)(pixInd) = (float)MagickCore::GetPixelBlue(imImage.image(), pixels) / maxValue;
+         if( alpha != NULL )
+-          (*alpha)(pixInd) = (float)pixels[c].opacity / maxValue;
++          (*alpha)(pixInd) = (float)MagickCore::GetPixelAlpha(imImage.image(), pixels) / maxValue;
+         pixInd++;
++        pixels += GetPixelChannels(imImage.image());
+       }
+EOF
+# fix missing GL/glut.h in src/pfsglview/glenv.h (version >= 2.1.0)
+sed -i.bak -e "s?GL/glut\.h?GL/freeglut.h?" src/pfsglview/glenv.h
+# fix ambiguous clamp() in src/fileformat/pfsinyuv.cpp (version >= 2.1.0)
+sed -i.bak -e "s/ \(clamp *(\)/ custom_\1/g" src/fileformat/pfsinyuv.cpp
+## fix undefined reference to `_imp__glutGetWindow@0' (version >= 2.0.3)
+#sed -i.bak -e "s/\(-lglu32\)/\1 -lglut32/" src/pfsglview/CMakeFiles/pfsglview.dir/linklibs.rsp
+## use CMake (version >= 2.0.0)
+#wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_MATLAB:BOOL=OFF -DWITH_NetPBM:BOOL=OFF -DWITH_Octave:BOOL=OFF . &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_MATLAB:BOOL=OFF -DWITH_NetPBM:BOOL=OFF -DWITH_Octave:BOOL=OFF . &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_MATLAB:BOOL=OFF -DWITH_OpenCV:BOOL=OFF -DWITH_Octave:BOOL=OFF . &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_MATLAB:BOOL=OFF -DWITH_NetPBM:BOOL=ON -DWITH_Octave:BOOL=OFF . &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_MATLAB:BOOL=OFF -DWITH_NetPBM:BOOL=OFF -DWITH_Octave:BOOL=OFF -DWITH_pfsglview:BOOL=OFF . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_MATLAB:BOOL=OFF -DWITH_OpenCV:BOOL=OFF -DWITH_Octave:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ #-DWITH_pfsglview:BOOL=OFF 
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_MATLAB:BOOL=OFF -DWITH_OpenCV:BOOL=OFF -DWITH_Octave:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ # manually copy .dll file (version >= 2.2.0)
+ strip build_shared/src/pfs/*.dll &&
+ cp -u build_shared/src/pfs/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

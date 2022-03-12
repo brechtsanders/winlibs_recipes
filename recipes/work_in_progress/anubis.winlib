@@ -1,0 +1,60 @@
+export NAME="anubis"
+export STATUS=
+export URL=http://www.gnu.org/software/anubis/
+export BASENAME=anubis
+export DESCRIPTION="GNU Anubis is an SMTP message submission daemon. It represents an intermediate layer between mail user agent (MUA) and mail transport agent (MTA), receiving messages from the MUA, applying to them a set of predefined changes and finally inserting modified messages into an MTA routing network. The set of changes applied to a message is configurable on a system-wide and per-user basis. The built-in configuration language used for defining sets of changes allows for considerable flexibility and is easily extensible."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=4.1.1
+#export VERSIONDATE=
+export VERSION=4.2
+export VERSIONDATE=20140524
+####lib/xalloc.h:26:3: error: #error "Please include config.h first."
+wl-showstatus --package-version
+export DEPENDANCIES=libgsasl,gnutls,gpgme,guile
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/anubis/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/anubis/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir win32fix win32fix/sys win32fix/netinet
+touch win32fix/sys/wait.h
+echo "#define SOCKET int" > win32fix/sys/socket.h
+cat > win32fix/sys/socket.h << EOF
+#include <winsock2.h>
+//#typedef SOCKET int;
+EOF
+touch win32fix/netdb.h
+touch win32fix/netinet/in.h
+cat > win32fix/pwd.h << EOF
+struct passwd {
+  char *pw_dir;
+  char *pw_name;
+};
+EOF
+# fix POSIX error
+mv src/headers.h src/headers.h.bak
+cat > src/headers.h << EOF
+#define HAVE_REGCOMP
+#define ANUBIS_PRINTFLIKE(fmt,narg)
+#define RETSIGTYPE void
+EOF
+cat src/headers.h.bak >> src/headers.h
+GUILE_LOAD_PATH=`ls -d1 $MINGWPREFIX/share/guile/*|tail -n1` ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix -I`pwd`/src -I`pwd`/lib" LDFLAGS="-lws2_32" &&
+ sed -i.bak "s/^#define u_char unsigned char/#include <winsock2.h>/" config.h &&
+ make install-strip &&
+    echo OK
+#make -j1 -Csrc LIBS="-liberty -lws2_32 -lgsasl"
+cd src; $RUNPLATFORM-gcc -I/home/win32/anubis-4.1.1/win32fix -I/home/win32/anubis-4.1.1/src -I/home/win32/anubis-4.1.1/lib    anubisusr.c   -o anubisusr    -lws2_32 -lgsasl -liberty  ; cd ..
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,66 @@
+export NAME="w3m"
+export STATUS=
+export URL=http://w3m.sourceforge.net/
+export BASENAME=w3m
+export DESCRIPTION="w3m is a pager and/or text-based browser. It can handle table, cookies, authentication, and almost everything except JavaScript."
+export CATEGORY=internet
+export TYPE=application
+#export VERSION=0.4.2
+export VERSION=0.5.3
+export VERSIONDATE=20110226
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,gettext,zlib,bdwgc
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=doc/README
+export LICENSETYPE=MIT
+export DOWNLOADURL="http://sourceforge.net/projects/w3m/files/w3m/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/w3m/w3m/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix GC_set_warn_proc in main.c
+mv main.c main.c.bak
+sed -e "s/\( * = *\)\(GC_set_warn_proc\)/\1GC_get_warn_proc();\2/" main.c.bak > main.c
+# fix missing bcopy in Str.c
+mv Str.c Str.c.bak
+echo "#define bcopy(b1,b2,len) (memmove((b2), (b1), (len)), (void) 0)" >> Str.c
+cat Str.c.bak >> Str.c
+# fix missing sleep in file.c
+mv file.c file.c.bak
+echo "#define sleep(t) _sleep((t) * 1000)" > file.c
+cat file.c.bak >> file.c
+# fix redefinition of C in etc.c (version >= 0.5.3)
+patch -ulbf etc.c << EOF
+@@ -575,3 +575,3 @@
+ #define A2 0xe66d
+-#define C 0xb
++#define C_ 0xb
+
+@@ -587,4 +587,4 @@
+ {
+-    R1 = (A1 * R1 << 16) + A1 * R2 + A2 * R1 + ((A2 * R2 + C) >> 16);
+-    R2 = (A2 * R2 + C) & 0xffff;
++    R1 = (A1 * R1 << 16) + A1 * R2 + A2 * R1 + ((A2 * R2 + C_) >> 16);
++    R2 = (A2 * R2 + C_) & 0xffff;
+     return (long)(R1 >> 1);
+EOF
+# fix issue with X509_NAME in istream.c (version >= 0.5.3)
+sed -i.bak -e "s/X509_NAME /struct X509_name_st/" istream.c
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-termlib="termcap curses" --disable-image --without-imagelib CFLAGS="-D__MINGW32_VERSION" LDFLAGS="-lws2_32" &&
+ echo "#undef __CYGWIN__" >> config.h &&
+ # fix missing RAND_egd
+ echo "#undef USE_EGD" >> config.h &&
+ wl-showstatus build-install &&
+ ( make install || make -j1 install ) &&
+#./w3m.exe
+####Can't find termcap entry cygwin
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

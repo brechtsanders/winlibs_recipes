@@ -1,0 +1,180 @@
+export NAME="speech_tools"
+export STATUS=
+export URL=http://www.cstr.ed.ac.uk/projects/festival/
+export BASENAME=speech_tools
+export DESCRIPTION="The Edinburgh speech tools system is a library of C++ classes, functions and utility programs that are frequently used in speech software. The system compiles to a single unix library .a file which can be linked with software. At present, C++ classes for several useful speech and language classes have been written, along with audio software and some basic signal processing software."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=2.0.95-beta
+#export VERSIONDATE=20100429
+#export VERSION=2.1
+#export VERSIONDATE=20101108
+#export VERSION=2.4
+#export VERSIONDATE=20121225
+export VERSION=2.5.0
+export VERSIONDATE=20171226
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=README
+export LICENSETYPE=
+export DOWNLOADURL="http://festvox.org/packed/festival/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://festvox.org/packed/festival/`echo $VERSION|sed -e "s/\-[a-z]*$//"`/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://festvox.org/packed/festival/`echo $VERSION|sed -e "s/\-[a-z]*$//"`/$BASENAME-$VERSION-release.tar.gz
+export DOWNLOADSOURCEURL=http://festvox.org/packed/festival/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1/")/$BASENAME-$VERSION-release.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-release.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/speech_tools
+# fix missing includes
+mkdir include/sys include/netinet include/arpa
+touch include/sys/wait.h include/sys/resource.h include/netdb.h include/netinet/in.h include/arpa/inet.h
+echo "#include <winsock2.h>" > include/sys/socket.h
+# fix missing config/systems/ix86_unknown.mak
+cat > config/systems/ix86_unknown.mak << EOF
+include \$(EST)/config/systems/default.mak
+NATIVE_AUDIO_MODULE=WIN32
+GNUTEST=test
+RM=rm
+NAWK=awk
+EGCS_CC=gcc
+EGCS_CXX=gcc
+OS_LIBS = -lwinmm -luser32
+EOF
+# fix siod/el_sys_unix.c
+cp siod/el_sys_win32.c siod/el_sys_unix.c
+# fix base_class/EST_Pathname_unix.cc
+cp base_class/EST_Pathname_win32.cc base_class/EST_Pathname_unix.cc
+## fix to build for Windows (version <= 2.1)
+#patch -ulbf include/EST_system.h << EOF
+#--- include/EST_system.h  2004-09-30 14:53:36 +0200
+#+++ include/EST_system.h  2010-11-08 15:21:10 +0100
+#@@ -44,3 +44,4 @@
+#
+#-#if defined(SYSTEM_IS_WIN32)
+#+#if defined(SYSTEM_IS_WIN32) || defined(__MINGW32__)
+#+#   define SYSTEM_IS_WIN32 1
+# #   define _WINSOCKAPI_                /* horrible hack */
+#EOF
+# fix to build for Windows (version >= 2.4)
+patch -ulbf include/EST_system.h << EOF
+--- include/EST_system.h  2004-09-29 10:24:18.000000000 +0200
++++ include/EST_system.h  2014-12-25 09:11:12.000000000 +0100
+@@ -44,5 +44,8 @@
+
+-#if defined(SYSTEM_IS_WIN32)
++#if defined(SYSTEM_IS_WIN32) || defined(__MINGW32__)
++#   define SYSTEM_IS_WIN32 1
++#if !defined(__MINGW32__)
+ #   define _WINSOCKAPI_                /* horrible hack */
+ #   define _LPCVOID_DEFINED     /* and another */
++#endif
+ #   include <windows.h>
+EOF
+# fix redefinition of F_OK and missing unix_access in include/win32/EST_unix_win32.h
+patch -ulbf include/win32/EST_unix_win32.h << EOF
+--- include/win32/EST_unix_win32.h  2004-09-30 14:53:36 +0200
++++ include/win32/EST_unix_win32.h  2010-11-08 15:52:44 +0100
+@@ -71,4 +71,8 @@
+
++#include <math.h>
+ #define rint(N) ((float)(int)((N)+0.5))
+
++#ifdef __MINGW32__
++#include <io.h>
++#else
+ #ifdef __cplusplus
+@@ -86,2 +90,3 @@
+ #define R_OK 4
++#endif
+
+@@ -98,2 +103,3 @@
+
++#ifndef __MINGW32__
+ #ifdef __cplusplus
+@@ -107,2 +113,3 @@
+ #define getcwd(P, L) unix_getcwd((P), (L))
++#endif
+ #define chdir(D) SetCurrentDirectory(D)
+EOF
+# fix redefinition of ssize_t in include/win32/EST_socket_win32.h
+patch -ulbf include/win32/EST_socket_win32.h << EOF
+--- include/win32/EST_socket_win32.h  2001-06-19 13:20:08 +0200
++++ include/win32/EST_socket_win32.h  2010-11-08 16:25:50 +0100
+@@ -47,3 +47,5 @@
+
++#ifndef __MINGW32__
+ typedef int ssize_t;
++#endif
+ typedef int socklen_t;
+EOF
+# fix main/Makefile
+patch -ulbf main/Makefile << EOF
+--- main/Makefile  2005-08-02 20:57:28 +0200
++++ main/Makefile  2010-11-09 16:21:34 +0100
+@@ -96,3 +96,3 @@
+ \$(ALL_EXECS) : % : \$(LIBDEPS) %_main.o
+-       \$(strip \$(LINK_COMMAND) -o \$@ \$@_main.o \$(LIBS) \$(\$(@:=_LIBS)))
++`printf "\\t"`\$(strip \$(LINK_COMMAND) -o \$@ \$@_main.o \$(LIBS) \$(\$(@:=_LIBS))) -lws2_32
+EOF
+# fix config/rules/test_make_rules.mak
+patch -ulbf config/rules/test_make_rules.mak << EOF
+--- config/rules/test_make_rules.mak  2004-01-27 23:28:52 +0100
++++ config/rules/test_make_rules.mak  2010-11-09 17:16:04 +0100
+@@ -130,3 +130,3 @@
+ % : %.o \$(PROJECT_LIBDEPS)
+-       \$(CXX) \$(CXXFLAGS) \$(TEMPLATES) -o \$@ \$@.o \$(\$(@:=_LIBS)) \$(LIBS)
++`printf "\\t"`\$(CXX) \$(CXXFLAGS) \$(TEMPLATES) -o \$@ \$@.o \$(\$(@:=_LIBS)) \$(LIBS) -lws2_32
+EOF
+# fix config/rules/bin_process.mak
+patch -ulbf config/rules/bin_process.mak << EOF
+--- config/rules/bin_process.mak  2010-02-03 13:28:14 +0100
++++ config/rules/bin_process.mak  2010-11-09 17:27:36 +0100
+@@ -89,3 +89,3 @@
+            \$(ECHO_N) " \$\$b";\\
+-           ln -s "\$(MAIN)/\$(DIRNAME)/\$\$i" "\$(subst TOP,\$(TOP),\$(BIN))/\$\$b";\\
++`printf "\\t"`ln -sf "\$(MAIN)/\$(DIRNAME)/\$\$i" "\$(subst TOP,\$(TOP),\$(BIN))/\$\$b" || ln -sf "\$(MAIN)/\$(DIRNAME)/\$\$i.exe" "\$(subst TOP,\$(TOP),\$(BIN))/\$\$b.exe"; \\
+        done
+EOF
+# fix config/rules/library.mak
+patch -ulbf config/rules/library.mak << EOF
+--- config/rules/library.mak  2001-04-04 13:55:32 +0200
++++ config/rules/library.mak  2010-11-09 20:21:24 +0100
+@@ -110,3 +110,3 @@
+        if [ -n "\$(PROJECT_LIBRARY_NEEDS_SYSLIBS_\$*)" ] ; then libs='\$(JAVA_PROJECT_LIBS)' ; fi ;\\
+-       \$(subst XXX,\$@.\$(PROJECT_LIBRARY_VERSION_\$*),\$(MAKE_SHARED_LIB)) shared_space/*.o \$(PROJECT_LIBRARY_USES_\$*:%=-L. -l%) \$\$libs
++       \$(subst XXX,\$@.\$(PROJECT_LIBRARY_VERSION_\$*),\$(MAKE_SHARED_LIB)) shared_space/*.o \$(PROJECT_LIBRARY_USES_\$*:%=-L. -l%) \$\$libs -lws2_32 -lwinmm
+        @\$(RM) -f shared_space/*.o \$@
+EOF
+# fix for 64-bit (version >= 2.4)	
+cp -f config/systems/ix86_unknown.mak config/systems/x86_64_unknown.mak
+# fix missing Windows types in include/EST_system.h (version >= 2.4)
+mv include/EST_system.h include/EST_system.h.bak
+echo "#include <windows.h>" > include/EST_system.h
+cat include/EST_system.h.bak >> include/EST_system.h
+# fix missing random in stats/wagon/wagon.cc (version >= 2.5.0)
+mv stats/wagon/wagon.cc stats/wagon/wagon.cc.bak &&
+echo "#define random rand" > stats/wagon/wagon.cc &&
+cat stats/wagon/wagon.cc.bak >> stats/wagon/wagon.cc
+## modify config
+#mv config/config config/config.bak
+#sed -e "s/^# *\(SHARED=\)/\1/" config/config.bak > config/config
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build &&
+ #make -j1 all CXX=g++ &&
+ #make -j1 all CXX="g++ -fpermissive" &&
+ make -j1 all CXX="g++ -fpermissive -Wl,--allow-multiple-definition" &&
+ wl-showstatus build-install &&
+ make install make_installed_exec_static make_installed_bin_static make_installed_lib_static INSTALLED_BIN=$INSTALLPREFIX/bin INSTALLED_LIB=$INSTALLPREFIX/lib INSTALLED_PRIVATE_LIB=$INSTALLPREFIX/bin &&
+ #mkdir -p $INSTALLPREFIX/bin/main &&
+ #make install make_installed_exec_shared make_installed_lib_shared make_installed_bin_shared INSTALLED_BIN=$INSTALLPREFIX/bin INSTALLED_LIB=$INSTALLPREFIX/lib INSTALLED_PRIVATE_LIB=$INSTALLPREFIX/bin &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

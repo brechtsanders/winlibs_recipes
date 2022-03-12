@@ -1,0 +1,60 @@
+export NAME="clthreads"
+export STATUS=
+export URL=https://github.com/dmeliza/clthreads
+export BASENAME=clthreads
+export DESCRIPTION="C++ threading library"
+export CATEGORY=system
+export TYPE=library
+export VERSION=2.4.0
+export VERSIONDATE=20180320
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://github.com/dmeliza/clthreads/releases"
+export DOWNLOADURL="https://github.com/dmeliza/clthreads/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/dmeliza/clthreads/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/dmeliza/clthreads/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing clock_gettime/CLOCK_REALTIME in itc_ctrl.cc
+mv itc_ctrl.cc itc_ctrl.cc.bak &&
+echo "#include <time.h>" > itc_ctrl.cc &&
+cat itc_ctrl.cc.bak >> itc_ctrl.cc
+# fix already defined NO_ERROR in clthreads.h
+patch -ulbf clthreads.h << EOF
+@@ -325,2 +325,5 @@
+     {
++#ifdef NO_ERROR
++#define NO_ERROR clthreads_NO_ERROR
++#endif
+         NO_ERROR  = 0,
+EOF
+## create fixed Makefile
+#sed -e "s/\.so\b/.dll/g; s/-Wl,-soname,[^ ]*/-Wl,--out-implib,libchebyshev.dll.a/" Makefile > Makefile.mingw
+#wl-showstatus build-install &&
+# make -fMakefile.mingw install PREFIX=$INSTALLPREFIX &&
+wl-showstatus build &&
+ for F in *.cc; do
+  g++ -c -O3 -Wall -I. -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -o $F.o $F
+ done &&
+ ar cru libclthreads.a *.o &&
+ #( echo EXPORTS; nm -f posix --defined-only -p libclthreads.a | sed -n -e "s/^\(_[^ ]*\) T .*$/\1/p" ) > clthreads.def &&
+ #g++ -shared -s -mwindows -def clthreads.def -o clthreads.dll libclthreads.a -Wl,--out-implib,libclthreads.dll.a &&
+ g++ -shared -s -mwindows -o clthreads.dll *.o -Wl,--out-implib,libclthreads.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

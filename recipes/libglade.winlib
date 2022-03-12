@@ -1,0 +1,46 @@
+export NAME="libglade"
+export STATUS=
+export URL=http://glade.gnome.org/
+export BASENAME=libglade
+export DESCRIPTION="Glade is a RAD tool to enable quick & easy development of user interfaces for the GTK+ toolkit and the GNOME desktop environment."
+export CATEGORY=gui
+export TYPE=library
+export VERSION=2.6.4
+export VERSIONDATE=20100506
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,atk,pango,libxml2,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2
+export DOWNLOADURL="http://ftp.gnome.org/pub/gnome/sources/libglade/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+wl-showstatus configure &&
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi
+#make check
+wl-showstatus build-install &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+PYTHON=$PY2DIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ ( make -j1 install-strip || make -j1 install-strip LIBS="-Wl,--as-needed -lgmodule-2.0" ) &&
+ # fix absolute path to python
+ #for F in $(grep -l "^#\!$PYDIR/python.exe" $INSTALLPREFIX/bin/*); do
+ for F in $(grep -l "^#\!$PY2DIR/python.exe" $INSTALLPREFIX/bin/*); do
+  mv $F $F.bak &&
+  #sed -e "s?^#\!$PYDIR/python.exe?#\!/bin/env PATH=\$PYDIR:\$PATH python.exe?; s?$PYDIR?\$PYDIR?" $F.bak > $F &&
+  sed -e "s?^#\!$PY2DIR/python.exe?#\!/bin/env PATH=\$PY2DIR:\$PATH python.exe?; s?$PY2DIR?\$PY2DIR?" $F.bak > $F &&
+  rm -f $F.bak
+ done &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

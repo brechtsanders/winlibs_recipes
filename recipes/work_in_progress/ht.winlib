@@ -1,0 +1,138 @@
+export NAME="The HT Editor"
+export STATUS=
+export URL=http://hte.sourceforge.net/
+#export URL=https://github.com/sebastianbiallas/ht
+export BASENAME=ht
+export DESCRIPTION="The HT Editor: A file editor/viewer/analyzer for executables."
+export CATEGORY=fileformat,development
+export TYPE=application
+#export VERSION=2.0.17
+#export VERSIONDATE=20190212
+export VERSION=2.1.0
+export VERSIONDATE=20190213
+wl-showstatus --package-version
+export DEPENDANCIES=lzo
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/hte/files/ht-source/"
+#export DOWNLOADURL="https://github.com/sebastianbiallas/ht/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/hte/ht-source/$VERSION/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/hte/ht-source/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix htapp.cc
+patch -ulbf htapp.cc << EOF
+@@ -56,2 +56,3 @@
+ #include <stdlib.h>
++#include <stdint.h>
+ #include <string.h>
+@@ -777,3 +778,3 @@
+ {
+-       unsigned long e=(unsigned long)entry;
++       uintptr_t e=(uintptr_t)entry;
+        if (!e) return NULL;
+@@ -788,3 +789,3 @@
+ {
+-       unsigned long e=(unsigned long)entry;
++       uintptr_t e=(uintptr_t)entry;
+        if (e > 1) {
+@@ -801,6 +802,6 @@
+                case 0:
+-                       ht_snprintf(mybuf, sizeof mybuf, "%s", ((ht_project_item*)(*project)[(long)entry-1])->get_filename());
++                       ht_snprintf(mybuf, sizeof mybuf, "%s", ((ht_project_item*)(*project)[(intptr_t)entry-1])->get_filename());
+                        break;
+                case 1:
+-                       ht_snprintf(mybuf, sizeof mybuf, "%s", ((ht_project_item*)(*project)[(long)entry-1])->get_path());
++                       ht_snprintf(mybuf, sizeof mybuf, "%s", ((ht_project_item*)(*project)[(intptr_t)entry-1])->get_path());
+                        break;
+@@ -3026,3 +3027,3 @@
+        uint b = u/a;
+-       while (abs(a - b) > 1) {
++       while (abs((long)(a - b)) > 1) {
+                a = (a+b)/2;
+EOF
+# fix syntax.cc
+sed -i.bak -e "s/false\(, false, 0 }\)/NULL\1/" syntax.cc
+# fix textedit.cc
+patch -ulbf textedit.cc << EOF
+@@ -1311,3 +1311,3 @@
+                default:
+-                       return false;
++                       return NULL;
+        }
+EOF
+# fix snprintf.cc
+patch -ulbf snprintf.cc << EOF
+@@ -392,3 +392,3 @@
+                                                strvalue = va_arg (args, char *);
+-                                               fmtint (buffer, &currlen, maxlen, (long) strvalue, 16, min, max, flags);
++                                               fmtint (buffer, &currlen, maxlen, (intptr_t) strvalue, 16, min, max, flags);
+                                                break;
+EOF
+# fix htxbe.cc
+patch -ulbf htxbe.cc << EOF
+@@ -120,3 +120,3 @@
+                // XXX: this is crashable!!!
+-               xbe_shared->sections.sections[i].section_name_address += (unsigned long) xbe_shared->headerspace - xbe_shared->header.base_address;
++               xbe_shared->sections.sections[i].section_name_address += (uintptr_t) xbe_shared->headerspace - xbe_shared->header.base_address;
+                xbe_shared->sections.sections[i].virtual_address -= xbe_shared->header.base_address;
+@@ -299,3 +299,3 @@
+        for (uint i=0; i < section_headers->number_of_sections; i++) {
+-               if (ht_strncmp(name, (char *)s->section_name_address, slen) == 0) {
++               if (ht_strncmp(name, (char *)(uintptr_t)s->section_name_address, slen) == 0) {
+                        *section = i;
+EOF
+# fix htdialog.cc
+patch -ulbf htdialog.cc << EOF
+@@ -23,2 +23,3 @@
+ #include <stdlib.h>
++#include <stdint.h>
+ #include <string.h>
+@@ -461,3 +462,3 @@
+        if (history->count()) {
+-               return (void*)(history->count());
++               return (void*)(intptr_t)(history->count());
+        } else {
+@@ -469,3 +470,3 @@
+ {
+-       unsigned long e=(unsigned long)entry;
++       uintptr_t e=(uintptr_t)entry;
+        if (!e) return NULL;
+@@ -480,3 +481,3 @@
+ {
+-       unsigned long e=(unsigned long)entry;
++       uintptr_t e=(uintptr_t)entry;
+        if (e > 1) {
+@@ -490,3 +491,3 @@
+ {
+-       return ((ht_history_entry*)(*history)[(long)entry-1])->desc;
++       return ((ht_history_entry*)(*history)[(long)(intptr_t)entry-1])->desc;
+ }
+EOF
+# fix httree.cc
+patch -ulbf httree.cc << EOF
+@@ -21,2 +21,3 @@
+ #include <stdlib.h>
++#include <stdint.h>
+
+@@ -164,3 +165,3 @@
+ {
+-       PUT_INT32D(s, (long)selected);
++       PUT_INT32D(s, (intptr_t)selected);
+ }
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-included-lzo &&
+ wl-showstatus build-install &&
+ ( make install-strip || make -j1 install-strip ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

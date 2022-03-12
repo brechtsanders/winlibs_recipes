@@ -1,0 +1,82 @@
+export NAME="RTRlib"
+export STATUS=
+export URL=http://rpki.realmv6.org/
+export BASENAME=rtrlib
+export DESCRIPTION="The RTRlib is a lightweight, open-source C library that implements the RPKI/RTR protocol. Basically, it fetches data from an RPKI cache server and allows for prefix origin validation as well as BGP path validation. The RTRlib is the backend for BGP daemons and monitoring tools."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.3.5
+#export VERSIONDATE=20151108
+#export VERSION=0.3.6
+#export VERSIONDATE=20160406
+#export VERSION=0.4.0
+#export VERSIONDATE=20170724
+####rtrlib/lib/ipv6.c:147:14: error: 'INET6_ADDRSTRLEN' undeclared (first use in this function)
+#export VERSION=0.5.0
+#export VERSIONDATE=20171108
+#export VERSION=0.6.0
+#export VERSIONDATE=20181006
+#export VERSION=0.6.1
+#export VERSIONDATE=20181022
+#export VERSION=0.6.2
+#export VERSIONDATE=20181201
+#export VERSION=0.6.3
+#export VERSIONDATE=20181209
+#export VERSION=0.7.0
+#export VERSIONDATE=20190718
+export VERSION=0.8.0
+export VERSIONDATE=20210910
+wl-showstatus --package-version
+export DEPENDANCIES=libssh
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,doxygen
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/rtrlib/rtrlib/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rtrlib/rtrlib/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p arpa netinet sys
+echo "#include <winsock2.h>" > sys/socket.h
+echo "#include <ws2tcpip.h>" >> sys/socket.h
+cp -f sys/socket.h arpa/inet.h
+touch netinet/in.h netdb.h
+# fix rtrlib/rtr/rtr.c
+patch -ulbf rtrlib/rtr/rtr.c << EOF
+@@ -43,4 +43,7 @@
+ static int install_sig_handler()
+ {
++#ifdef _WIN32
++    return -1;
++#else
+     struct sigaction sa;
+     sa.sa_handler = &sighandler;
+@@ -51,4 +54,5 @@
+
+     return sigaction(SIGUSR1, &sa, NULL);
++#endif
+ }
+
+EOF
+# fix CMakeLists.txt
+####install Library TARGETS given no DESTINATION!
+mv CMakeLists.txt CMakeLists.txt.bak
+sed -e "s/LIBRARY \(DESTINATION\)/\1/" CMakeLists.txt.bak > CMakeLists.txt
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DRT_LIB:FILEPATH= . &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF . &&
+ wl-showstatus build-install &&
+ ( make install/strip || make install ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,49 @@
+export NAME="Detours"
+export STATUS=
+export URL=https://github.com/microsoft/Detours
+export BASENAME=detours
+export DESCRIPTION="Detours is a software package for monitoring and instrumenting API calls on Windows."
+export CATEGORY=system
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20210826
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/microsoft/Detours/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+@export DOWNLOADSOURCEURL=https://github.com/microsoft/Detours/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/microsoft/Detours/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd Detours-$VERSION
+# fix missing DWordMult in src/uimports.cpp
+mv src/uimports.cpp src/uimports.cpp.bak &&
+echo "#include <intsafe.h>" > src/uimports.cpp &&
+cat src/uimports.cpp.bak >> src/uimports.cpp
+wl-showstatus build &&
+ touch SUCCESS &&
+ for F in $(sed -ne "s/^\s*\$(OBJD)\\\\\(.*\)\.obj\s*\\\\$/\1/p" src/Makefile); do
+  echo CXX $F
+  g++ -c -o src/$F.o src/$F.cpp -O3 -Isrc || rm -f SUCCESS
+ done &&
+ ls -1 SUCCESS > /dev/null &&
+ ar cr libdetours.a src/*.o &&
+ #( echo "EXPORTS" && nm -f posix --defined-only -p libdetours.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > detours.def &&
+ #g++ -shared -s -mwindows -def detours.def -o detours.dll libdetours.a -Wl,--out-implib,libdetours.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f src/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ #cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Detours-$VERSION
+
+
+

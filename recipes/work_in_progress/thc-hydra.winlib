@@ -1,0 +1,136 @@
+export NAME="THC Hydra"
+export STATUS=
+#export URL=http://sectools.org/tool/hydra/
+export URL=https://www.thc.org/thc-hydra/
+export BASENAME=thc-hydra
+#export DESCRIPTION="When you need to brute force crack a remote authentication service, Hydra is often the tool of choice. It can perform rapid dictionary attacks against more than 50 protocols, including telnet, ftp, http, https, smb, several databases, and much more."
+export DESCRIPTION="A very fast network logon cracker which support many different services."
+export CATEGORY=security
+export TYPE=application
+#export VERSION=8.1
+#export VERSIONDATE=
+#export VERSION=8.2
+#export VERSIONDATE=20160617
+#export VERSION=8.3
+#export VERSIONDATE=20160811
+#export VERSION=8.4
+#export VERSIONDATE=20170128
+#export VERSION=8.5
+#export VERSIONDATE=20170510
+#export VERSION=8.6
+#export VERSIONDATE=20170724
+#export VERSION=9.0
+#export VERSIONDATE=20200405
+#export VERSION=9.1
+#export VERSIONDATE=20200729
+#export VERSION=9.2
+#export VERSIONDATE=20210316
+export VERSION=9.3
+export VERSIONDATE=20220203
+####hydra-telnet.c:157:25: error: 'IAC' undeclared (first use in this function)
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="GNU Affero General Public License"
+#export DOWNLOADURL="https://www.thc.org/thc-hydra/ hydra-"
+export DOWNLOADURL="https://github.com/vanhauser-thc/thc-hydra/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.thc.org/releases/hydra-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/vanhauser-thc/thc-hydra/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/hydra-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd hydra-$VERSION
+cd $BASENAME-$VERSION
+patch -ulbf hydra.h << EOF
+--- hydra.h  2014-12-07 15:50:20.000000000 +0100
++++ hydra.h  2015-09-13 09:16:04.190399200 +0200
+@@ -13,4 +13,6 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+-#include <sys/stat.h>
+ #include <netdb.h>
+@@ -18,6 +20,8 @@
+ #include <arpa/inet.h>
+-#include <fcntl.h>
+-#include <ctype.h>
+ #include <sys/resource.h>
+ #include <sys/wait.h>
++#endif
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <ctype.h>
+ #include <errno.h>
+EOF
+patch -ulbf hydra-mod.c << EOF
+--- hydra-mod.c  2014-12-07 15:50:20.000000000 +0100
++++ hydra-mod.c  2015-09-13 09:18:22.303127100 +0200
+@@ -1,3 +1,10 @@
+ #include "hydra-mod.h"
++#ifdef _WIN32
++#include <ws2tcpip.h>
++#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})
++#define signal(a,b)
++#define SIGALRM 0
++#else
+ #include <arpa/inet.h>
++#endif
+ #ifdef LIBOPENSSL
+EOF
+patch -ulbf hydra-telnet.c << EOF
+--- hydra-telnet.c  2014-12-07 15:50:24.000000000 +0100
++++ hydra-telnet.c  2015-09-13 09:18:35.725206600 +0200
+@@ -1,3 +1,5 @@
+ #include "hydra-mod.h"
++#ifndef _WIN32
+ #include <arpa/telnet.h>
++#endif
+
+EOF
+wl-showstatus configure &&
+#./autogen.sh &&
+#    echo OK
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+./configure --prefix=$INSTALLPREFIX --disable-xhydra &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ #make install &&
+ make install CC=gcc &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    mkdir -p build_test; cd build_test; cmake.exe -G"MSYS Makefiles" . -LH && echo OK; cd ..; rm -rf build_test
+#wl-showstatus configure &&
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf hydra-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Windows port, see: https://github.com/maaaaz/thc-hydra-windows/releases
+
+
+

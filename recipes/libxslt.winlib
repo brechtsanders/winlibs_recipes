@@ -1,0 +1,85 @@
+export NAME="libxslt"
+export STATUS=
+export URL=http://xmlsoft.org/XSLT/
+export BASENAME=libxslt
+export DESCRIPTION="Libxslt is the XSLT C library developed for the GNOME project (but usable outside of the Gnome platform)."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=1.1.22
+#export VERSION=1.1.23
+#export VERSION=1.1.24
+#export VERSION=1.1.26
+#export VERSIONDATE=
+#export VERSION=1.1.27
+#export VERSIONDATE=20120912
+#export VERSION=1.1.28
+#export VERSIONDATE=20121121
+#export VERSION=1.1.29
+#export VERSIONDATE=20160524
+#export VERSION=1.1.30
+#export VERSIONDATE=20170905
+#export VERSION=1.1.31
+#export VERSIONDATE=20171006
+#export VERSION=1.1.32
+#export VERSIONDATE=20171103
+#export VERSION=1.1.33
+#export VERSIONDATE=20190104
+export VERSION=1.1.34
+export VERSIONDATE=20191031
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://xmlsoft.org/sources/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://xmlsoft.org/sources/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix xsltproc/testThreads.c (version = 1.1.26)
+#patch -ulbf xsltproc/testThreads.c << EOF
+#--- xsltproc/testThreads.c  Fri Aug 14 09:14:22 2009
+#+++ xsltproc/testThreads.c  Fri Sep 25 10:08:00 2009
+#@@ -202,3 +202,8 @@
+#            results[i] = NULL;
+#+#ifdef __WIN32__
+#+           tid[i].p = -1;
+#+           tid[i].x = 0;
+#+#else
+#            tid[i] = (pthread_t) -1;
+#+#endif
+#        }
+#@@ -244,3 +249,8 @@
+#            results[i] = NULL;
+#+#ifdef __WIN32__
+#+           tid[i].p = -1;
+#+           tid[i].x = 0;
+#+#else
+#            tid[i] = (pthread_t) -1;
+#+#endif
+#        }
+#EOF
+## fix mkdir in libxslt/security.c (version <= 1.1.28)
+#mv libxslt/security.c libxslt/security.c.bak
+#sed -e "s/\(mkdir([^,]*\),[^)]*/\1/" libxslt/security.c.bak > libxslt/security.c
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined" && make install
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libgcc" && make install
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ # fix absolute paths in xslt-config
+ sed -i.bak -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/xslt-config &&
+ rm -f $INSTALLPREFIX/bin/xslt-config.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

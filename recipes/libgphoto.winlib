@@ -1,0 +1,166 @@
+export NAME="libgphoto"
+export STATUS=
+export URL=http://gphoto.sourceforge.net/
+#export URL=https://github.com/gphoto/libgphoto2
+export BASENAME=libgphoto
+export DESCRIPTION="gPhoto2 is a free, redistributable, ready to use set of digital camera software applications for Unix-like systems, written by a whole team of dedicated volunteers around the world."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=2.5.9
+#export VERSIONDATE=20160219
+#export VERSION=2.5.10
+#export VERSIONDATE=20160324
+#export VERSION=2.5.11
+#export VERSIONDATE=20161121
+#export VERSION=2.5.12
+#export VERSIONDATE=20170106
+#export VERSION=2.5.13
+#export VERSIONDATE=20170409
+#export VERSION=2.5.14
+#export VERSIONDATE=20170606
+#export VERSION=2.5.15
+#export VERSIONDATE=20171003
+#export VERSION=2.5.16
+#export VERSIONDATE=20171016
+#export VERSION=2.5.17
+#export VERSIONDATE=20180417
+#export VERSION=2.5.18
+#export VERSIONDATE=20180514
+#export VERSION=2.5.19
+#export VERSIONDATE=20180723
+#export VERSION=2.5.20
+#export VERSIONDATE=20181028
+#export VERSION=2.5.21
+#export VERSIONDATE=20181209
+#export VERSION=2.5.22
+#export VERSIONDATE=20190102
+#export VERSION=2.5.23
+#export VERSIONDATE=20190602
+#export VERSION=2.5.24
+#export VERSIONDATE=20200224
+#export VERSION=2.5.25
+#export VERSIONDATE=20200525
+#export VERSION=2.5.26
+#export VERSIONDATE=20201012
+#export VERSION=2.5.27
+#export VERSIONDATE=20210221
+#export VERSION=2.5.28
+#export VERSIONDATE=20220103
+export VERSION=2.5.29
+export VERSIONDATE=20220305
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,pthreads,libltdl,pcre,libjpeg,libexif,libxml2,libusb,libgd
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://sourceforge.net/projects/gphoto/files/libgphoto/"
+export DOWNLOADURL="https://github.com/gphoto/libgphoto2/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/gphoto/libgphoto/$VERSION/libgphoto2-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/gphoto/libgphoto/$VERSION/libgphoto2-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/gphoto/libgphoto2/releases/download/v$VERSION/libgphoto2-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/libgphoto2-$VERSION.tar.bz2
+cd libgphoto2-$VERSION
+# fix redefinition of ssize_t in libgphoto2_port/gphoto2/gphoto2-port-portability.h (version >= 2.5.11)
+if ! gcc --version | grep -q "MinGW-W64"; then
+ mv libgphoto2_port/gphoto2/gphoto2-port-portability.h libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak &&
+ sed -e "s?typedef SSIZE_T ssize_t;?//&?" libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak > libgphoto2_port/gphoto2/gphoto2-port-portability.h
+fi
+# fix missing usleep in libgphoto2_port/gphoto2/gphoto2-port-portability.h (version >= 2.5.12)
+if ! gcc --version | grep -q "MinGW-W64"; then
+ mv libgphoto2_port/gphoto2/gphoto2-port-portability.h libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak2 &&
+ #sed -e "s/usleep((x) \* 1000 \* 1000)/_sleep((x) * 1000)/" libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak2 > libgphoto2_port/gphoto2/gphoto2-port-portability.h
+ #grep -v usleep libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak2 > libgphoto2_port/gphoto2/gphoto2-port-portability.h
+ sed -e "s?^#\s*define\s*sleep?//&?" libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak2 > libgphoto2_port/gphoto2/gphoto2-port-portability.h
+fi
+# fix redefinition of jpeg_mem_src
+if grep -q jpeg_mem_src /custombuilt/include/jpeglib.h; then
+ mv camlibs/ax203/jpeg_memsrcdest.h camlibs/ax203/jpeg_memsrcdest.h.bak &&
+ echo "#include <jpeglib.h>" > camlibs/ax203/jpeg_memsrcdest.h &&
+ mv camlibs/ax203/jpeg_memsrcdest.c camlibs/ax203/jpeg_memsrcdest.c.bak &&
+ touch camlibs/ax203/jpeg_memsrcdest.c &&
+ mv camlibs/jl2005c/jpeg_memsrcdest.h camlibs/jl2005c/jpeg_memsrcdest.h.bak &&
+ echo "#include <jpeglib.h>" > camlibs/jl2005c/jpeg_memsrcdest.h &&
+ mv camlibs/jl2005c/jpeg_memsrcdest.c camlibs/jl2005c/jpeg_memsrcdest.c.bak &&
+ touch camlibs/jl2005c/jpeg_memsrcdest.c
+fi
+# fix missing setenv/unsetenv in camlibs/ptp2/config.c
+patch -ulbf camlibs/ptp2/config.c << EOF
+--- camlibs/ptp2/config.c  2015-11-18 19:46:21.000000000 +0100
++++ camlibs/ptp2/config.c  2016-02-20 11:11:35.602734700 +0100
+@@ -4925,3 +4925,7 @@
+                C_MEM (tz = strdup(tz));
++#if _WIN32
++       putenv("TZ=");
++#else
+        setenv("TZ", "", 1);
++#endif
+        tzset();
+@@ -4929,6 +4933,17 @@
+        if (tz) {
++#if _WIN32
++               C_MEM (tz = (char*)realloc(tz, strlen(tz) + 4));
++               memmove(tz + 3, tz, strlen(tz) + 1);
++               memcpy(tz, "TZ=", 3);
++               putenv(tz);
++#else
+                setenv("TZ", tz, 1);
++#endif
+                free(tz);
+        } else
++#if _WIN32
++               putenv("TZ=");
++#else
+                unsetenv("TZ");
++#endif
+        tzset();
+EOF
+# fix redefinition of ssize_t in libgphoto2_port/gphoto2/gphoto2-port-portability.h (version >= 2.5.10)
+mv libgphoto2_port/gphoto2/gphoto2-port-portability.h libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak &&
+grep -v "typedef .*ssize_t;" libgphoto2_port/gphoto2/gphoto2-port-portability.h.bak > libgphoto2_port/gphoto2/gphoto2-port-portability.h
+# fix already defined _IO_H in camlibs/mustek/io.h (version >= 2.5.13)
+mv camlibs/mustek/io.h camlibs/mustek/io.h.bak &&
+sed -e "s/_IO_H/_MUSTEK&/" camlibs/mustek/io.h.bak > camlibs/mustek/io.h
+## fix missing MDC800_DEFAULT_COMMAND_RETRY_DELAY in camlibs/mustek/io.c (version >= 2.5.13)
+#mv camlibs/mustek/io.c camlibs/mustek/io.c.bak &&
+#sed -e "s/\(#include \"\)\(io\.h\"\)/\1..\/mustek\/\2/" camlibs/mustek/io.c.bak > camlibs/mustek/io.c
+## fix missing MDC800_DEFAULT_COMMAND_RETRY_DELAY in camlibs/mustek/rs232.c (version >= 2.5.13)
+#mv camlibs/mustek/rs232.c camlibs/mustek/rs232.c.bak &&
+#sed -e "s/\(#include \"\)\(io\.h\"\)/\1..\/mustek\/\2/" camlibs/mustek/rs232.c.bak > camlibs/mustek/rs232.c
+## fix missing MDC800_DEFAULT_COMMAND_RETRY_DELAY in camlibs/mustek/usb.c (version >= 2.5.13)
+#mv camlibs/mustek/usb.c camlibs/mustek/usb.c.bak &&
+#sed -e "s/\(#include \"\)\(io\.h\"\)/\1..\/mustek\/\2/" camlibs/mustek/usb.c.bak > camlibs/mustek/usb.c
+## fix missing MDC800_DEFAULT_COMMAND_RETRY_DELAY in camlibs/mustek/core.h (version >= 2.5.13)
+#mv camlibs/mustek/core.h camlibs/mustek/core.h.bak &&
+#sed -e "s/\(#include \"\)\(io\.h\"\)/\1..\/mustek\/\2/" camlibs/mustek/core.h.bak > camlibs/mustek/core.h
+# fix camlibs/lumix/lumix.c (version >= 2.5.24)
+patch -ulbf camlibs/lumix/lumix.c << EOF
+@@ -38,6 +38,10 @@
+
+-#include <sys/socket.h>
+ #include <stdlib.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
++#include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
++#endif
+
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared &&
+ #echo "#undef HAVE_LANGINFO_H" >> config.h &&
+ wl-showstatus build-install &&
+ ( make install-strip || make -j1 install-strip ) &&
+ # fix absolute paths in *-config
+ sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/*-config &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libgphoto2-$VERSION
+
+
+

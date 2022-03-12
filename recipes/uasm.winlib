@@ -1,0 +1,162 @@
+export NAME="UASM"
+export STATUS=
+export URL=http://www.terraspace.co.uk/uasm.html
+export BASENAME=uasm
+export DESCRIPTION="UASM is a free MASM-compatible assembler based on JWasm (HJWasm)."
+export CATEGORY=development
+export TYPE=application
+export VERSION=213
+export VERSIONDATE=20200224
+#export VERSION=master
+#export VERSIONDATE=20210210
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=License.txt
+export LICENSETYPE="JWasm License"
+#export DOWNLOADURL="http://www.terraspace.co.uk/uasm.html"
+#export DOWNLOADURL="https://github.com/Terraspace/UASM/releases"
+export DOWNLOADURL="https://github.com/Terraspace/UASM/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/Terraspace/UASM/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/Terraspace/UASM/archive/refs/tags/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/Terraspace/UASM/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd UASM-$VERSION
+## fix H/codegenv2.h
+#patch -ulbf H/codegenv2.h << EOF
+#@@ -391,3 +391,3 @@
+# int           BuildMemoryEncoding(unsigned char* pmodRM, unsigned char* pSIB, unsigned char* pREX, bool* needRM, bool* needSIB,
+#-                                     unsigned int* dispSize, int* pDisp, struct Instr_Def* instr,
+#+                                     unsigned int* dispSize, uint_64* pDisp, struct Instr_Def* instr,
+#                                                                  struct expr opExpr[4], bool* needB, bool* needX,
+#EOF
+## fix codegenv2.c
+#patch -ulbf codegenv2.c << EOF
+#@@ -1654,3 +1654,3 @@
+#                else if (CodeInfo->Ofssize == USE64)
+#-                       rexByte |= BuildREX(rexByte, matchedInstr, opExpr, FALSE);           /* Modify the REX prefix for non-memory operands/sizing */
+#+                       rexByte |= BuildREX(rexByte, matchedInstr, opExpr);
+#                                                                        /* Modify the REX prefix for non-memory operands/sizing */
+#
+#EOF
+## fix invoke.c
+#patch -ulbf invoke.c << EOF
+#@@ -224,3 +224,3 @@
+# #endif
+#-#if AMD64_SUPPORT
+#+#if AMD64_SUPPORT && SYSV_SUPPORT
+#        { sysv_fcstart, sysv_fcend , sysv_param } /* FCT_WIN64 */
+#@@ -254,3 +254,3 @@
+# #endif
+#-#if AMD64_SUPPORT
+#+#if AMD64_SUPPORT && SYSV_SUPPORT
+#        { sysv_fcstart, sysv_fcend , sysv_param } /* FCT_WIN64 */
+#@@ -4017,3 +4017,3 @@
+#                                type = p->sym.target_type;
+#-                               while (type->target_type && (int)type->target_type > 0x2000)
+#+                               while (type->target_type && (intptr_t)type->target_type > 0x2000)
+#                                {
+#@@ -4064,4 +4064,4 @@
+# {
+#-       uint_64 fnv_basis = 14695981039346656037;
+#-       uint_64 register fnv_prime = 1099511628211;
+#+       uint_64 fnv_basis = 14695981039346656037UL;
+#+       uint_64 register fnv_prime = 1099511628211UL;
+#        uint_64 h;
+#@@ -5300,2 +5300,3 @@
+#        // Reset SYSTEMV pass values.
+#+#if SYSV_SUPPORT
+#        if (proc->sym.langtype == LANG_SYSVCALL || (proc->sym.langtype == LANG_REGCALL && ((Options.output_format == OFORMAT_ELF && Options.sub_format == SFORMAT_64BIT) || Options.output_format == OFORMAT_MAC) && (Options.sub_format == SFORMAT_64BIT)))
+#@@ -5311,2 +5312,3 @@
+#        }
+#+#endif
+#
+#@@ -5456,2 +5458,3 @@
+#        {
+#+#if SYSV_SUPPORT
+#                unsigned char sGPR = proc->e.procinfo->firstGPR;
+#@@ -5496,2 +5499,3 @@
+#                proc->e.procinfo->firstVEC = sVEC;
+#+#endif
+#        }
+#EOF
+## fix tokenize.c
+#patch -ulbf tokenize.c << EOF
+#@@ -958,12 +958,2 @@
+#        int i = 0;
+#-<<<<<<< HEAD
+#-  //if (_memicmp(p->input, "dword bcst[rax]", 15) == 0) {
+#-  //  __debugbreak();
+#-  //  strcpy (p->input, "dword ptr [rax]");
+#-  //  broadflags = 0x40;
+#-  //  p->input+=15;
+#-  //  //return(NOT_ERROR);
+#-  //}
+#-=======
+#->>>>>>> v2.49.1
+# #if CONCATID || DOTNAMEX
+#@@ -1299,8 +1289,3 @@
+#           }
+#-<<<<<<< HEAD
+#-          else if (*p.input == 'v') {
+#-            /* Implement ml64 BCST for broadcast */
+#-            for (p1 = p.input; *p1 != 0; p1++) {     /* start from the beginning of string */
+#-=======
+#-                 else if (*p.input == 'v' || *p.input == 'V') {
+#+          else if (*p.input == 'v' || *p.input == 'V') {
+#             /* Implement ml64 BCST for broadcast */
+#@@ -1309,3 +1294,2 @@
+#                 break;
+#->>>>>>> v2.49.1
+#               if (*p1 == 'b' || *p1 == 'B') {        /* found  'b' */
+#@@ -1315,7 +1299,3 @@
+#             }
+#-<<<<<<< HEAD
+#-            if (*p1 != 0) {                        /* if 'bcst' present p1 is pointing to "bcst" */
+#-=======
+#             if (*p1 != 0 && *p1 != ';') {                        /* if 'bcst' present p1 is pointing to "bcst" */
+#->>>>>>> v2.49.1
+#               input1 = p1 + 4;                     /* skip "bcst" and save location in input1 */
+#@@ -1352,11 +1332,2 @@
+#                 cnt += cnt;                        /* double it for dword */
+#-<<<<<<< HEAD
+#-              else if (*p1 != 'q' || *p1 == 'Q')   /* incorret size? */
+#-                goto nobcst;                       /* let parser throw error */-              if (*input1 != '\\[') {               /* if address is not inside [] */
+#-                *p1++ = '\\[';                      /* force it   */
+#-                for (; *input1 > ','; p1++, input1++)  /* input1 points to [address] */
+#-                  *p1 = *input1;                     /* copy first memory part over 'qword bcst */
+#-                *p1++ = '\\]';
+#-=======
+#               else if (*p1 == 'q' || *p1 == 'Q')   /* incorret size? */
+#@@ -1375,3 +1346,2 @@
+#                   *input1 = 0;
+#->>>>>>> v2.49.1
+#                 while (isspace(*input1)) input1++;   /* skip the space, now pointing to address  */
+#@@ -1394,4 +1364,2 @@
+#               for (p1 = p.input; *p1 != 0; p1++) {     /* start from the beginning of string */
+#-<<<<<<< HEAD
+#-=======
+#                 if (*p1 == ';') {                        /* found  ';' */
+#@@ -1399,3 +1367,2 @@
+#                 }
+#->>>>>>> v2.49.1
+#                 if (*p1 == '\\{') {                     /* found  '{' */
+#EOF
+## disable SYSV stuff
+#sed -i.bak -e "s/^c_flags\s*=\s*/&-DSYSV_SUPPORT=0 /" GccWin.mak
+wl-showstatus build &&
+ make -f GccWin.mak lflagsd="-s -Wl,--allow-multiple-definition" &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f MinGWR/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf UASM-$VERSION
+
+
+

@@ -1,0 +1,202 @@
+#export NAME="GUPnP-IGD"
+#export STATUS=
+#export URL=http://www.gupnp.org/
+#export BASENAME=gupnp-igd
+#export DESCRIPTION="GUPnP is an elegant, object-oriented open source framework for creating UPnP devices and control points, written in C using GObject and libsoup. The GUPnP API is intended to be easy to use, efficient and flexible. It provides the same set of features as libupnp, but shields the developer from most of UPnP's internals."
+#export CATEGORY=communication
+#export TYPE=library
+##export VERSION=0.1.7
+##export VERSIONDATE=20101019
+##export VERSION=0.1.10
+##export VERSIONDATE=20110427
+#####make[3]: *** No rule to make target `GUPnPIgd-1.0.typelib', needed by `all-am'.
+##export VERSION=0.1.11
+##export VERSIONDATE=20110505
+##export VERSION=0.2.1
+##export VERSIONDATE=20111108
+#####Requested 'gupnp-1.0 >= 0.18' but version of gupnp-1.0 is 0.16.1
+##export VERSION=0.2.2
+##export VERSIONDATE=20121123
+##export VERSION=0.2.3
+##export VERSIONDATE=20140207
+##export VERSION=0.2.4
+##export VERSIONDATE=20141001
+#export VERSION=0.2.5
+#export VERSIONDATE=20171121
+#wl-showstatus --package-version
+#export DEPENDANCIES=gupnp
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=LGPL
+##export DOWNLOADURL="http://www.gupnp.org/download"
+##export DOWNLOADURL="http://www.gupnp.org/download?keys=&tid=6"
+#export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gupnp-igd/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://www.gupnp.org/sites/all/files/sources/$BASENAME-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+##tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+##tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## fix missing file
+#mkdir -p arpa
+#cat > arpa/inet.h << EOF
+##include <winsock2.h>
+##include <ws2tcpip.h>
+#EOF
+### fix missing inet_pton in libgupnp-igd/gupnp-simple-igd.c
+##mv libgupnp-igd/gupnp-simple-igd.c.bak libgupnp-igd/gupnp-simple-igd.c
+##cat > libgupnp-igd/gupnp-simple-igd.c << EOF
+###include <stdio.h>
+###include <winsock2.h>
+##inline int inet_pton (int af, const char* src, void* dst)
+##{
+##  switch (af) {
+##    case AF_INET:
+##    {
+##      int ch;
+##      unsigned char tmp[4];
+##      unsigned char* tp = tmp;
+##      int saw_digit = 0;
+##      int octets = 0;
+##      *tmp = 0;
+##      while ((ch = *src++) != '\\0') {
+##        if ('0' <= ch && ch <= '9') {
+##          unsigned octet = *tp * 10 + ch - '0';
+##          if (saw_digit && *tp == 0)
+##            return (0);
+##          if (octet > 255)
+##            return (0);
+##          *tp = octet;
+##          if (!saw_digit) {
+##            if (++octets > 4)
+##              return (0);
+##            saw_digit = 1;
+##          }
+##        } else if (ch == '.' && saw_digit) {
+##          if (octets == 4)
+##            return (0);
+##          *++tp = 0;
+##          saw_digit = 0;
+##        } else
+##          return (0);
+##      }
+##      if (octets < 4)
+##        return (0);
+##      memcpy(dst, tmp, 4);
+##      return (1);
+##    }
+##    default:
+##      return -1;//to do: implement AF_INET6
+##  }
+##}
+##EOF
+#cat libgupnp-igd/gupnp-simple-igd.c > libgupnp-igd/gupnp-simple-igd.c.bak
+#mv libgupnp-igd/gupnp-simple-igd.c libgupnp-igd/gupnp-simple-igd.c.bak
+#echo "#define _WIN32_WINNT 0x0600" > libgupnp-igd/gupnp-simple-igd.c
+#grep -v "netinet/in.h\|sys/socket.h" libgupnp-igd/gupnp-simple-igd.c.bak >> libgupnp-igd/gupnp-simple-igd.c
+## skip making tests/examples
+#cat > tests/examples/Makefile.in << EOF
+#all:
+#install:
+#install-strip:
+#clean:
+#EOF
+#cp -f tests/examples/Makefile.in tests/examples/Makefile.am
+## fix newer versions of dependancies
+#sed -i.bak -e "s/gssdp-[0-9]*\.[0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gssdp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\([^\/]*.*\)\.pc$/\1/")/; s/gupnp-[0-9]*\.[0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gupnp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\([^\/]*.*\)\.pc$/\1/")/" configure *.pc.in
+#wl-showstatus configure &&
+### fix building DLLs
+##autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+##PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PYDIR/include" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python --enable-introspection=no LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+# wl-showstatus build-install &&
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# PATH=$PYDIR:$PATH make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+## To do: build DLL
+#####libgupnp-igd/gupnp-simple-igd-thread.c:355: undefined reference to `gupnp_simple_igd_get_type'
+#####libgupnp-igd/gupnp-simple-igd-thread.c:367: undefined reference to `gupnp_simple_igd_get_type'
+#####libgupnp-igd/gupnp-simple-igd-thread.c:327: undefined reference to `gupnp_simple_igd_get_type'
+#####libgupnp-igd/gupnp-simple-igd-thread.c:339: undefined reference to `gupnp_simple_igd_get_type'
+#####libgupnp-igd/gupnp-simple-igd-thread.c:141: undefined reference to `gupnp_simple_igd_delete_all_mappings'
+#####libgupnp-igd/gupnp-simple-igd-thread.c:183: undefined reference to `gupnp_simple_igd_get_type'
+#####libgupnp-igd/gupnp-simple-igd-thread.c:183: undefined reference to `gupnp_simple_igd_delete_all_mappings'
+#####libgupnp-igd/gupnp-simple-igd-thread.c:72: undefined reference to `gupnp_simple_igd_get_type'
+
+
+
+export NAME="GUPnP-IGD"
+export STATUS=
+export URL=http://www.gupnp.org/
+export BASENAME=gupnp-igd
+export DESCRIPTION="GUPnP is an elegant, object-oriented open source framework for creating UPnP devices and control points, written in C using GObject and libsoup. The GUPnP API is intended to be easy to use, efficient and flexible. It provides the same set of features as libupnp, but shields the developer from most of UPnP's internals."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.2.0
+export VERSIONDATE=20200919
+wl-showstatus --package-version
+#export DEPENDANCIES=glib2,gupnp,gssdp
+export DEPENDANCIES=glib2,gupnp,gssdp,gobject-introspection
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gupnp-igd/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix libgupnp-igd/gupnp-simple-igd.c (version >= 1.2.0)
+patch -ulbf libgupnp-igd/gupnp-simple-igd.c << EOF
+@@ -45,7 +45,18 @@
+
++#ifdef _WIN32
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
++#endif
+ #include <string.h>
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <sys/socket.h>
++#endif
+
+EOF
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dintrospection=false -Dgtk_doc=false -Dc_link_args="-lws2_32" . build_both &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dintrospection=true -Dgtk_doc=false -Dc_link_args="-lws2_32" . build_both &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -C build_both install &&
+ PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH ninja -C build_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

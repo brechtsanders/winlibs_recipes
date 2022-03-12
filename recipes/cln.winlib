@@ -1,0 +1,80 @@
+export NAME="CLN"
+export STATUS=
+export URL=http://www.ginac.de/CLN/
+export BASENAME=cln
+export DESCRIPTION="CLN is a library for efficient computations with all kinds of numbers in arbitrary precision."
+export CATEGORY=math
+export TYPE=library
+#export VERSION=1.3.2
+#export VERSIONDATE=20110802
+####64-bit: checking how large gmp demands uintD to be... configure: error: Don't know which C-type has sizeof(mp_limb_t)
+#export VERSION=1.3.3
+#export VERSIONDATE=20130722
+####64-bit: ./base/cl_sysdep.h:10:26: fatal error: cln/intparam.h: No such file or directory
+#export VERSION=1.3.4
+#export VERSIONDATE=20150209
+#export VERSION=1.3.5
+#export VERSIONDATE=20191118
+export VERSION=1.3.6
+export VERSIONDATE=20191206
+wl-showstatus --package-version
+export DEPENDANCIES=gmp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="ftp://ftpthep.physik.uni-mainz.de/pub/gnu/"
+export DOWNLOADURL="http://www.ginac.de/CLN/"
+#export DOWNLOADURL="http://www.ginac.de/CLN/cln.git/ cln_"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.ginac.de/CLN/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+patch -ulbf include/cln/object.h << EOF
+--- include/cln/object.h  2014-10-13 21:29:57.000000000 +0200
++++ include/cln/object.h  2015-03-24 11:46:41.769853500 +0100
+@@ -141,8 +141,12 @@
+   #if (cl_word_alignment == 4)
+     #define cl_FN_tag  1
+     #define cl_SF_tag  2
+   #endif
++  #if (cl_word_alignment == 8)
++    #define cl_FN_tag  1
++    #define cl_SF_tag  2
++  #endif
+ #else // CL_WIDE_POINTERS
+   // Single Floats are immediate as well.
+   #define cl_FN_tag    1
+   #define cl_SF_tag    2
+EOF
+# fix for 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ for F in grep -l "for (std::size_t i = 0; i < len; i++)" src/vector/*.cc src/vector/output/*.cc; do
+  sed -i.bak -e "s/\(for (\)std::size_t\( i = 0; i < len; i++)\)/\1unsigned long\2/" $F
+ done
+fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static LDFLAGS="-Wl,--allow-multiple-definition -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static LDFLAGS="-Wl,--allow-multiple-definition -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static CXXFLAGS="-fpermissive" LDFLAGS="-Wl,--allow-multiple-definition -Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # ignore 64-bit errors
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  mv include/cln/intparam.h include/cln/intparam.h.bak &&
+  grep -v "^#error" include/cln/intparam.h.bak > include/cln/intparam.h
+ fi &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: fix 64-bit
+
+
+

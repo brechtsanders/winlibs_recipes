@@ -1,0 +1,176 @@
+#export NAME="Point Cloud Library (PCL)"
+#export STATUS=
+#export URL=http://pointclouds.org/
+##export URL=https://github.com/PointCloudLibrary/pcl
+#export BASENAME=pcl
+#export DESCRIPTION="The Point Cloud Library (PCL) is a standalone, large scale, open project for 2D/3D image and point cloud processing."
+#export CATEGORY=graphics
+#export TYPE=library
+##export VERSION=1.8.1
+##export VERSIONDATE=20180414
+#####-- Could NOT find OpenNI (missing:  OPENNI_LIBRARY OPENNI_INCLUDE_DIR)
+#####-- Could NOT find OpenNI2 (missing:  OPENNI2_LIBRARY OPENNI2_INCLUDE_DIRS)
+#####-- Could NOT find FZAPI (missing:  FZAPI_LIBS FZAPI_INCLUDE_DIRS)
+#####-- Could NOT find ensenso (missing:  ENSENSO_LIBRARY ENSENSO_INCLUDE_DIR)
+#####-- Could NOT find davidSDK (missing:  DAVIDSDK_LIBRARY DAVIDSDK_INCLUDE_DIR)
+#####-- Could NOT find DSSDK (missing:  DSSDK_LIBRARIES DSSDK_INCLUDE_DIRS)
+#####-- Could NOT find RSSDK (missing:  RSSDK_LIBRARIES RSSDK_INCLUDE_DIRS)
+##export VERSION=1.9.0
+##export VERSIONDATE=20181107
+#export VERSION=1.9.1
+#export VERSIONDATE=20181126
+#####on 32-bit Windows: common/include/pcl/pcl_macros.h:420:4: error: #error aligned_malloc not supported on your platform
+#####ld.exe: Error: export ordinal too large: 79813
+##export VERSION=1.10.0
+##export VERSIONDATE=20200120
+##export VERSION=1.10.1
+##export VERSIONDATE=20200319
+##export VERSION=1.11.0
+##export VERSIONDATE=20200511
+##export VERSION=1.11.1
+##export VERSIONDATE=20200814
+##export VERSION=1.12.0
+##export VERSIONDATE=20210708
+##export VERSION=1.12.1
+##export VERSIONDATE=20211222
+#####common/include/pcl/common/impl/common.hpp:55:49: error: 'M_PI' was not declared in this scope
+#wl-showstatus --package-version
+##export DEPENDANCIES=zlib,libpng,libusb,winpcap,qt,flann,eigen,vtk
+#export DEPENDANCIES=zlib,libpng,libusb,libpcap,qt,flann,eigen,vtk
+#export OPTIONALDEPENDANCIES=metslib,qhull,openni2
+#export BUILDDEPENDANCIES=cmake
+#export LICENSEFILE=LICENSE.txt
+#export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/PointCloudLibrary/pcl/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/PointCloudLibrary/pcl/archive/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd pcl-pcl-$VERSION
+## fix missing M_LOG2E in common/include/pcl/pcl_macros.h (version >= 1.8.1)
+#mv common/include/pcl/pcl_macros.h common/include/pcl/pcl_macros.h.bak &&
+#echo "#undef _USE_MATH_DEFINES" > common/include/pcl/pcl_macros.h &&
+#echo "#include <math.h>" >> common/include/pcl/pcl_macros.h &&
+#cat common/include/pcl/pcl_macros.h.bak >> common/include/pcl/pcl_macros.h
+## fix missing _mm_malloc on 32-bit Windows in common/include/pcl/pcl_macros.h (version >= 1.9.1)
+#if ( echo $RUNPLATFORM | grep -qv x86_64 ); then
+# mv common/include/pcl/pcl_macros.h common/include/pcl/pcl_macros.h.bak2 &&
+# echo "#ifndef HAVE_MM_MALLOC" > common/include/pcl/pcl_macros.h &&
+# echo "#define HAVE_MM_MALLOC" >> common/include/pcl/pcl_macros.h &&
+# echo "#include <mm_malloc.h>" >> common/include/pcl/pcl_macros.h &&
+# echo "#endif" >> common/include/pcl/pcl_macros.h &&
+# cat common/include/pcl/pcl_macros.h.bak2 >> common/include/pcl/pcl_macros.h
+#fi
+## fix redefinition of ssize_t on 32-bit Windows in io/include/pcl/io/low_level_io.h (version >= 1.9.1)
+#if ( echo $RUNPLATFORM | grep -qv x86_64 ); then
+# sed -i.bak -e "s?^typedef SSIZE_T ssize_t;?//&?" io/include/pcl/io/low_level_io.h
+#fi
+## fix pointer conversion error in segmentation/include/pcl/segmentation/plane_coefficient_comparator.h
+#patch -ulbf segmentation/include/pcl/segmentation/plane_coefficient_comparator.h << EOF
+#@@ -143,3 +143,3 @@
+#       {
+#-        return (plane_coeff_d_);
+#+        return *(plane_coeff_d_);
+#       }
+#EOF
+### fix missing boost/detail/endian.hpp
+##mkdir -p winfix/boost/detail
+##echo "#include <boost/endian.hpp>" > winfix/boost/detail/endian.hpp
+### fix missing M_PI/M_LOG2E (version <= 1.10.0)
+##for F in $(grep -lw "M_PI\|M_LOG2E" $(find -name '*.h' -or -name '*.hpp' -or -name '*.cpp')) common/src/range_image_planar.cpp octree/src/octree_inst.cpp sample_consensus/src/sac.cpp; do
+## mv $F $F.bak &&
+## echo "#undef __STRICT_ANSI__" > $F &&
+## echo "#ifndef _USE_MATH_DEFINES" >> $F &&
+## echo "#define _USE_MATH_DEFINES" >> $F &&
+## echo "#endif" >> $F &&
+## echo "#include <math.h>" >> $F &&
+## cat $F.bak >> $F
+##done
+## fix too many sections error with -Wa,-mbig-obj compiler flag
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=OFF -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap" -DWITH_VTK:BOOL=OFF -S. -Bbuild_static &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=OFF -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap" -DWITH_VTK:BOOL=ON -S. -Bbuild_static &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=OFF -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_static &&
+# PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=OFF -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_static &&
+# #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=OFF -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_static &&
+# echo "-Wl,--as-needed -lws2_32" >> build_static/io/tools/CMakeFiles/pcl_hdl_grabber.dir/linklibs.rsp &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=ON -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DPCAP_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpcap.dll.a -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap" -S. -Bbuild_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=ON -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DPCAP_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpcap.dll.a -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -Wa,-mbig-obj" -S. -Bbuild_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=ON -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DPCAP_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpcap.dll.a -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_shared &&
+# PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=ON -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DPCAP_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpcap.dll.a -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_shared &&
+# #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=ON -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DPCAP_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpcap.dll.a -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_shared &&
+# echo "-Wl,--as-needed -lws2_32" >> build_shared/io/CMakeFiles/pcl_io.dir/linklibs.rsp &&
+# echo "-Wl,--as-needed -lws2_32" >> build_shared/io/tools/CMakeFiles/pcl_hdl_grabber.dir/linklibs.rsp &&
+# #echo "-Wa,-mbig-obj" >> build_shared/features/CMakeFiles/pcl_features.dir/linklibs.rsp &&
+# ## fix linker error: export ordinal too large
+# #####see also: https://github.com/PointCloudLibrary/pcl/issues/3672
+# #echo "-Wl,--discard-all" >> build_shared/features/CMakeFiles/pcl_features.dir/linklibs.rsp &&
+# sed -i.bak -e "s/--export-all-symbols//" build_shared/features/CMakeFiles/pcl_features.dir/build.make &&
+# wl-showstatus build-install &&
+# ( make -Cbuild_static install/strip || make -j1 -Cbuild_static install/strip ) &&
+# wl-showstatus build-install &&
+# ( make -Cbuild_shared install/strip || make -j1 -Cbuild_shared install/strip ) &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pcl-pcl-$VERSION
+#####TO DO: 32-bit build
+#####-- Could NOT find OpenMP_C (missing: OpenMP_mingwthrd_LIBRARY OpenMP_mingwthrd_LIBRARY) (found version "4.5")
+#####-- Could NOT find OpenMP_CXX (missing: OpenMP_mingwthrd_LIBRARY OpenMP_mingwthrd_LIBRARY) (found version "4.5")
+
+
+
+
+export NAME="Point Cloud Library (PCL)"
+export STATUS=
+export URL=http://pointclouds.org/
+#export URL=https://github.com/PointCloudLibrary/pcl
+export BASENAME=pcl
+export DESCRIPTION="The Point Cloud Library (PCL) is a standalone, large scale, open project for 2D/3D image and point cloud processing."
+export CATEGORY=graphics
+export TYPE=library
+export VERSION=1.12.1
+export VERSIONDATE=20211222
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libpng,libusb,libpcap,qt,flann,eigen,vtk
+export OPTIONALDEPENDANCIES=metslib,qhull,openni2
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/PointCloudLibrary/pcl/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/PointCloudLibrary/pcl/archive/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd pcl-pcl-$VERSION
+## fix common/src/print.cpp (version >= 1.12.1)
+#patch -ulbf common/src/print.cpp << EOF
+#@@ -49,3 +49,3 @@
+#
+#-#ifndef _MSC_VER
+#+#ifndef _WIN32
+# # define COMMON_LVB_UNDERSCORE    0
+#EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=OFF -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_static &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=OFF -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DWITH_OPENMP:BOOL=ON -DWITH_VTK:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -S. -Bbuild_static &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -ldl/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ #PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=ON -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DPCAP_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpcap.dll.a -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -DWITH_VTK:BOOL=ON -S. -Bbuild_shared &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ PKG_CONFIG=$(which pkg-config.exe) cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCL_SHARED_LIBS:BOOL=ON -DQt5Core_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Core -DQt5Concurrent_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Concurrent -DQt5Gui_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Gui -DQt5OpenGL_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5OpenGL -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -DEIGEN_INCLUDE_DIR:PATH=$MINGWPREFIX/include/eigen3 -DPCAP_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpcap.dll.a -DWITH_OPENMP:BOOL=ON -DWITH_VTK:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap -I$(pwd)/winfix -Wa,-mbig-obj" -DOpenMP_mingwthrd_LIBRARY:STRING="-lgomp" -S. -Bbuild_shared &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -ldl/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ( ninja -Cbuild_static install/strip || ninja -j1 -Cbuild_static install/strip ) &&
+ wl-showstatus build-install &&
+ ( ninja -Cbuild_shared install/strip || ninja -j1 -Cbuild_shared install/strip ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pcl-pcl-$VERSION
+####TO DO: 32-bit build
+
+
+

@@ -1,0 +1,94 @@
+export NAME="Lua"
+export STATUS=
+export URL=http://www.lua.org/
+export BASENAME=lua
+export DESCRIPTION="Lua is a powerful, fast, lightweight, embeddable scripting language."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=5.1.4
+#export VERSIONDATE=20110525
+#export VERSION=5.1.5
+#export VERSIONDATE=20120217
+#export VERSION=5.2.0
+#export VERSIONDATE=20111217
+#export VERSION=5.2.1
+#export VERSIONDATE=20120615
+#export VERSION=5.2.2
+#export VERSIONDATE=20130327
+#export VERSION=5.2.3
+#export VERSIONDATE=20131207
+#export VERSION=5.2.4
+#export VERSIONDATE=20150307
+#export VERSION=5.3.0
+#export VERSIONDATE=20150112
+#export VERSION=5.3.1
+#export VERSIONDATE=20150617
+#export VERSION=5.3.2
+#export VERSIONDATE=20151130
+#export VERSION=5.3.3
+#export VERSIONDATE=20160610
+#export VERSION=5.3.4
+#export VERSIONDATE=20170201
+#export VERSION=5.3.5
+#export VERSIONDATE=20180710
+#export VERSION=5.3.6
+#export VERSIONDATE=20200925
+#export VERSION=5.4.0
+#export VERSIONDATE=20200630
+#export VERSION=5.4.1
+#export VERSIONDATE=20201010
+#export VERSION=5.4.2
+#export VERSIONDATE=20201203
+export VERSION=5.4.3
+export VERSIONDATE=20210329
+wl-showstatus --package-version
+export DEPENDANCIES=pexports
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYRIGHT
+export LICENSEFILE=doc/readme.html
+export LICENSETYPE=MIT
+export DOWNLOADURL="http://www.lua.org/ftp/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.lua.org/ftp/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# create pkgconfig .pc file (version >= 5.2.0)
+mkdir -p $INSTALLPREFIX/lib/pkgconfig
+cat > $INSTALLPREFIX/lib/pkgconfig/lua.pc << EOF
+prefix=$INSTALLPREFIX
+exec_prefix=\${prefix}
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: $BASENAME
+Description: $DESCRIPTION
+Version: $VERSION
+Libs: -L\${libdir} -llua -lm
+Cflags: -I\${includedir}
+EOF
+# fix src/Makefile for building .dll.a files
+mv src/Makefile src/Makefile.bak &&
+#sed -e "s/ -shared -o/ -Wl,--compat-implib -Wl,--out-implib,liblua.dll.a -Wl,--output-def,liblua.def&/" src/Makefile.bak > src/Makefile
+sed -e "s/ -shared -o/ -Wl,--out-implib,liblua.dll.a&/" src/Makefile.bak > src/Makefile
+wl-showstatus build &&
+#make mingw &&
+make mingw MYCFLAGS="-DLUA_COMPAT_ALL -DLUA_COMPAT_MODULE" &&
+#make mingw MYCFLAGS="-DLUA_COMPAT_ALL -DLUA_COMPAT_MODULE -DLUA_BUILD_AS_DLL -DLUA_LIB -DLUA_CORE" &&
+ wl-showstatus build-install &&
+ make install INSTALL_TOP=$INSTALLPREFIX &&
+ #pexports src/lua*.dll > liblua.def &&
+ #dlltool --def liblua.def --dllname src/lua*.dll --output-lib $INSTALLPREFIX/lib/liblua.dll.a &&
+ cp src/liblua.dll.a $INSTALLPREFIX/lib/ &&
+ cp src/lua*.dll $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*.dll $INSTALLPREFIX/bin/*.exe &&
+ ## create pkgconfig .pc file (version <= 5.1.4)
+ #mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ #sed -e "s?\(prefix= *\).*?\1$INSTALLPREFIX?" etc/lua.pc > $INSTALLPREFIX/lib/pkgconfig/lua.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

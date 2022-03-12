@@ -1,0 +1,83 @@
+export NAME="nvptx-tools"
+export STATUS=
+export URL=https://github.com/MentorEmbedded/nvptx-tools
+export BASENAME=nvptx-tools
+export DESCRIPTION="a collection of tools for use with nvptx-none GCC toolchains"
+export CATEGORY=development
+export TYPE=application
+#export VERSION=master
+#export VERSIONDATE=20180511
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+export VERSION=master
+export VERSIONDATE=20210427
+wl-showstatus --package-version
+export DEPENDANCIES=sys_wait_h
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING3
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/MentorEmbedded/nvptx-tools/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/MentorEmbedded/nvptx-tools/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing strndup/WIFSIGNALED/WTERMSIG/WCOREDUMP/WIFEXITED/WEXITSTATUS in nvptx-as.c
+patch -ulbf nvptx-as.c << EOF
+@@ -42,2 +42,14 @@
+ #include <hashtab.h>
++#ifdef _WIN32
++#include <stdlib.h>
++#include <string.h>
++char* strndup (const char *str, size_t maxlen)
++{
++  int l = strnlen(str, maxlen);
++  char* s = (char*)malloc(l + 1);
++  memcpy(s, str, l);
++  s[l] = 0;
++  return s;
++}
++#endif
+
+@@ -907,2 +919,5 @@
+   if (status)
++#ifdef _WIN32
++    return status;
++#else
+     {
+@@ -919,2 +934,3 @@
+     }
++#endif
+   return 0;
+EOF
+# fix already define sys_errlist in libiberty/strerror.c (version >= master)
+patch -ulbf libiberty/strerror.c << EOF
+@@ -472,3 +472,5 @@
+ extern int sys_nerr;
++#ifndef __MINGW32__
+ extern char *sys_errlist[];
++#endif
+
+EOF
+## fix missing files
+#mkdir -p winfix
+#touch winfix/wait.h
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX/share/nvptx-tools --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-I$(pwd)/winfix" &&
+ #./configure --prefix=$INSTALLPREFIX/share/nvptx-tools --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none CXXFLAGS="-I$(pwd)/winfix" &&
+ ./configure --prefix=$INSTALLPREFIX/share/nvptx-tools --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none CXXFLAGS="-I$MINGWPREFIX/win32ports/include" &&
+ wl-showstatus build-install &&
+ make install &&
+ # fix missing .exe extension where needed
+ ( for F in $(find $INSTALLPREFIX -name '*ar' -or -name '*as' -or -name '*ld' -or -name '*ranlib'); do mv -f $F $F.exe; done || true ) &&
+ strip $INSTALLPREFIX/share/nvptx-tools/bin/*.exe $INSTALLPREFIX/share/nvptx-tools/nvptx-none/bin/*.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: cuda support
+
+
+

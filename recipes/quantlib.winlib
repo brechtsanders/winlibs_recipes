@@ -1,0 +1,61 @@
+export NAME="QuantLib"
+export STATUS=
+export URL=https://www.quantlib.org/
+export BASENAME=quantlib
+#export DESCRIPTION="A free/open-source library for quantitative finance"
+export DESCRIPTION="The QuantLib project is aimed at providing a comprehensive software framework for quantitative finance. QuantLib is a free/open-source library for modeling, trading, and risk management in real-life."
+export CATEGORY=finance
+export TYPE=library
+#export VERSION=1.16
+#export VERSIONDATE=20190819
+export VERSION=1.21
+export VERSIONDATE=20210125
+####You should build QuantLib in STATIC mode as nothing is exported from the library.  Use BUILD_SHARED_LIBS=OFF
+wl-showstatus --package-version
+export DEPENDANCIES=boost
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=BSD-style
+#export DOWNLOADURL="https://bintray.com/quantlib/releases/QuantLib download_file?file_path=QuantLib-"
+#export DOWNLOADURL="https://bintray.com/quantlib/releases/QuantLib"
+export DOWNLOADURL="https://bintray.com/quantlib/releases/QuantLib#files download_file?file_path=QuantLib-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://bintray.com/quantlib/releases/download_file?file_path=QuantLib-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/*QuantLib-$VERSION.tar.gz
+cd QuantLib-$VERSION
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+##--disable-benchmark 
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf QuantLib-$VERSION
+# fix building shared library
+sed -i.bak -e "s/\(message(\)FATAL_ERROR\( \"You should build QuantLib in STATIC\)/\1WARNING\2/" ql/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_BOOST_DYNAMIC_LIBRARIES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_BOOST_DYNAMIC_LIBRARIES:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_BOOST_DYNAMIC_LIBRARIES:BOOL=ON -DBoost_SYSTEM_LIBRARY_RELEASE:STRING=$MINGWPREFIX/lib/libboost_system-mt.dll.a -DBoost_TIMER_LIBRARY_RELEASE:STRING=$MINGWPREFIX/lib/libboost_timer-mt.dll.a -DBoost_UNIT_TEST_FRAMEWORK_LIBRARY_RELEASE:STRING=$MINGWPREFIX/lib/libboost_unit_test_framework-mt.dll.a -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*libboost_chrono[^ ]*\.a/& /" build_shared/build.ninja &&
+ sed -i.bak -e "s/\([^ ]*libboost_[^ ]*\)\.a/\1.dll.a/g" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/ql/libQuantLib.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_shared/ql/libQuantLib.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf QuantLib-$VERSION
+####TO DO: shared benchmark fails
+
+
+

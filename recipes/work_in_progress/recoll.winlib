@@ -1,0 +1,90 @@
+export NAME="Recoll"
+export STATUS=
+export URL=https://framagit.org/medoc92/recoll
+export BASENAME=recoll
+export DESCRIPTION="Recoll is a desktop full-text search tool. It finds keywords inside documents as well as file names."
+export CATEGORY=office
+export TYPE=application
+#export VERSION=1.27.2
+#export VERSIONDATE=20200831
+#export VERSION=1.27.12
+#export VERSIONDATE=20201123
+#export VERSION=1.28.3
+#export VERSIONDATE=20210104
+#export VERSION=1.28.6
+#export VERSIONDATE=20210204
+#export VERSION=1.29.1
+#export VERSIONDATE=20210310
+#export VERSION=1.29.2
+#export VERSIONDATE=20210315
+#export VERSION=1.30.1
+#export VERSIONDATE=20210413
+#export VERSION=1.31.4
+#export VERSIONDATE=20211127
+export VERSION=1.32.0
+export VERSIONDATE=20220311
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,zlib,aspell,file,libxslt,xapian,qt,sys_wait_h
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://framagit.org/medoc92/recoll/-/tags recoll-RECOLL-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://framagit.org/medoc92/recoll/-/archive/RECOLL-$VERSION/recoll-RECOLL-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/recoll-RECOLL-$VERSION.tar.bz2
+cd recoll-RECOLL-$VERSION/src
+# fix common/conf_post.h (version >= 1.27.2)
+patch -ulbf common/conf_post.h << EOF
+@@ -34,3 +34,5 @@
+
++#ifndef __MINGW32__
+ typedef int pid_t;
++#endif
+ inline int readlink(const char *a, void *b, int c)
+@@ -45,2 +47,3 @@
+ typedef unsigned __int8 u_int8_t;
++#ifndef __MINGW64__
+ typedef int ssize_t;
+@@ -48,2 +51,3 @@
+ #define strcasecmp _stricmp
++#endif
+ #define chdir _chdir
+EOF
+# fix index/recollindex.cpp (version >= 1.27.2)
+patch -ulbf index/recollindex.cpp << EOF
+@@ -21,4 +21,4 @@
+ #include <errno.h>
+-#include <fnmatch.h>
+ #ifndef _WIN32
++#include <fnmatch.h>
+ #include <sys/time.h>
+EOF
+# fix utils/miniz.cpp (version >= 1.29.1)
+patch -ulbf utils/miniz.cpp << EOF
+@@ -3872,3 +3872,3 @@
+         return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__MINGW32__)
+     pFile = MZ_FOPENREAD(pFilename, L"rb");
+EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-qtgui --enable-recollq --without-aspell --disable-webkit --disable-webengine --without-x --disable-x11mon --disable-python-module --disable-python-chm CFLAGS="-I$(pwd)/windows -I$MINGWPREFIX/win32ports/include" CXXFLAGS="-std=c++11 -I$(pwd)/windows -I$MINGWPREFIX/win32ports/include" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf recoll-RECOLL-$VERSION
+
+
+

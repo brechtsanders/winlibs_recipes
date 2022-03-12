@@ -1,0 +1,98 @@
+export NAME="Google Cloud Platform C++ Client Libraries"
+export STATUS=
+export URL=https://github.com/googleapis/google-cloud-cpp/
+export BASENAME=google-cloud-cpp
+export DESCRIPTION="C++ client libraries for the following Google Cloud Platform services: Google Cloud BigQuery, Google Cloud Bigtable, Google Cloud IAM, Google Cloud Spanner, Google Cloud Pub/Sub, Google Cloud Storage"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.31.1
+#export VERSIONDATE=20210903
+#export VERSION=1.32.0
+#export VERSIONDATE=20211002
+#export VERSION=1.32.1
+#export VERSIONDATE=20211007
+#export VERSION=1.33.0
+#export VERSIONDATE=20211102
+#export VERSION=1.34.0
+#export VERSIONDATE=20211202
+#export VERSION=1.34.1
+#export VERSIONDATE=20211208
+#export VERSION=1.35.0
+#export VERSIONDATE=20220105
+#export VERSION=1.36.0
+#export VERSIONDATE=20220202
+#export VERSION=1.37.0
+#export VERSIONDATE=20220302
+export VERSION=1.38.0
+export VERSIONDATE=20220304
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,openssl,c-ares,protobuf,crc32c,nlohmann-json,abseil,grpc,libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/googleapis/google-cloud-cpp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/googleapis/google-cloud-cpp/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix unresolved _dupenv_s in google/cloud/internal/getenv.cc (version >= 1.31.1)
+patch -ulbf google/cloud/internal/getenv.cc << EOF
+@@ -30,3 +30,3 @@
+ absl::optional<std::string> GetEnv(char const* variable) {
+-#if _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+   // On Windows, std::getenv() is not thread-safe. It returns a pointer that
+EOF
+# fix ambiguous ExtractPageToken() in google/cloud/internal/pagination_range.h (version >= 1.31.1)
+patch -ulbf google/cloud/internal/pagination_range.h << EOF
+@@ -121,4 +121,5 @@
+     return std::move(*u.mutable_next_page_token());
+   }
++/*
+   template <typename U>
+   static constexpr auto ExtractPageToken(U& u)
+@@ -126,4 +127,5 @@
+     return std::move(u.next_page_token);
+   }
++*/
+
+   Request request_;
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;pubsub;spanner;storage" -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;logging;pubsub;spanner;storage"
+ # don't force older C++ standard and don't treat warnings as errors
+ sed -i.bak -e "s/-std=gnu++11//; s/-Werror//" build_static/build.ninja &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;pubsub;spanner;storage" -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ # don't force older C++ standard and don't treat warnings as errors
+ sed -i.bak -e "s/-std=gnu++11//; s/-Werror//" build_shared/build.ninja &&
+ wl-showstatus build &&
+ ( ninja -Cbuild_static || (
+  # fix already defined OPTIONAL
+  sed -i.bak -e "s/^\s*OPTIONAL = 1/#undef OPTIONAL\n&/" build_static/external/googleapis/google/api/field_behavior.pb.h &&
+  ninja -Cbuild_static
+ )) &&
+ wl-showstatus build &&
+ ( ninja -Cbuild_shared || (
+  # fix already defined OPTIONAL
+  sed -i.bak -e "s/^\s*OPTIONAL = 1/#undef OPTIONAL\n&/" build_shared/external/googleapis/google/api/field_behavior.pb.h &&
+  ninja -Cbuild_shared
+ )) &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: shared CURL linkage for shared build
+
+
+

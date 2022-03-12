@@ -1,0 +1,262 @@
+export NAME="WinFsp"
+export STATUS=
+export URL=http://www.secfs.net/winfsp/
+#export URL=https://github.com/billziss-gh/winfsp
+export BASENAME=winfsp
+export DESCRIPTION="WinFsp is a set of software components for Windows computers that allows the creation of user mode file systems. In this sense it is similar to FUSE (Filesystem in Userspace), which provides the same functionality on UNIX-like computers."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=1.6
+#export VERSIONDATE=20200425
+#export VERSION=1.7
+#export VERSIONDATE=20200621
+#export VERSION=1.8
+#export VERSIONDATE=20201031
+#export VERSION=1.9
+#export VERSIONDATE=20210407
+#export VERSION=1.10B2
+#export VERSIONDATE=20210614
+#export VERSION=1.10B3
+#export VERSIONDATE=20211109
+#export VERSION=1.10B4
+#export VERSIONDATE=20211126
+#export VERSION=1.10B5
+#export VERSIONDATE=20211221
+export VERSION=1.10
+export VERSIONDATE=20220107
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=License.txt
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/billziss-gh/winfsp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/billziss-gh/winfsp/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/billziss-gh/winfsp/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# avoid defining functions as both static and inline
+sed -i.bak -e "s/^static \(FORCEINLINE\)/\1/" src/shared/um/minimal.h
+sed -i.bak -e "s/^static \(__forceinline\)/\1/" src/dll/dirbuf.c
+## fix inc/winfsp/fsctl.h (version >= 1.10B2)
+#patch -ulbf inc/winfsp/fsctl.h << EOF
+#@@ -31,3 +31,5 @@
+# /* static_assert is a C++11 feature, but seems to work with C on MSVC 2015 */
+#-#if defined(WINFSP_SYS_INTERNAL) || defined(WINFSP_DLL_INTERNAL)
+#+#if defined(__MINGW32__)
+#+#define FSP_FSCTL_STATIC_ASSERT(e,m)
+#+#elif defined(WINFSP_SYS_INTERNAL) || defined(WINFSP_DLL_INTERNAL)
+# #define FSP_FSCTL_STATIC_ASSERT(e,m)    static_assert(e,m)
+#EOF
+# fix inc/winfsp/fsctl.h (version >= 1.10)
+patch -ulbf inc/winfsp/fsctl.h << EOF
+@@ -31,3 +31,5 @@
+ /* static_assert is a C++11 feature, but seems to work with C on MSVC 2015 */
+-#if defined(WINFSP_SYS_INTERNAL) || defined(WINFSP_DLL_INTERNAL)
++#if defined(__MINGW32__)
++#define FSP_FSCTL_STATIC_ASSERT(e,m)
++#elif defined(WINFSP_SYS_INTERNAL) || defined(WINFSP_DLL_INTERNAL)
+ #define FSP_FSCTL_STATIC_ASSERT(e,m)    static_assert(e,m)
+@@ -72,3 +74,7 @@
+ #define FSP_FSCTL_DEFAULT_ALIGN_UP(x)   FSP_FSCTL_ALIGN_UP(x, FSP_FSCTL_DEFAULT_ALIGNMENT)
++#if defined(__GNUC__)
++#define FSP_FSCTL_DECLSPEC_ALIGN        __attribute__((aligned(FSP_FSCTL_DEFAULT_ALIGNMENT)))
++#else
+ #define FSP_FSCTL_DECLSPEC_ALIGN        __declspec(align(FSP_FSCTL_DEFAULT_ALIGNMENT))
++#endif
+
+EOF
+# fix src/sys/meta.c (version >= 1.10)
+patch -ulbf src/sys/meta.c << EOF
+@@ -37,3 +37,8 @@
+     ULONG Size;
+-    __declspec(align(MEMORY_ALLOCATION_ALIGNMENT)) UINT8 Buffer[];
++#if defined(__GNUC__)
++    __attribute__((aligned(MEMORY_ALLOCATION_ALIGNMENT)))
++#else
++    __declspec(align(MEMORY_ALLOCATION_ALIGNMENT))
++#endif
++    UINT8 Buffer[];
+ } FSP_META_CACHE_ITEM_BUFFER;
+EOF
+# fix src/dll/fuse/library.h (version >= 1.10)
+patch -ulbf src/dll/fuse/library.h << EOF
+@@ -81,3 +81,8 @@
+     char *PosixPath;
+-    __declspec(align(MEMORY_ALLOCATION_ALIGNMENT)) UINT8 ContextBuf[];
++#if defined(__GNUC__)
++    __attribute__((aligned(MEMORY_ALLOCATION_ALIGNMENT)))
++#else
++    __declspec(align(MEMORY_ALLOCATION_ALIGNMENT))
++#endif
++    UINT8 ContextBuf[];
+ };
+@@ -106,3 +111,8 @@
+     void (*dtor)(void *);
+-    __declspec(align(MEMORY_ALLOCATION_ALIGNMENT)) UINT8 ObjectBuf[];
++#if defined(__GNUC__)
++    __attribute__((aligned(MEMORY_ALLOCATION_ALIGNMENT)))
++#else
++    __declspec(align(MEMORY_ALLOCATION_ALIGNMENT))
++#endif
++    UINT8 ObjectBuf[];
+ };
+EOF
+# fix src/sys/driver.h (version >= 1.10)
+patch -ulbf src/sys/driver.h << EOF
+@@ -1021,3 +1021,8 @@
+     FSP_FSCTL_TRANSACT_REQ_WORK_ITEM *WorkItem;
+-    __declspec(align(FSP_FSCTL_TRANSACT_REQ_ALIGNMENT)) UINT8 RequestBuf[];
++#if defined(__GNUC__)
++    __attribute__((aligned(FSP_FSCTL_TRANSACT_REQ_ALIGNMENT)))
++#else
++    __declspec(align(FSP_FSCTL_TRANSACT_REQ_ALIGNMENT))
++#endif
++    UINT8 RequestBuf[];
+ } FSP_FSCTL_TRANSACT_REQ_HEADER;
+@@ -1097,3 +1102,8 @@
+     /* align to 64 bytes */
+-    __declspec(align(64)) UINT8 EndOfStruct[];
++#if defined(__GNUC__)
++    __attribute__((aligned(64)))
++#else
++    __declspec(align(64))
++#endif
++    UINT8 EndOfStruct[];
+ } FSP_STATISTICS;
+EOF
+# fix src/shared/um/minimal.h (version >= 1.10B2)
+patch -ulbf src/shared/um/minimal.h << EOF
+@@ -78,2 +78,5 @@
+ #pragma warning(pop)
++#define memset CUSTOM_memset
++#define memcpy CUSTOM_memcpy
++#define memmove CUSTOM_memmove
+ static inline
+EOF
+# fix missing PREPARSE_DATA_BUFFER in src/dll/debug.c
+mv src/dll/debug.c src/dll/debug.c.bak &&
+echo "#include <ntdef.h>" > src/dll/debug.c &&
+cat src/dll/debug.c.bak >> src/dll/debug.c
+# fix missing PREPARSE_DATA_BUFFER in src/dll/fsop.c
+mv src/dll/fsop.c src/dll/fsop.c.bak &&
+echo "#include <ntdef.h>" > src/dll/fsop.c &&
+cat src/dll/fsop.c.bak >> src/dll/fsop.c
+# fix missing PREPARSE_DATA_BUFFER in src/dll/fuse/fuse_intf.c
+mv src/dll/fuse/fuse_intf.c src/dll/fuse/fuse_intf.c.bak &&
+echo "#include <ntdef.h>" > src/dll/fuse/fuse_intf.c &&
+cat src/dll/fuse/fuse_intf.c.bak >> src/dll/fuse/fuse_intf.c
+# fix missing PREPARSE_DATA_BUFFER in src/dll/mount.c
+mv src/dll/mount.c src/dll/mount.c.bak &&
+echo "#include <ntdef.h>" > src/dll/mount.c &&
+cat src/dll/mount.c.bak >> src/dll/mount.c
+# fix src/dll/np.c (version >= 1.10B2)
+patch -ulbf src/dll/np.c << EOF
+@@ -401,3 +401,3 @@
+     if (!CredPackAuthenticationBufferW(
+-            CRED_PACK_GENERIC_CREDENTIALS, UserName, Password, 0, &InAuthSize) &&
++            CREDUI_FLAGS_GENERIC_CREDENTIALS, UserName, Password, 0, &InAuthSize) &&
+         ERROR_INSUFFICIENT_BUFFER != GetLastError())
+@@ -416,3 +416,3 @@
+     if (!CredPackAuthenticationBufferW(
+-        CRED_PACK_GENERIC_CREDENTIALS, UserName, Password, InAuthBuf, &InAuthSize))
++        CREDUI_FLAGS_GENERIC_CREDENTIALS, UserName, Password, InAuthBuf, &InAuthSize))
+     {
+@@ -736,2 +736,3 @@
+
++#define NPAddConnection3 CUSTOM_NPAddConnection3
+ DWORD APIENTRY NPAddConnection3(HWND hwndOwner,
+EOF
+# fix src/dll/ntstatus.i (version >= 1.10B2)
+patch -ulbf src/dll/ntstatus.i << EOF
+@@ -48,3 +48,5 @@
+ case ERROR_CANT_RESOLVE_FILENAME:             return STATUS_REPARSE_POINT_NOT_RESOLVED;
++#ifdef ERROR_CANT_WAIT
+ case ERROR_CANT_WAIT:                         return STATUS_CANT_WAIT;
++#endif
+ case ERROR_CHILD_MUST_BE_VOLATILE:            return STATUS_CHILD_MUST_BE_VOLATILE;
+EOF
+# fix missing __FUNCTION__
+sed -i.bak -e "s/ __FUNCTION__ / /" src/dll/service.c
+# fix comma issue with __VA_ARGS__ when no arguments are specified in src/launcher/launchctl.c (version >= 1.10B2)
+patch -ulbf src/launcher/launchctl.c << EOF
+@@ -26,5 +26,5 @@
+
+-#define info(format, ...)               printlog(GetStdHandle(STD_OUTPUT_HANDLE), format, __VA_ARGS__)
+-#define warn(format, ...)               printlog(GetStdHandle(STD_ERROR_HANDLE), format, __VA_ARGS__)
+-#define fatal(ExitCode, format, ...)    (warn(format, __VA_ARGS__), ExitProcess(ExitCode))
++#define info(format, ...)               printlog(GetStdHandle(STD_OUTPUT_HANDLE), format, ## __VA_ARGS__)
++#define warn(format, ...)               printlog(GetStdHandle(STD_ERROR_HANDLE), format, ## __VA_ARGS__)
++#define fatal(ExitCode, format, ...)    (warn(format, ## __VA_ARGS__), ExitProcess(ExitCode))
+
+EOF
+# fix src/shared/ku/library.h (version >= 1.10B2)
+patch -ulbf src/shared/ku/library.h << EOF
+@@ -29,3 +29,5 @@
+ #include <dsgetdc.h>
+-#include <lm.h>
++#include <levmar.h>
++#include <lmcons.h>
++#include <lmapibuf.h>
+ #define _NTDEF_
+EOF
+#wl-showstatus build &&
+# touch SUCCESS &&
+# for F in $(find -name '*.c'|grep -v cyg); do
+#  echo CC $F
+#  ls -1 $F.o &> /dev/null ||
+#  #gcc -c -o $F.o $F -Iinc -Isrc -Iext -Itst/memfs -Iopt/fsext/inc -I$MINGWDIR/$RUNPLATFORM/include/ddk -D_FILE_OFFSET_BITS=64 -DSTRSAFE_NO_DEPRECATE || ( rm -f SUCCESS; false) || break
+#  g++ -c -o $F.o $F -fpermissive -Iinc -Isrc -Iext -Itst/memfs -Iopt/fsext/inc -I$MINGWDIR/$RUNPLATFORM/include/ddk -D_FILE_OFFSET_BITS=64 -DSTRSAFE_NO_DEPRECATE || ( rm -f SUCCESS; false) || break
+#  #-DWINAPI_FAMILY=WINAPI_PARTITION_DESKTOP 
+# done &&
+# ls -1 SUCCESS &> /dev/null &&
+#    echo OK
+wl-showstatus build &&
+ mkdir -p obj &&
+ touch SUCCESS &&
+ for F in $(sed -ne "s/^.*\.\.\\\\\.\.\\\\\(.*\.c\)\".*$/\1/p" build/VStudio/winfsp_dll.vcxproj); do
+  echo CC $F
+  gcc -c -o obj/$(basename -s.c $F).o $F -Iinc -Isrc -DSTRSAFE_NO_DEPRECATE -D_FILE_OFFSET_BITS=64 -D_UNICODE -DUNICODE || ( rm -f SUCCESS; false ) || break
+ done &&
+ for F in $(sed -ne "s/^.*\.\.\\\\\.\.\\\\\(.*\.rc\)\".*$/\1/p" build/VStudio/winfsp_dll.vcxproj); do
+  echo WINDRES $F
+  windres -o obj/$(basename -s.rc $F)_rc.o $F -DMyVersionWithCommas=$(echo $VERSION|tr . ,) || ( rm -f SUCCESS; false ) || break
+ done &&
+ ls -1 SUCCESS &>/dev/null &&
+ sed -e "s?/inc/?/include/?; s?-\${arch}??" src/dll/fuse/fuse.pc.in > fuse.pc &&
+ ar cr libwinfsp.a obj/*.o &&
+ gcc -shared -s -mwindows -o winfsp.dll obj/*.o -Wl,--out-implib,libwinfsp.dll.a -Wl,--output-def winfsp.def -lrpcrt4 -lcredui -lsecur32 -lversion -lnetapi32 -lwldap32 -lole32 &&
+ wl-showstatus build &&
+ mkdir -p $INSTALLPREFIX/share/winfsp/include $INSTALLPREFIX/share/winfsp/lib/pkgconfig $INSTALLPREFIX/share/winfsp/bin &&
+ cp -rf inc/* $INSTALLPREFIX/share/winfsp/include/ &&
+ cp -f *.a $INSTALLPREFIX/share/winfsp/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/share/winfsp/bin/ &&
+ cp -f *.pc $INSTALLPREFIX/share/winfsp/lib/pkgconfig/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build winfsp.sys
+
+
+
+#wl-showstatus build &&
+# mkdir -p obj_sys &&
+# touch SUCCESS &&
+# for F in $(sed -ne "s/^.*\.\.\\\\\.\.\\\\\(.*\.c\)\".*$/\1/p" build/VStudio/winfsp_sys.vcxproj); do
+#  echo CC $F
+#  gcc -c -o obj_sys/$(basename -s.c $F).o $F -Iopt/fsext/inc -Iinc -Isrc -I$MINGWDIR/$RUNPLATFORM/include/ddk $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-D_WIN64 -D_AMD64_=1 -DAMD64"; else echo "-D_X86_=1 -Di386=1 -DSTD_CALL"; fi) || ( rm -f SUCCESS; false ) || break
+# done &&
+# for F in $(sed -ne "s/^.*\.\.\\\\\.\.\\\\\(.*\.rc\)\".*$/\1/p" build/VStudio/winfsp_sys.vcxproj); do
+#  echo WINDRES $F
+#  windres -o obj_sys/$(basename -s.rc $F)_rc.o $F -DMyVersionWithCommas=$(echo $VERSION|tr . ,) || ( rm -f SUCCESS; false ) || break
+# done &&
+# ls -1 SUCCESS &>/dev/null &&
+# gcc -shared -s -mwindows -o winfsp.sys obj_sys/*.o &&
+#    echo OK
+
+
+
+

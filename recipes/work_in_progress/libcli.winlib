@@ -1,0 +1,186 @@
+export NAME="libcli"
+export STATUS=
+export URL=https://github.com/dparrish/libcli
+export BASENAME=libcli
+export DESCRIPTION="Libcli provides a shared library for including a Cisco-like command-line interface into other software. It's a telnet interface which supports command-line editing, history, authentication and callbacks for a user-definable function tree."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.9.7
+#export VERSIONDATE=20160928
+#export VERSION=1.9.8-4
+#export VERSIONDATE=20180222
+#export VERSION=1.10.0
+#export VERSIONDATE=20190725
+#export VERSION=1.10.2
+#export VERSIONDATE=20190925
+#export VERSION=1.10.3
+#export VERSIONDATE=20200228
+#export VERSION=1.10.4
+#export VERSIONDATE=20200311
+#export VERSION=1.10.5
+#export VERSIONDATE=20210209
+#export VERSION=1.10.6
+#export VERSIONDATE=20210223
+export VERSION=1.10.7
+export VERSIONDATE=20210226
+####libcli.c:2411:40: warning: implicit declaration of function 'strchrnul'
+wl-showstatus --package-version
+export DEPENDANCIES=
+#export DEPENDANCIES=pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/dparrish/libcli/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/dparrish/libcli/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/dparrish/libcli/archive/V$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/V$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of _write in libcli.c
+mv libcli.c libcli.c.bak &&
+sed -e "s/_write/MY&/g" libcli.c.bak > libcli.c
+# fix libcli.c (version >= 1.10.2)
+patch -ulbf libcli.c << EOF
+@@ -91,5 +91,5 @@
+ int regex_dummy() {
+   return 0;
+-};
++}
+ #define regfree(...) regex_dummy()
+ #define regexec(...) regex_dummy()
+@@ -1846,5 +1846,7 @@
+   struct cli_match_filter_state *state;
+   char *search_pattern = cli_get_optarg_value(cli, "search_pattern", NULL);
++#ifndef WIN32
+   char *search_flags = cli_get_optarg_value(cli, "search_flags", NULL);
++#endif
+
+   filt->filter = cli_match_filter;
+EOF
+# fix missing strndup/strchrnul in libcli.c (version >= 1.10.2)
+mv libcli.c libcli.c.bak2
+cat > libcli.c << EOF
+#include <stdlib.h>
+#include <string.h>
+#include <winsock2.h>
+static inline char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+static inline char* strchrnul (const char *str, int c)
+{
+  if (str)
+    while (*str && *str != c)
+      str++;
+  return (char*)str;
+}
+EOF
+cat libcli.c.bak2 >> libcli.c
+# fix already existing vasprintf/asprintf/fprintf in libcli.c (version >= 1.10.4)
+patch -ulbf libcli.c << EOF
+@@ -62,2 +62,3 @@
+
++#if !defined(__MINGW64_VERSION_MAJOR) || __MINGW64_VERSION_MAJOR < 8
+ int vasprintf(char **strp, const char *fmt, va_list args) {
+@@ -106,2 +107,3 @@
+ }
++#endif
+
+EOF
+## fix libcli.c (version >= 1.10.4)
+#patch -ulbf libcli.c << EOF
+#@@ -20,3 +20,3 @@
+# #include <unistd.h>
+#-#ifndef WIN32
+#+#if !defined(WIN32) || defined(__MINGW32__)
+# #include <regex.h>
+#@@ -35,2 +35,20 @@
+# #ifdef WIN32
+#+static inline char* strndup (const char *str, size_t maxlen)
+#+{
+#+  int l = strnlen(str, maxlen);
+#+  char* s = (char*)malloc(l + 1);
+#+  memcpy(s, str, l);
+#+  s[l] = 0;
+#+  return s;
+#+}
+#+static inline char* strchrnul (const char *str, int c)
+#+{
+#+  if (str)
+#+    while (*str && *str != c)
+#+      str++;
+#+  return (char*)str;
+#+}
+#+#endif
+#+
+#+#if defined(WIN32) && !defined(__MINGW32__)
+# // Stupid windows has multiple namespaces for filedescriptors, with different read/write functions required for each ..
+#@@ -179,2 +197,5 @@
+#
+#+#ifdef __MINGW32__
+#+#define _write LIBCLI_write
+#+#endif
+# static ssize_t _write(int fd, const void *buf, size_t count) {
+#EOF
+# fix clitest.c (version >= 1.10.2)
+patch -ulbf clitest.c << EOF
+@@ -5,4 +5,4 @@
+ #ifdef WIN32
+-#include <windows.h>
+ #include <winsock2.h>
++#include <windows.h>
+ #else
+@@ -440,5 +440,5 @@
+   struct sockaddr_in addr;
+-  int on = 1;
+
+ #ifndef WIN32
++  int on = 1;
+   signal(SIGCHLD, SIG_IGN);
+@@ -446,2 +446,3 @@
+ #ifdef WIN32
++  BOOL on = 1;
+   if (!winsock_init()) {
+@@ -457,3 +458,7 @@
+
++#ifndef WIN32
+   if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) {
++#else
++  if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on))) {
++#endif
+     perror("setsockopt");
+EOF
+## remove -fPIC from Makefile
+#mv Makefile Makefile.bak &&
+#sed -e "s/-fPIC//g; s/clitest$/&.exe/" Makefile.bak > Makefile
+wl-showstatus build &&
+ #make CC="gcc -DWIN32" LIBS="-Wl,--as-needed -lws2_32" -j1 &&
+ gcc -c -o libcli.o libcli.c -I. -O3 -DWIN32 &&
+ ar cru libcli.a libcli.o &&
+ ( echo EXPORTS; sed -ne "s/^[a-z_* ]*\(cli_[^( ]*\) *(.*$/\1/p" libcli.h ) > libcli.def &&
+ gcc -shared -s -mwindows -def libcli.def -o libcli.dll libcli.a -Wl,--out-implib,libcli.dll.a -lws2_32 &&
+ #gcc -shared -s -mwindows -def libcli.def -o libcli.dll libcli.a -Wl,--out-implib,libcli.dll.a -lws2_32 -lregex &&
+ #gcc -c -o clitest.o clitest.c -I. -O3 -DWIN32 &&
+ #gcc -s -o clitest.exe clitest.o libcli.dll.a -lws2_32 &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: the login/password for clitest is: fred/nerk
+
+
+

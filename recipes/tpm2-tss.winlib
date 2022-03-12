@@ -1,0 +1,75 @@
+export NAME="TPM2-TSS"
+export STATUS=
+export URL=https://tpm2-software.github.io/
+#export URL=https://github.com/tpm2-software/tpm2-tss
+export BASENAME=tpm2-tss
+export DESCRIPTION="OSS implementation of the TCG TPM2 Software Stack (TSS2)"
+export CATEGORY=security,hardware
+export TYPE=library
+#export VERSION=3.1.0
+#export VERSIONDATE=20220116
+export VERSION=3.2.0
+export VERSIONDATE=20220219
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,libdl,json,libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/tpm2-software/tpm2-tss/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/tpm2-software/tpm2-tss/releases/download/$VERSION/tpm2-tss-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/tpm2-tss-$VERSION.tar.gz
+cd tpm2-tss-$VERSION
+# fix missing strndup in src/tss2-tcti/tctildr.c
+mv src/tss2-tcti/tctildr.c src/tss2-tcti/tctildr.c.bak
+cat > src/tss2-tcti/tctildr.c << EOF
+#include <stdlib.h>
+#include <string.h>
+char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+EOF
+cat src/tss2-tcti/tctildr.c.bak >> src/tss2-tcti/tctildr.c
+# fix redefinition of SSIZE_T in src/util/io.h (version >= 3.1.0)
+patch -ulbf src/util/io.h << EOF
+@@ -12,3 +12,5 @@
+ #include <ws2tcpip.h>
++#ifndef __MINGW32__
+ typedef SSIZE_T ssize_t;
++#endif
+ #define _HOST_NAME_MAX MAX_COMPUTERNAME_LENGTH
+EOF
+# skip installing man pages
+sed -i.bak -e "s/\(@install-man:\).*$/\1/" Makefile.in
+# don't on certain errors in configure
+sed -i.bak -e "s/as_fn_error\(.*\)\(strndup function not found\|Missing required program 'groupadd'\|Missing required program 'useradd'\)/echo\1\2/" configure
+# disable stack protection
+sed -i.bak2 -e "s/\(_FORTIFY_SOURCE=\)2/\10/; s/-fstack-protector/&-DISABLE/" configure
+# don't fail if addgroup/groupadd and adduser/useradd are not found (version >= 3.2.0)
+sed -i.bak3 -e "s/as_fn_error\(.*add.* are needed\)/echo\1/" configure
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-esys --disable-fapi --disable-tcti-device --disable-tcti-mssim --enable-tcti-swtpm --disable-tcti-pcap --disable-tcti-cmd --with-crypto=ossl --without-udevrulesdir --disable-doxygen-doc CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lws2_32" &&
+ #--with-devicetests=
+ # fix building DLLs
+ sed -i.bak1 -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || ( cp -u man/man3/Tss2_TctiLdr_Initialize.3 . && mkdir -p $INSTALLPREFIX/share/man/man3 && make install-strip )) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tpm2-tss-$VERSION
+####TO DO: build tcti-tbs (Windows support)
+#gcc -c -o src/tss2-tcti/tcti-tbs.o src/tss2-tcti/tcti-tbs.c -I. -Iinclude/tss2 -Isrc
+
+
+

@@ -1,0 +1,191 @@
+export NAME="freetype2"
+export STATUS=
+#export URL=http://freetype.sourceforge.net/
+export URL=http://www.freetype.org
+export BASENAME=freetype2
+export DESCRIPTION="A Free, High-Quality, and Portable Font Engine"
+export CATEGORY=font
+export TYPE=library
+#export VERSION=2.3.5
+#export VERSION=2.3.7
+#export VERSION=2.3.9
+#export VERSION=2.3.10
+#export VERSION=2.3.11
+#export VERSION=2.3.12
+#export VERSIONDATE=20100213
+#export VERSION=2.4.0
+#export VERSIONDATE=20100713
+#export VERSION=2.4.1
+#export VERSIONDATE=20100719
+#export VERSION=2.4.2
+#export VERSIONDATE=20100809
+#export VERSION=2.4.3
+#export VERSIONDATE=20101004
+#export VERSION=2.4.4
+#export VERSIONDATE=20101202
+#export VERSION=2.4.6
+#export VERSIONDATE=20110729
+#export VERSION=2.4.7
+#export VERSIONDATE=20111018
+#export VERSION=2.4.8
+#export VERSIONDATE=20111115
+#export VERSION=2.4.9
+#export VERSIONDATE=20120309
+#export VERSION=2.4.10
+#export VERSIONDATE=20120615
+#export VERSION=2.4.11
+#export VERSIONDATE=20121220
+#export VERSION=2.4.12
+#export VERSIONDATE=20130509
+#export VERSION=2.5.0.1
+#export VERSIONDATE=20130620
+#export VERSION=2.5.1
+#export VERSIONDATE=20131125
+#export VERSION=2.5.2
+#export VERSIONDATE=20131209
+#export VERSION=2.5.3
+#export VERSIONDATE=20140307
+#export VERSION=2.5.4
+#export VERSIONDATE=20141207
+#export VERSION=2.5.5
+#export VERSIONDATE=20141231
+#export VERSION=2.6
+#export VERSIONDATE=20150610
+#export DEPENDANCIES=zlib,libpng
+#export VERSION=2.6.1
+#export VERSIONDATE=20151004
+#export VERSION=2.6.2
+#export VERSIONDATE=20151129
+#export VERSION=2.6.3
+#export VERSIONDATE=20160209
+#export VERSION=2.6.4
+#export VERSIONDATE=20160706
+#export VERSION=2.6.5
+#export VERSIONDATE=20160712
+#export VERSION=2.7
+#export VERSIONDATE=20160908
+#export VERSION=2.7.1
+#export VERSIONDATE=20161231
+#export VERSION=2.8
+#export VERSIONDATE=20170513
+#export VERSION=2.8.1
+#export VERSIONDATE=20170917
+#export VERSION=2.9
+#export VERSIONDATE=20180108
+#export VERSION=2.9.1
+#export VERSIONDATE=20180502
+#export VERSION=2.10.0
+#export VERSIONDATE=20190315
+#export VERSION=2.10.1
+#export VERSIONDATE=20190702
+#export VERSION=2.10.2
+#export VERSIONDATE=20200509
+#export VERSION=2.10.3
+#export VERSIONDATE=20201011
+#export VERSION=2.10.4
+#export VERSIONDATE=20201020
+#export VERSION=2.11.0
+#export VERSIONDATE=20210720
+export VERSION=2.11.1
+export VERSIONDATE=20211202
+####Cannot export FT_GetFilePath_From_Mac_ATS_Name: symbol not defined
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libpng,libbz2
+export OPTIONALDEPENDANCIES=harfbuzz
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake,ninja
+#export BUILDDEPENDANCIES=meson,ninja
+#export LICENSEFILE=docs/GPL.TXT
+export LICENSEFILE=docs/GPLv2.TXT
+export LICENSETYPE="GPLv2/BSD-like"
+#export DOWNLOADURL="http://download.savannah.gnu.org/releases/freetype/ freetype-"
+export DOWNLOADURL="http://sourceforge.net/projects/freetype/files/freetype2/ freetype-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-`echo $VERSION|sed -e 's/\./-/'`
+#export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/freetype/freetype-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/freetype/freetype2/`echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\.[0-9]*\)\..*$/\1/"`/freetype-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/freetype/freetype2/`echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\.[0-9]*\)\..*$/\1/"`/freetype-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/freetype-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/freetype-$VERSION.tar.xz
+cd freetype-$VERSION
+# force configure parameters
+mv builds/unix/detect.mk builds/unix/detect.mk.bak
+sed -e "s?\(configure \)\$(value CFG)?\1 --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM?" builds/unix/detect.mk.bak > builds/unix/detect.mk
+rm config.mk
+#cp $INSTALLPREFIX/bin/libfreetype-6.dll $INSTALLPREFIX/bin/freetype6.dll
+wl-showstatus configure &&
+ #./autogen.sh &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ ## fix detection of shared libraries
+ sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" builds/unix/libtool &&
+ wl-showstatus build &&
+ # fix undefined off_t
+ mv builds/unix/unix-cc.mk builds/unix/unix-cc.mk.bak &&
+ sed -e "s/ -pedantic -ansi//" builds/unix/unix-cc.mk.bak > builds/unix/unix-cc.mk &&
+ #mv builds/compiler/gcc.mk builds/compiler/gcc.mk.bak &&
+ #sed -e "s/-ansi -pedantic//" builds/compiler/gcc.mk.bak > builds/compiler/gcc.mk &&
+ #( make || make -j1 ) &&
+ ( make || make -j1 || (
+  # fix invalid exports (version >= 2.6.3)
+  mv objs/ftexport.sym objs/ftexport.sym.bak &&
+  grep -v "FT_GetFilePath_From_Mac_ATS_Name\|FT_GetFile_From_Mac_ATS_Name\|FT_GetFile_From_Mac_Name\|FT_New_Face_From_FOND\|FT_New_Face_From_FSRef\|FT_New_Face_From_FSSpec" objs/ftexport.sym.bak > objs/ftexport.sym &&
+  make
+ )) &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ make install &&
+ ## fix include path so config/ftconfig.h can be found (version >= 2.4.12 <= 2.5.0)
+ ##sed -i -e "s?\(Cflags:.*\)\(-I[^ ]*/freetype2\)?\1\2 \2/freetype?" $INSTALLPREFIX/lib/pkgconfig/freetype2.pc &&
+ #mkdir -p $INSTALLPREFIX/include/freetype2/config &&
+ #echo '#include "../freetype/config/ftheader.h"' > $INSTALLPREFIX/include/freetype2/config/ftheader.h &&
+ # fix missing freetype-config (version >= 2.9.1)
+ ( ls -1 $INSTALLPREFIX/bin/freetype-config &> /dev/null || cp -f builds/unix/freetype-config $INSTALLPREFIX/bin/ ) &&
+ # fix absolute paths in freetype-config
+ sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/freetype-config &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
+
+
+
+### fix CMakeLists.txt for building DLL
+##patch -ulbf CMakeLists.txt << EOF
+##--- CMakeLists.txt  2015-10-04 06:55:55.000000000 +0200
+##+++ CMakeLists.txt  2015-10-14 21:25:24.084724800 +0200
+##@@ -103,3 +102,0 @@
+##-if (WIN32 AND BUILD_SHARED_LIBS)
+##-  message(FATAL_ERROR "Shared libraries not supported on Windows.")
+##-endif ()
+##EOF
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
+####TO DO: also install freetype-config
+####grep % builds/unix/freetype-config.in
+
+
+
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dc_args="['-I$(cygpath -m $MINGWPREFIX/include/harfbuzz)','-I$(cygpath -m $MINGWPREFIX/include/mman-win32)']" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+# PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dharfbuzz=disabled -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+# #-Dharfbuzz=enabled 
+# echo "#undef FT_CONFIG_OPTION_USE_HARFBUZZ" >> build_both/ftoption.h &&
+# # fix invalid -R linker flag
+# sed -i.bak -e "s/\"-R/\"-L/" build_both/build.ninja &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
+####TO DO: also install freetype-config
+####grep % builds/unix/freetype-config.in
+
+
+

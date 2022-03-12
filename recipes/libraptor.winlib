@@ -1,0 +1,128 @@
+export NAME="Raptor"
+export STATUS=
+export URL=http://librdf.org/raptor/
+export BASENAME=libraptor
+export DESCRIPTION="Raptor is a free software / Open Source C library that provides a set of parsers and serializers that generate Resource Description Framework (RDF) triples by parsing syntaxes or serialize the triples into a syntax. The supported parsing syntaxes are RDF/XML, N-Triples, TRiG, Turtle, RSS tag soup including all versions of RSS, Atom 1.0 and 0.3, GRDDL and microformats for HTML, XHTML and XML and RDFa. The serializing syntaxes are RDF/XML (regular, and abbreviated), Atom 1.0, GraphViz, JSON, N-Quads, N-Triples, RSS 1.0 and XMP."
+export CATEGORY=parsing
+export TYPE=library
+#export VERSION=1.9.0
+#export VERSIONDATE=20100927
+#export VERSION=1.9.1
+#export VERSIONDATE=20101202
+#export VERSION=2.0.0
+#export VERSIONDATE=20110104
+#export VERSION=2.0.2
+#export VERSIONDATE=20110321
+#export VERSION=2.0.3
+#export VERSIONDATE=20110602
+#export VERSION=2.0.4
+#export VERSIONDATE=20110726
+#export VERSION=2.0.5
+#export VERSIONDATE=20111115
+#export VERSION=2.0.6
+#export VERSIONDATE=20111128
+#export VERSION=2.0.7
+#export VERSIONDATE=20120322
+#export VERSION=2.0.8
+#export VERSIONDATE=20120625
+#export VERSION=2.0.9
+#export VERSIONDATE=20130227
+#export VERSION=2.0.10
+#export VERSIONDATE=20130828
+#export VERSION=2.0.11
+#export VERSIONDATE=20131125
+#export VERSION=2.0.12
+#export VERSIONDATE=20131213
+#export VERSION=2.0.13
+#export VERSIONDATE=20140130
+#export VERSION=2.0.14
+#export VERSIONDATE=20140506
+export VERSION=2.0.15
+export VERSIONDATE=20141102
+wl-showstatus --package-version
+export DEPENDANCIES=libcurl,libxml2,libxslt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL/LGPL
+export DOWNLOADURL="http://download.librdf.org/source/ raptor2-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.librdf.org/source/raptor2-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/raptor2-$VERSION.tar.gz
+cd raptor2-$VERSION
+# fix missing raptor_init_parser_n3 in src/raptor_parse.c
+patch -ulbf src/raptor_parse.c << EOF
+--- src/raptor_parse.c  2010-09-27 13:11:06 +0200
++++ src/raptor_parse.c  2010-09-27 13:11:20 +0200
+@@ -95,3 +95,3 @@
+ #ifdef RAPTOR_PARSER_N3
+-  rc+= raptor_init_parser_n3(world) != 0;
++//  rc+= raptor_init_parser_n3(world) != 0;
+ #endif
+EOF
+# fix missing index function in librdfa/rdfa.c (version >= 1.9.1)
+mv librdfa/rdfa.c librdfa/rdfa.c.bak
+echo "#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})" > librdfa/rdfa.c
+cat librdfa/rdfa.c.bak >> librdfa/rdfa.c
+# fix missing qsort_r in src/sort_r.h on MinGW-W64 (version 2.0.15)
+if gcc --version|grep -q MinGW-W64; then
+patch -ulbf src/sort_r.h << EOF
+--- src/sort_r.h  2014-10-10 01:00:44 +0200
++++ src/sort_r.h  2014-11-02 21:13:20 +0100
+@@ -27,7 +27,7 @@
+      defined AMIGA)
+ #  define _SORT_R_BSD
+ #elif (defined _GNU_SOURCE || defined __gnu_hurd__ || defined __GNU__ || \\
+-       defined __linux__ || defined __MINGW32__ || defined __GLIBC__)
++       defined __linux__ || defined __GLIBC__) && !defined __MINGW32__
+ #  define _SORT_R_LINUX
+ #elif (defined _WIN32 || defined _WIN64 || defined __WINDOWS__)
+ #  define _SORT_R_WINDOWS
+@@ -61,7 +61,7 @@
+ #else /* !NESTED_QSORT */
+
+   /* Declare structs and functions */
+-  #if defined _SORT_R_BSD
++  #if !defined _SORT_R_LINUX
+
+     /* BSD requires argument swap */
+     extern void qsort_r(void *base, size_t nel, size_t width, void *thunk,
+@@ -79,7 +79,7 @@
+       return (ss->compar)(a, b, ss->arg);
+     }
+
+-  #elif defined _SORT_R_LINUX
++  #else
+
+     typedef int(* __compar_d_fn_t)(const void *, const void *, void *);
+     extern void qsort_r(void *base, size_t nel, size_t width,
+EOF
+fi
+# skip making tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+cp -f tests/Makefile.in tests/Makefile.am
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+fi
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,--compat-implib -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,--compat-implib -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ echo "#define strtok_r(_s,_sep,_lasts) (*(_lasts) = strtok((_s), (_sep)))" >> librdfa/rdfa_utils.h &&
+ make install-strip install-pkgconfigDATA &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf raptor2-$VERSION
+
+
+

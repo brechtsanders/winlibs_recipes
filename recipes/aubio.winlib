@@ -1,0 +1,136 @@
+#export NAME="aubio"
+#export STATUS=
+#export URL=http://aubio.org/
+#export BASENAME=aubio
+#export DESCRIPTION="aubio is a tool designed for the extraction of annotations from audio signals. Its features include segmenting a sound file before each of its attacks, performing pitch detection, tapping the beat and producing midi streams from live audio."
+#export CATEGORY=audio
+#export TYPE=library
+#export VERSION=0.3.2
+#export VERSIONDATE=20131115
+#wl-showstatus --package-version
+#export DEPENDANCIES=libsndfile,libsamplerate,fftw
+#export OPTIONALDEPENDANCIES=jack,puredata
+#export BUILDDEPENDANCIES=pexports
+##export BUILDDEPENDANCIES=pexports,doxygen
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="http://aubio.org/download"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://aubio.org/pub/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix python/aubio/aubio_wrap.c for 64-bit
+#pexports $PYDIR/python[0-9][0-9].dll|grep -q Py_InitModule4_64 && (
+#mv python/aubio/aubio_wrap.c python/aubio/aubio_wrap.c.bak
+#cat > python/aubio/aubio_wrap.c << EOF
+#//#ifdef __MINGW64__
+##define Py_InitModule4 Py_InitModule4_64
+#//#endif
+#EOF
+#cat python/aubio/aubio_wrap.c.bak >> python/aubio/aubio_wrap.c
+#)
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# ( autoreconf -f -i -I $MINGWPREFIX/share/aclocal || (
+#  libtoolize -f -i &&
+#  aclocal-1.10 --force -I $MINGWPREFIX/share/aclocal &&
+#  autoheader -f &&
+#  autoconf -f -I $MINGWPREFIX/share/aclocal &&
+#  automake-1.10 -a -c
+# ))
+#fi
+## skip making plugins/puredata (missing libpd)
+#mv plugins/puredata/Makefile.in plugins/puredata/Makefile.in.bak
+#cat > plugins/puredata/Makefile.in << EOF
+#clean:
+#all:
+#install:
+#install-strip:
+#EOF
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PYDIR/include" LDFLAGS="-L$PYDIR/libs" &&
+# wl-showstatus build-install &&
+# ## fix building DLLs on 64-bit
+# #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# # mv libtool libtool.bak &&
+# # sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool
+# #fi &&
+# PATH=$PYDIR:$PATH SWIG_LIB=$MINGWPREFIX/share/swig/$(swig -version|sed -n -e "s/^.*Version \([0-9.]*.*\)$/\1/p") make -j1 install-strip PYTHON_VERSION=$(ls -1 =/libs/libpython*.a|sed -e "s/^.*libpython\([0-9]*\)\.a/\1/") PYTHON=$PYDIR/python.exe &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="aubio"
+export STATUS=
+export URL=http://aubio.org/
+export BASENAME=aubio
+export DESCRIPTION="aubio is a tool designed for the extraction of annotations from audio signals. Its features include segmenting a sound file before each of its attacks, performing pitch detection, tapping the beat and producing midi streams from live audio."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=0.4.0
+#export VERSIONDATE=20131218
+#export VERSION=0.4.1
+#export VERSIONDATE=20140313
+#export VERSION=0.4.2
+#export VERSIONDATE=20150811
+#export VERSION=0.4.3
+#export VERSIONDATE=20160826
+#export VERSION=0.4.4
+#export VERSIONDATE=20170109
+#export VERSION=0.4.5
+#export VERSIONDATE=20170411
+#export VERSION=0.4.6
+#export VERSIONDATE=20171007
+export VERSION=0.4.7
+export VERSIONDATE=20181003
+wl-showstatus --package-version
+export DEPENDANCIES=libsndfile,libsamplerate,fftw
+export OPTIONALDEPENDANCIES=jack,puredata
+export BUILDDEPENDANCIES=
+#export BUILDDEPENDANCIES=doxygen
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://aubio.org/download"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://aubio.org/pub/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix missing strnlen in src/io/sink_sndfile.c (version = 0.4.3)
+#if ( ! gcc --version | grep -q "MinGW-W64" ); then
+# for F in src/synth/sampler.c src/io/sink_sndfile.c src/io/sink_wavwrite.c src/io/source_sndfile.c src/io/source_wavread.c; do
+#  mv $F $F.bak &&
+#  echo "#define strnlen(a,b) MIN(strlen(a),b)" > $F &&
+#  cat $F.bak >> $F
+# done
+#fi
+# fix missing pause in examples/utils.c (version >= 0.4.6)
+sed -i.bak -e "s/pause *()/Sleep (10000)/g" examples/utils.c
+#wl-showstatus configure &&
+##PATH=$PYDIR:$PATH ./waf configure --prefix=$INSTALLPREFIX --destdir=$INSTALLPREFIX &&
+#WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $(which waf) configure --prefix=$INSTALLPREFIX --destdir=$INSTALLPREFIX &&
+# wl-showstatus build &&
+# PATH=$PYDIR:$PATH ./waf build &&
+# wl-showstatus build-install &&
+# PATH=$PYDIR:$PATH ./waf install &&
+#    echo OK
+# fix invalid detection of Doxygen
+mv wscript wscript.bak &&
+sed -e "s/'doxygen/&.exe/" wscript.bak > wscript
+#DOXYGEN="$(which doxygen.exe)" WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf configure build install --prefix=$INSTALLPREFIX &&
+wl-showstatus configure &&
+ CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf configure --prefix=$INSTALLPREFIX &&
+ wl-showstatus build-install &&
+ CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf build install &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ # replace backslash(es) with forward slash(es) in .pc file
+ sed -i -e 's?\\?/?g' $INSTALLPREFIX/lib/pkgconfig/*.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

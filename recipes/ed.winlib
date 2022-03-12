@@ -1,0 +1,135 @@
+export NAME="Ed"
+export STATUS=
+export URL=https://www.gnu.org/software/ed/
+export BASENAME=ed
+export DESCRIPTION="GNU ed is a line-oriented text editor. It is used to create, display, modify and otherwise manipulate text files, both interactively and via shell scripts."
+export CATEGORY=editor
+export TYPE=application
+#export VERSION=1.12
+#export VERSIONDATE=20160211
+#export VERSION=1.13
+#export VERSIONDATE=20160212
+#export VERSION=1.14
+#export VERSIONDATE=20170107
+#export VERSION=1.14.1
+#export VERSIONDATE=20170110
+#export VERSION=1.14.2
+#export VERSIONDATE=20170223
+#export VERSION=1.15
+#export VERSIONDATE=20190102
+#export VERSION=1.16
+#export VERSIONDATE=20200221
+#export VERSION=1.17
+#export VERSIONDATE=20210112
+export VERSION=1.18
+export VERSIONDATE=20220205
+####signal.c:27:21: fatal error: termios.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=lzip
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/ed/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/ed/$BASENAME-$VERSION.tar.lz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfa $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.lz
+cd $BASENAME-$VERSION
+patch -ulbf signal.c << EOF
+--- signal.c  2017-01-06 02:06:04.000000000 +0100
++++ signal.c  2017-04-10 23:14:48.560731300 +0200
+@@ -25,7 +25,11 @@
+ #include <stdlib.h>
+ #include <string.h>
++#ifndef _WIN32
+ #include <termios.h>
++#endif
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+
+ #include "ed.h"
+@@ -70,4 +74,5 @@
+
+
++#ifndef _WIN32
+ static void sigint_handler( int signum )
+   {
+@@ -83,4 +88,5 @@
+     }
+   }
++#endif
+
+
+@@ -103,4 +109,7 @@
+ static int set_signal( const int signum, void (*handler)( int ) )
+   {
++#ifdef _WIN32
++  return -1;
++#else
+   struct sigaction new_action;
+
+@@ -113,4 +122,5 @@
+ #endif
+   return sigaction( signum, &new_action, 0 );
++#endif
+   }
+
+@@ -121,6 +131,8 @@
+     {
+     mutex = 0;
++#ifndef _WIN32
+     if( sighup_pending ) sighup_handler( SIGHUP );
+     if( sigint_pending ) sigint_handler( SIGINT );
++#endif
+     }
+   }
+@@ -132,4 +144,5 @@
+ void set_signals( void )
+   {
++#ifndef _WIN32
+ #ifdef SIGWINCH
+   sigwinch_handler( SIGWINCH );
+@@ -139,4 +152,5 @@
+   set_signal( SIGQUIT, SIG_IGN );
+   set_signal( SIGINT, sigint_handler );
++#endif
+   }
+
+EOF
+patch -ulbf buffer.c << EOF
+--- buffer.c  2017-01-06 02:06:04.000000000 +0100
++++ buffer.c  2017-04-10 23:22:56.400790100 +0200
+@@ -393,4 +393,7 @@
+ int path_max( const char * filename )
+   {
++#ifdef _WIN32
++  return 256;
++#else
+   long result;
+   if( !filename ) filename = "/";
+@@ -400,4 +403,5 @@
+   else if( result < 256 ) result = 256;
+   return result;
++#endif
+   }
+
+EOF
+sed -i.bak -e "s/\(\$(LDFLAGS)\) \(.*\)$/\2 \1/" Makefile.in
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX &&
+ wl-showstatus build &&
+ #make &&
+ #make CC="gcc -D_PC_PATH_MAX=255" LDFLAGS="-Wl,--as-needed -lregex" &&
+ make LDFLAGS="-Wl,--as-needed -lregex" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

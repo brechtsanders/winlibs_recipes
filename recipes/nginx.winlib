@@ -1,0 +1,92 @@
+export NAME="NGINX"
+export STATUS=
+export URL=http://nginx.org/en/
+export BASENAME=nginx
+export DESCRIPTION="nginx [engine x] is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server, originally written by Igor Sysoev."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.11.7
+#export VERSIONDATE=20161219
+#export VERSION=1.19.5
+#export VERSIONDATE=20201124
+#export VERSION=1.19.6
+#export VERSIONDATE=20201216
+#export VERSION=1.19.7
+#export VERSIONDATE=20210217
+#export VERSION=1.19.8
+#export VERSIONDATE=20210310
+#export VERSION=1.19.9
+#export VERSIONDATE=20210331
+#export VERSION=1.19.10
+#export VERSIONDATE=20210414
+#export VERSION=1.20.0
+#export VERSIONDATE=20210421
+#export VERSION=1.20.1
+#export VERSIONDATE=20210526
+#export VERSION=1.21.0
+#export VERSIONDATE=20210526
+#export VERSION=1.21.1
+#export VERSIONDATE=20210707
+#export VERSION=1.21.2
+#export VERSIONDATE=20210901
+#export VERSION=1.21.3
+#export VERSIONDATE=20210908
+#export VERSION=1.21.5
+#export VERSIONDATE=20220122
+export VERSION=1.21.6
+export VERSIONDATE=20220126
+wl-showstatus --package-version
+export DEPENDANCIES=pcre,zlib,openssl,libatomic_ops
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=docs/text/LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="http://nginx.org/en/download.html"
+#export DOWNLOADURL="http://nginx.org/download/"
+#export DOWNLOADURL="https://github.com/nginx/nginx/releases"
+export DOWNLOADURL="https://github.com/nginx/nginx/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://nginx.org/download/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/nginx/nginx/archive/release-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/nginx/nginx/archive/refs/tags/release-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/release-$VERSION.tar.gz
+cd nginx-release-$VERSION
+# set up fake dependancy folder
+mkdir -p fake_deps/.libs fake_deps/src
+cat > fake_deps/Makefile.in << EOF
+clean:
+distclean:
+all:
+install:
+install-strip:
+EOF
+echo '#!/bin/sh' > fake_deps/configure
+echo 'cp -f Makefile.in Makefile' >> fake_deps/configure
+mkdir -p fake_deps/win32
+touch fake_deps/win32/Makefile.gcc
+cp -f $MINGWPREFIX/lib/libz.dll.a fake_deps/libz.a
+cp -f $MINGWPREFIX/lib/libpcre.dll.a fake_deps/.libs/libpcre.a
+cp -f $MINGWPREFIX/lib/libpcre.la fake_deps/
+cp -f $MINGWPREFIX/lib/libatomic_ops.dll.a fake_deps/src/libatomic_ops.a
+## fix missing files 
+#mkdir -p src/os/win32
+#cp -f src/os/unix/* src/os/win32/
+#cp -u src/os/unix/ngx_posix_config.h src/os/win32/ngx_win32_config.h
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --with-cc=gcc --with-pcre=$MINGWPREFIX --with-zlib=$MINGWPREFIX --with-openssl=$MINGWPREFIX --with-libatomic=$MINGWPREFIX &&
+ #auto/configure --prefix=$INSTALLPREFIX --with-cc=gcc --with-pcre=$MINGWPREFIX --with-zlib=$MINGWPREFIX --with-openssl=$MINGWPREFIX --with-libatomic=$MINGWPREFIX &&
+ auto/configure --prefix=$INSTALLPREFIX --with-cc=gcc --with-pcre=$(pwd)/fake_deps --with-zlib=$(pwd)/fake_deps --with-openssl=$(pwd)/fake_deps --with-libatomic=$(pwd)/fake_deps &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf nginx-release-$VERSION
+
+
+

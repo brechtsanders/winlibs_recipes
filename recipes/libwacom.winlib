@@ -1,0 +1,196 @@
+#export NAME="libwacom"
+#export STATUS=
+#export URL=https://github.com/linuxwacom/libwacom
+#export BASENAME=libwacom
+#export DESCRIPTION="Libwacom is a library to help implement Wacom tablet settings. It is intended to be used by client-programs that need model identification."
+#export CATEGORY=hardware
+#export TYPE=library
+##export VERSION=0.33
+##export VERSIONDATE=20190509
+##export VERSION=1.0
+##export VERSIONDATE=20190826
+##export VERSION=1.1
+##export VERSIONDATE=20190916
+##export VERSION=1.2
+##export VERSIONDATE=20191223
+##export VERSION=1.3
+##export VERSIONDATE=20200325
+#####No package 'gudev-1.0' found
+##export VERSION=1.4
+##export VERSIONDATE=20200624
+##export VERSION=1.4.1
+##export VERSIONDATE=20200630
+##export VERSION=1.5
+##export VERSIONDATE=20200831
+##export VERSION=1.6
+##export VERSIONDATE=20201103
+##export VERSION=1.7
+##export VERSIONDATE=20201217
+#####ccQERBDJ.s:18: Error: unknown pseudo-op: `.symver'
+##export VERSION=1.8
+##export VERSIONDATE=20210129
+##export VERSION=1.9
+##export VERSIONDATE=20210224
+##export VERSION=1.10
+##export VERSIONDATE=20210428
+##export VERSION=1.11
+##export VERSIONDATE=20210716
+##export VERSION=1.12
+##export VERSIONDATE=20210901
+#export VERSION=1.12.1
+#export VERSIONDATE=20220117
+##export VERSION=1.99.1
+##export VERSIONDATE=20211213
+##export VERSION=2.0.0
+##export VERSIONDATE=20220117
+#####tools_list-devices.c.obj:list-devices.c:(.text+0x143): undefined reference to `dprintf'
+#wl-showstatus --package-version
+#export DEPENDANCIES=gudev,glib2,gettext
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/linuxwacom/libwacom/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/linuxwacom/libwacom/releases/download/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.bz2
+##export DOWNLOADSOURCEURL=https://github.com/linuxwacom/libwacom/releases/download/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+##tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## avoid scandir() in libwacom/libwacom-database.c (version >= 1.4)
+#####TO DO: replace with proper scandir() implementation
+#mv libwacom/libwacom-database.c libwacom/libwacom-database.c.bak &&
+#echo "#define scandir(dirp,namelist,filter,compar) -1" > libwacom/libwacom-database.c &&
+#cat libwacom/libwacom-database.c.bak >> libwacom/libwacom-database.c
+## avoid scandir() in tools/list-local-devices.c (version >= 1.5)
+#####TO DO: replace with proper scandir() implementation
+#mv tools/list-local-devices.c tools/list-local-devices.c.bak &&
+#echo "#define scandir(dirp,namelist,filter,compar) -1" > tools/list-local-devices.c &&
+#cat tools/list-local-devices.c.bak >> tools/list-local-devices.c
+## fix missing dprintf in (version >= 1.5)
+#cat > mingw_dprintf.c << EOF
+##include <stdlib.h>
+##include <stdio.h>
+##include <string.h>
+##include <io.h>
+##include <stdarg.h>
+#static void dprintf (int fd, const char* fmt, ...)
+#{
+#  size_t buflen;
+#  va_list args;
+#  va_start(args, fmt);
+#  if ((buflen = vsnprintf(NULL, 0, fmt, args)) >= 0) {
+#    char* buf = (char*)malloc(buflen + 1);
+#    vsnprintf(buf, buflen + 1, fmt, args);
+#    write(fd, buf, buflen);
+#    free(buf);
+#  }
+#  va_end(args);
+#}
+#EOF
+#mv libwacom/libwacom.c libwacom/libwacom.c.bak &&
+#echo "#include \"../mingw_dprintf.c\"" > libwacom/libwacom.c &&
+#cat libwacom/libwacom.c.bak >> libwacom/libwacom.c
+#mv tools/list-local-devices.c tools/list-local-devices.c.bak &&
+#echo "#include \"../mingw_dprintf.c\"" > tools/list-local-devices.c &&
+#cat tools/list-local-devices.c.bak >> tools/list-local-devices.c
+## avoid error: unknown pseudo-op: `.symver' in libwacom/libwacom-deprecated.c (version >= 1.4.1)
+#####https://sourceforge.net/p/mingw/mailman/mingw-users/thread/20021204023256.GC20386@redhat.com/
+#sed -i.bak -e "s?asm(\"\.symver?//&?" libwacom/libwacom-deprecated.c
+### avoid building test
+##cat > test/Makefile.in << EOF
+##clean:
+##all:
+##install:
+##install-strip:
+##EOF
+## avoid gudev dependancy
+#sed -i.bak -e "s/ gudev-1\.0//g" configure
+#wl-showstatus configure &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM PYTHON=$PYDIR/python.exe CFLAGS="$(pkg-config --cflags gudev-1.0) -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed $(pkg-config --libs gudev-1.0) -ldl" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM PYTHON=$PYDIR/python.exe CFLAGS="$(pkg-config --cflags gudev-1.0)" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed $(pkg-config --libs gudev-1.0)" &&
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# #wl-showstatus build &&
+# #make &&
+# wl-showstatus build-install &&
+# #( make install-strip || ( make -Clibwacom install-strip && make install-pkgconfigDATA && make -Cdata install-strip && make -Cdoc install-strip )) &&
+# ( make install-strip || ( make -Clibwacom install-strip && make install-pkgconfigDATA && make install-data && make -Cdoc install-strip )) &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####See also: https://github.com/qzed/libwacom-surface
+#####TO DO: also install tools and compile tests
+#####TO DO: test if functional (probably not due to missing udev on Windows)
+
+
+
+export NAME="libwacom"
+export STATUS=
+export URL=https://github.com/linuxwacom/libwacom
+export BASENAME=libwacom
+export DESCRIPTION="Libwacom is a library to help implement Wacom tablet settings. It is intended to be used by client-programs that need model identification."
+export CATEGORY=hardware
+export TYPE=library
+#export VERSION=2.0.0
+#export VERSIONDATE=20220117
+export VERSION=2.1.0
+export VERSIONDATE=20220211
+wl-showstatus --package-version
+export DEPENDANCIES=gudev,glib2,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/linuxwacom/libwacom/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/linuxwacom/libwacom/releases/download/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing EXIT_FAILURE in tools/list-devices.c (version >= 1.99.1)
+mv tools/list-devices.c tools/list-devices.c.bak &&
+echo "#include <stdlib.h>" > tools/list-devices.c &&
+cat tools/list-devices.c.bak >> tools/list-devices.c
+# fix missing dprintf in tools/list-devices.c (version >= 1.99.1)
+sed -i.bak3 -e "s/dprintf(STDOUT_FILENO, /printf(/" tools/list-devices.c
+# fix detection of Python
+sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+# fix missing dprintf in (version >= 1.5)
+cat > mingw_dprintf.c << EOF
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <io.h>
+#include <stdarg.h>
+static void dprintf (int fd, const char* fmt, ...)
+{
+  size_t buflen;
+  va_list args;
+  va_start(args, fmt);
+  if ((buflen = vsnprintf(NULL, 0, fmt, args)) >= 0) {
+    char* buf = (char*)malloc(buflen + 1);
+    vsnprintf(buf, buflen + 1, fmt, args);
+    write(fd, buf, buflen);
+    free(buf);
+  }
+  va_end(args);
+}
+EOF
+mv libwacom/libwacom.c libwacom/libwacom.c.bak &&
+echo "#include \"../mingw_dprintf.c\"" > libwacom/libwacom.c &&
+cat libwacom/libwacom.c.bak >> libwacom/libwacom.c
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Ddocumentation=disabled -Dtests=disabled . build_both &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####See also: https://github.com/qzed/libwacom-surface
+####TO DO: also install tools and compile tests
+####TO DO: test if functional (probably not due to missing udev on Windows)

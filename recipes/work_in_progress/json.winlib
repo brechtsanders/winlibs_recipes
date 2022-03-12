@@ -1,0 +1,142 @@
+export NAME="JSON-C"
+export STATUS=
+#export URL=http://oss.metaparadigm.com/json-c/
+export URL=https://github.com/json-c/json-c
+export BASENAME=json
+export DESCRIPTION="JSON-C implements a reference counting object model that allows you to easily construct JSON objects in C, output them as JSON formatted strings and parse JSON formatted strings back into the C representation of JSON objects."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=0.9
+#export VERSIONDATE=20120313
+#export VERSION=0.12-20140410
+#export VERSIONDATE=20140618
+#export VERSION=0.12.1-20160607
+#export VERSIONDATE=20160607
+#export VERSION=0.13-20171207
+#export VERSIONDATE=20171208
+#export VERSION=0.13.1-20180305
+#export VERSIONDATE=20180306
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export VERSION=0.14-20200419
+#export VERSIONDATE=20200419
+export VERSION=0.15-20200726
+export VERSIONDATE=20200727
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+#export BUILDDEPENDANCIES=cmake,ninja,doxygen
+export LICENSEFILE=COPYING
+export LICENSETYPE=MIT
+#export DOWNLOADURL="http://oss.metaparadigm.com/json-c/ json-c-"
+#export DOWNLOADURL="https://github.com/json-c/json-c/releases json-c-"
+export DOWNLOADURL="https://github.com/json-c/json-c/tags json-c-"
+#export DOWNLOADURL="https://s3.amazonaws.com/json-c_releases/releases/index.html json-c-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://oss.metaparadigm.com/json-c/json-c-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/json-c/json-c/archive/json-c-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/json-c/json-c/archive/refs/tags/json-c-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://s3.amazonaws.com/json-c_releases/releases/json-c-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/json-c-$VERSION $TARBALLDIR/$BASENAME/json-c-$VERSION.tar.gz
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/json-c-$VERSION.tar.gz
+cd json-c*$VERSION
+## fix missing strncasecmp in json_tokener.c (version <= 0.9)
+#patch -ulbf json_tokener.c << EOF
+#--- json_tokener.c  2009-07-31 04:10:16 +0200
+#+++ json_tokener.c  2013-11-20 10:52:56 +0100
+#@@ -31,3 +31,3 @@
+#
+#-#if !HAVE_STRNCASECMP && defined(_MSC_VER)
+#+#if !HAVE_STRNCASECMP && (defined(_MSC_VER) || defined(__MINGW32__))
+#   /* MSC has the version as _strnicmp */
+#EOF
+## fix missing strncasecmp in json_tokener.c (version >= 0.13-20171207 <= 0.13.1-20180305)
+#if ! gcc --version | grep -q MinGW-W64; then
+#patch -ulbf json_tokener.c << EOF
+#@@ -45,3 +45,5 @@
+#
+#-#if !HAVE_STRNCASECMP && defined(_MSC_VER)
+#+#if defined(__MINGW32__)
+#+# define strncasecmp _strnicmp
+#+#elif !HAVE_STRNCASECMP && defined(_MSC_VER)
+#   /* MSC has the version as _strnicmp */
+#EOF
+#fi
+## fix missing _strtoi64 in json_util.c (version >= 0.13-20171207 <= 0.13.1-20180305)
+#if ! gcc --version | grep -q MinGW-W64; then
+#patch -ulbf json_util.c << EOF
+#@@ -41,3 +41,3 @@
+# #ifdef WIN32
+#-# if MSC_VER < 1800
+#+# if MSC_VER < 1800 && !defined(__MINGW32__)
+# /* strtoll is available only since Visual Studio 2013 */
+#EOF
+#fi
+## fix unused variable size in json_tokener.c (version >= 0.12 <= 0.13.1-20180305)
+#patch -ulbf json_tokener.c << EOF
+#--- json_tokener.c  2014-04-11 04:35:46.000000000 +0200
+#+++ json_tokener.c  2014-06-18 21:31:20.000000000 +0200
+#@@ -353,10 +353,10 @@
+#     case json_tokener_state_inf: /* aka starts with 'i' */
+#       {
+#-       int size;
+#+       //int size;
+#        int size_inf;
+#        int is_negative = 0;
+#
+#        printbuf_memappend_fast(tok->pb, &c, 1);
+#-       size = json_min(tok->st_pos+1, json_null_str_len);
+#+       //size = json_min(tok->st_pos+1, json_null_str_len);
+#        size_inf = json_min(tok->st_pos+1, json_inf_str_len);
+#        char *infbuf = tok->pb->buf;
+#EOF
+## remove invalid #pragma from random_seed.c (version >= 0.12 <= 0.13.1-20180305)
+#mv random_seed.c random_seed.c.bak
+#cat > random_seed.c << EOF
+##include <windows.h>
+##include <wincrypt.h>
+#EOF
+#sed -e "s?\(#pragma\)?//\1?" random_seed.c.bak >> random_seed.c
+## remove -Wall to continue building on warnings
+#mv Makefile.in Makefile.in.bak
+#sed -e "s/-Wall//" Makefile.in.bak > Makefile.in
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# wl-showstatus build-install &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# ## fix error: undefined reference to `__sync_val_compare_and_swap_4'
+# #make -j1 CC="gcc -march=i686" &&
+# ( make install-strip || make install-strip CC="gcc -Wno-error=implicit-fallthrough" ) &&
+# cp -f json_object_private.h $INSTALLPREFIX/include/json-c/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf json-c*$VERSION
+# fix linkhash.h (version >= 0.15-20200726)
+patch -ulbf linkhash.h << EOF
+@@ -331,6 +331,3 @@
+  */
+-static _LH_INLINE unsigned long lh_get_hash(const struct lh_table *t, const void *k)
+-{
+-       return t->hash_fn(k);
+-}
++#define lh_get_hash(t, k) (t)->hash_fn(k)
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf json-c*$VERSION
+
+
+

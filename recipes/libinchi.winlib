@@ -1,0 +1,42 @@
+export NAME="InChI"
+export STATUS=
+export URL=http://www.inchi-trust.org/
+export BASENAME=libinchi
+export DESCRIPTION="The InChI Trust is a nonprofit charity which works to develop and promote the use of the IUPAC InChI open-source chemical structure representation algorithm."
+export CATEGORY=science
+export TYPE=library
+export VERSION=1.05
+export VERSIONDATE=20171122
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENCE
+export LICENSETYPE=
+export DOWNLOADURL="http://www.inchi-trust.org/downloads/ INCHI- -SRC.zip"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.inchi-trust.org/download/$(echo $VERSION|sed -e "s/\.//g")/INCHI-$(echo $VERSION|sed -e "s/\..*$//g")-SRC.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/INCHI-$(echo $VERSION|sed -e "s/\..*$//g")-SRC.zip $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip
+wl-wait4deps
+wl-showstatus extract
+#unzip -oq $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.zip
+unzip -oq $TARBALLDIR/$BASENAME/INCHI-$(echo $VERSION|sed -e "s/\..*$//g")-SRC.zip
+cd INCHI-$(echo $VERSION|sed -e "s/\..*$//g")-SRC
+sed -e "s/\.so\$(VERSION)/.dll/g; s/-soname,\([^ ]*\).so[^ ]*/--out-implib,\1.dll.a -s/; s/ln -fs *\([^ .]*\).*$/ar cru \1.a \$(INCHI_LIB_OBJS)/; s/^\$(INCHI_LIB_PATHNAME)\.so\$(MAIN_VERSION)$//" INCHI_API/libinchi/gcc/makefile > INCHI_API/libinchi/gcc/makefile.mingw
+# avoid -fPIC (useless on Windows and not supported by clang) and invalid linker flag --version-script in INCHI_API/libinchi/gcc/makefile.mingw
+sed -i.bak -e "s/-fPIC//; s/,--version-script=[^ ]*//" INCHI_API/libinchi/gcc/makefile.mingw
+wl-showstatus build &&
+ make -C INCHI_API/libinchi/gcc -f makefile.mingw ISLINUX=0 LINUX_Z_RELRO= &&
+ make -C INCHI_EXE/inchi-1/gcc &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f INCHI_BASE/src/inchi_api.h INCHI_BASE/src/ixa.h $INSTALLPREFIX/include/ &&
+ cp -f INCHI_API/libinchi/gcc/*.a $INSTALLPREFIX/lib/ &&
+ cp -f INCHI_API/bin/Linux/*.dll INCHI_EXE/bin/Linux/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf INCHI-$(echo $VERSION|sed -e "s/\..*$//g")-SRC
+####Note: actually version 1.05
+
+
+

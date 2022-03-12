@@ -1,0 +1,48 @@
+export NAME="Shogun"
+export STATUS=
+export URL=https://www.shogun-toolbox.org/
+export BASENAME=shogun
+export DESCRIPTION="Shogun is and open-source machine learning library that offers a wide range of efficient and unified machine learning methods."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=6.1.4
+export VERSIONDATE=20210826
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libbz2,xz,snappy,lzo,nlopt,json,eigen,libcurl,khronos-opencl-icd-loader,viennacl,glpk,colpack,arpack-ng,protobuf,libxml2,ctags,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja,doxygen
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD/GPL
+export DOWNLOADURL="https://github.com/shogun-toolbox/shogun/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/shogun-toolbox/shogun/archive/refs/tags/shogun_$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/shogun_$VERSION.tar.gz
+cd shogun-shogun_$VERSION
+# fix src/shogun/base/progress.h
+sed -i.bak -e "s/\(#ifdef \)\(WIN32\)/\1_\2/" src/shogun/base/progress.h
+# fix src/shogun/lib/Time.h (version >= 6.1.4)
+patch -ulbf src/shogun/lib/Time.h << EOF
+@@ -23,3 +23,5 @@
+
+-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
++#ifdef __MINGW32__
++#include <sys/time.h>
++#elif defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
+
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBSHOGUN_BUILD_STATIC:BOOL=ON -DLICENSE_GPL_SHOGUN:BOOL=OFF -DUSE_SVMLIGHT:BOOL=OFF -DINTERFACE_PYTHON:BOOL=OFF -DINTERFACE_OCTAVE:BOOL=OFF -DINTERFACE_JAVA:BOOL=OFF -DINTERFACE_PERL:BOOL=OFF -DINTERFACE_RUBY:BOOL=OFF -DINTERFACE_CSHARP:BOOL=OFF -DINTERFACE_R:BOOL=OFF -DINTERFACE_LUA:BOOL=OFF -DINTERFACE_SCALA:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_META_EXAMPLES:BOOL=OFF -DCURL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/curl -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_CXX_FLAGS:STRING="-DWIN32 -I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ CPLUS_INCLUDE_PATH=$MINGWPREFIX/include/mman-win32:$CPLUS_INCLUDE_PATH ninja -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf shogun-shogun_$VERSION
+
+
+

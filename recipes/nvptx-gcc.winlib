@@ -1,0 +1,142 @@
+export NAME="GCC, the GNU Compiler Collection (targetting nVidia)"
+export STATUS=
+export URL=https://gcc.gnu.org/
+export BASENAME=nvptx-gcc
+export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom. This build targets nVidia."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=10.2.0
+#export VERSIONDATE=20200723
+export VERSION=10.3.0
+export VERSIONDATE=20210408
+#export VERSION=11.1.0
+#export VERSIONDATE=20210427
+#export VERSION=11.2.0
+#export VERSIONDATE=20210728
+#export VERSION=12-20211205
+#export VERSIONDATE=20211206
+####When running on RAM drive: collect2.exe: error: ld returned 1 exit status
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=nvptx-tools,newlib
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://gcc.gnu.org/releases.html gcc-"
+#export DOWNLOADURL="https://ftp.gnu.org/gnu/gcc/ gcc-"
+export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/releases/ gcc-"
+#export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/snapshots/ gcc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.mpi-sb.mpg.de/pub/gnu/mirror/gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/gcc/gcc-$VERSION/gcc-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/snapshots/$VERSION/gcc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/gcc $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfJlh $TARBALLDIR/gcc/gcc-$VERSION.tar.xz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/gcc-$VERSION
+## download and extract newlib
+##export NEWLIBVERSION=4.0.0
+#export NEWLIBVERSION=4.1.0
+##export NEWLIBVERSION=4.2.0
+#export NEWLIBDOWNLOADSOURCEURL=https://www.sourceware.org/ftp/newlib/newlib-$NEWLIBVERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/newlib $NEWLIBDOWNLOADSOURCEURL
+#tar xfz $TARBALLDIR/newlib/newlib-$NEWLIBVERSION.tar.gz
+cp -rf $MINGWPREFIX/src/newlib/newlib .
+# fix missing sys/wait.h fixincludes/fixincl.c (version >= 9.3.0)
+patch -ulbf fixincludes/fixincl.c << EOF
+@@ -28,4 +28,12 @@
+ #ifndef SEPARATE_FIX_PROC
++#ifdef _WIN32
++#include <Windows.h>
++#define wait(p) Sleep(0)
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#else
+ #include <sys/wait.h>
+ #endif
++#endif
+
+EOF
+# fix missing pipe in fixincludes/procopen.c (version >= 9.3.0)
+patch -ulbf fixincludes/procopen.c << EOF
+@@ -50,2 +50,7 @@
+ #include "server.h"
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#endif
+
+EOF
+# fix missing kill/alarm in fixincludes/server.c (version >= 9.3.0)
+patch -ulbf fixincludes/server.c << EOF
+@@ -50,2 +50,6 @@
+ #include "server.h"
++#ifdef _WIN32
++#define kill(pid,sig) -1
++#define alarm(n) 0
++#endif
+
+EOF
+# fix c++tools/Makefile.in (version >= 11.2.0)
+patch -ulbf c++tools/Makefile.in << EOF
+@@ -93,3 +93,3 @@
+ g++-mapper-server\$(exeext): \$(MAPPER.O) \$(CODYLIB)
+-       +\$(CXX) \$(LDFLAGS) \$(PIEFLAG) -o \$@ \$^ \$(VERSION.O) \$(LIBIBERTY)
+\$(NETLIBS)
++       +\$(CXX) \$(PIEFLAG) -o \$@ \$^ \$(VERSION.O) \$(LIBIBERTY) \$(NETLIBS)
+\$(LDFLAGS)
+
+EOF
+# fix issue with nul input
+sed -i.bak -e "s?\(-nostdinc \)\$(DEVNULL)?\1$(pwd)/empty?" gcc/Makefile.in
+touch empty
+mkdir -p build_nvptx_gcc &&
+ wl-showstatus configure &&
+ cd build_nvptx_gcc &&
+ #PATH=$MINGWPREFIX/share/nvptx-tools/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/nvptx-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --with-pkgversion="built by Brecht Sanders" --disable-shared --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-version-specific-runtime-libs --enable-languages="c,c++" --disable-{multilib,sjlj-exceptions,libmudflap,libgomp,libssp,libstdcxx-pch} --enable-{multiarch,newlib-io-long-long,linker-build-id} --with-newlib --with-headers=$(pwd)/../newlib-$NEWLIBVERSION/newlib/libc/include/ CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #PATH=$MINGWPREFIX/share/nvptx-tools/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/nvptx-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --with-pkgversion="built by Brecht Sanders" --disable-shared --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-version-specific-runtime-libs --enable-languages="c,c++" --disable-{multilib,sjlj-exceptions,libmudflap,libgomp,libssp,libstdcxx-pch} --enable-{multiarch,newlib-io-long-long,linker-build-id} --with-newlib --with-headers=$(pwd)/../newlib-$NEWLIBVERSION/newlib/libc/include/ &&
+ PATH=$MINGWPREFIX/share/nvptx-tools/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/nvptx-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --with-pkgversion="built by Brecht Sanders" --disable-shared --with-build-sysroot=$MINGWPREFIX/share/nvptx-tools/nvptx-none --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --without-gnu-ld --disable-version-specific-runtime-libs --enable-languages="c,c++,lto" --disable-{multilib,sjlj-exceptions,libmudflap,libgomp,libssp,libstdcxx-pch,lto} --enable-{multiarch,newlib-io-long-long,linker-build-id} --with-newlib --with-headers=$PWD/../newlib/libc/include --with-plugin-ld="nvptx-none-ld.exe" &&
+ #--enable-checking=yes 
+ #PATH=$MINGWPREFIX/share/nvptx-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/nvptx-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --with-pkgversion="built by Brecht Sanders" --disable-shared --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --without-libbacktrace --enable-languages="c,c++,fortran,lto" --disable-{multilib,sjlj-exceptions,libmudflap,libgomp,libssp,libstdcxx-pch} --enable-{multiarch,newlib-io-long-long,linker-build-id} --with-newlib --with-headers=$(pwd)/../newlib-$NEWLIBVERSION/newlib/libc/include/ CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #PATH=$MINGWPREFIX/share/nvptx-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/nvptx-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --with-pkgversion="built by Brecht Sanders" --disable-shared --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --enable-languages="c,c++,fortran" --disable-{multilib,sjlj-exceptions,libmudflap,libgomp,libssp,libstdcxx-pch} --enable-{multiarch,newlib-io-long-long,linker-build-id} --with-newlib --with-headers=$(pwd)/../newlib-$NEWLIBVERSION/newlib/libc/include/ --without-libbacktrace --with-system-zlib --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-diagnostics-color=auto CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #PATH=$MINGWPREFIX/share/nvptx-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/nvptx-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --with-pkgversion="built by Brecht Sanders" --disable-shared --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --enable-languages="c,c++,fortran,lto" --disable-{multilib,sjlj-exceptions,libmudflap,libgomp,libssp,libstdcxx-pch} --enable-{multiarch,newlib-io-long-long,linker-build-id} --with-newlib --with-headers=$(pwd)/../newlib-$NEWLIBVERSION/newlib/libc/include/ --with-system-zlib --without-included-gettext --with-diagnostics-color=auto --with-libiconv --disable-twoprocess CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #LDFLAGS_FOR_TARGET="-s" 
+ #--with-libatomic 
+ #--disable-lto
+ cd .. &&
+ wl-showstatus build &&
+ ( PATH=$PWD/build_nvptx_gcc/gcc:$PATH make -Cbuild_nvptx_gcc || PATH=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin:$PWD/build_nvptx_gcc/gcc:$PATH make -Cbuild_nvptx_gcc ) &&
+ wl-showstatus build-install &&
+ make -Cbuild_nvptx_gcc install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#### bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100293
+
+#### see also: https://github.com/pc2/OMP-Offloading
+
+##### see also: https://gitlab.uliege.be/R.Boman/math0471/blob/39b58a65407468c8f3e8fb27ad029b16607ac31d/openacc/benchmark/buildgcc-offload.sh
+##    --enable-offload-targets=nvptx-none \
+##    --with-cuda-driver-include=$cuda/include \
+##    --with-cuda-driver-lib=$cuda/lib64 \
+##    --disable-bootstrap \
+##    --disable-multilib \
+##    --enable-languages="c,c++,fortran,lto" \
+##    --prefix=$install_dir
+#### see also: https://gist.github.com/resetnow/1b55beed32f3eb3f90513896565ef5c0
+
+#--enable-linker-plugin-configure-flags="CFLAGS=-fno-lto" 
+
+#sed -i.bak -e 's/"ld"/"ld.exe"/g' gcc/collect2.c
+#sed -i.bak -e "s/\(use_collect2=\)yes/\1no/" gcc/config.gcc
+
+# see also: https://gcc.gnu.org/onlinedocs/gccint/Collect2.html
+#-DREAL_LD_FILE_NAME=\"nvptx-none-ld.exe\"
+#PATH=$MINGWPREFIX/share/nvptx-tools/bin:$PATH make -Cbuild_nvptx_gcc

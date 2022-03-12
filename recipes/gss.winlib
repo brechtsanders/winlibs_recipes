@@ -1,0 +1,82 @@
+export NAME="GSS"
+export STATUS=
+export URL=https://gnu.org/software/gss/
+export BASENAME=gss
+export DESCRIPTION="Generic Security Service (GSS), a free implementation of RFC 2743/2744"
+export CATEGORY=security
+export TYPE=library
+export VERSION=1.0.3
+export VERSIONDATE=20160207
+####src/gss.c:304: undefined reference to `getline'
+wl-showstatus --package-version
+export DEPENDANCIES=gettext
+export OPTIONALDEPENDANCIES=shishi
+export BUILDDEPENDANCIES=help2man
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="ftp://ftp.gnu.org/gnu/gss/"
+export DOWNLOADURL="https://ftp.gnu.org/gnu/gss/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.gnu.org/gnu/gss/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/gss/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing getline in src/gss.c
+mv src/gss.c src/gss.c.bak
+cat > src/gss.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat src/gss.c.bak >> src/gss.c
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libshishi-prefix=$MINGWPREFIX &&
+ wl-showstatus build &&
+ ( make || ( make -Clib libgss.la && make ) || make HELP2MAN="$PERLDIR/bin/perl.exe $(which help2man)" || make HELP2MAN=true ) &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip HELP2MAN="$PERLDIR/bin/perl.exe $(which help2man)" || make install-strip HELP2MAN=true ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

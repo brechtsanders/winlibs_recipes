@@ -1,0 +1,70 @@
+export NAME="LibTomCrypt"
+export STATUS=
+export URL=http://www.libtom.net/LibTomCrypt/
+#export URL=https://github.com/libtom/libtomcrypt
+export BASENAME=libtomcrypt
+export DESCRIPTION="LibTomCrypt is a fairly comprehensive, modular and portable cryptographic toolkit that provides developers with a vast array of well known published block ciphers, one-way hash functions, chaining modes, pseudo-random number generators, public key cryptography and a plethora of other routines."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.17
+#export VERSIONDATE=20141203
+####Error: incorrect register `%r15d' used with `q' suffix
+#export VERSION=1.18.0
+#export VERSIONDATE=20171011
+#export VERSION=1.18.1
+#export VERSIONDATE=20180122
+export VERSION=1.18.2
+export VERSIONDATE=20180703
+wl-showstatus --package-version
+export DEPENDANCIES=libtommath
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=latex
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="public domain"
+#export LICENSETYPE=WTFPL
+export DOWNLOADURL="https://github.com/libtom/libtomcrypt/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/libtom/libtomcrypt/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/libtom/libtomcrypt/releases/download/$VERSION/crypt-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/libtom/libtomcrypt/releases/download/v$VERSION/crypt-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/crypt-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/crypt-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix building shared testprof
+mv testprof/makefile.shared testprof/makefile.shared.bak &&
+sed -e "s/--mode=link gcc/& -no-undefined/" testprof/makefile.shared.bak > testprof/makefile.shared
+# fix file ownership issues on Windows
+mv makefile makefile.bak &&
+sed -e "s/-g \$(GROUP) -o \$(USER)//" makefile.bak > makefile
+wl-showstatus build &&
+ #( make CC=gcc || make CC="gcc -DLTC_NO_ASM" ) &&
+ #make -f makefile.shared CC=gcc CFLAGS="-I$(pwd)/src/headers -I$(pwd)/testprof" EXTRALIBS="-no-undefined" &&
+ #make CC="gcc $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DLTC_NO_ASM"; fi)" &&
+ make CC="gcc $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DLTC_NO_ASM"; fi) -DLTM_DESC -DUSE_LTM" &&
+ #make CC="gcc $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DLTC_NO_ASM"; fi) -DGMP_DESC -DLTM_DESC -DTFM_DESC -DUSE_GMP -DUSE_LTM -DUSE_TFM" &&
+ # manually build DLL
+ echo "EXPORTS" > libtomcrypt.def &&
+ nm -f posix --defined-only -p libtomcrypt.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" >> libtomcrypt.def &&
+ sed -n -e "s/\[\]//; s/^extern .* \**\([^ ]*\);$/\1 DATA/p" src/headers/*.h | grep -v "^\(tfm_desc\|gmp_desc\)\b" >> libtomcrypt.def &&
+ gcc -shared -s -mwindows -def libtomcrypt.def -o libtomcrypt.dll libtomcrypt.a -Wl,--out-implib,libtomcrypt.dll.a -ltommath &&
+ wl-showstatus build-install &&
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #cp -f .libs/*.la .libs/*.dll.a testprof/.libs/*.la testprof/.libs/*.a $INSTALLPREFIX/lib/ &&
+ #cp -f .libs/*.dll testprof/.libs/*.dll $INSTALLPREFIX/bin/ &&
+ #make install CC=gcc DESTDIR=$INSTALLPREFIX LIBPATH=/lib INCPATH=/include DATAPATH=/share/doc/libtomcrypt/pdf NODOCS=1 INSTALL_GROUP=users &&
+ #make install CC=gcc DESTDIR=$INSTALLPREFIX LIBPATH=/lib INCPATH=/include DATAPATH=/share/doc/libtomcrypt/pdf NODOCS=1 &&
+ make install CC="gcc -I$(pwd)/src/headers" DESTDIR=$INSTALLPREFIX LIBPATH=/lib INCPATH=/include DATAPATH=/share/doc/libtomcrypt/pdf NODOCS=1 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "DLTC_NO_ASM=1 CFLAGS=-DLTC_NO_ASM=1"; fi) &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

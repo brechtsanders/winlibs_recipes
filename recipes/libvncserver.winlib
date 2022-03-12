@@ -1,0 +1,252 @@
+#export NAME="LibVNCServer/LibVNCClient"
+#export STATUS=
+##export URL=http://libvncserver.sourceforge.net/
+#export URL=http://libvnc.github.io/
+#export BASENAME=libvncserver
+#export DESCRIPTION="LibVNCServer/LibVNCClient are cross-platform C libraries that allow you to easily implement VNC server or client functionality in your program."
+#export CATEGORY=communication
+#export TYPE=library
+##export VERSION=0.9.8
+##export VERSIONDATE=20110330
+##export VERSION=0.9.8.1
+##export VERSIONDATE=20111013
+##export VERSION=0.9.8.2
+##export VERSIONDATE=20111109
+##export VERSION=0.9.9
+##export VERSIONDATE=20120505
+##export VERSION=0.9.10
+##export VERSIONDATE=20160708
+#export VERSION=0.9.11
+#export VERSIONDATE=20161231
+#wl-showstatus --package-version
+#export DEPENDANCIES=libjpeg,zlib,pthreads,gnutls,libnettle,libgcrypt
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+##export DOWNLOADURL="http://sourceforge.net/projects/libvncserver/files/"
+##export DOWNLOADURL="http://sourceforge.net/projects/libvncserver/files/libvncserver/"
+#export DOWNLOADURL="https://github.com/LibVNC/libvncserver/releases LibVNCServer-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/libvncserver/$BASENAME/$VERSION/LibVNCServer-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/LibVNC/libvncserver/archive/LibVNCServer-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/LibVNCServer-$VERSION.tar.gz
+##cd LibVNCServer-$VERSION
+#cd libvncserver-LibVNCServer-$VERSION
+## fix redefinition of SOCKET
+#patch -ulbf rfb/rfbproto.h << EOF
+#--- rfb/rfbproto.h  Tue Jan 29 12:50:18 2008
+#+++ rfb/rfbproto.h  Wed Dec  9 10:44:50 2009
+#@@ -79,3 +79,7 @@
+# #endif
+#+#if defined __MINGW32__
+#+#include <winsock2.h>
+#+#else
+# #define SOCKET int
+#+#endif
+# typedef int8_t rfbBool;
+#EOF
+## fix missing pwd.h
+#cat > pwd.h << EOF
+##define S_IRGRP 0
+##define S_IWGRP 0
+##define S_IROTH 0
+##define S_IWOTH 0
+#//typedef int uid_t;
+##define geteuid() 0
+##define getpwuid(uid) 0
+#struct passwd {
+#  char *pw_dir;
+#//  char *pw_name;
+#};
+#EOF
+## fix wrong mkdir and missing S_IRGRP/S_IWGRP/S_IROTH/S_IWOTH in libvncserver/tightvnc-filetransfer/filetransfermsg.c (version >= 0.9.8)
+#mv libvncserver/tightvnc-filetransfer/filetransfermsg.c libvncserver/tightvnc-filetransfer/filetransfermsg.c.bak
+#echo "#include <pwd.h>" > libvncserver/tightvnc-filetransfer/filetransfermsg.c
+#sed -e "s/\(mkdir([^,]*\),[^)]*)/\1)/" libvncserver/tightvnc-filetransfer/filetransfermsg.c.bak >> libvncserver/tightvnc-filetransfer/filetransfermsg.c
+## fix redefinition of CreateDirectory
+#cp libvncserver/tightvnc-filetransfer/filetransfermsg.h libvncserver/tightvnc-filetransfer/filetransfermsg.h.bak
+#cat > libvncserver/tightvnc-filetransfer/filetransfermsg.h << EOF
+##ifdef CreateDirectory
+##undef CreateDirectory
+##endif
+#EOF
+#cat libvncserver/tightvnc-filetransfer/filetransfermsg.h.bak >> libvncserver/tightvnc-filetransfer/filetransfermsg.h
+## fix redefinition of GetHomeDir
+#mv libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c.bak
+#sed -e "s/GetHomeDir/MyGetHomeDir/g" libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c.bak > libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c
+### fix libvncserver/tightvnc-filetransfer/filetransfermsg.c
+##mv libvncserver/tightvnc-filetransfer/filetransfermsg.c libvncserver/tightvnc-filetransfer/filetransfermsg.c.bak
+##echo "#include <plibc.h>" > libvncserver/tightvnc-filetransfer/filetransfermsg.c
+##cat libvncserver/tightvnc-filetransfer/filetransfermsg.c.bak >> libvncserver/tightvnc-filetransfer/filetransfermsg.c
+### fix building DLLs on 64-bit
+##if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+## mv configure configure.bak
+## sed -e "s/\(-lws2_32\)/-Wl,\1/g" configure.bak > configure
+##fi
+## fix deprecated gnutls_transport_set_global_errno (version >= 0.9.8.2)
+#mv libvncclient/tls.c libvncclient/tls.c.bak
+#sed -e "s/gnutls_transport_set_global_errno(/gnutls_transport_set_errno(NULL,/g" libvncclient/tls.c.bak > libvncclient/tls.c
+## fix deprecated gnutls_transport_set_global_errno (version >= 0.9.9)
+#mv libvncclient/tls_gnutls.c libvncclient/tls_gnutls.c.bak
+#sed -e "s/gnutls_transport_set_global_errno(/gnutls_transport_set_errno(NULL,/g" libvncclient/tls_gnutls.c.bak > libvncclient/tls_gnutls.c
+### fix missing sleep in test/encodingstest.c (version >= 0.9.8.2)
+##mv test/encodingstest.c test/encodingstest.c.bak
+##echo "#define sleep(t) _sleep((t) * 1000)" > test/encodingstest.c
+##cat test/encodingstest.c.bak >> test/encodingstest.c
+## fix redefinition of gettimeofday in libvncserver/main.c (version >= 0.9.9)
+#patch -ulbf libvncserver/main.c << EOF
+#--- libvncserver/main.c  2012-05-04 16:19:00 +0200
+#+++ libvncserver/main.c  2012-05-07 14:39:56 +0200
+#@@ -1074,3 +1074,3 @@
+#
+#-#ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
+#+#if !defined(LIBVNCSERVER_HAVE_GETTIMEOFDAY) && !defined(__MINGW32__)
+# #include <fcntl.h>
+#EOF
+## fix number of parameters to mkdir in libvncserver/rfbserver.c (version >= 0.9.10)
+#mv libvncserver/rfbserver.c libvncserver/rfbserver.c.bak &&
+#sed -e "s/\(mkdir([^,]*\),[^)]*)/\1)/" libvncserver/rfbserver.c.bak >> libvncserver/rfbserver.c
+##make check
+#wl-showstatus configure &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DHAVE_BOOLEAN -Duid_t=int" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DHAVE_BOOLEAN -Duid_t=int" LDFLAGS="-Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x11vnc CFLAGS="-DHAVE_BOOLEAN -Duid_t=int" LDFLAGS="-Wl,-no-undefined" &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf LibVNCServer-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libvncserver-LibVNCServer-$VERSION
+
+
+
+export NAME="LibVNCServer/LibVNCClient"
+export STATUS=
+export URL=http://libvnc.github.io/
+export BASENAME=libvncserver
+export DESCRIPTION="LibVNCServer/LibVNCClient are cross-platform C libraries that allow you to easily implement VNC server or client functionality in your program."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.9.12
+#export VERSIONDATE=20190107
+export VERSION=0.9.13
+export VERSIONDATE=20200614
+wl-showstatus --package-version
+export DEPENDANCIES=libjpeg,libpng,zlib,pthreads,libwebsockets,gnutls,libnettle,libgcrypt,cyrus-sasl,lzo,sdl2,libav
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/LibVNC/libvncserver/releases LibVNCServer-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/LibVNC/libvncserver/archive/LibVNCServer-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/LibVNCServer-$VERSION.tar.gz
+cd libvncserver-LibVNCServer-$VERSION
+# fix redefinition of in_addr_t in rfb/rfb.h (version >= 0.9.12)
+patch -ulbf rfb/rfb.h << EOF
+@@ -56,3 +56,5 @@
+ #undef SOCKET
++#ifndef __MINGW32__
+ typedef UINT32 in_addr_t;
++#endif
+ #include <winsock2.h>
+EOF
+# fix missing pipe() in libvncserver/main.c (version >= 0.9.12)
+mv libvncserver/main.c libvncserver/main.c.bak &&
+echo "#include <fcntl.h>" > libvncserver/main.c &&
+echo "#define pipe(fds) _pipe(fds, 4096, _O_BINARY)" >> libvncserver/main.c &&
+cat libvncserver/main.c.bak >> libvncserver/main.c
+# fix redefinition of CreateDirectory in libvncserver/tightvnc-filetransfer/filetransfermsg.h (version >= 0.9.12)
+patch -ulbf libvncserver/tightvnc-filetransfer/filetransfermsg.h << EOF
+@@ -28,4 +28,6 @@
+
++#ifdef _WIN32
+ #ifdef _MSC_VER
+ #pragma push_macro("CreateDirectory")
++#endif
+ #undef CreateDirectory /* Prevent macro clashes under Windows */
+EOF
+# fix missing pthread_t in libvncserver/tightvnc-filetransfer/rfbtightproto.h (version >= 0.9.12)
+mv libvncserver/tightvnc-filetransfer/rfbtightproto.h libvncserver/tightvnc-filetransfer/rfbtightproto.h.bak &&
+echo "#include <pthread.h>" > libvncserver/tightvnc-filetransfer/rfbtightproto.h &&
+cat libvncserver/tightvnc-filetransfer/rfbtightproto.h.bak >> libvncserver/tightvnc-filetransfer/rfbtightproto.h
+# fix mising pwd.h and uid_t in libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c (version >= 0.9.12)
+mv libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c.bak &&
+echo "#include <dirent.h>" > libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c &&
+sed -e "s/_MSC_VER/_WIN32/; s/\buid_t\b/unsigned int/; s/geteuid *()\|getpwuid *(uid)\|pwEnt->pw_dir/NULL/" libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c.bak >> libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c
+# fix mkdir() in libvncserver/tightvnc-filetransfer/filetransfermsg.c (version >= 0.9.12)
+patch -ulbf libvncserver/tightvnc-filetransfer/filetransfermsg.c << EOF
+@@ -51,4 +51,7 @@
+ #define unlink _unlink
+ #endif /* _MSC_VER */
++#ifdef __MINGW32__
++#define mkdir(path, perms) _mkdir(path) /* Match POSIX signature */
++#endif
+ #else
+ #include <dirent.h>
+EOF
+# fix thread support in test/encodingstest.c (version >= 0.9.12)
+mv test/encodingstest.c test/encodingstest.c.bak &&
+echo "#define LIBVNCSERVER_HAVE_LIBPTHREAD" > test/encodingstest.c &&
+echo "#include <pthread.h>" >> test/encodingstest.c &&
+sed -e "s?#error .*need pthread?//&?" test/encodingstest.c.bak >> test/encodingstest.c
+# fix missing inet_ntop in libvncclient/sasl.c (version >= 0.9.12)
+mv libvncclient/sasl.c libvncclient/sasl.c.bak
+cat > libvncclient/sasl.c << EOF
+#include <io.h>
+#include <stdio.h>
+#define _WIN32_WINNT 0x0501
+#include <winsock2.h>
+#include <ws2tcpip.h>
+inline const char* inet_ntop (int af, void const *src, char *dst, size_t dstlen)
+{
+  struct sockaddr_in srcaddr;
+  memset(&srcaddr, 0, sizeof(struct sockaddr_in));
+  memcpy(&(srcaddr.sin_addr), src, sizeof(srcaddr.sin_addr));
+  srcaddr.sin_family = af;
+  if (WSAAddressToString((struct sockaddr*)&srcaddr, sizeof(struct sockaddr_in), 0, dst, (LPDWORD)&dstlen) != 0) {
+    DWORD rv = WSAGetLastError();
+    fprintf(stderr, "WSAAddressToString() : %d\n",rv);
+    return NULL;
+  }
+  return dst;
+}
+EOF
+cat libvncclient/sasl.c.bak >> libvncclient/sasl.c
+# fix thread support in examples/example.c (version >= 0.9.12)
+mv examples/example.c examples/example.c.bak &&
+echo "#define LIBVNCSERVER_HAVE_LIBPTHREAD" > examples/example.c &&
+echo "#include <pthread.h>" >> examples/example.c &&
+sed -e "s?#error .*need pthreads?//&?" examples/example.c.bak >> examples/example.c
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_GNUTLS:BOOL=ON -DWITH_OPENSSL:BOOL=OFF -DWITH_THREADS:BOOL=OFF -DWITH_SYSTEMD:BOOL=OFF .. &&
+ PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_GNUTLS:BOOL=ON -DWITH_OPENSSL:BOOL=OFF -DWITH_THREADS:BOOL=OFF -DWITH_SYSTEMD:BOOL=ON .. &&
+ echo "#undef LIBVNCSERVER_HAVE_LIBPTHREAD" >> rfb/rfbconfig.h &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_GNUTLS:BOOL=ON -DWITH_OPENSSL:BOOL=OFF -DWITH_THREADS:BOOL=OFF -DWITH_SYSTEMD:BOOL=OFF .. &&
+ PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_GNUTLS:BOOL=ON -DWITH_OPENSSL:BOOL=OFF -DWITH_THREADS:BOOL=OFF -DWITH_SYSTEMD:BOOL=ON .. &&
+ echo "#undef LIBVNCSERVER_HAVE_LIBPTHREAD" >> rfb/rfbconfig.h &&
+ cd .. &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libvncserver-LibVNCServer-$VERSION
+####TO DO: use libjpeg-turbo instead of libjpeg
+####*** The libjpeg library you are building against is not libjpeg-turbo. Performance will be reduced.
+
+
+

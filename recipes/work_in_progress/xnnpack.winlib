@@ -1,0 +1,43 @@
+export NAME="XNNPACK"
+export STATUS=
+export URL=https://github.com/google/XNNPACK
+export BASENAME=xnnpack
+export DESCRIPTION="High-efficiency floating-point neural network inference operators for mobile, server, and Web"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20210225
+wl-showstatus --package-version
+export DEPENDANCIES=fp16,pthreadpool,cpuinfo
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/google/XNNPACK/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/google/XNNPACK/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DXNNPACK_LIBRARY_TYPE:STRING=static -DXNNPACK_USE_SYSTEM_LIBS:BOOL=ON -DBUILD_GMOCK:BOOL=OFF -DXNNPACK_BUILD_BENCHMARKS:BOOL=OFF -DXNNPACK_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DXNNPACK_LIBRARY_TYPE:STRING=shared -DXNNPACK_USE_SYSTEM_LIBS:BOOL=ON -DBUILD_GMOCK:BOOL=OFF -DXNNPACK_BUILD_BENCHMARKS:BOOL=OFF -DXNNPACK_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ # fix dependancy detection issues
+ sed -i.bak -e "s?\(pthreadpool\|cpuinfo\)-NOTFOUND?lib\1.dll.a?g" build_shared/build.ninja &&
+ cp -u $MINGWPREFIX/lib/lib{pthreadpool,cpuinfo}.dll.a build_shared/ &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

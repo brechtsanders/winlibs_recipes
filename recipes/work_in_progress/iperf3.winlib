@@ -1,0 +1,141 @@
+export NAME="iperf3"
+export STATUS=
+export URL=https://code.google.com/p/iperf/
+export BASENAME=iperf3
+export DESCRIPTION="iperf was orginally developed by NLANR/DAST as a tool for measuring maximum TCP and UDP bandwidth performance. It allows the tuning of various parameters and UDP characteristics and reports bandwidth, delay jitter, and datagram loss. iperf3 is a new implementation from scratch, with the goal of a smaller, simpler code base, and a library version of the functionality that can be used in other programs. iperf3 also a number of features found in other tools such as nuttcp and netperf, but were missing from iperf2.X."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=3.0.3
+#export VERSIONDATE=20140606
+#export VERSION=3.0.12
+#export VERSIONDATE=20160609
+#export VERSION=3.1.1
+#export VERSIONDATE=20160106
+#export VERSION=3.1.2
+#export VERSIONDATE=20160204
+#export VERSION=3.1.3
+#export VERSIONDATE=20160609
+#export VERSION=3.1.4
+#export VERSIONDATE=20161101
+####nanosleep() required for timing operations.
+#export VERSION=3.1.5
+#export VERSIONDATE=20170113
+#export VERSION=3.1.6
+#export VERSIONDATE=20170203
+#export VERSION=3.1.7
+#export VERSIONDATE=20170307
+#export VERSION=3.2
+#export VERSIONDATE=20170627
+#export VERSION=3.3
+#export VERSIONDATE=20171101
+#export VERSION=3.4
+#export VERSIONDATE=20180215
+#export VERSION=3.5
+#export VERSIONDATE=20180303
+#export VERSION=3.6
+#export VERSIONDATE=20180626
+#export VERSION=3.7
+#export VERSIONDATE=20190622
+#export VERSION=3.8
+#export VERSIONDATE=20200609
+#export VERSION=3.8.1
+#export VERSIONDATE=20200611
+#export VERSION=3.9
+#export VERSIONDATE=20200818
+#export VERSION=3.10
+#export VERSIONDATE=20210527
+#export VERSION=3.10.1
+#export VERSIONDATE=20210603
+export VERSION=3.11
+export VERSIONDATE=20220203
+####checking for library containing socket... no
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="http://stats.es.net/software/"
+#export DOWNLOADURL="https://github.com/esnet/iperf/releases"
+export DOWNLOADURL="https://github.com/esnet/iperf/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://stats.es.net/software/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/esnet/iperf/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/esnet/iperf/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd iperf-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h winfix/netdb.h winfix/netinet/tcp.h winfix/sys/resource.h
+# fix missing int64_t in src/cjson.h
+mv src/cjson.h src/cjson.h.bak
+echo "#include <stdint.h>" > src/cjson.h
+cat src/cjson.h.bak >> src/cjson.h
+# fix missing u_char
+for F in src/cjson.c src/units.c; do
+ mv $F $F.bak &&
+ echo "#define u_char unsigned char" > $F &&
+ cat $F.bak >> $F
+done
+# fix configure for Windows
+patch -ulbf configure << EOF
+--- configure  2016-02-02 00:48:54.000000000 +0100
++++ configure  2016-02-04 09:32:40.083138000 +0100
+@@ -12245,3 +12245,2 @@
+ echo "nanosleep() required for timing operations."
+-exit 1
+
+@@ -12308,3 +12307,2 @@
+ echo "nanosleep() required for timing operations."
+-exit 1
+
+@@ -12338,3 +12336,3 @@
+ _ACEOF
+-for ac_lib in '' socket; do
++for ac_lib in '' socket ws2_32; do
+   if test -z "\$ac_lib"; then
+EOF
+  ./configure --help
+  head COPYING* LICENSE*
+  ls -l COPYING* LICENSE*
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" &&
+ wl-showstatus build &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm -f CMakeCache.txt
+#wl-showstatus configure
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf iperf-$VERSION
+
+
+

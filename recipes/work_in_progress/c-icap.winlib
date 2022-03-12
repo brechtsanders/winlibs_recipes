@@ -1,0 +1,101 @@
+export NAME="c-icap"
+export STATUS=
+export URL=http://c-icap.sourceforge.net/
+export BASENAME=c-icap
+export DESCRIPTION="c-icap is an implementation of an ICAP server. It can be used with HTTP proxies that support the ICAP protocol to implement content adaptation and filtering services."
+export CATEGORY=security
+export TYPE=application
+export VERSION=0.5.6
+export VERSIONDATE=20200821
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,zlib,libbz2,brotli,bdb,pcre,openssl,openldap
+#mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=doxygen
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://sourceforge.net/projects/c-icap/files/c-icap/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/c-icap/c-icap/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1.x/")/c_icap-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/c_icap-$VERSION.tar.gz
+cd c_icap-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa winfix/netinet
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/netinet/tcp.h
+touch winfix/arpa/inet.h winfix/netdb.h winfix/netinet/in.h winfix/sys/select.h
+# fix already defined OUT in decode.c
+sed -i.bak -e "s/\bOUT\b/arr&/g" decode.c
+# fix net_io.c
+mv net_io.c net_io.c.bak &&
+echo "#include <wspiapi.h>" > net_io.c &&
+cat net_io.c.bak >> net_io.c
+# fix missing S_IREAD/S_IWRITE in os/win32/utilfunc.c
+mv os/win32/utilfunc.c os/win32/utilfunc.c.bak &&
+echo "#include <sys/stat.h>" > os/win32/utilfunc.c &&
+cat os/win32/utilfunc.c.bak >> os/win32/utilfunc.c
+# make sure to build Windows sources
+cp -f os/win32/* os/unix
+# fix include/net_io.h (version >= 0.5.6)
+patch -ulbf include/net_io.h << EOF
+@@ -159,3 +159,7 @@
+ CI_DECLARE_FUNC(int) icap_socket_opts(ci_socket fd, int secs_to_linger);
++#ifdef _WIN32
++CI_DECLARE_FUNC(ci_socket) icap_init_server(int port, int *protocol_family, int secs_to_linger);
++#else
+ CI_DECLARE_FUNC(ci_socket) icap_init_server(struct ci_port *port);
++#endif
+ CI_DECLARE_FUNC(int) icap_accept_raw_connection(struct ci_port *port, ci_connection_t *conn);
+@@ -163,3 +167,7 @@
+
++#ifdef _WIN32
++CI_DECLARE_FUNC(int) ci_wait_for_data(int fd,int secs,int what_wait);
++#else
+ CI_DECLARE_FUNC(int) ci_wait_for_data(ci_socket fd,int secs,int what_wait);
++#endif
+
+EOF
+# fix missing struct tm in txt_format.c
+mv txt_format.c txt_format.c.bak &&
+echo "#include <time.h>" > txt_format.c &&
+cat txt_format.c.bak >> txt_format.c
+# fix missing O_CREAT in utils/c-icap-client.c
+mv utils/c-icap-client.c utils/c-icap-client.c.bak &&
+echo "#include <fcntl.h>" > utils/c-icap-client.c &&
+cat utils/c-icap-client.c.bak >> utils/c-icap-client.c
+wl-showstatus configure &&
+# mkdir -p m4 &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./autogen.sh &&
+#    echo OK
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-ipv6 --without-openssl --disable-poll --disable-sysvipc CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -lmman" &&
+ echo "#define HAVE_POSIX_MAPPED_FILES 1" >> autoconf.h &&
+ echo "#define USE_POSIX_MAPPED_FILES 1" >> autoconf.h &&
+ # fix missing localtime_r
+ echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" >> autoconf.h &&
+ #echo "#undef HAVE_DLFCN_H" >> autoconf.h &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf c_icap-$VERSION
+
+
+

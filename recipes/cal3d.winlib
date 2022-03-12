@@ -1,0 +1,82 @@
+export NAME="Cal3D"
+export STATUS=
+#export URL=http://home.gna.org/cal3d/
+export URL=https://mp3butcher.github.io/Cal3D/
+export BASENAME=cal3d
+export DESCRIPTION="Cal3D is a skeletal based 3D character animation library written in C++ in a platform-/graphic API-independent way. Originally designed to be used in a 3D client for Worldforge, it evolved into a stand-alone product which can be used in many different kinds of projects. It supports combining animations and actions through a "mixer" interface, and work is currently underway to integrate morph targets (interpolating between one mesh and another, using the same vertex sequence) easily into the system."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=0.11.0
+#export VERSIONDATE=20101214
+export VERSION=0.120
+export VERSIONDATE=20170628
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://home.gna.org/cal3d/"
+#export DOWNLOADURL="http://download.gna.org/cal3d/sources/"
+export DOWNLOADURL="https://github.com/mp3butcher/Cal3D/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.gna.org/cal3d/sources/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/mp3butcher/Cal3D/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix type mismatch in src/cal3d/loader.cpp (version <= 0.11.0)
+#mv src/cal3d/loader.cpp src/cal3d/loader.cpp.bak &&
+#sed -e "s/return false;/return NULL;/" src/cal3d/loader.cpp.bak > src/cal3d/loader.cpp
+##make check
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,--enable-auto-import" &&
+# # fix missing memset/memcpy
+# echo "#include <string.h>" >> config.h &&
+# wl-showstatus build &&
+# make &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+cd Cal3D-$VERSION/cal3d
+# fix type mismatch in src/cal3d/loader.cpp (version >= 0.120)
+mv src/cal3d/loader.cpp src/cal3d/loader.cpp.bak &&
+sed -e "s/return false;/return NULL;/" src/cal3d/loader.cpp.bak > src/cal3d/loader.cpp
+# fix type mismatch in src/cal3d/xmlformat.cpp (version >= 0.120)
+mv src/cal3d/xmlformat.cpp src/cal3d/xmlformat.cpp.bak &&
+sed -e "s/return false;/return NULL;/" src/cal3d/xmlformat.cpp.bak > src/cal3d/xmlformat.cpp
+# fix creating static library (version >= 0.120)
+echo "ADD_LIBRARY(cal3d_s STATIC \${PROJECT_SOURCES} )" >> src/CMakeLists.txt
+# fix for 32-bit Windows (version >= 0.120)
+if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv src/CMakeLists.txt src/CMakeLists.txt.bak &&
+ sed -e "s/-DWIN64\|-Dx64BIT//g" src/CMakeLists.txt.bak > src/CMakeLists.txt
+fi
+# skip making examples
+wl-showstatus configure &&
+mv CMakeLists.txt CMakeLists.txt.bak &&
+sed -e "s/\(SUBDIRS(.*\)examples/\1/" CMakeLists.txt.bak > CMakeLists.txt
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+ echo "-Wl,--as-needed -lopengl32" >> src/CMakeFiles/cal3d.dir/linklibs.rsp &&
+ #echo "-Wl,--as-needed -lopengl32 -lglu32" >> examples/cally/src/CMakeFiles/callyDemo.dir/linklibs.rsp &&
+ ##echo "-Wl,--as-needed -lopengl32 -lglu32 -lfreeglut" >> examples/cally/src/CMakeFiles/callyDemo.dir/linklibs.rsp &&
+ #echo "-Wl,--as-needed -lopengl32 -lglu32" >> examples/miniviewer_gl/src/CMakeFiles/miniviewer_gl.dir/linklibs.rsp &&
+ ##echo "-Wl,--as-needed -lopengl32 -lglu32 -lfreeglut" >> examples/miniviewer_gl/src/CMakeFiles/miniviewer_gl.dir/linklibs.rsp &&
+ #echo "-Wl,--as-needed -lopengl32 -lglu32" >> examples/miniviewer_gl_vp/src/CMakeFiles/miniviewer_gl_vp.dir/linklibs.rsp &&
+ ##echo "-Wl,--as-needed -lopengl32 -lglu32 -lfreeglut -lglew32" >> examples/miniviewer_gl_vp/src/CMakeFiles/miniviewer_gl_vp.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make install/strip &&
+ mkdir -p $INSTALLPREFIX/lib &&
+ cp -f bin/libcal3d_s.a $INSTALLPREFIX/lib/libcal3d.a &&
+ mv -f $INSTALLPREFIX/bin/*.a $INSTALLPREFIX/lib/ &&
+ rm -f $INSTALLPREFIX/glut64.dll &&
+ #mv -f $INSTALLPREFIX/glut64.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf Cal3D-$VERSION
+
+
+

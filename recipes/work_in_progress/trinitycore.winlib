@@ -1,0 +1,118 @@
+export NAME="TrinityCore"
+export STATUS=
+export URL=https://www.trinitycore.org/
+export BASENAME=trinitycore
+export DESCRIPTION="TrinityCore is an MMORPG framework that's built using C++, and using a back-end of MySQL for the DB content."
+export CATEGORY=games
+export TYPE=library
+#export VERSION=335.21011
+#export VERSIONDATE=20210118
+#export VERSION=335.21021
+#export VERSIONDATE=20210215
+#export VERSION=335.21031
+#export VERSIONDATE=20210316
+#export VERSION=335.21041
+#export VERSIONDATE=20210417
+#export VERSION=335.21051
+#export VERSIONDATE=20210514
+#export VERSION=335.21061
+#export VERSIONDATE=20210616
+#export VERSION=335.21071
+#export VERSIONDATE=20210715
+#export VERSION=335.21081
+#export VERSIONDATE=20210816
+#export VERSION=335.21101
+#export VERSIONDATE=20211016
+#export VERSION=335.21091
+#export VERSIONDATE=20210929
+#export VERSION=335.21111
+#export VERSIONDATE=20211116
+#export VERSION=335.21121
+#export VERSIONDATE=20211217
+#export VERSION=905.21071
+#export VERSIONDATE=20210705
+#export VERSION=910.21081
+#export VERSIONDATE=20210819
+#export VERSION=910.21101
+#export VERSIONDATE=20211016
+#export VERSION=915.21111
+#export VERSIONDATE=20211117
+#export VERSION=915.22011
+#export VERSIONDATE=20220103
+#export VERSION=915.22012
+#export VERSIONDATE=20220116
+export VERSION=920.22031
+export VERSIONDATE=20220307
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/TrinityCore/TrinityCore/releases TDB"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.21011/TDB_full_world_335.21011_2021_01_15.7z
+export DOWNLOADSOURCEURL=https://github.com/TrinityCore/TrinityCore/archive/TDB$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/TDB$VERSION.tar.gz
+cd TrinityCore-TDB$VERSION
+# fix missing _CrtCheckMemory in dep/g3dlite/source/System.cpp (version >= 335.21041)
+mv dep/g3dlite/source/System.cpp dep/g3dlite/source/System.cpp.bak &&
+echo "#include <crtdbg.h>" > dep/g3dlite/source/System.cpp &&
+cat dep/g3dlite/source/System.cpp.bak >> dep/g3dlite/source/System.cpp
+# fix redefinition of strcasecmp/strncasecmp in dep/g3dlite/source/stringutils.cpp (version >= 905.21071)
+patch -ulbf dep/g3dlite/source/stringutils.cpp << EOF
+@@ -17,4 +17,6 @@
+     // Define functions for ffmpeg since we don't link in gcc's c library
++#ifndef __MINGW64_VERSION_MAJOR
+     extern int strncasecmp(const char *string1, const char *string2, size_t count) { return _strnicmp(string1, string2, count); }
+     extern int strcasecmp(const char *string1, const char *string2) { return _stricmp(string1, string2); }
++#endif
+ }
+EOF
+# fix missing std::at_quick_exit in dep/g3dlite/include/G3D/platform.h (version >= 915.21111)
+mv dep/g3dlite/include/G3D/platform.h dep/g3dlite/include/G3D/platform.h.bak &&
+echo "#include <stdlib.h>" > dep/g3dlite/include/G3D/platform.h &&
+cat dep/g3dlite/include/G3D/platform.h.bak >> dep/g3dlite/include/G3D/platform.h
+# fix cmake/macros/FindOpenSSL.cmake (version >= 910.21101)
+patch -ulbf cmake/macros/FindOpenSSL.cmake << EOF
+@@ -578,3 +578,3 @@
+   if(NOT OPENSSL_VERSION_OK)
+-      message(FATAL_ERROR "TrinityCore needs OpenSSL version \${OPENSSL_EXPECTED_VERSION} but found too new version \${OPENSSL_VERSION}. TrinityCore needs OpenSSL 1.0.x or 1.1.x to work properly. If you still have problems please install OpenSSL 1.0.x if you still have problems search on forum for TCE00022")
++      message(WARNING "TrinityCore needs OpenSSL version \${OPENSSL_EXPECTED_VERSION} but found too new version \${OPENSSL_VERSION}. TrinityCore needs OpenSSL 1.0.x or 1.1.x to work properly. If you still have problems please install OpenSSL 1.0.x if you still have problems search on forum for TCE00022")
+   endif()
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMYSQL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb/ -DMYSQL_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libmariadbclient.dll.a -DMYSQL_EXECUTABLE:FILEPATH=$MINGWPREFIX/bin/mariadb_config.exe -DBOOST_ROOT:FILEPATH=$MINGWPREFIX -DNOPCH:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMYSQL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb/ -DMYSQL_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libmariadbclient.dll.a -DMYSQL_EXECUTABLE:FILEPATH=$MINGWPREFIX/bin/mariadb_config.exe -DBOOST_ROOT:FILEPATH=$MINGWPREFIX -DNOPCH:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMYSQL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb/ -DMYSQL_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libmariadbclient.dll.a -DMYSQL_EXECUTABLE:FILEPATH=$MINGWPREFIX/bin/mariadb_config.exe -DBOOST_ROOT:FILEPATH=$MINGWPREFIX -DNOPCH:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf TrinityCore-TDB$VERSION
+
+
+

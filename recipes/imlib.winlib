@@ -1,0 +1,205 @@
+export NAME="imlib"
+export STATUS=
+export URL=http://www.gnome.org/projects/imlib
+export BASENAME=imlib
+export DESCRIPTION="Imlib is an advanced replacement library for libraries like libXpm that provides many more features with much greater flexibility and speed. It was originally written for E, now used by the GNOME Project."
+export CATEGORY=graphics
+export TYPE=library
+export VERSION=1.9.15
+export VERSIONDATE=20101008
+wl-showstatus --package-version
+export DEPENDANCIES=gtk2,libx11,libxext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/imlib/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p netinet sys
+touch netinet/in.h sys/wait.h
+# fix missing gdk/gdkx.h
+mkdir -p gdk
+cat > gdk/gdkx.h << EOF
+//fix error: /include/w32api/winspool.h:255: error: two or more data types in declaration specifiers
+#undef Status
+#include <windows.h>
+#include <gdk/gdkwin32.h>
+#include <gdk/gdkdisplay.h>
+//#include <X11/X.h>
+#include <X11/Xlib.h>
+#define GdkWindowPrivate GdkWindow
+#define gdk_root_parent gdk_get_default_root_window
+#define gdk_display gdk_display_get_default()
+/*
+//#define GDK_WINDOW_XID(dw) (int)GDK_WINDOW_HWND(dw)
+#define GDK_DRAWABLE_XID GDK_DRAWABLE_HANDLE
+//#define GDK_DRAWABLE_XID GDK_WINDOW_HWND
+//#define GDK_DRAWABLE_XID(win)         (GDK_DRAWABLE_WIN32DATA(win)->xid)
+#define GDK_WINDOW_XWINDOW GDK_DRAWABLE_XID
+//#define GDK_VISUAL_XVISUAL(vis) (((GdkVisualPrivate *) vis)->xvisual)
+#define GDK_DRAWABLE_HANDLE(win)      (GDK_IS_WINDOW (win) ? GDK_WINDOW_HWND (win) : (GDK_IS_PIXMAP (win) ? GDK_PIXMAP_HBITMAP (win) : (GDK_IS_DRAWABLE_IMPL_WIN32 (win) ? GDK_DRAWABLE_IMPL_WIN32_HANDLE (win) : 0)))
+*/
+#define GDK_DRAWABLE_XID(drawable) gdk_win32_drawable_get_handle(drawable)
+#define GDK_DRAWABLE_HANDLE(drawable) gdk_win32_drawable_get_handle(drawable)
+#define GDK_WINDOW_XWINDOW(window) gdk_win32_drawable_get_handle(window)
+#define GDK_VISUAL_XVISUAL(vis) (vis)
+EOF
+# fix missing gdk_display and in utils/imlib_config.c
+mv utils/imlib_config.c utils/imlib_config.c.bak
+cat > utils/imlib_config.c << EOF
+#include "gdk/gdkx.h"
+#define getuid() 0
+EOF
+cat utils/imlib_config.c.bak >> utils/imlib_config.c
+# fix duplicate gettimeofday
+patch -ulbf Imlib/Imlib_types.h << EOF
+--- Imlib/Imlib_types.h  2010-11-16 23:19:00 +0100
++++ Imlib/Imlib_types.h  2010-11-16 23:19:10 +0100
+@@ -13,2 +13,5 @@
+ #include <ctype.h>
++#if defined(__MINGW32__) && defined(gettimeofday)
++#undef gettimeofday
++#endif
+ #include <time.h>
+EOF
+# fix JPEG error handling problems in Imlib/load.c
+patch -ulbf Imlib/load.c << EOF
+--- Imlib/load.c  2004-09-21 02:23:20 +0200
++++ Imlib/load.c  2010-11-16 23:25:54 +0100
+@@ -61,3 +61,5 @@
+   struct jpeg_error_mgr pub;
++#ifndef __MINGW32__
+   sigjmp_buf          setjmp_buffer;
++#endif
+ };
+@@ -66,2 +68,3 @@
+
++#ifndef __MINGW32__
+ void
+@@ -81,2 +84,3 @@
+ }
++#endif
+
+@@ -91,2 +95,3 @@
+   cinfo.err = jpeg_std_error(&(jerr.pub));
++#ifndef __MINGW32__
+   jerr.pub.error_exit = _JPEGFatalErrorHandler;
+@@ -100,2 +105,3 @@
+     }
++#endif
+
+@@ -604,6 +610,14 @@
+
++#ifndef BI_RGB
+ #define BI_RGB       0
++#endif
++#ifndef BI_RLE8
+ #define BI_RLE8      1
++#endif
++#ifndef BI_RLE4
+ #define BI_RLE4      2
++#endif
++#ifndef BI_BITFIELDS
+ #define BI_BITFIELDS 3
++#endif
+
+EOF
+# fix gdk_imlib/misc.c
+patch -ulbf gdk_imlib/misc.c << EOF
+--- gdk_imlib/misc.c  2002-03-04 18:06:32 +0100
++++ gdk_imlib/misc.c  2010-11-19 18:03:04 +0100
+@@ -83,3 +83,3 @@
+
+-      cm = XCreateColormap(id->x.disp, private->xwindow,
++      cm = XCreateColormap(id->x.disp, GDK_DRAWABLE_XID(private),
+                           id->x.visual, AllocNone);
+@@ -93,3 +93,3 @@
+     }
+-  id->x.base_window = XCreateWindow(id->x.disp, private->xwindow,
++  id->x.base_window = XCreateWindow(id->x.disp, GDK_DRAWABLE_XID(private),
+                                    -100, -100, 10, 10, 0,
+@@ -138,3 +138,3 @@
+
+-  disp = (Display *) gdk_display;
++  disp = (Display *) gdk_display_get_default();
+   if (!disp)
+@@ -653,3 +653,3 @@
+   palfile = NULL;
+-  disp = (Display *) gdk_display;
++  disp = (Display *) gdk_display_get_default();
+   if (!disp)
+EOF
+# fix gdk_imlib/misc.c
+patch -ulbf gdk_imlib/rend.c << EOF
+--- gdk_imlib/rend.c  2001-02-14 05:54:14 +0100
++++ gdk_imlib/rend.c  2010-11-19 18:40:52 +0100
+@@ -19,2 +19,3 @@
+
++/*
+   private->xdisplay = window_private->xdisplay;
+@@ -34,2 +35,3 @@
+   gdk_xid_table_insert(&private->xwindow, pixmap);
++*/
+EOF
+# fix gdk_imlib/io-jpeg.c
+mv gdk_imlib/io-jpeg.c gdk_imlib/io-jpeg.c.bak
+cat > gdk_imlib/io-jpeg.c << EOF
+//#define sigsetjmp(buf,n) _setjmp(buf)
+#define sigsetjmp(buf,n) _setjmp(buf,n)
+#define siglongjmp longjmp
+#define sigjmp_buf jmp_buf
+EOF
+cat gdk_imlib/io-jpeg.c.bak >> gdk_imlib/io-jpeg.c
+# fix missing htonl in Imlib/misc.c
+mv Imlib/misc.c Imlib/misc.c.bak
+echo "#include <winsock2.h>" > Imlib/misc.c
+cat Imlib/misc.c.bak >> Imlib/misc.c
+# fix gdk_imlib/io-png.c for newer libpng
+mv gdk_imlib/io-png.c gdk_imlib/io-png.c.bak
+sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\)/png_get_\1(png_ptr, info_ptr)/g" gdk_imlib/io-png.c.bak > gdk_imlib/io-png.c
+# fix Imlib/load.c for newer libpng
+mv Imlib/load.c Imlib/load.c.bak
+sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\)/png_get_\1(png_ptr, info_ptr)/g" Imlib/load.c.bak > Imlib/load.c
+wl-showstatus configure &&
+# fix gdk_imlib/utils.c for newer libpng
+mv gdk_imlib/utils.c gdk_imlib/utils.c.bak
+sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\)/png_get_\1(png_ptr, info_ptr)/g" gdk_imlib/utils.c.bak > gdk_imlib/utils.c
+# fix Imlib/utils.c for newer libpng
+mv Imlib/utils.c Imlib/utils.c.bak
+sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\)/png_get_\1(png_ptr, info_ptr)/g" Imlib/utils.c.bak > Imlib/utils.c
+# fix Imlib/save.c for newer libpng
+mv Imlib/save.c Imlib/save.c.bak
+sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\)/png_get_\1(png_ptr, info_ptr)/g" Imlib/save.c.bak > Imlib/save.c
+# fix missing DGifOpen/DGifCloseFile parameter in gdk_imlib/io-gif.c (version >= 1.9.15)
+if grep -q "DGifCloseFile(.*ErrorCode)" $MINGWPREFIX/include/gif_lib.h; then
+ mv gdk_imlib/io-gif.c gdk_imlib/io-gif.c.bak &&
+ sed -e "s/\(DGifOpen\|DGifOpenFileName\|DGifCloseFile\)\(([^)]*([^)]*)[^)]*\|[^)]*\))/\1\2, NULL)/g" gdk_imlib/io-gif.c.bak > gdk_imlib/io-gif.c
+ mv Imlib/load.c Imlib/load.c.bak2 &&
+ sed -e "s/\(DGifOpen\|DGifOpenFileName\|DGifCloseFile\)\(([^)]*([^)]*)[^)]*\|[^)]*\))/\1\2, NULL)/g" Imlib/load.c.bak2 > Imlib/load.c
+fi
+wl-showstatus configure &&
+#mkdir -p m4 &&
+#WANT_AUTOMAKE=latest autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtktest --with-x=no GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtktest --with-x=no GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ # fix for newer giflib where PrintGifError no longer exists
+ if ! grep -wq PrintGifError $MINGWPREFIX/include/gif_lib.h; then
+  #echo "#define PrintGifError GifError" >> config.h
+  echo "#define PrintGifError()" >> config.h
+ fi &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lws2_32 -lX11 -lpng -ljpeg -lgif -ltiff -lXext" ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# To do: fix ugly hacks (e.g. in gdk/gdkx.h) which probably brake functionality
+
+
+

@@ -1,0 +1,160 @@
+export NAME="YARP"
+export STATUS=
+export URL=http://www.yarp.it/
+export BASENAME=yarp
+export DESCRIPTION="YARP stands for Yet Another Robot Platform. What is it? If data is the bloodstream of your robot, then YARP is the circulatory system."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=3.1.0
+#export VERSIONDATE=20180922
+#export VERSION=3.1.1
+#export VERSIONDATE=20190418
+#export VERSION=3.1.2
+#export VERSIONDATE=20190605
+#export VERSION=3.2.0
+#export VERSIONDATE=20190627
+#export VERSION=3.2.1
+#export VERSIONDATE=20190927
+#export VERSION=3.2.2
+#export VERSIONDATE=20191129
+#export VERSION=3.3.0
+#export VERSIONDATE=20191205
+#export VERSION=3.3.1
+#export VERSIONDATE=20200117
+#export VERSION=3.3.2
+#export VERSIONDATE=20200219
+#export VERSION=3.3.3
+#export VERSIONDATE=20200720
+#export VERSION=3.4.0
+#export VERSIONDATE=20200731
+#export VERSION=3.4.1
+#export VERSIONDATE=20200929
+#export VERSION=3.4.2
+#export VERSIONDATE=20210119
+#export VERSION=3.4.3
+#export VERSIONDATE=20210223
+#export VERSION=3.4.4
+#export VERSIONDATE=20210519
+#export VERSION=3.4.5
+#export VERSIONDATE=20210524
+#export VERSION=3.4.6
+#export VERSIONDATE=20210703
+#export VERSION=3.5.0
+#export VERSIONDATE=20210715
+export VERSION=3.5.1
+export VERSIONDATE=20211111
+#export VERSION=3.6.0
+#export VERSIONDATE=20211231
+wl-showstatus --package-version
+export DEPENDANCIES=ace,sqlite3,ffmpeg3,eigen,tinyxml2,glfw3,glew,libjpeg,libpng,sdl,glib2,gstreamer,qt,opencv,ycm
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/robotology/yarp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/robotology/yarp/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing rand_r in src/libYARP_OS/src/AbstractCarrier.cpp
+for F in src/libYARP_OS/src/*.cpp; do
+ mv $F $F.bak &&
+ echo "#include <ace/OS_NS_stdlib.h>" > $F &&
+ cat $F.bak >> $F
+done
+# fix missing setenv/unsetenv in src/libYARP_conf/src/yarp/conf/environment.h
+sed -i.bak -e "s/defined(_MSC_VER)/defined(_WIN32)/" src/libYARP_conf/src/yarp/conf/environment.h
+# fix already defined stat in src/libYARP_os/src/yarp/os/Os.h (version >= 3.4.1)
+mv src/libYARP_os/src/yarp/os/Os.h src/libYARP_os/src/yarp/os/Os.h.bak
+cat > src/libYARP_os/src/yarp/os/Os.h << EOF
+#include <sys/stat.h>
+#undef stat
+EOF
+cat src/libYARP_os/src/yarp/os/Os.h.bak >> src/libYARP_os/src/yarp/os/Os.h
+# fix src/libYARP_os/src/yarp/os/impl/ThreadImpl.cpp (version >= 3.4.1)
+patch -ulbf src/libYARP_os/src/yarp/os/impl/ThreadImpl.cpp << EOF
+@@ -259,2 +259,5 @@
+ #if defined(YARP_HAS_ACE)
++#  ifdef __MINGW32__
++        yCError(THREADIMPL, "Cannot set priority on Windows");
++#  else
+         if (std::is_same<std::thread::native_handle_type, ACE_hthread_t>::value) {
+@@ -263,2 +266,3 @@
+         yCError(THREADIMPL, "Cannot set priority without ACE");
++#  endif
+ #elif defined(__unix__)
+@@ -284,2 +288,5 @@
+ #if defined(YARP_HAS_ACE)
++#  ifdef __MINGW32__
++        yCError(THREADIMPL, "Cannot get priority on Windows");
++#  else
+         if (std::is_same<std::thread::native_handle_type, ACE_hthread_t>::value) {
+@@ -289,2 +296,3 @@
+         }
++#  endif
+ #elif defined(__unix__)
+@@ -311,2 +319,5 @@
+ #if defined(YARP_HAS_ACE)
++#  ifdef __MINGW32__
++        yCError(THREADIMPL, "Cannot get scheduling policy on Windows");
++#  else
+         if (std::is_same<std::thread::native_handle_type, ACE_hthread_t>::value) {
+@@ -317,2 +328,3 @@
+         }
++#  endif
+ #elif defined(__unix__)
+EOF
+# fix src/libYARP_wire_rep_utils/src/yarp/wire_rep_utils/WireTwiddler.cpp (version >= 3.4.1)
+patch -ulbf src/libYARP_wire_rep_utils/src/yarp/wire_rep_utils/WireTwiddler.cpp << EOF
+@@ -853,3 +853,3 @@
+             dbg_printf("  block %d is at %ld, length %d\\n",block,
+-                       (long int)blockPtr, blockLen);
++                       (long int)(intptr_t)blockPtr, blockLen);
+             offset = 0;
+@@ -868,3 +868,3 @@
+         if (shouldCheck) {
+-            dbg_printf("Type check against %ld\\n", (long int)activeCheck);
++            dbg_printf("Type check against %ld\\n", (long int)(intptr_t)activeCheck);
+             int result = memcmp(activeCheck,blockPtr+offset,rem);
+@@ -935,3 +935,3 @@
+     }
+-    dbg_printf("  cache %ld len %d offset %d /// activeEmit %ld %d %d\\n", (long int)src, len, noffset, (long int) activeEmit, activeEmitLength, activeEmitOffset);
++    dbg_printf("  cache %ld len %d offset %d /// activeEmit %ld %d %d\\n", (long int)(intptr_t)src, len, noffset, (long int)(intptr_t)activeEmit, activeEmitLength, activeEmitOffset);
+     if (activeEmit != nullptr || activeEmitOffset >= 0) {
+@@ -946,3 +946,3 @@
+         if (push) {
+-            dbg_printf("  ** emit %ld len %d offset %d\\n", (long int)activeEmit,
++            dbg_printf("  ** emit %ld len %d offset %d\\n", (long int)(intptr_t)activeEmit,
+                        activeEmitLength, activeEmitOffset);
+@@ -954,3 +954,3 @@
+             activeEmitLength += len;
+-            dbg_printf("  ** extend %ld len %d offset %d\\n", (long int)activeEmit,
++            dbg_printf("  ** extend %ld len %d offset %d\\n", (long int)(intptr_t)activeEmit,
+                        activeEmitLength, activeEmitOffset);
+EOF
+## fix number of parameters to wcstok() when using UCRT (version >= 3.5.1)
+#####Bug reported: https://github.com/mingw-w64/mingw-w64.github.io/issues/7
+#for F in $(grep -l "#\s*include <ace/" $(find -name '*.h' -or -name '*.cpp')); do
+# mv $F $F.bak &&
+# echo "#include <wchar.h>" > $F &&
+# #echo "#include <string.h>" > $F &&
+# echo "#define ACE_HAS_3_PARAM_WCSTOK" >> $F &&
+# cat $F.bak >> $F
+#done
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSKIP_ACE:BOOL=OFF -DYARP_COMPILE_GUIS:BOOL=OFF -DFTDI_INCLUDE_DIR:PATH=$MINGWPREFIX/include/libftdi1 -DFTDI_LIBRARY:FILEPATH=-lftdi1 -DFFMPEG_ROOT:PATH=$MINGWPREFIX/ffmpeg4 -DYARP_COMPILE_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSKIP_ACE:BOOL=OFF -DYARP_COMPILE_GUIS:BOOL=OFF -DFTDI_INCLUDE_DIR:PATH=$MINGWPREFIX/include/libftdi1 -DFTDI_LIBRARY:FILEPATH=-lftdi1 -DFFMPEG_ROOT:PATH=$MINGWPREFIX/ffmpeg4 -DYARP_COMPILE_TESTS:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ #-DCMAKE_CXX_FLAGS:STRING="-DACE_HAS_3_PARAM_WCSTOK=1" 
+ # add missing libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lpsapi -lwbemuuid/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

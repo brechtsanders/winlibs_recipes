@@ -1,0 +1,128 @@
+export NAME="libmba"
+export STATUS=
+export URL=http://www.ioplex.com/~miallen/libmba/
+export BASENAME=libmba
+export DESCRIPTION="The libmba package is a collection of mostly independent C modules potentially useful to any project. There are the usual ADTs including a linkedlist, hashmap, pool, stack, and varray, a flexible memory allocator, CSV parser, path canonicalization routine, I18N text abstraction, configuration file module, portable semaphores, condition variables and more."
+export CATEGORY=development
+export TYPE=library
+export VERSION=0.9.1
+export VERSIONDATE=20120717
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://www.ioplex.com/~miallen/libmba/dl/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.ioplex.com/~miallen/libmba/dl/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix mktool.c
+patch -ulb mktool.c << EOF
+--- mktool.c  2012-07-17 21:03:22 +0200
++++ mktool.c  2012-07-17 21:12:34 +0200
+@@ -34,2 +34,5 @@
+ #include <unistd.h>
++#if defined(__MINGW32__) && !defined(ENOBUFS)
++#define ENOBUFS 105
++#endif
+
+@@ -126,2 +129,19 @@
+                "hpux",
++#elif defined(__MINGW32__) ||  defined(__MINGW64__)
++               "gcc",
++               " -g",
++               " -Wall -W",
++               " -Wall -W -ansi -pedantic",
++               " -std=c99",
++               " -std=c89",
++               "",
++               "",
++               "",
++               "",
++               " -shared",
++               " -Wl,-rpath,%s",
++               "",
++               "",
++               "lib%n.dll",
++               "windows",
+ #else
+@@ -319,3 +339,7 @@
+                        *bp = '\0';
++#ifdef _WIN32
++                       if (mkdir(buf) == -1 && errno != EEXIST) {
++#else
+                        if (mkdir(buf, mode) == -1 && errno != EEXIST) {
++#endif
+                                ERR(errno, buf);
+@@ -462,2 +486,3 @@
+                }
++#if !defined(__MINGW32__) && !defined(__MINGW64__)
+                if (arg_array[ARG_SOLNK1][0]) {
+@@ -470,2 +495,3 @@
+                }
++#endif
+        } else {
+EOF
+# fix src/daemon.c
+patch -ulb src/daemon.c << EOF
+--- src/daemon.c  2005-03-27 01:05:12 +0100
++++ src/daemon.c  2012-07-17 21:18:10 +0200
+@@ -60,2 +60,5 @@
+ {
++#if defined(__MINGW32__) ||  defined(__MINGW64__)
++       return -1;
++#else
+        pid_t pid;
+@@ -130,2 +133,3 @@
+        return 0;
++#endif
+ }
+EOF
+# fix src/mba/time.h
+patch -ulb src/mba/time.h << EOF
+--- src/mba/time.h  2005-04-03 04:18:36 +0200
++++ src/mba/time.h  2012-07-17 21:23:36 +0200
+@@ -33,2 +33,5 @@
+ #else
++#if defined(__MINGW32__) ||  defined(__MINGW64__)
++#define MILLISECONDS_BETWEEN_1970_AND_1601 11644473600000ULL
++#endif
+ #include <inttypes.h> /* punt! */
+EOF
+# fix src/time.c
+patch -ulb src/time.c << EOF
+--- src/time.c  2012-07-17 21:20:38 +0200
++++ src/time.c  2012-07-17 21:24:34 +0200
+@@ -31,3 +31,3 @@
+
+-uint64_t
++LIBMBA_API uint64_t
+ time_current_millis(void)
+@@ -40,5 +40,13 @@
+        ret = ftime.dwHighDateTime;
++#if defined(__MINGW32__) ||  defined(__MINGW64__)
++       ret <<= 32ULL;
++#else
+        ret <<= 32Ui64;
++#endif
+        ret |= ftime.dwLowDateTime;
++#if defined(__MINGW32__) ||  defined(__MINGW64__)
++       ret = ret / 10000ULL - MILLISECONDS_BETWEEN_1970_AND_1601;
++#else
+        ret = ret / 10000Ui64 - MILLISECONDS_BETWEEN_1970_AND_1601;
++#endif
+
+EOF
+wl-showstatus build &&
+make -j1 CC=gcc &&
+    echo OK
+#wl-showstatus build-install &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

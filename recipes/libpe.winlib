@@ -1,0 +1,105 @@
+#export NAME="libpe"
+#export STATUS=
+#export URL=https://github.com/evilsocket/libpe
+#export BASENAME=libpe
+#export DESCRIPTION="A C/C++ library to parse Windows portable executables written with speed and stability in mind."
+#export CATEGORY=fileformat
+#export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20171129
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/evilsocket/libpe/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/evilsocket/libpe/archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+##mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#wl-showstatus build &&
+# for F in $(find . -name *.cpp); do
+#  g++ -O3 -c -o $F.o $F -Ilibpe -fpermissive
+# done &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="libpe"
+export STATUS=
+#export URL=http://pev.sourceforge.net/
+export URL=https://github.com/merces/libpe
+export BASENAME=libpe
+export DESCRIPTION="The PE library used by pev the PE file analysis toolkit"
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20190211
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/merces/libpe/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/merces/libpe/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing madvise() in pe.c
+sed -i.bak -e "s?madvise\s*(.*)?-1?" pe.c
+# fix missing strerror_r
+mv error.c error.c.bak &&
+if ! gcc --version | grep -q MinGW-W64; then
+echo "#define strerror_r(a,b,c) (strerror_s((b),(c),(a)))" > error.c
+else
+echo "#define strerror_r(a,b,c) (strncpy(b,strerror(a),c-1),b[c-1]=0,b)" > error.c
+fi &&
+cat error.c.bak >> error.c
+# fix home directory detection in utils.c
+patch -ulbf utils.c << EOF
+@@ -30,3 +30,5 @@
+ #include <sys/stat.h>
++#ifndef _WIN32
+ #include <pwd.h>
++#endif
+ #include <unistd.h>
+@@ -177,2 +179,5 @@
+ const char *pe_utils_get_homedir(void) {
++#ifdef _WIN32
++       return getenv("APPDATA");
++#else
+        const char *homedir = getenv("HOME");
+@@ -185,2 +190,3 @@
+        return pwd == NULL ? NULL : pwd->pw_dir;
++#endif
+ }
+EOF
+# avoid redefinitions in include/libpe/hdr_coff.h
+#sed -i.bak -e "s/^\([ \t]*\)\(IMAGE_\|RT_\)\([^ \t]*\).*=.*$/\1#undef \2\3\n&/" include/libpe/hdr_coff.h include/libpe/sections.h include/libpe/directories.h include/libpe/dir_resources.h include/libpe/hdr_optional.h
+sed -i.bak -e "s/^\([ \t]*\)\(IMAGE_\|RT_\)\([^ \t]*\).*=.*$/\1#define \2\3 LIBPE_\2\3\n&/" include/libpe/hdr_coff.h include/libpe/sections.h include/libpe/directories.h include/libpe/dir_resources.h include/libpe/hdr_optional.h
+# fix building .dll.a file
+sed -i.bak -e "s/-o \(\$(LIBNAME)\.dll\).*/-s -Wl,--out-implib,\1.a &; ar cru libpe.a \$\^/" Makefile
+wl-showstatus build &&
+ make PLATFORM_OS=CYGWIN CC="gcc -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-lmman" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

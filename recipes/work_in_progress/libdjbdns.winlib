@@ -1,0 +1,158 @@
+export NAME="djbdns"
+export STATUS=
+export URL=http://cr.yp.to/djbdns/blurb/library.html
+export BASENAME=libdjbdns
+export DESCRIPTION="DNS client library designed to replace the BIND res_*/dn_* library"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.05
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://cr.yp.to/djbdns/install.html djbdns-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://cr.yp.to/djbdns/djbdns-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/djbdns-$VERSION.tar.gz
+cd djbdns-$VERSION
+# various fixes
+echo "-lws2_32" > socket.lib
+patch -ulbf conf-cc << EOF
+--- conf-cc  Sun Feb 11 22:11:46 2001
++++ conf-cc  Tue Sep  1 09:56:32 2009
+@@ -1,2 +1,2 @@
+-gcc -O2 -Wimplicit -Wunused -Wcomment -Wchar-subscripts -Wuninitialized -Wshadow -Wcast-qual -Wcast-align -Wwrite-strings
++gcc -O2 -Wimplicit -Wunused -Wcomment -Wchar-subscripts -Wuninitialized -Wshadow -Wcast-qual -Wcast-align -Wwrite-strings -I.
+EOF
+patch -ulbf generic-conf.c << EOF
+--- generic-conf.c  Sun Feb 11 22:11:46 2001
++++ generic-conf.c  Tue Sep  1 10:14:58 2009
+@@ -7,2 +7,3 @@
+ #include "generic-conf.h"
++#define fsync(fd) _commit(fd)
+ 
+@@ -21,3 +22,3 @@
+   umask(022);
+-  if (mkdir(dir,0700) == -1)
++  if (mkdir(dir/*,0700*/) == -1)
+     strerr_die4sys(111,fatal,"unable to create ",dir,": ");
+@@ -37,3 +38,3 @@
+   fn = s;
+-  if (mkdir(fn,0700) == -1) fail();
++  if (mkdir(fn/*,0700*/) == -1) fail();
+ }
+@@ -77,3 +78,3 @@
+ {
+-  if (chown(fn,uid,gid) == -1) fail();
++  //if (chown(fn,uid,gid) == -1) fail();
+ }
+EOF
+patch -ulbf ndelay_off.c << EOF
+--- ndelay_off.c  Sun Feb 11 22:11:46 2001
++++ ndelay_off.c  Tue Sep  1 10:24:48 2009
+@@ -4,5 +4,3 @@
+ 
+-#ifndef O_NONBLOCK
+-#define O_NONBLOCK O_NDELAY
+-#endif
++#include <winsock2.h>
+ 
+@@ -10,3 +8,4 @@
+ {
+-  return fcntl(fd,F_SETFL,fcntl(fd,F_GETFL,0) & ~O_NONBLOCK);
++  unsigned long flags = 0;
++  return ioctlsocket(fd, FIONBIO, &flags);
+ }
+EOF
+patch -ulbf ndelay_on.c << EOF
+--- ndelay_on.c  Sun Feb 11 22:11:46 2001
++++ ndelay_on.c  Tue Sep  1 10:24:48 2009
+@@ -4,5 +4,3 @@
+ 
+-#ifndef O_NONBLOCK
+-#define O_NONBLOCK O_NDELAY
+-#endif
++#include <winsock2.h>
+ 
+@@ -10,3 +8,4 @@
+ {
+-  return fcntl(fd,F_SETFL,fcntl(fd,F_GETFL,0) | O_NONBLOCK);
++  unsigned long flags = 1;
++  return ioctlsocket(fd, FIONBIO, &flags);
+ }
+EOF
+patch -ulbf open_read.c << EOF
+--- open_read.c  Sun Feb 11 22:11:46 2001
++++ open_read.c  Thu Sep  3 16:35:36 2009
+@@ -6 +6,5 @@
+-{ return open(fn,O_RDONLY | O_NDELAY); }
++{ return open(fn,O_RDONLY
++#ifdef O_NDELAY
++ | O_NDELAY
++#endif
++ ); }
+EOF
+patch -ulbf open_trunc.c << EOF
+--- open_trunc.c  Sun Feb 11 22:11:46 2001
++++ open_trunc.c  Thu Sep  3 16:38:20 2009
+@@ -6 +6,5 @@
+-{ return open(fn,O_WRONLY | O_NDELAY | O_TRUNC | O_CREAT,0644); }
++{ return open(fn,O_WRONLY |
++#ifdef O_NDELAY
++ O_NDELAY |
++#endif
++  O_TRUNC | O_CREAT,0644); }
+EOF
+#fix missing pwd.h
+cat > pwd.h << EOF
+#define getuid() 0
+#define getgid() 0
+#define getppid() 0
+#define getpwnam(username) NULL
+struct passwd {
+  int pw_uid;
+  int pw_gid;
+};
+#include <stdlib.h>
+EOF
+# fix missing files
+mkdir sys netinet
+echo "#include <winsock2.h>" > sys/socket.h
+touch netinet/in.h
+# fix missing errno
+mv buffer_put.c buffer_put.c.bak
+echo "#include <errno.h>" > buffer_put.c
+cat buffer_put.c.bak >> buffer_put.c
+mv buffer_get.c buffer_get.c.bak
+echo "#include <errno.h>" > buffer_get.c
+cat buffer_get.c.bak >> buffer_get.c
+mv strerr_sys.c strerr_sys.c.bak
+echo "#include <errno.h>" > strerr_sys.c
+cat strerr_sys.c.bak >> strerr_sys.c
+# fix missing includes
+mv iopause.c iopause.c.bak
+echo "#include <winsock2.h>" > iopause.c
+cat iopause.c.bak >> iopause.c
+mv select.h1 select.h1.bak
+echo "#include <winsock2.h>" > select.h1
+# fix missing getgroups/setgroups in chkshsgr.c
+cat >> exit.h << EOF
+#define getgroups(size, list) 0
+#define setgroups(size,list) 0
+EOF
+
+wl-showstatus build &&
+make &&
+    echo OK
+#wl-showstatus build-install &&
+
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf djbdns-$VERSION
+
+
+

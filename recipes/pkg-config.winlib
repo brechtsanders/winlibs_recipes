@@ -1,0 +1,104 @@
+export NAME="pkg-config"
+export STATUS=
+export URL=http://pkgconfig.freedesktop.org/
+export BASENAME=pkg-config
+export DESCRIPTION="pkg-config is a helper tool used when compiling applications and libraries. It helps you insert the correct compiler options on the command line so an application can use  gcc -o test test.c 'pkg-config --libs --cflags glib-2.0'  for instance, rather than hard-coding values on where to find glib (or other libraries). It is language-agnostic, so it can be used for defining the location of documentation tools, for instance."
+export CATEGORY=build
+export TYPE=application
+#export VERSION=0.22
+#export VERSION=0.23
+#export VERSION=0.24
+#export VERSIONDATE=20100524
+#export VERSION=0.25
+#export VERSIONDATE=20100531
+#export VERSION=0.26
+#export VERSIONDATE=20110515
+#export VERSION=0.27
+#export VERSIONDATE=20120711
+#export DEPENDANCIES=libiconv,gettext,glib2,popt
+#export VERSION=0.27.1
+#export VERSIONDATE=20120824
+#export VERSION=0.28
+#export VERSIONDATE=20130124
+#export VERSION=0.29
+#export VERSIONDATE=20150929
+#export VERSION=0.29.1
+#export VERSIONDATE=20160405
+export VERSION=0.29.2
+export VERSIONDATE=20170321
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://pkgconfig.freedesktop.org/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://pkgconfig.freedesktop.org/releases/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing strcasecmp in glib/glib/glib-init.c (version >= 0.29.2)
+mv glib/glib/glib-init.c glib/glib/glib-init.c.bak &&
+sed -e "s/\bstrcasecmp\b/stricmp/g" glib/glib/glib-init.c.bak > glib/glib/glib-init.c
+# fix missing strcasecmp/strncasecmp in glib/glib/gstrfuncs.c (version >= 0.29.2)
+mv glib/glib/gstrfuncs.c glib/glib/gstrfuncs.c.bak &&
+sed -e "s/\bstrcasecmp\b/stricmp/g; s/\bstrncasecmp\b/strnicmp/g" glib/glib/gstrfuncs.c.bak > glib/glib/gstrfuncs.c
+## fix missing _stricmp/_strnicmp in glib/glib/win_iconv.c (version >= 0.29.2)
+#mv glib/glib/win_iconv.c glib/glib/win_iconv.c.bak &&
+#sed -e "s/\b_\(strn*icmp\)\b/\1/g" glib/glib/win_iconv.c.bak > glib/glib/win_iconv.c
+## fix missing _stricmp in glib/glib/gfileutils.c (version >= 0.29.2)
+#mv glib/glib/gfileutils.c glib/glib/gfileutils.c.bak &&
+#sed -e "s/\b_\(stricmp\)\b/\1/g" glib/glib/gfileutils.c.bak > glib/glib/gfileutils.c
+# fix printf format issue issue with MinGW-w64 >= 8.0.0 (version >= 0.29.2)
+mv glib/glib/gslice.c glib/glib/gslice.c.bak &&
+echo "#include <_mingw.h>" > glib/glib/gslice.c &&
+echo "#if defined(__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR == 8" >> glib/glib/gslice.c &&
+echo "#undef __USE_MINGW_ANSI_STDIO" >> glib/glib/gslice.c &&
+echo "#define __USE_MINGW_ANSI_STDIO 0" >> glib/glib/gslice.c &&
+echo "#endif" >> glib/glib/gslice.c &&
+cat glib/glib/gslice.c.bak >> glib/glib/gslice.c
+# fix glib/glib/gslice.c (version >= 0.29.2)
+patch -ulbf glib/glib/gslice.c << EOF
+@@ -33,2 +38,3 @@
+ #include <errno.h>
++#include <inttypes.h>
+
+@@ -1505,3 +1511,3 @@
+     {
+-      fprintf (stderr, "GSlice: MemChecker: attempt to release non-allocated block: %p size=%" G_GSIZE_FORMAT "\\n", pointer, size);
++      fprintf (stderr, "GSlice: MemChecker: attempt to release non-allocated block: %p size=%" PRIu64 "\\n", pointer, (uint64_t)size);
+       return 0;
+@@ -1510,3 +1516,3 @@
+     {
+-      fprintf (stderr, "GSlice: MemChecker: attempt to release block with invalid size: %p size=%" G_GSIZE_FORMAT " invalid-size=%" G_GSIZE_FORMAT "\\n", pointer, real_size, size);
++      fprintf (stderr, "GSlice: MemChecker: attempt to release block with invalid size: %p size=%" PRIu64 " invalid-size=%" PRIu64 "\\n", pointer, (uint64_t)real_size, (uint64_t)size);
+       return 0;
+@@ -1515,3 +1521,3 @@
+     {
+-      fprintf (stderr, "GSlice: MemChecker: attempt to release non-allocated block: %p size=%" G_GSIZE_FORMAT "\\n", pointer, size);
++      fprintf (stderr, "GSlice: MemChecker: attempt to release non-allocated block: %p size=%" PRIu64 "\\n", pointer, (uint64_t)size);
+       return 0;
+EOF
+# fix glib/configure when using supplied glib2 (0.29.1)
+sed -i.bak -e "s/as_fn_error\(.*Could not determine values for [A-Z_]*\)/echo\1/" glib/configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/glib-2.0 -I$MINGWPREFIX/lib/glib-2.0/include" &&
+ #PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM GLIB_CFLAGS="-I$MINGWPREFIX/include/glib-2.0 -I$MINGWPREFIX/lib/glib-2.0/include" GLIB_LIBS="-lglib-2.0" &&
+ #PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-installed-popt GLIB_CFLAGS="-I$MINGWPREFIX/include/glib-2.0 -I$MINGWPREFIX/lib/glib-2.0/include" GLIB_LIBS="-Wl,--enable-auto-import -Wl,--as-needed -lglib-2.0" &&
+ #PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-internal-glib CFLAGS="$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo -march=i686; fi)" &&
+ PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-internal-glib CFLAGS="$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo -march=i686; fi)" &&
+ #echo "#define strcasecmp stricmp" >> glib/config.h &&
+ #echo "#define strncasecmp strnicmp" >> glib/config.h &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ make install-strip LN="cp" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# from here on use this version of pkg-config
+#export PKG_CONFIG="$MINGWPREFIX/bin/pkg-config.exe --dont-define-prefix"
+
+
+

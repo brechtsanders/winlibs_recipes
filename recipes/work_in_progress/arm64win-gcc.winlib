@@ -1,0 +1,174 @@
+export NAME="GCC, the GNU Compiler Collection (targetting Windows on ARM 64-bit)"
+export STATUS=
+export URL=https://gcc.gnu.org/
+export BASENAME=arm64win-gcc
+export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom. This build targets the Windows on ARM platform."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=10.2.0
+#export VERSIONDATE=20201123
+#export VERSION=10.3.0
+#export VERSIONDATE=20210408
+#export VERSION=11.1.0
+#export VERSIONDATE=20210427
+export VERSION=11.2.0
+export VERSIONDATE=20210728
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mman-win32,mingw-w64
+#export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mman-win32,armwin-mingw-w64
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=arm64win-binutils
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://gcc.gnu.org/releases.html gcc-"
+#export DOWNLOADURL="https://ftp.gnu.org/gnu/gcc/ gcc-"
+export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/releases/ gcc-"
+#export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/snapshots/ gcc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.mpi-sb.mpg.de/pub/gnu/mirror/gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/gcc/gcc-$VERSION/gcc-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/snapshots/$VERSION/gcc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/gcc $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfJlh $TARBALLDIR/gcc/gcc-$VERSION.tar.xz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/gcc-$VERSION
+# fix missing sys/wait.h fixincludes/fixincl.c (version >= 9.3.0)
+patch -ulbf fixincludes/fixincl.c << EOF
+@@ -28,4 +28,12 @@
+ #ifndef SEPARATE_FIX_PROC
++#ifdef _WIN32
++#include <Windows.h>
++#define wait(p) Sleep(0)
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#else
+ #include <sys/wait.h>
+ #endif
++#endif
+
+EOF
+# fix missing pipe in fixincludes/procopen.c (version >= 9.3.0)
+patch -ulbf fixincludes/procopen.c << EOF
+@@ -50,2 +50,7 @@
+ #include "server.h"
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#endif
+
+EOF
+# fix missing kill/alarm in fixincludes/server.c (version >= 9.3.0)
+patch -ulbf fixincludes/server.c << EOF
+@@ -50,2 +50,6 @@
+ #include "server.h"
++#ifdef _WIN32
++#define kill(pid,sig) -1
++#define alarm(n) 0
++#endif
+
+EOF
+# fix to support Windows on ARM in gcc/config.gcc
+patch -ulbf gcc/config.gcc << EOF
+@@ -2116,3 +2116,3 @@
+        ;;
+-i[34567]86-*-mingw* | x86_64-*-mingw*)
++i[34567]86-*-mingw* | x86_64-*-mingw* | arm*-*-mingw* | aarch64*-*-mingw*)
+        tm_file="\${tm_file} i386/unix.h i386/bsd.h i386/gas.h dbxcoff.h i386/cygming.h"
+EOF
+# fix to support Windows on ARM in gcc/config.host
+patch -ulbf gcc/config.host << EOF
+@@ -236,3 +236,3 @@
+     ;;
+-  i[34567]86-*-mingw32*)
++  i[34567]86-*-mingw32* | arm*-*-mingw* | aarch64*-*-mingw*)
+     host_xm_file=i386/xm-mingw32.h
+EOF
+# fix undefined TARGET_64BIT in gcc/config/i386/mingw-stdint.h (version >= 10.2.0)
+patch -ulbf gcc/config/i386/mingw-stdint.h << EOF
+@@ -48,3 +48,8 @@
+
++#ifdef TARGET_64BIT
+ #define INTPTR_TYPE (TARGET_64BIT ? "long long int" : "int")
+ #define UINTPTR_TYPE (TARGET_64BIT ? "long long unsigned int" : "unsigned int")
++#else
++#define INTPTR_TYPE "long long int"
++#define UINTPTR_TYPE "long long unsigned int"
++#endif
+EOF
+## fix undefined TARGET_64BIT in gcc/config/i386/cygming.h (version >= 11.1.0)
+#patch -ulbf gcc/config/i386/cygming.h << EOF
+#@@ -33,2 +33,5 @@
+# #undef TARGET_SEH
+#+#ifndef TARGET_64BIT_MS_ABI
+#+#define TARGET_64BIT_MS_ABI 0
+#+#endif
+# #define TARGET_SEH  (TARGET_64BIT_MS_ABI && flag_unwind_tables)
+#@@ -59,2 +62,5 @@
+# #undef DEFAULT_ABI
+#+#ifndef TARGET_64BIT
+#+#define TARGET_64BIT 0
+#+#endif
+# #define DEFAULT_ABI (TARGET_64BIT ? MS_ABI : SYSV_ABI)
+#EOF
+## fix redefinition of uintptr_t in libiberty/regex.c (version >= 10.3.0)
+#patch -ulbf libiberty/regex.c << EOF
+#@@ -303,3 +303,3 @@
+# # if !defined _LIBC && !defined HAVE_UINTPTR_T
+#-typedef unsigned long int uintptr_t;
+#+//typedef unsigned long int uintptr_t;
+# # endif
+#EOF
+# avoid looking for libiberty.a in a pic subdirectory
+sed -i.bak -e "s?pic/\(libiberty\.a\)?\1?g" $(grep -l "pic/libiberty\.a" */Makefile.in)
+# copy MinGW-w64 files
+mkdir -p build_arm64win/mingw-w64/mingw &&
+cp -rf $MINGWPREFIX/share/mingw-w64/include build_arm64win/mingw-w64/mingw/ &&
+cp -rf $MINGWPREFIX/share/mingw-w64/lib build_arm64win/mingw-w64/mingw/
+mkdir -p build_arm64win &&
+ wl-showstatus configure &&
+ cd build_arm64win &&
+ #PATH=$MINGWPREFIX/share/arm64win-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/arm64win-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=aarch64-w64-mingw32 --with-pkgversion="GCC targetting Windows on ARM, built by Brecht Sanders" --disable-bootstrap --enable-languages=c,c++ --disable-nls --disable-libssp --with-dwarf2 --disable-version-specific-runtime-libs --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-system-zlib --disable-twoprocess CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #PATH=$MINGWPREFIX/share/arm64win-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/arm64win-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=aarch64-w64-mingw32 --with-pkgversion="GCC targetting Windows on ARM, built by Brecht Sanders" --enable-checking=release --enable-threads=posix --disable-libunwind-exceptions --enable-serial-configure --disable-bootstrap --enable-host-shared --enable-plugin --enable-default-ssp --disable-rpath --disable-libstdcxx-pch --enable-libstdcxx-time=yes --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi) --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) &&
+ #PATH=$MINGWPREFIX/share/arm64win-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/arm64win-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=aarch64-w64-mingw32 --with-pkgversion="GCC targetting Windows on ARM, built by Brecht Sanders" --enable-checking=release --enable-threads=posix --disable-libunwind-exceptions --enable-serial-configure --disable-bootstrap --enable-host-shared --enable-plugin --enable-default-ssp --disable-rpath --disable-libstdcxx-pch --enable-libstdcxx-time=yes --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi) --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,interwork} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) &&
+ PATH=$MINGWPREFIX/share/arm64win-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/arm64win-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=aarch64-w64-mingw32 --with-pkgversion="GCC targetting Windows on ARM, built by Brecht Sanders" --enable-checking=release --enable-threads=posix --disable-libunwind-exceptions --enable-serial-configure --disable-bootstrap --enable-host-shared --enable-plugin --enable-default-ssp --disable-rpath --disable-libstdcxx-pch --enable-libstdcxx-time=yes --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++ --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,interwork} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) &&
+ #PATH=$MINGWPREFIX/share/arm64win-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/arm64win-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=aarch64-w64-mingw32 --with-pkgversion="GCC targetting Windows on ARM, built by Brecht Sanders" --enable-checking=release --enable-threads=posix --disable-libunwind-exceptions --enable-serial-configure --enable-bootstrap --enable-host-shared --enable-plugin --enable-default-ssp --disable-rpath --disable-libstdcxx-pch --enable-libstdcxx-time=yes --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi) --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,interwork} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) &&
+ #$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)
+ #CFLAGS="-DTARGET_64BIT=1" 
+ #CFLAGS_FOR_TARGET="-DTARGET_64BIT=1" 
+ #PATH=$MINGWPREFIX/share/arm64win-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/arm64win-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi)-posix-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" --with-tune=generic --enable-checking=release --enable-threads=posix $(if [ "0$USE_SJLJ" -ne 0 ]; then if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--without-dwarf2 "; fi; echo "--enable-sjlj-exceptions"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--with-dwarf2 "; fi; echo "--disable-sjlj-exceptions"; fi) --disable-libunwind-exceptions --enable-serial-configure --disable-bootstrap --enable-host-shared --enable-plugin --enable-default-ssp --disable-rpath --disable-libstdcxx-pch --enable-libstdcxx-time=yes --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi) --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) &&
+ #--with-newlib 
+ cd .. &&
+ wl-showstatus build &&
+ #PATH=$(pwd)/build_arm64win/gcc:$(pwd)/build_arm64win/gcc/build:$MINGWPREFIX/share/arm64win-binutils/bin:$PATH make -Cbuild_arm64win &&
+ ( PATH=$(pwd)/build_arm64win/gcc:$(pwd)/build_arm64win/gcc/build:$MINGWPREFIX/share/arm64win-binutils/bin:$PATH make -Cbuild_arm64win || (
+  # fix missing TARGET_64BIT (version <= 10.3.0)
+  echo "#ifndef TARGET_64BIT" >> build_arm64win/gcc/auto-host.h &&
+  echo "#define TARGET_64BIT 0" >> build_arm64win/gcc/auto-host.h &&
+  echo "#endif" >> build_arm64win/gcc/auto-host.h &&
+  # fix missing TARGET_64BIT_MS_ABI (version <= 10.3.0)
+  echo "#ifndef TARGET_64BIT_MS_ABI" >> build_arm64win/gcc/auto-host.h &&
+  echo "#define TARGET_64BIT_MS_ABI 0" >> build_arm64win/gcc/auto-host.h &&
+  echo "#endif" >> build_arm64win/gcc/auto-host.h &&
+  # fix missing MS_ABI (version <= 10.3.0)
+  echo "#ifndef MS_ABI" >> build_arm64win/gcc/auto-host.h &&
+  echo "#define MS_ABI 1" >> build_arm64win/gcc/auto-host.h &&
+  echo "#endif" >> build_arm64win/gcc/auto-host.h &&
+  # fix missing ix86_abi (version <= 10.3.0)
+  echo "#ifndef ix86_abi" >> build_arm64win/gcc/auto-host.h &&
+  echo "#define ix86_abi MS_ABI" >> build_arm64win/gcc/auto-host.h &&
+  echo "#endif" >> build_arm64win/gcc/auto-host.h &&
+  PATH=$(pwd)/build_arm64win/gcc:$(pwd)/build_arm64win/gcc/build:$MINGWPREFIX/share/arm64win-binutils/bin:$PATH make -Cbuild_arm64win
+ )) &&
+ wl-showstatus build-install &&
+ PATH=$(pwd)/build_arm64win/gcc:$(pwd)/build_arm64win/gcc/build:$MINGWPREFIX/share/arm64win-binutils/bin:$PATH make -Cbuild_arm64win install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#### Windows for ARM: ARM64 = aarch64-w64-mingw32, ARM32 = armv7-w64-mingw32
+
+
+

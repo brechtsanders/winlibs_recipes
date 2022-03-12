@@ -1,0 +1,73 @@
+export NAME="Avian"
+export STATUS=
+export URL=https://readytalk.github.io/avian/
+export BASENAME=avian
+export DESCRIPTION="Avian - A lightweight alternative to Java"
+export CATEGORY=development
+export TYPE=application
+export VERSION=1.2.0
+export VERSIONDATE=20170615
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=license.txt
+export LICENSETYPE="BSD/ISC"
+#export DOWNLOADURL="https://github.com/ReadyTalk/avian/releases"
+export DOWNLOADURL="https://github.com/ReadyTalk/avian/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://readytalk.github.io/avian-web/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://github.com/ReadyTalk/avian/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ReadyTalk/avian/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#mkdir -p $BASENAME-$VERSION
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2 -C$BASENAME-$VERSION
+#cd $BASENAME-$VERSION/avian
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+
+mv src/system/posix.cpp src/system/posix.cpp.bak &&
+cp src/system/windows.cpp src/system/posix.cpp
+
+#make platform=windows build-platform=windows arch=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i386; fi) build-arch=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i386; fi) process=compile mode=fast lzma=$MINGWPRREFIX bootimage=true use-clang=false ar=ar ranlib=ranlib dlltool=dlltool strip=strip &&
+make platform=windows platform=windows arch=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i386; fi) process=compile mode=fast lzma=$MINGWPRREFIX bootimage=true heapdump=false tails=false continuations=false use-clang=false ar=ar ranlib=ranlib dlltool=dlltool strip=strip &&
+    echo OK
+
+# fix type issues in src/codegen/compiler/event.cpp
+patch -ulbf src/codegen/compiler/event.cpp << EOF
+@@ -142,3 +142,3 @@
+   r->value = v;
+-  if (this) {
++  {//if (this) {
+     r->event = this;
+@@ -1109,6 +1109,6 @@
+                 secondValue->source,
+-                secondValue->source->type(c),
++                (int)secondValue->source->type(c),
+                 secondValue->nextWord,
+                 secondValue->nextWord->source,
+-                secondValue->nextWord->source->type(c));
++                (int)secondValue->nextWord->source->type(c));
+       }
+EOF
+# fix for Windows
+mv src/system/CMakeLists.txt src/system/CMakeLists.txt.bak &&
+sed -e "s/\(if (MSVC\)/& OR WIN32/" src/system/CMakeLists.txt.bak > src/system/CMakeLists.txt
+mkdir -p build &&
+ wl-showstatus configure &&
+ cd build &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF .. &&
+ cd .. &&
+ wl-showstatus build &&
+ make -Cbuild &&
+ wl-showstatus build-install &&
+ make -Cbuild install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

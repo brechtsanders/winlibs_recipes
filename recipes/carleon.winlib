@@ -1,0 +1,59 @@
+export NAME="carleon"
+export STATUS=
+export URL=https://github.com/babelouest/carleon
+export BASENAME=carleon
+export DESCRIPTION="Backend application webservices for logres and angharad applications"
+export CATEGORY=communication
+export TYPE=library,application
+export VERSION=1.2.0
+export VERSIONDATE=20180307
+wl-showstatus --package-version
+export DEPENDANCIES=ulfius,hoel,libconfig,libdl,libjansson
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/babelouest/carleon/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/babelouest/carleon/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing uint
+for F in carleon-standalone.c carleon.h service-modules/service-liquidsoap.c service-modules/service-mock.c service-modules/service-motion.c service-modules/service-mpd.c; do
+ sed -i.bak -e "s/\buint\b/unsigned int/g" $F
+done
+# fix missing sleep() in carleon-standalone.c
+if ( gcc --version | grep -q MinGW-W64 ); then
+ mv carleon-standalone.c carleon-standalone.c.bak2 &&
+ #echo "#define sleep(t) _sleep((t) * 1000)" > carleon-standalone.c &&
+ echo "#define sleep(s) Sleep((s) * 1000)" > carleon-standalone.c &&
+ cat carleon-standalone.c.bak2 >> carleon-standalone.c
+fi
+# fix missing SIGQUIT/SIGHUP in carleon-standalone.c
+sed -i.bak3 -e "s/^.*\(SIGQUIT\|SIGHUP\).*$/#ifdef \1\n&\n#endif/" carleon-standalone.c
+# fix missing -lc in Makefile
+sed -e "s/ -lc / /" Makefile > Makefile.mingw
+wl-showstatus build &&
+ #make -f Makefile.mingw &&
+ make -f Makefile.mingw ADDITIONALFLAGS="-O3 -I$MINGWPREFIX/include/libdl-win32" &&
+ strip *.exe &&
+ ar cru libcarleon.a carleon.o &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libcarleon.a  | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > carleon.def &&
+ #gcc -shared -s -mwindows -def carleon.def -o carleon.dll libcarleon.a -Wl,--out-implib,libcarleon.dll.a -ljansson -lyder &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/carleon $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/etc $INSTALLPREFIX/share/carleon &&
+ cp -f carleon.h $INSTALLPREFIX/include/carleon/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ #cp -f *.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ cp -f docs/carleon.conf.sample $INSTALLPREFIX/etc/ &&
+ cp -f docs/*.sql docs/*.md $INSTALLPREFIX/share/carleon/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: carleon.dll
+
+
+

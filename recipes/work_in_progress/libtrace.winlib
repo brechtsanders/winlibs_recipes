@@ -1,0 +1,101 @@
+export NAME="libtrace"
+export STATUS=
+export URL=https://research.wand.net.nz/software/libtrace.php
+export BASENAME=libtrace
+export DESCRIPTION="libtrace is a library for trace processing. It supports multiple input methods, including device capture, raw and gz-compressed trace, and sockets; and multiple input formats, including pcap and DAG."
+export CATEGORY=
+export TYPE=library
+#export VERSION=4.0.10-1
+#export VERSIONDATE=20191118
+#export VERSION=4.0.11-1
+#export VERSIONDATE=20200213
+#export VERSION=4.0.12-1
+#export VERSIONDATE=20200327
+#export VERSION=4.0.13-1
+#export VERSIONDATE=20200526
+#export VERSION=4.0.14-1
+#export VERSIONDATE=20200807
+#export VERSION=4.0.15-1
+#export VERSIONDATE=20201029
+#export VERSION=4.0.16-1
+#export VERSIONDATE=20210319
+#export VERSION=4.0.17-1
+#export VERSIONDATE=20210720
+export VERSION=4.0.18-1
+export VERSIONDATE=20220208
+####/lib/libtrace.h:61:65: error: size of unnamed array is negative
+wl-showstatus --package-version
+export DEPENDANCIES=libwandio,mman-win32,openssl,
+export OPTIONALDEPENDANCIES=libpcap
+export BUILDDEPENDANCIES=doxygen
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://research.wand.net.nz/software/libtrace.php"
+export DOWNLOADURL="https://github.com/LibtraceTeam/libtrace/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://research.wand.net.nz/software/libtrace/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/LibtraceTeam/libtrace/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/arpa/inet.h
+## fix missing uint64_t in lib/libtrace.h
+#mv lib/libtrace.h.in lib/libtrace.h.in.bak &&
+#echo "#include <stdint.h>" > lib/libtrace.h.in &&
+#echo "#include <pthread.h>" >> lib/libtrace.h.in &&
+#cat lib/libtrace.h.in.bak >> lib/libtrace.h.in
+# fix lib/libtrace.h.in (version >= 4.0.15-1)
+patch -ulbf lib/libtrace.h.in << EOF
+@@ -62,5 +62,7 @@
+
+-#ifndef WIN32
++#ifndef _MSC_VER
+ #include <sys/time.h>
+ #endif
++#include <stdint.h>
++#include <pthread.h>
+
+@@ -81,3 +83,3 @@
+
+-#ifdef WIN32
++#ifdef _WIN32
+ #   include <winsock2.h>
+@@ -214,3 +216,3 @@
+
+-#ifdef _MSC_VER
++#ifdef _WIN32
+     #ifdef LT_BUILDING_DLL
+@@ -748,3 +750,3 @@
+
+-#ifdef WIN32
++#ifdef _WIN32
+ #pragma pack(push)
+@@ -1299,3 +1301,3 @@
+
+-#ifdef WIN32
++#ifdef _WIN32
+ #pragma pack(pop)
+EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ncurses --without-dpdk -with-man CFLAGS="-DWIN32 -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-DWIN32 -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman -lws2_32" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK && ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

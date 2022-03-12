@@ -1,0 +1,102 @@
+export NAME="waifu2x-ncnn-vulkan"
+export STATUS=
+export URL=https://github.com/nihui/waifu2x-ncnn-vulkan
+export BASENAME=waifu2x-ncnn-vulkan
+export DESCRIPTION="waifu2x converter ncnn version, runs fast on intel / amd / nvidia GPU with vulkan"
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=20200414
+#export VERSIONDATE=20200418
+#export VERSION=20200530
+#export VERSIONDATE=20200530
+#export VERSION=20200606
+#export VERSIONDATE=20200607
+#export VERSION=20200818
+#export VERSIONDATE=20200818
+#export VERSION=20210102
+#export VERSIONDATE=20210102
+#export VERSION=20210210
+#export VERSIONDATE=20210210
+export VERSION=20210521
+export VERSIONDATE=20210522
+wl-showstatus --package-version
+export DEPENDANCIES=vulkan-loader,pthreads,ncnn,libwebp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/nihui/waifu2x-ncnn-vulkan/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/nihui/waifu2x-ncnn-vulkan/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/wic_image.h (version >= 20210102)
+patch -ulbf src/wic_image.h << EOF
+@@ -178,3 +178,3 @@
+     PROPBAG2 option = { 0 };
+-    option.pstrName = L"ImageQuality";
++    option.pstrName = (LPOLESTR)L"ImageQuality";
+     VARIANT varValue;
+EOF
+## fix src/main.cpp (version = 20210102)
+#patch -ulbf src/main.cpp << EOF
+#@@ -420,3 +420,5 @@
+#
+#-#if _WIN32
+#+#if defined(__MINGW32__)
+#+int main(int arg8c, char** arg8v)
+#+#elif defined(_WIN32)
+# int wmain(int argc, wchar_t** argv)
+#@@ -426,2 +428,7 @@
+# {
+#+#if defined(__MINGW32__)
+#+    int argc;
+#+    wchar_t** argv;
+#+    argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+#+#endif
+#     path_t inputpath;
+#@@ -796,3 +803,3 @@
+#         {
+#-            int gpu_queue_count = ncnn::get_gpu_info(gpuid[i]).compute_queue_count();
+#+            int gpu_queue_count = ncnn::get_gpu_info(gpuid[i]).compute_queue_count;
+#             jobs_proc[i] = std::min(jobs_proc[i], gpu_queue_count);
+#EOF
+# fix src/main.cpp (version >= 20210210)
+patch -ulbf src/main.cpp << EOF
+@@ -455,3 +455,5 @@
+
+-#if _WIN32
++#if defined(__MINGW32__)
++int main(int arg8c, char** arg8v)
++#elif defined(_WIN32)
+ int wmain(int argc, wchar_t** argv)
+@@ -461,2 +463,7 @@
+ {
++#if defined(__MINGW32__)
++    int argc;
++    wchar_t** argv;
++    argv = CommandLineToArgvW(GetCommandLineW(), &argc);
++#endif
+     path_t inputpath;
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SYSTEM_NCNN:BOOL=ON -DUSE_SYSTEM_WEBP:BOOL=ON -DGLSLANG_TARGET_DIR:PATH=$MINGWPREFIX/lib/cmake -Ssrc -Bbuild_win &&
+ #-DUSE_STATIC_MOLTENVK:BOOL=OFF
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lwindowscodecs/" build_win/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
+ strip build_win/*.exe &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_win install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_win/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

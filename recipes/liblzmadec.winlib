@@ -1,0 +1,43 @@
+export NAME="liblzma"
+export STATUS=
+export URL=http://tukaani.org/lzma/
+export BASENAME=liblzmadec
+export DESCRIPTION="liblzma: written in C, has zlib-like API, supports filters and both old and new header formats. Average compression ratio of LZMA is about 30% better than that of gzip, and 15% better than that of bzip2."
+export CATEGORY=compression
+export TYPE=library
+export VERSION=4.32.7
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LGPLv2.1
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://tukaani.org/lzma/ lzma-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://tukaani.org/lzma/lzma-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/lzma-$VERSION.tar.bz2
+cd lzma-$VERSION
+# build and manually create DLL
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build &&
+ make -C src/liblzmadec install-strip &&
+ #dlltool --export-all-symbols -D lzmadec.dll -l liblzmadec.dll.a -z in.def src/liblzmadec/.libs/liblzmadec.a &&
+ #ranlib liblzmadec.dll.a &&
+ #gcc -shared -s -mwindows -def in.def -o lzmadec.dll src/liblzmadec/.libs/liblzmadec.a &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p src/liblzmadec/.libs/liblzmadec.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > lzmadec.def &&
+ gcc -shared -s -mwindows -def lzmadec.def -o lzmadec.dll src/liblzmadec/.libs/liblzmadec.a -Wl,--out-implib,liblzmadec.dll.a &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin/ &&
+ cp lzmadec.dll $INSTALLPREFIX/bin/ &&
+ cp liblzmadec.dll.a $INSTALLPREFIX/lib/ &&
+ cp lzmadec.def $INSTALLPREFIX/lib/ &&
+ sed -e "s/^\(dlname=\)''/\1'lzmadec.dll'/; s/^\(library_names=\)''/\1'liblzmadec.dll.a'/" src/liblzmadec/.libs/liblzmadec.la > $INSTALLPREFIX/lib/liblzmadec.la &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lzma-$VERSION
+
+
+

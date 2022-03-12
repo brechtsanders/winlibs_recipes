@@ -1,0 +1,64 @@
+export NAME="JWTPP"
+export STATUS=
+export URL=https://github.com/troian/jwtpp/
+export BASENAME=jwtpp
+export DESCRIPTION="JSON Object Signing and Encryption library for C++."
+export CATEGORY=communication,security
+export TYPE=library
+#export VERSION=2.0.2
+#export VERSIONDATE=20200414
+#export VERSION=2.0.3
+#export VERSIONDATE=20200617
+#export VERSION=2.0.4
+#export VERSIONDATE=20210408
+export VERSION=2.0.5
+export VERSIONDATE=20210614
+wl-showstatus --package-version
+export DEPENDANCIES=jsoncpp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/troian/jwtpp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/troian/jwtpp/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+mv include/export/jwtpp/jwtpp.hh include/export/jwtpp/jwtpp.hh.bak
+cat > include/export/jwtpp/jwtpp.hh << EOF
+#if !defined(DLL_EXPORT_JWTPP)
+# if defined(_WIN32) && defined(jwtpp_shared_EXPORT)
+#  define DLL_EXPORT_JWTPP __declspec(dllexport)
+# elif defined(_WIN32) && !defined(STATIC) && !defined(BUILD_JWTPP_STATIC) && !defined(BUILD_JWTPP)
+#  define DLL_EXPORT_JWTPP __declspec(dllimport)
+# else
+#  define DLL_EXPORT_JWTPP
+# endif
+#endif
+EOF
+# fix building DLL with proper exports
+sed -e "s/^class /&DLL_EXPORT_JWTPP /" include/export/jwtpp/jwtpp.hh.bak >> include/export/jwtpp/jwtpp.hh
+#sed -i.bak -e "s/\(\${PROJECT_NAME}\)-shared/\1_SHARED/g" CMakeLists.txt
+sed -i.bak -e "s/^\(\s*\)add_library *( *\([^ ]*\) .*SHARED.*$/&\n\1target_compile_definitions(\2 PUBLIC BUILD_JWTPP_DLL)/g" CMakeLists.txt
+#mkdir -p build_test && cd build_test && cmake.exe -G"MSYS Makefiles" .. -LH && echo OK; cd ..; rm -rf build_test
+#rm -rf CMakeCache.txt CMakeFiles; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#export BUILDDEPENDANCIES=cmake
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DJWTPP_WITH_SHARED_LIBS:BOOL=ON -DJWTPP_WITH_COVERAGE:BOOL=OFF -DJWTPP_WITH_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DBUILD_JWTPP_STATIC" -S. -Bbuild_win &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=\s*/&-Wl,--as-needed -ljsoncpp /" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ strip build_win/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_win/*.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f build_win/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,75 @@
+export NAME="telegnome"
+export STATUS=
+#export URL=https://sourceforge.net/projects/telegnome/
+#export URL=https://github.com/GNOME/telegnome
+export URL=http://www.gnome.org/projects/telegnome
+export BASENAME=telegnome
+export DESCRIPTION="A program to view the teletext pages as offered by broadcasting companies of several countries."
+export CATEGORY=
+export TYPE=application
+#export VERSION=0.1.1
+#export VERSIONDATE=20101008
+#export VERSION=0.3.1
+#export VERSIONDATE=20160406
+####cannot find -ldconf
+####src/channel.o:channel.c:(.text+0xade): undefined reference to `uuid_generate'
+####src/channel.o:channel.c:(.text+0xb32): undefined reference to `uuid_unparse'
+####src/prefs.o:prefs.c:(.text+0x3402): undefined reference to `dconf_client_new'
+####src/prefs.o:prefs.c:(.text+0x3459): undefined reference to `dconf_client_write_sync'
+#export VERSION=0.3.2
+#export VERSIONDATE=20160707
+####msgfmt.exe: cannot locate ITS rules for telegnome.appdata.xml.in
+#export VERSION=0.3.3
+#export VERSIONDATE=20170618
+#export VERSION=0.3.4
+#export VERSIONDATE=20190112
+####prefs.o:prefs.c:(.text+0x3e37): undefined reference to `dconf_client_new'
+####prefs.o:prefs.c:(.text+0x3ea9): undefined reference to `dconf_client_write_sync'
+#export VERSION=0.3.5
+#export VERSIONDATE=20190905
+export VERSION=0.3.6
+export VERSIONDATE=20210830
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,dconf
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/telegnome/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/telegnome/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/telegnome/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2 
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing uuid/uuid.h
+mkdir -p winfix
+cat > winfix/uuid.h << EOF
+//#include <windows.h>
+#include <rpc.h>
+#include <ctype.h>
+#define uuid_generate(uuid) UuidCreate(&uuid)
+#define uuid_unparse(uuid,uuid_string) { UCHAR* buf = NULL; UuidToString(&uuid, &buf); strcpy(uuid_string, (char*)buf); RpcStringFree(&buf); }
+//#define uuid_unparse_upper(uuid,uuid_string) { UCHAR* buf = NULL; UuidToString(&uuid, &buf); int i = 0; while (buf[i]) { ((char*)uuid_string)[i] = toupper(buf[i]); i++; } strcpy(uuid_string, (char*)buf); RpcStringFree(&buf); }
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-debug=no --disable-glibtest &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-debug=no --disable-glibtest LDFLAGS="-Wl,--as-needed -lossp-uuid" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-debug=no --disable-glibtest CFLAGS="-I$(pwd)/winfix" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-debug=no --disable-glibtest CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lrpcrt4" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-debug --disable-schemas-compile --disable-glibtest CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lrpcrt4" ITSTOOL="$PYDIR/python.exe $(which itstool)" &&
+  wl-showstatus build &&
+ make -j1 -Csrc LIBS="-Wl,--as-needed -lrpcrt4 -ldconf" &&
+ #make &&
+ #PYTHONPATH=$MINGWPREFIX/python/lib/site-packages:$PYTHONPATH GETTEXTDATADIR=$MINGWPREFIX/share/gettext make &&
+ PYTHONPATH=$MINGWPREFIX/python/lib/site-packages GETTEXTDATADIR=$MINGWPREFIX/share/gettext make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

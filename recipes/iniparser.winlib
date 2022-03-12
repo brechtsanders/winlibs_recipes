@@ -1,0 +1,70 @@
+export NAME="iniParser"
+export STATUS=
+export URL=http://ndevilla.free.fr/iniparser/
+export BASENAME=iniparser
+export DESCRIPTION="iniparser is a free stand-alone ini file parsing library"
+export CATEGORY=
+export TYPE=library
+#export VERSION=3.1
+#export VERSIONDATE=20151229
+#export VERSION=4.0
+#export VERSIONDATE=20170422
+export VERSION=4.1
+export VERSIONDATE=20171102
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+#export DOWNLOADURL="http://ndevilla.free.fr/iniparser/"
+#export DOWNLOADURL="https://github.com/ndevilla/iniparser/releases"
+export DOWNLOADURL="https://github.com/ndevilla/iniparser/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ndevilla.free.fr/iniparser/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/ndevilla/iniparser/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ndevilla/iniparser/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz -C$BASENAME-$VERSION
+#cd $BASENAME-$VERSION/iniparser
+cd $BASENAME-$VERSION/iniparser-$VERSION
+## fix redefinition of _strdup in src/iniparser.c (version = 4.0)
+#patch -ulbf src/iniparser.c << EOF
+#@@ -66,2 +66,3 @@
+# /*--------------------------------------------------------------------------*/
+#+#ifndef __MINGW32__
+# static char * _strdup(const char *s)
+#@@ -72,2 +73,3 @@
+# }
+#+#endif
+#
+#EOF
+## fix missing ssize_t in src/dictionary.h (version >= 4.0)
+#mv src/dictionary.h src/dictionary.h.bak &&
+#echo "typedef long ssize_t;" > src/dictionary.h &&
+#cat src/dictionary.h.bak >> src/dictionary.h
+# fix for building DLL
+sed -i.bak -e "s/\.so/\.dll/g; s/\.0//g" Makefile
+# avoid -fPIC (useless on Windows and not supported by clang) and other issues in Makefile
+sed -i.bak2 -e "s/-fPIC\|-Wl,-Bsymbolic\|-Wl,-rpath,[^ ]*\|-Wl,-rpath -Wl,[^ ]*//g; s/-Wl,-soname=\`basename \$(SO_TARGET)\`/-s -Wl,--out-implib,\$(SO_TARGET).a/" Makefile
+wl-showstatus build &&
+ #make &&
+ #make CC=gcc &&
+ make CC=gcc SO_TARGET=libiniparser.dll &&
+ #strip libiniparser.dll &&
+ #dlltool -D libiniparser.dll -l libiniparser.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f src/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

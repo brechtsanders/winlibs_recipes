@@ -1,0 +1,67 @@
+export NAME="libpnet6"
+export STATUS=
+export URL=http://pnet6.sourceforge.net/
+export BASENAME=libpnet6
+export DESCRIPTION="libpnet6 is a powerful library for writing cross-platform network applications. libpnet6 facilitates the writing of professional quality client/server applications in the TCP, UDP, and UNIX domain protocols, offering full support for the IPv4 and IPv6 Internet protocols. In addition, advanced networking functionality such as network inteface access and configuration, and the reading and writing of raw packets on the datalink are also supported."
+export CATEGORY=network
+export TYPE=library
+export VERSION=0.1.5
+export VERSIONDATE=20170203
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://pnet6.sourceforge.net/download.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/pnet6/libpnet6-sources/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+patch -ulbf src/local.h << EOF
+--- src/local.h  2002-12-22 16:39:35.000000000 +0100
++++ src/local.h  2017-02-03 21:32:10.344955800 +0100
+@@ -517,3 +517,3 @@
+ # ifndef HAVE_GETTIMEOFDAY
+-# ifdef __GNUC__
++# if defined(__GNUC__) && !defined(__MINGW64_VERSION_MAJOR)
+ struct timezone {
+EOF
+# fix missing pid_t in src/proto.h
+mv src/proto.h src/proto.h.bak &&
+echo "#include <sys/types.h>" > src/proto.h &&
+cat src/proto.h.bak >> src/proto.h
+# fix Makefile
+patch -ulbf Makefile << EOF
+--- Makefile  2017-02-03 22:35:17.338780600 +0100
++++ Makefile  2017-02-03 22:35:32.379209800 +0100
+@@ -58,6 +58,4 @@
+        \$(INSTALL_LINUX) lib/libpnet6.a \$(INST_ROOT)/lib/libpnet6.a
+-       install -D -c -o root -g root -m 755 \\
+-               lib/libpnet6.so \$(INST_ROOT)/lib/libpnet6-\$(VERSION).so
+-       ln -sf \$(INST_ROOT)/lib/libpnet6-\$(VERSION).so \\
+-                       \$(INST_ROOT)/lib/libpnet6.so.0
++`printf "\\t"`\$(INSTALL_LINUX) lib/libpnet6.dll.a \$(INST_ROOT)/lib/libpnet6.dll.a
++`printf "\\t"`\$(INSTALL_LINUX) lib/libpnet6.dll \$(INST_ROOT)/bin/libpnet6.dll
+        \$(INSTALL_LINUX) src/pnet6.h \$(INST_ROOT)/include/pnet6.h
+EOF
+wl-showstatus build &&
+ make mingw CC="gcc -DPNET_WIN32 -I$(pwd)/src" AR=ar &&
+ echo "EXPORTS" > libpnet6.def &&
+ nm -f posix --defined-only -p lib/libpnet6.a | sed -n "s/^_*\(pnet[^ ]*\).*$/\1/p" >> libpnet6.def &&
+ dlltool -D lib/libpnet6.dll -l lib/libpnet6.dll.a -d libpnet6.def lib/libpnet6.a &&
+ gcc -shared -s -mwindows -def libpnet6.def -o lib/libpnet6.dll lib/libpnet6.a -lws2_32 -liphlpapi &&
+ #gcc -mconsole -s -o udpserv.exe examples/udpserv/udpserv.c -Llib -llibpnet6 &&
+ #gcc -mconsole -s -o tcpmon.exe examples/tcpmon/tcpmon.c -Llib -llibpnet6 &&
+ #gcc -mconsole -s -o snoop6.exe examples/snoop6/snoop6.c -Llib -llibpnet6 &&
+ #gcc -mconsole -s -o arp6.exe examples/arp6/arp6.c -Llib -llibpnet6 &&
+ wl-showstatus install &&
+ make install-linux INST_ROOT=$INSTALLPREFIX INSTALL_LINUX="install -D -c" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

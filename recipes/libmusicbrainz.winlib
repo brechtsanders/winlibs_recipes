@@ -1,0 +1,63 @@
+export NAME="libmusicbrainz"
+export STATUS=
+export URL=http://musicbrainz.org/doc/libmusicbrainz
+export BASENAME=libmusicbrainz
+export DESCRIPTION="The libmusicbrainz (also known as mb_client or MusicBrainz Client Library) is a development library geared towards developers who wish to add MusicBrainz lookup capabilities to their applications."
+export CATEGORY=audio
+export TYPE=library
+export VERSION=3.0.3
+export VERSIONDATE=20101116
+#export VERSION=4.0.0
+#export VERSIONDATE=20110117
+####src/Query.cc:292: error: 'timersub' was not declared in this scope
+####src/Query.cc:295: error: 'usleep' was not declared in this scope
+#export VERSION=5.0.1
+#export VERSIONDATE=20120531
+#export VERSION=5.1.0
+#export VERSIONDATE=20141114
+####include/musicbrainz5/xmlParser.h:247:69: error: use of C++0x long long integer constant [-Wlong-long]
+wl-showstatus --package-version
+export DEPENDANCIES=libdiscid,neon,cppunit
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING.txt
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://musicbrainz.org/doc/libmusicbrainz"
+#export DOWNLOADURL="ftp://ftp.musicbrainz.org/pub/musicbrainz/"
+#export DOWNLOADURL="http://ftp.musicbrainz.org/pub/musicbrainz/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.musicbrainz.org/pub/musicbrainz/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/downloads/metabrainz/libmusicbrainz/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/metabrainz/libmusicbrainz/releases/download/release-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing timersub in src/Query.cc (version >= 5.1.0)
+mv src/Query.cc src/Query.cc.bak
+cat > src/Query.cc << EOF
+#define timersub(a, b, result) { (result)->tv_sec = (a)->tv_sec - (b)->tv_sec; (result)->tv_usec = (a)->tv_usec - (b)->tv_usec; if ((result)->tv_usec < 0) { --(result)->tv_sec; (result)->tv_usec += 1000000; } }
+EOF
+cat src/Query.cc.bak >> src/Query.cc
+# support static builds in include/musicbrainz3/defines.h
+patch -ulbf include/musicbrainz3/defines.h << EOF
+@@ -32,2 +32,4 @@
+ #if (defined(_WIN32) || defined(_WIN64))
+-#      ifdef MB_API_EXPORTS
++#      if defined(STATIC) || defined(MB_API_STATIC)
++#              define MB_API
++#      elif defined(MB_API_EXPORTS)
+ #              define MB_API __declspec(dllexport)
+EOF
+# also build static library
+sed -i.bak -e "s/^\(.*ADD_LIBRARY *(\)\([^ ]*\) SHARED\( *.*\)$/&\n\1\2_static STATIC\3\nSET_TARGET_PROPERTIES(\2_static PROPERTIES OUTPUT_NAME \2)\nSET_TARGET_PROPERTIES(\2_static PROPERTIES COMPILE_DEFINITIONS \"MB_API_STATIC\")\nINSTALL(TARGETS \2_static DESTINATION \${LIB_INSTALL_DIR})/" src/CMakeLists.txt
+wl-showstatus configure &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE=Release . &&
+ wl-showstatus build-install &&
+ make install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

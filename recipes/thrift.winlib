@@ -1,0 +1,226 @@
+export NAME="Apache Thrift"
+export STATUS=
+export URL=https://thrift.apache.org/
+export BASENAME=thrift
+export DESCRIPTION="The Apache Thrift software framework, for scalable cross-language services development, combines a software stack with a code generation engine to build services that work efficiently and seamlessly between C++, Java, Python, PHP, Ruby, Erlang, Perl, Haskell, C#, Cocoa, JavaScript, Node.js, Smalltalk, OCaml and Delphi and other languages."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=0.13.0
+#export VERSIONDATE=20201008
+#export VERSION=0.14.0
+#export VERSIONDATE=20210212
+#export VERSION=0.14.1
+#export VERSIONDATE=20210303
+#export VERSION=0.14.2
+#export VERSIONDATE=20210618
+#export VERSION=0.15.0
+#export VERSIONDATE=20210911
+export VERSION=0.16.0
+export VERSIONDATE=20220216
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="https://thrift.apache.org/download"
+export DOWNLOADURL="https://github.com/apache/thrift/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.apache.org/dyn/closer.cgi?path=/thrift/$VERSION/thrift-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/apache/thrift/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix lib/c_glib/src/thrift/c_glib/transport/thrift_socket.c (version >= 0.13.0)
+patch -ulbf lib/c_glib/src/thrift/c_glib/transport/thrift_socket.c << EOF
+@@ -20,3 +20,2 @@
+ #include <errno.h>
+-#include <netdb.h>
+ #include <stdlib.h>
+@@ -24,2 +23,7 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#define hstrerror strerror
++#else
++#include <netdb.h>
+ #include <sys/socket.h>
+@@ -27,2 +31,3 @@
+ #include <netinet/in.h>
++#endif
+
+@@ -134,2 +139,7 @@
+   if (tsocket->path) {
++#ifdef _WIN32
++    g_set_error (error, THRIFT_TRANSPORT_ERROR, THRIFT_TRANSPORT_ERROR_SOCKET,
++                 "Unix sockets not supported on Windows");
++    return FALSE;
++#else
+     /* create a socket structure */
+@@ -160,2 +170,3 @@
+     return TRUE;
++#endif
+   }
+EOF
+# fix ./lib/c_glib/src/thrift/c_glib/transport/thrift_framed_transport.c (version >= 0.13.0)
+patch -ulbf ./lib/c_glib/src/thrift/c_glib/transport/thrift_framed_transport.c << EOF
+@@ -19,3 +19,2 @@
+
+-#include <netdb.h>
+ #include <stdlib.h>
+@@ -24,4 +23,9 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
++#include <netdb.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#endif
+
+EOF
+# fix ./lib/c_glib/src/thrift/c_glib/transport/thrift_server_socket.c (version >= 0.13.0)
+patch -ulbf ./lib/c_glib/src/thrift/c_glib/transport/thrift_server_socket.c << EOF
+@@ -20,3 +20,2 @@
+ #include <errno.h>
+-#include <netdb.h>
+ #include <string.h>
+@@ -24,2 +23,6 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
++#include <netdb.h>
+ #include <sys/socket.h>
+@@ -27,2 +30,3 @@
+ #include <netinet/in.h>
++#endif
+
+@@ -78,2 +82,8 @@
+     /* create a socket structure */
++#ifdef _WIN32
++    g_set_error (error, THRIFT_SERVER_SOCKET_ERROR,
++                 THRIFT_SERVER_SOCKET_ERROR_BIND,
++                 "Unix sockets not supported on Windows");
++    return FALSE;
++#else
+     struct sockaddr_un pin;
+@@ -91,2 +101,3 @@
+     }
++#endif
+   }
+EOF
+# fix ./lib/c_glib/src/thrift/c_glib/transport/thrift_memory_buffer.c (version >= 0.13.0)
+patch -ulbf ./lib/c_glib/src/thrift/c_glib/transport/thrift_memory_buffer.c << EOF
+@@ -19,3 +19,7 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <netdb.h>
++#endif
+ #include <stdlib.h>
+EOF
+# fix lib/c_glib/src/thrift/c_glib/transport/thrift_fd_transport.c (version >= 0.13.0)
+patch -ulbf lib/c_glib/src/thrift/c_glib/transport/thrift_fd_transport.c << EOF
+@@ -23,2 +23,5 @@
+ #include <string.h>
++#ifdef _WIN32
++#define fsync(fd) _commit(fd)
++#endif
+
+@@ -44,2 +47,5 @@
+ {
++#ifdef _WIN32
++  return FALSE;
++#else
+   ThriftFDTransport *t;
+@@ -47,2 +53,3 @@
+   return t->fd >= 0 && ! (fcntl (t->fd, F_GETFL) == -1 && errno == EBADF);
++#endif
+ }
+EOF
+# fix ./lib/c_glib/src/thrift/c_glib/transport/thrift_buffered_transport.c (version >= 0.13.0)
+patch -ulbf ./lib/c_glib/src/thrift/c_glib/transport/thrift_buffered_transport.c << EOF
+@@ -19,3 +19,7 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <netdb.h>
++#endif
+ #include <stdlib.h>
+EOF
+# fix lib/c_glib/src/thrift/c_glib/transport/thrift_ssl_socket.c (version >= 0.13.0)
+patch -ulbf lib/c_glib/src/thrift/c_glib/transport/thrift_ssl_socket.c << EOF
+@@ -20,3 +20,2 @@
+ #include <errno.h>
+-#include <netdb.h>
+ #include <stdlib.h>
+@@ -24,4 +23,10 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
++#include <netdb.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#endif
+ #include <openssl/ssl.h>
+EOF
+# fix ./lib/c_glib/src/thrift/c_glib/transport/thrift_ssl_socket.h (version >= 0.13.0)
+patch -ulbf ./lib/c_glib/src/thrift/c_glib/transport/thrift_ssl_socket.h << EOF
+@@ -28,3 +28,7 @@
+ #include <openssl/x509v3.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
++#endif
+
+EOF
+# fix lib/c_glib/src/thrift/c_glib/transport/thrift_platform_socket.h (version >= 0.13.0)
+patch -ulbf lib/c_glib/src/thrift/c_glib/transport/thrift_platform_socket.h << EOF
+@@ -25,3 +25,3 @@
+ #ifdef _WIN32
+-#  define THRIFT_GET_SOCKET_ERROR ::WSAGetLastError()
++#  define THRIFT_GET_SOCKET_ERROR WSAGetLastError()
+ #  define THRIFT_ERRNO (*_errno())
+EOF
+# fix lib/c_glib/src/thrift/c_glib/transport/thrift_zlib_transport.c (version >= 0.15.0)
+patch -ulbf lib/c_glib/src/thrift/c_glib/transport/thrift_zlib_transport.c << EOF
+@@ -20,3 +20,7 @@
+ #include <errno.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <netdb.h>
++#endif
+ #include <stdio.h>
+@@ -25,2 +29,3 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <sys/socket.h>
+@@ -28,2 +33,3 @@
+ #include <netinet/in.h>
++#endif
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_PYTHON:BOOL=OFF -DWITH_HASKELL:BOOL=OFF -DWITH_JAVA:BOOL=OFF -DWITH_NODEJS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_PYTHON:BOOL=OFF -DWITH_HASKELL:BOOL=OFF -DWITH_JAVA:BOOL=OFF -DWITH_NODEJS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

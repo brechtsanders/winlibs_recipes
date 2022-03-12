@@ -1,0 +1,49 @@
+export NAME="libSmtpThread"
+export STATUS=
+export URL=http://www.beranek.de/node/7
+export BASENAME=libsmtpthread
+export DESCRIPTION="libSmtpThread is a multi-threaded C++ library for sending mail via SMTP. The library provides a connection pool that initializes a set of threaded SMTP connections. Emails can be pushed into the pool, which accepts all mail and delivers them to a free connection. The delivery to the SMTP server is processed in a separate thread, so you don't have to wait for mail to be accepted. It has been successfully tested with Postfix."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.1.0
+export VERSIONDATE=20120301
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://www.beranek.de/node/7 smtpthread-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+wl-wait4deps
+export DOWNLOADSOURCEURL=http://www.beranek.de/download/software/smtpthread-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+tar xfz $TARBALLDIR/$BASENAME/smtpthread-$VERSION.tgz
+cd smtpthread-$VERSION
+# fix missing files
+mkdir -p sys netinet arpa
+echo "#include <winsock2.h>" > sys/socket.h
+touch netinet/in.h arpa/inet.h
+# fix missing sleep in SMTPConnection.cc
+mv SMTPConnection.cc SMTPConnection.cc.bak
+echo "#define sleep(t) _sleep((t) * 1000)" > SMTPConnection.cc
+cat SMTPConnection.cc.bak >> SMTPConnection.cc
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lpthread -lws2_32" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf smtpthread-$VERSION
+
+
+

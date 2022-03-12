@@ -1,0 +1,165 @@
+#export NAME="msitools"
+#export STATUS=
+#export URL=https://wiki.gnome.org/msitools
+#export BASENAME=msitools
+#export DESCRIPTION="msitools is a set of programs to inspect and build Windows Installer (.MSI) files. It is based on libmsi, a portable library to read and write .MSI files. libmsi in turn is a port of (and a subset of) Wine's implementation of the Windows Installer."
+#export CATEGORY=compression
+#export TYPE=application
+##export VERSION=0.92
+##export VERSIONDATE=20150330
+##export VERSION=0.93
+##export VERSIONDATE=20150331
+##export VERSION=0.94
+##export VERSIONDATE=20150616
+#####tools/wixl/util.c:111: undefined reference to `uuid_generate'
+#####tools/wixl/util.c:112: undefined reference to `uuid_unparse'
+##export VERSION=0.95
+##export VERSIONDATE=20151201
+##export VERSION=0.96
+##export VERSIONDATE=20161109
+##export VERSION=0.97
+##export VERSIONDATE=20170816
+##export VERSION=0.98
+##export VERSIONDATE=20180802
+##export VERSION=0.99
+##export VERSIONDATE=20190215
+#export VERSION=0.100
+#export VERSIONDATE=20191113
+#wl-showstatus --package-version
+#export DEPENDANCIES=ossp-uuid,glib2,gcab,libgsf,libxml2,gettext
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE="GPL/LGPL"
+#export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/msitools/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/msitools/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## fix missing gmtime_r in libmsi/libmsi-summary-info.c
+#mv libmsi/libmsi-summary-info.c libmsi/libmsi-summary-info.c.bak
+#if ( gcc --version | grep -q "MinGW-W64" ); then
+#echo "#include <pthread.h>" > libmsi/libmsi-summary-info.c
+#else
+#cat > libmsi/libmsi-summary-info.c << EOF
+##include <pthread.h>
+##define gmtime_r( _clock, _result ) ( *(_result) = *gmtime( (_clock) ), (_result) )
+#EOF
+#fi
+#cat libmsi/libmsi-summary-info.c.bak >> libmsi/libmsi-summary-info.c
+### fix missing uuid_generate in tools/msibuild.c (version <= 0.93)
+##mv tools/msibuild.c tools/msibuild.c.bak
+##cat > tools/msibuild.c << EOF
+###include <windows.h>
+##define uuid_generate(uuid) UuidCreate(&uuid)
+##EOF
+##grep -v "#include <uuid.h>" tools/msibuild.c.bak >> tools/msibuild.c
+## fix missing uuid/uuid.h (version >= 0.94)
+#mkdir -p winfix
+#cat > winfix/uuid.h << EOF
+#//#include <windows.h>
+##include <rpc.h>
+##include <ctype.h>
+##define uuid_generate(uuid) UuidCreate(&uuid)
+##define uuid_unparse(uuid,uuid_string) { UCHAR* buf = NULL; UuidToString(&uuid, &buf); strcpy(uuid_string, (char*)buf); RpcStringFree(&buf); }
+##define uuid_unparse_upper(uuid,uuid_string) { UCHAR* buf = NULL; UuidToString(&uuid, &buf); int i = 0; while (buf[i]) { ((char*)uuid_string)[i] = toupper(buf[i]); i++; } strcpy(uuid_string, (char*)buf); RpcStringFree(&buf); }
+#EOF
+### fix missing uuid_generate/uuid_unparse in tools/wixl/util.c (version >= 0.94 <= 0.97)
+##mv tools/wixl/util.c tools/wixl/util.c.bak
+##echo '#include "uuid.h"' > tools/wixl/util.c
+##grep -v "^void uuid_" tools/wixl/util.c.bak >> tools/wixl/util.c
+## fix missing uuid_generate/uuid_unparse in tools/wixl/util.c (version >= 0.98)
+#patch -ulbf tools/wixl/util.c << EOF
+#@@ -12,2 +12,3 @@
+# #include <unistd.h>
+#+#include "uuid.h"
+#
+#@@ -57,5 +58,2 @@
+# GQuark wixl_error_quark (void);
+#-void uuid_generate (guchar* uuid);
+#-void uuid_unparse (guchar* uuid,
+#-                   guchar* output);
+# gchar* wixl_uuid_generate (void);
+#EOF
+## fix missing endian.h (version >= 0.100)
+#mkdir -p winfix
+#echo "#define le16toh(x) (x)" > winfix/endian.h
+## fix missing gmtime_r in libmsi/libmsi-summary-info.c (version >= 0.100)
+#mv -f libmsi/libmsi-summary-info.c libmsi/libmsi-summary-info.c.bak &&
+#echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > libmsi/libmsi-summary-info.c &&
+#cat libmsi/libmsi-summary-info.c.bak >> libmsi/libmsi-summary-info.c
+## skip making tests
+#cat > tests/Makefile.in << EOF
+#check:
+#clean:
+#all:
+#install:
+#install-strip:
+#EOF
+## fix detection of ossp-uuid
+#sed -i.bak -e "s/\(uuid >= \)[0-9.]*/\10.1/g" configure
+#wl-showstatus configure &&
+##INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX/share/msitools --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lossp-uuid" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX/share/msitools --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-introspection CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lrpcrt4 -lossp-uuid" &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####libmsi conflicts with the one in Windows/MinGW -> install in separate folder
+
+
+
+export NAME="msitools"
+export STATUS=
+export URL=https://wiki.gnome.org/msitools
+export BASENAME=msitools
+export DESCRIPTION="msitools is a set of programs to inspect and build Windows Installer (.MSI) files. It is based on libmsi, a portable library to read and write .MSI files. libmsi in turn is a port of (and a subset of) Wine's implementation of the Windows Installer."
+export CATEGORY=compression,development
+export TYPE=application
+export VERSION=0.101
+export VERSIONDATE=20210203
+wl-showstatus --package-version
+#export DEPENDANCIES=ossp-uuid,glib2,gcab,libgsf,libxml2,gettext
+export DEPENDANCIES=ossp-uuid,glib2,gcab,libgsf,libxml2,gettext,gobject-introspection,vala
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=copyright
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/msitools/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/msitools/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+# fix to also build static library
+sed -i.bak -e "s/shared_\(library\)/\1/" libmsi/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX/share/msitools --backend ninja --buildtype release --strip --default-library both -Dintrospection=false . build_both &&
+ PKG_CONFIG= PYTHONPATH=$MINGWPREFIX/lib/$PYTHONPATH $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX/share/msitools --backend ninja --buildtype release --strip --default-library both -Dintrospection=true . build_both &&
+ # fix slash/backslash path issue when calling Python from Ninja
+ sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ PATH=$PATH:$PYDIR PKG_CONFIG= PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH ninja -C build_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####libmsi conflicts with the one in Windows/MinGW -> install in separate folder
+
+
+

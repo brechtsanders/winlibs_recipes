@@ -1,0 +1,56 @@
+export NAME="libkqueue"
+export STATUS=
+export URL=https://github.com/mheily/libkqueue
+export BASENAME=libkqueue
+export DESCRIPTION="kqueue compatibility library"
+export CATEGORY=system
+export TYPE=library
+export VERSION=2.4.0
+export VERSIONDATE=20210816
+#export VERSION=2.5.0
+#export VERSIONDATE=20210907
+####src/common/private.h:400:5: error: expected specifier-qualifier-list before 'LIST_HEAD'
+#### bugs reported: https://github.com/mheily/libkqueue/issues/111
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/mheily/libkqueue/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mheily/libkqueue/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix include/sys/event.h (version >= 2.4.0)
+patch -ulbf include/sys/event.h << EOF
+@@ -237,3 +237,3 @@
+
+-#if (_MSC_VER < 1900)
++#if (_MSC_VER < 1900) && !defined(__MINGW32__)
+ struct timespec {
+EOF
+# fix missing EINVAL/ENOSYS (version >= 2.5.0)
+echo "#include <errno.h>" >> src/common/private.h
+# don't use -Wall -Werror
+sed -i.bak -e "s/-Wall -Werror//" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSTATIC_KQUEUE:BOOL=ON -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSTATIC_KQUEUE:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip $INSTALLPREFIX/lib/*.dll &&
+ mkdir $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

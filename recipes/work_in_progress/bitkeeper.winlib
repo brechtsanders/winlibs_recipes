@@ -1,0 +1,102 @@
+export NAME="BitKeeper"
+export STATUS=
+export URL=http://www.bitkeeper.org/
+#export URL=https://github.com/bitkeeper-scm/bitkeeper
+export BASENAME=bitkeeper
+export DESCRIPTION="BitKeeper is the original distributed source management system."
+export CATEGORY=
+export TYPE=library
+#export VERSION=7.3ce
+#export VERSIONDATE=20160713
+export VERSION=7.3.2
+export VERSIONDATE=20170924
+wl-showstatus --package-version
+export DEPENDANCIES=libtomcrypt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/bitkeeper-scm/bitkeeper/releases bk-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/bitkeeper-scm/bitkeeper/archive/bk-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/bk-$VERSION.tar.gz
+cd bitkeeper-bk-$VERSION
+# fix src/libc/win32.h
+patch -ulbf src/libc/win32.h << EOF
+@@ -79,3 +79,5 @@
+ #define        NOPROC
++#ifndef ELOOP
+ #define ELOOP          40
++#endif
+
+EOF
+# fix src/libc/win32/stat.h
+patch -ulbf src/libc/win32/stat.h << EOF
+@@ -23,10 +23,22 @@
+
++#ifndef S_IRGRP
+ #define S_IRGRP 0040
++#endif
++#ifndef S_IROTH
+ #define S_IROTH 0004
++#endif
+
++#ifndef S_IWGRP
+ #define S_IWGRP 0020
++#endif
++#ifndef S_IWOTH
+ #define S_IWOTH 0002
++#endif
+
++#ifndef S_IXGRP
+ #define        S_IXGRP 0010
++#endif
++#ifndef S_IXOTH
+ #define        S_IXOTH 0001
++#endif
+
+EOF
+# fix src/libc/win32/times.h
+patch -ulbf src/libc/win32/times.h << EOF
+@@ -21,2 +21,3 @@
+
++#ifndef __MINGW32_MAJOR_VERSION
+ struct timezone
+@@ -25,2 +26,3 @@
+ };
++#endif
+
+EOF
+# fix src/libc/stdio/reentrant.h
+mv src/libc/stdio/reentrant.h src/libc/stdio/reentrant.h.bak
+cat > src/libc/stdio/reentrant.h << EOF
+//#ifndef _POSIX
+//#define _POSIX
+//#define __MINGW_EXTENSION
+#include <sys/types.h>
+#include <sys/cdefs.h>
+//#endif
+EOF
+cat src/libc/stdio/reentrant.h.bak >> src/libc/stdio/reentrant.h
+# fix src/libc/win32/misc.h
+patch -ulbf src/libc/win32/misc.h << EOF
+@@ -45 +45 @@
+-extern int ftruncate(int, size_t);
++//extern int ftruncate(int, size_t);
+@@ -55 +55 @@
+-extern void usleep(unsigned long);
++//extern void usleep(unsigned long);
+EOF
+# fix MSYS support in src/mkconf.sh
+sed -i.orig -e "s/XMINGW\*)/XMINGW*|XMSYS*)/" src/mkconf.sh
+wl-showstatus build &&
+ make OSTYPE=msys CC="gcc -D_POSIX -D__MINGW_EXTENSION -I$(pwd)/src/libc" TOMCRYPT_CPPFLAGS= TOMCRYPT_LDFLAGS="-ltomcrypt" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf bitkeeper-bk-$VERSION
+
+
+

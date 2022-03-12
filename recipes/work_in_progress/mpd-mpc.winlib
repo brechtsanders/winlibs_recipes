@@ -1,0 +1,46 @@
+export NAME="mpc"
+export STATUS=
+export URL=https://musicpd.org/clients/mpc/
+export BASENAME=mpd-mpc
+export DESCRIPTION="A minimalist command line interface to MPD."
+export CATEGORY=audio
+export TYPE=application
+export VERSION=0.33
+export VERSIONDATE=20200503
+wl-showstatus --package-version
+export DEPENDANCIES=mpd,libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://musicpd.org/download/mpc/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.musicpd.org/download/mpc/$(echo $VERSION|sed -e "s/^\([0-9]*\)\..*$/\1/")/mpc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/mpc-$VERSION.tar.xz
+cd mpc-$VERSION
+# fix missing langinfo.h
+cat > langinfo.h << EOF
+#define nl_langinfo(codeset) "UTF-8"
+EOF
+# fix detection of iconv meson.build (version >= 0.33)
+patch -ulbf meson.build << EOF
+@@ -25,3 +25,3 @@
+ else
+-  error('iconv() not available')
++  iconv = true
+ endif
+EOF
+mkdir -p build_shared &&
+ wl-showstatus configure &&
+ PKG_CONFIG=$(which pkg-config.exe) PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library shared -Diconv=enabled -Ddocumentation=disabled -Dtest=false . build_shared &&
+ sed -i.bak -e "s/^\s*LINK_ARGS\s*=\s*/& -Wl,--as-needed -liconv /" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -C build_shared install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mpc-$VERSION
+
+
+

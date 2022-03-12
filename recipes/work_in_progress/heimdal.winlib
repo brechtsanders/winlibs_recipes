@@ -1,0 +1,131 @@
+export NAME="Heimdal"
+export STATUS=
+export URL=http://www.h5l.org/
+export BASENAME=heimdal
+export DESCRIPTION="Heimdal is an implementation of Kerberos 5 (and some more stuff). It is freely available under a three clause BSD style license."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.5.1
+#export VERSIONDATE=20140524
+####configure: error: termios.h is required!
+####heimbase.c:37:20: fatal error: syslog.h: No such file or directory
+#export VERSION=1.5.3
+#export VERSIONDATE=20140615
+####configure: error: termios.h is required!
+####configure: error: ./configure failed for lib/libedit
+#export DEPENDANCIES=openssl,readline,wineditline,gettext,sqlite3,openldap,bdb
+export VERSION=7.1.0
+export VERSIONDATE=20161226
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,readline,wineditline,gettext,sqlite3,openldap,bdb
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="http://www.h5l.org/dist/"
+export DOWNLOADURL="http://www.h5l.org/dist/src/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.h5l.org/dist/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://www.h5l.org/dist/src/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing syslog in base/heimbase.c
+patch -ulbf base/heimbase.c << EOF
+--- base/heimbase.c  2012-12-09 23:06:44.000000000 +0100
++++ base/heimbase.c  2015-03-09 14:24:23.933678700 +0100
+@@ -36,3 +36,5 @@
+ #include "baselocl.h"
++#ifndef _WIN32
+ #include <syslog.h>
++#endif
+
+@@ -370,2 +372,3 @@
+ {
++#ifndef _WIN32
+     static char str[1024];
+@@ -374,2 +377,3 @@
+     syslog(LOG_ERR, "heim_abort: %s", str);
++#endif
+     abort();
+EOF
+# fix lib/roken/signal.c
+patch -ulbf lib/roken/signal.c << EOF
+--- lib/roken/signal.c  2012-12-09 23:06:44.000000000 +0100
++++ lib/roken/signal.c  2015-03-09 14:29:35.246763200 +0100
+@@ -42,3 +42,3 @@
+  */
+-#if !defined(NeXT) && !defined(__APPLE__)
++#if !defined(NeXT) && !defined(__APPLE__) && !defined(__MINGW32__)
+ /*
+EOF
+# fix missing struct addrinfo in lib/roken/roken.h
+mv lib/roken/roken.h.in lib/roken/roken.h.in.bak
+cat > lib/roken/roken.h.in << EOF
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0502
+#endif
+#define h_errno WINSOCK_h_errno
+#define gai_strerror WINSOCK_gai_strerror
+#include <ws2tcpip.h>
+#include <winsock2.h>
+#undef h_errno
+#undef gai_strerror
+//#include <sys/types.h>
+typedef char* caddr_t;
+struct iovec {
+ caddr_t iov_base;
+ int iov_len;
+};
+#ifndef uid_t
+#define uid_t int
+#endif
+#ifndef gid_t
+#define gid_t int
+#endif
+EOF
+sed -e "s/ROKEN_LIB_VARIABLE \(extern \)/\1/" lib/roken/roken.h.in.bak >> lib/roken/roken.h.in
+# fix missing MAXHOSTNAMELEN in lib/roken/getaddrinfo_hostspec.c
+mv lib/roken/getaddrinfo_hostspec.c lib/roken/getaddrinfo_hostspec.c.bak &&
+echo "#define MAXHOSTNAMELEN 64" > lib/roken/getaddrinfo_hostspec.c &&
+cat lib/roken/getaddrinfo_hostspec.c.bak >> lib/roken/getaddrinfo_hostspec.c
+# avoid libedit detection in configure
+mv configure configure.bak &&
+sed -e "s/^subdirs=.*lib\/libedit/#&/" configure.bak > configure
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libedit=$MINGWPREFIX --with-libedit-lib=$MINGWPREFIX/lib --with-libedit-include=$MINGWPREFIX/include LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm -f CMakeCache.txt
+#wl-showstatus configure
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

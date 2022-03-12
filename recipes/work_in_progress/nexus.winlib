@@ -1,0 +1,52 @@
+export NAME="Nexus C API"
+export STATUS=
+export URL=https://github.com/nexusformat/code
+export BASENAME=nexus
+export DESCRIPTION="NeXus API code and helper applications"
+export CATEGORY=
+export TYPE=library
+export VERSION=4.4.3
+export VERSIONDATE=20180725
+wl-showstatus --package-version
+export DEPENDANCIES=hdf5,libxml2,mxml,libjpeg,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,doxygen
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/nexusformat/code/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/nexusformat/code/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd code-$VERSION
+# fix missing rindex in applications/NXbrowse/NXbrowse.c
+mv applications/NXbrowse/NXbrowse.c applications/NXbrowse/NXbrowse.c.bak
+echo "#define rindex(haystack,needle) strrchr(haystack,needle)" > applications/NXbrowse/NXbrowse.c
+cat applications/NXbrowse/NXbrowse.c.bak >> applications/NXbrowse/NXbrowse.c
+# fix redefinition of round in applications/NXtranslate/FRM2/frm2_retriever.cpp
+patch -ulbf applications/NXtranslate/FRM2/frm2_retriever.cpp << EOF
+@@ -1544,3 +1544,3 @@
+
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+ static double round(double x)
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_HDF5:BOOL=ON -DENABLE_HDF4:BOOL=OFF -DENABLE_APPS:BOOL=ON -DENABLE_NXINTER:BOOL=OFF -DENABLE_JAVA:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMINGW_MSYS:BOOL=ON -DHAVE_MS_LIB:BOOL=ON -DENABLE_HDF5:BOOL=ON -DENABLE_HDF4:BOOL=OFF -DENABLE_MXML:BOOL=ON -DENABLE_NXINTER:BOOL=OFF -DENABLE_APPS:BOOL=ON -DENABLE_CONTRIB:BOOL=OFF -S. -Bbuild_win &&
+ PKG_CONFIG=$(which pkg-config.exe) cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMINGW_MSYS:BOOL=ON -DHAVE_MS_LIB:BOOL=ON -DENABLE_HDF5:BOOL=ON -DENABLE_HDF4:BOOL=OFF -DENABLE_MXML:BOOL=ON -DENABLE_NXINTER:BOOL=OFF -DENABLE_APPS:BOOL=ON -DENABLE_CONTRIB:BOOL=OFF -S. -Bbuild_win &&
+ sed -i.bak -e "s/if(.*Runtime.*)/if(FALSE)/" build_win/cmake_install.cmake &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ cp -f $INSTALLPREFIX/lib/libNeXusStatic.a $INSTALLPREFIX/lib/libNeXus.a &&
+ #rm -f $INSTALLPREFIX/bin/*.dll &&
+ #cp -f build_win/src/libNeXus.dll $INSTALLPREFIX/bin/ &&
+ #strip $INSTALLPREFIX/bin/libNeXus.dll
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf code-$VERSION
+
+
+

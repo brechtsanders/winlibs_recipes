@@ -1,0 +1,71 @@
+export NAME="srtp2"
+export STATUS=
+export URL=https://github.com/cisco/libsrtp
+export BASENAME=srtp2
+export DESCRIPTION="The libSRTP library is an open-source implementation of the Secure Real-time Transport Protocol (SRTP) originally authored by Cisco Systems, Inc."
+export CATEGORY=audio,communication
+export TYPE=library
+#export VERSION=2.1.0
+#export VERSIONDATE=20170715
+#export VERSION=2.2.0
+#export VERSIONDATE=20180516
+#export VERSION=2.3.0
+#export VERSIONDATE=20191223
+#export VERSION=2.4.0
+#export VERSIONDATE=20210814
+#export VERSION=2.4.1
+#export VERSIONDATE=20210910
+export VERSION=2.4.2
+export VERSIONDATE=20210921
+wl-showstatus --package-version
+export DEPENDANCIES=openssl
+#export OPTIONALDEPENDANCIES=winpcap
+export OPTIONALDEPENDANCIES=libpcap
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD-style
+export DOWNLOADURL="https://github.com/cisco/libsrtp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/cisco/libsrtp/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd libsrtp-$VERSION
+# fix missing timersub in test/rtp_decoder.c
+mv test/rtp_decoder.c test/rtp_decoder.c.bak
+cat > test/rtp_decoder.c << EOF
+#include <time.h>
+#ifndef timersub
+/* This is a copy from GNU C Library (GNU LGPL 2.1), sys/time.h. */
+# define timersub(a, b, result)                                               \\
+  do {                                                                        \\
+    (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;                             \\
+    (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;                          \\
+    if ((result)->tv_usec < 0) {                                              \\
+      --(result)->tv_sec;                                                     \\
+      (result)->tv_usec += 1000000;                                           \\
+    }                                                                         \\
+  } while (0)
+#endif
+EOF
+cat test/rtp_decoder.c.bak >> test/rtp_decoder.c
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-openssl CFLAGS="-I$MINGWPREFIX/include/pcap" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-openssl CFLAGS="-fcommon -I$MINGWPREFIX/include/pcap" &&
+ wl-showstatus build &&
+ make all libsrtp2.a &&
+ wl-showstatus build-install &&
+ make install &&
+ # manually create and install DLL
+ grep -v "No newline at end of file" srtp.def > libsrtp2.def &&
+ gcc -shared -s -mwindows -def libsrtp2.def -Wl,--out-implib,libsrtp2.dll.a -o libsrtp2.dll libsrtp2.a -lws2_32 -leay32 &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f libsrtp2.dll $INSTALLPREFIX/bin/ &&
+ cp -f libsrtp2.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libsrtp-$VERSION
+
+
+

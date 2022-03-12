@@ -1,0 +1,147 @@
+export NAME="libzdb"
+export STATUS=
+export URL=http://tildeslash.com/libzdb/
+export BASENAME=libzdb
+export DESCRIPTION="A small, easy to use Open Source Database Connection Pool Library with the following features: Thread safe Database Connection Pool; Connect to multiple database systems; Zero runtime configuration, connect using a URL scheme; Supports MySQL, PostgreSQL, SQLite and Oracle"
+export CATEGORY=database
+export TYPE=library
+#export VERSION=3.1
+#export VERSIONDATE=20160523
+#export VERSION=3.2
+#export VERSIONDATE=20190404
+#export VERSION=3.2.1
+#export VERSIONDATE=20200306
+export VERSION=3.2.2
+export VERSIONDATE=20200401
+####configure: error: vsnprintf does not conform to c11
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,openssl,sqlite3,postgresql,mariadb-client
+export OPTIONALDEPENDANCIES=ocilib
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://tildeslash.com/libzdb/dist/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://tildeslash.com/libzdb/dist/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/system/Time.c
+#patch -ulbf src/system/Time.c << EOF
+#--- src/system/Time.c  2015-08-31 14:55:18.000000000 +0200
+#+++ src/system/Time.c  2016-05-31 13:50:13.698707600 +0200
+#@@ -35,3 +35,9 @@
+# #include <sys/types.h>
+#+#ifdef _WIN32
+#+#include <stdint.h>
+#+#include <winsock2.h>
+#+#define gmtime_r( _clock, _result ) ( *(_result) = *gmtime( (_clock) ), (_result) )
+#+#else
+# #include <sys/select.h>
+#+#endif
+# #include <limits.h>
+#@@ -506,3 +512,3 @@
+#         t.tv_sec = u / USEC_PER_SEC;
+#-        t.tv_usec = (suseconds_t)(u % USEC_PER_SEC);
+#+        t.tv_usec = (u % USEC_PER_SEC);
+#         select(0, 0, 0, 0, &t);
+#EOF
+patch -ulbf src/system/Time.c << EOF
+@@ -35,3 +35,8 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <stdint.h>
++#include <winsock2.h>
++#else
+ #include <sys/select.h>
++#endif
+ #include <limits.h>
+@@ -579,3 +584,3 @@
+         t.tv_sec = u / USEC_PER_SEC;
+-        t.tv_usec = (suseconds_t)(u % USEC_PER_SEC);
++        t.tv_usec = (u % USEC_PER_SEC);
+         select(0, 0, 0, 0, &t);
+EOF
+# avoid issue in src/db/ConnectionPool.c
+mv src/db/ConnectionPool.c src/db/ConnectionPool.c.bak &&
+sed -e "s/\(P->doSweep\) && P->reaper/\1/" src/db/ConnectionPool.c.bak > src/db/ConnectionPool.c
+## fix missing gmtime_r in src/db/sqlite/SQLiteResultSet.c
+#mv src/db/sqlite/SQLiteResultSet.c src/db/sqlite/SQLiteResultSet.c.bak &&
+#echo "#define gmtime_r( _clock, _result ) ( *(_result) = *gmtime( (_clock) ), (_result) )" > src/db/sqlite/SQLiteResultSet.c &&
+#cat src/db/sqlite/SQLiteResultSet.c.bak >> src/db/sqlite/SQLiteResultSet.c
+# fix missing gmtime_r (version >= 3.2)
+for F in $(grep -l gmtime_r $(find -name '*.c')); do
+ mv $F $F.bak &&
+ echo "#define _POSIX_THREAD_SAFE_FUNCTIONS 1" > $F &&
+ cat $F.bak >> $F
+done
+# fix %lld warnings in src/db/postgresql/PostgresqlPreparedStatement.c
+mv src/db/postgresql/PostgresqlPreparedStatement.c src/db/postgresql/PostgresqlPreparedStatement.c.bak
+echo "#include <inttypes.h>" > src/db/postgresql/PostgresqlPreparedStatement.c
+sed -e "s/%ll\(d\)/%\" PRI\164 \"/g; s/\(PRId64\) \"\",/\1,/g" src/db/postgresql/PostgresqlPreparedStatement.c.bak >> src/db/postgresql/PostgresqlPreparedStatement.c
+# fix %lld in test/unit.c
+mv test/unit.c test/unit.c.bak
+echo "#include <inttypes.h>" > test/unit.c
+sed -e "s/%ll\(d\)/%\" PRI\164 \"/g; s/\(PRId64\) \"\",/\1,/g" test/unit.c.bak >> test/unit.c
+# fix missing srandom in src/system/System.c (version >= 3.2)
+mv src/system/System.c src/system/System.c.bak
+sed -e "s/\(srandom(\)/srand(/" src/system/System.c.bak >> src/system/System.c
+# fix missing random in src/db/sqlite/SQLiteAdapter.c (version >= 3.2)
+sed -i.bak -e "s/\(random(\)/rand(/" src/db/sqlite/SQLiteAdapter.c
+# use _vsnprintf instead of vsnprintf (version >= 3.2)
+sed -i.bak -e "s/\bvsnprintf\b/_&/" $(grep -lw vsnprintf $(find -name '*.c'))
+# fix missing assert in test/zdbpp.cpp (version >= 3.2)
+patch -ulbf test/zdbpp.cpp << EOF
+@@ -58,6 +58,8 @@
+         ResultSet result = con.executeQuery("select id, name, percent, image from zild_t where id < ? order by id;", 100);
+         result.setFetchSize(100);
++#ifdef assert
+         assert(result.columnCount() == 4);
+         assert(std::string(result.columnName(1)) == "id");
++#endif
+         while (result.next()) {
+                 int id = result.getInt(1);
+@@ -67,7 +69,9 @@
+                 printf("\t%-5d%-20s%-10.2f%-16.38s\n", id, name ? name : "null", percent, size ? (char *)image : "null");
+                 // Assert that SQL null above was set
++#ifdef assert
+                 if (id == 11) {
+                     assert(result.isnull(4));
+                 }
++#endif
+         }
+ }
+EOF
+# fix conflict between time_t and long long in src/zdbpp.h (version >= 3.2)
+patch -ulbf src/zdbpp.h << EOF
+@@ -328,7 +328,9 @@
+         }
+
++#ifndef __MINGW32__
+         void bind(int parameterIndex, time_t x) {
+             this->setTimestamp(parameterIndex, x);
+         }
++#endif
+
+         //blob
+EOF
+# detect _vsnprintf instead of vsnprintf (version >= 3.2)
+sed -i.bak -e "s/\(n = \)\(vsnprintf\)/\1_\2/" configure.ac
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I config -I $MINGWPREFIX/share/aclocal &&
+ sed -i.bak -e "s/^as_fn_error\(.*vsnprintf does not conform to c[0-9]*\)/\$as_echo\1/" configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-optimized --enable-openssl --with-sqlite $(grep -q sqlite3_unlock_notify $MINGWPREFIX/lib/libsqlite3.a && echo --enable-sqliteunlock) --without-mysql --with-postgresql --without-oci LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-optimized --enable-openssl --with-sqlite $(grep -q sqlite3_unlock_notify $MINGWPREFIX/lib/libsqlite3.dll.a && echo --enable-sqliteunlock) --with-mysql --with-postgresql --with-oci-include=$MINGWPREFIX/include --with-oci-lib=$MINGWPREFIX/lib LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: check if fixes break anything
+####To do: support Oracle database
+
+
+

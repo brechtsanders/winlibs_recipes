@@ -1,0 +1,109 @@
+export NAME="OpenLLDP"
+export STATUS=
+#export URL=http://openlldp.sourceforge.net/
+#export URL=https://github.com/intel/openlldp
+export URL=http://open-lldp.org/
+export BASENAME=openlldp
+export DESCRIPTION="The OpenLLDP project aims to provide a comprehensive implementation of the IEEE standard 802.1AB Link Layer Discovery Protocol. LLDP is an industry standard protocol designed to supplant proprietary Link-Layer protocols such as Extreme's EDP (Extreme Discovery Protocol) and CDP (Cisco Discovery Protocol). The goal of LLDP is to provide an inter-vendor compatible mechanism to deliver Link-Layer notifications to adjacent network devices. The Open Source implementation of LLDP provided by the OpenLLDP project is intended to help foster wider adoption of LLDP."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.4alpha
+#export VERSIONDATE=20130613
+#export VERSION=0.9.46
+#export VERSIONDATE=20190508
+#####configure: error: Package requirements (libconfig >= 1.3.2) were not met: No package 'libconfig' found
+#export VERSION=1.0.1
+#export VERSIONDATE=20190508
+export VERSION=1.1
+export VERSIONDATE=20201103
+####configure: error: Package requirements (libnl-3.0 >= 3.2) were not met: No package 'libnl-3.0' found
+wl-showstatus --package-version
+export DEPENDANCIES=libconfig,libnl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="http://sourceforge.net/projects/openlldp/files/"
+#export DOWNLOADURL="http://ftp-osl.osuosl.org/pub/open-lldp/"
+export DOWNLOADURL="https://github.com/intel/openlldp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/openlldp/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp-osl.osuosl.org/pub/open-lldp/open-lldp-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/intel/openlldp/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/sys/un.h
+## fix missing framehandlers/windows/lldp_windows_framer.h in src/lldp_main.c
+#patch -ulbf src/lldp_main.c << EOF
+#--- src/lldp_main.c  2013-06-13 17:16:20 +0200
+#+++ src/lldp_main.c  2013-06-13 17:16:24 +0200
+#@@ -39,4 +39,6 @@
+# #include <shlobj.h>
+#+#ifndef __MINGW32__
+# #include "framehandlers/windows/lldp_windows_framer.h"
+# #endif
+#+#endif
+#
+#EOF
+## fix src/tlv/tlv.c
+#patch -ulbf src/tlv/tlv.c << EOF
+#--- src/tlv/tlv.c  2010-06-08 07:04:22 +0200
+#+++ src/tlv/tlv.c  2013-06-13 17:21:22 +0200
+#@@ -24,3 +24,5 @@
+# #include <string.h>
+#+#ifndef __MINGW32__
+# #include <netinet/in.h>
+#+#endif
+# #include "lldp_port.h"
+#EOF
+## fix src/tlv/tlv_common.c
+#patch -ulbf src/tlv/tlv_common.c << EOF
+#--- src/tlv/tlv_common.c  2010-06-08 07:04:22 +0200
+#+++ src/tlv/tlv_common.c  013-06-13 17:22:24 +0200
+#@@ -12,3 +12,5 @@
+# #include <string.h>
+#+#ifndef __MINGW32__
+# #include <netinet/in.h>
+#+#endif
+#
+#EOF
+## fix autoconf issue with subdirectories (version <= 0.9.46)
+#mv configure.ac configure.ac.bak
+#sed -e "s/\(AM_INIT_AUTOMAKE(\)/\1[subdir-objects] /" configure.ac.bak > configure.ac
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DWINDOWS -DWIN32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-debug CFLAGS="-DWINDOWS -DWIN32 -I$(pwd)/winfix" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip LIBS="-Wl,--as-needed -lws2_32" &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm -f CMakeCache.txt &&
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

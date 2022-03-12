@@ -1,0 +1,120 @@
+export NAME="pygobject2"
+export STATUS=
+export URL=http://www.gnome.org/projects/pygobject
+export BASENAME=pygobject2
+export DESCRIPTION="PyGObject is a Python package which provides bindings for GObject based libraries such as GTK, GStreamer, WebKitGTK, GLib, GIO and many more."
+export CATEGORY=
+export TYPE=library
+#export VERSION=2.26.0
+#export VERSIONDATE=20101008
+#export VERSION=2.27.0
+#export VERSIONDATE=20101111
+#export VERSION=2.28.0
+#export VERSIONDATE=20110309
+#export VERSION=2.28.1
+#export VERSIONDATE=20110322
+#export VERSION=2.28.2
+#export VERSIONDATE=20110323
+#export VERSION=2.28.3
+#export VERSIONDATE=20110324
+#export VERSION=2.28.4
+#export VERSIONDATE=20110419
+#export VERSION=2.28.6
+#export VERSIONDATE=20110614
+export VERSION=2.28.7
+export VERSIONDATE=20171211
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,libffi
+#export DEPENDANCIES=glib2,libffi,gobject-introspection
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/pygobject/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/pygobject/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/pygobject-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/pygobject-$VERSION.tar.xz
+cd pygobject-$VERSION
+# fix making tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# fix Python name
+sed -i.bak -e "s/\(basename \$PYTHON\)/\1|sed -e s?\\.exe??/" configure
+# fix missing GI_INFO_TYPE_ERROR_DOMAIN in gi/pygi-info.c (version >= 2.28.7)
+patch -ulbf gi/pygi-info.c << EOF
+@@ -164,2 +164,3 @@
+             break;
++#ifdef GI_INFO_TYPE_ERROR_DOMAIN
+         case GI_INFO_TYPE_ERROR_DOMAIN:
+@@ -167,2 +168,3 @@
+             break;
++#endif
+         case GI_INFO_TYPE_UNION:
+@@ -483,3 +485,5 @@
+                 case GI_INFO_TYPE_CONSTANT:
++#ifdef GI_INFO_TYPE_ERROR_DOMAIN
+                 case GI_INFO_TYPE_ERROR_DOMAIN:
++#endif
+                 case GI_INFO_TYPE_VALUE:
+@@ -862,3 +866,5 @@
+                     case GI_INFO_TYPE_CONSTANT:
++#ifdef GI_INFO_TYPE_ERROR_DOMAIN
+                     case GI_INFO_TYPE_ERROR_DOMAIN:
++#endif
+                     case GI_INFO_TYPE_VALUE:
+EOF
+# fix missing Python library file
+mkdir -p pylibs &&
+pexports $PYDIR/python[0-9][0-9].dll > pylibs/python3.def &&
+(( grep -q Py_InitModule4_64 pylibs/python3.def && echo "Py_InitModule4 = Py_InitModule4_64" >> pylibs/python3.def ) || true ) &&
+dlltool -D $PYDIR/python[0-9][0-9].dll -d pylibs/python3.def -l pylibs/libpython3.dll.a
+# fix shared library extension in */Makefile.in
+sed -i.bak -e "s/\.so/.dll/g" $(grep -l "\.so" */Makefile.in)
+# avoid -fPIC (useless on Windows and not supported by clang) in configure
+sed -i.bak -e "s/-fPIC//" configure
+wl-showstatus configure &&
+ PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-ffi --disable-introspection --disable-cairo --disable-glibtest --disable-docs CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -L$(pwd)/pylibs -lpython3" &&
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-ffi --enable-introspection --disable-cairo --disable-glibtest --disable-docs CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -L$(pwd)/pylibs -lpython3" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # avoid stuff that is not available
+ echo "#undef HAVE_PYSIGNAL_SETWAKEUPFD" >> config.h &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus build-install &&
+ PATH=$PYDIR:$PATH PYTHONPATH=$INSTALLPREFIX/Lib/site-packages:$PYTHONPATH make install-strip pythondir=$INSTALLPREFIX/Lib/site-packages pyexecdir=$INSTALLPREFIX/Lib/site-packages &&
+ #pkgpyexecdir=$INSTALLPREFIX/Lib/site-packages 
+ mkdir -p $INSTALLPREFIX/share/pygobject/2.0/codegen &&
+ cp -rf codegen/* $INSTALLPREFIX/share/pygobject/2.0/codegen/ &&
+ sed -i -e "s?$INSTALLPREFIX?\$MINGWPREFIX?" $INSTALLPREFIX/share/pygobject/2.0/codegen/codegen.py &&
+# # fix issue with backslashes
+# for F in Makefile */Makefile ; do
+#  mv $F $F.bak
+#  sed -e 's?\\Lib\\?/Lib/?g; s/-std=c9x//' $F.bak > $F
+# done &&
+# ## manually create pygobject-codegen-2.0 if not done automatically
+# #( ls -1 codegen/pygobject-codegen-2.0 &> /dev/null || (
+# # mkdir -p $INSTALLPREFIX/bin &&
+# # sed -e "s?@prefix@?$MINGWPREFIX?; s?@datarootdir@?\${prefix}/share?; s?@datadir@?\${datarootdir}?; s?@PYTHON@?\$PYDIR/python.exe?" codegen/pygobject-codegen-2.0.in > $INSTALLPREFIX/bin/pygobject-codegen-2.0
+# #)) &&
+# #( make -j1 install-strip || make -j1 install-strip LIBS="-Wl,--as-needed -lpython26" ) &&
+# ( make -j1 all install-strip pyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages pkgpyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages ||
+#  ( touch glib/.libs/libpyglib-2.0-python.lai && make -j1 all install-strip pyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages pkgpyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages ) ||
+#  ( touch glib/.libs/_glib.lai && make -j1 all install-strip pyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages pkgpyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages ) ||
+#  ( touch gobject/.libs/_gobject.lai && make -j1 all install-strip pyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages pkgpyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages ) ||
+#  ( touch gio/.libs/_gio.lai && make -j1 all install-strip pyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages pkgpyexecdir=$INSTALLPREFIX/python/App/Lib/site-packages )
+# ) &&
+# mv $INSTALLPREFIX/bin/pygobject-codegen-2.0 $INSTALLPREFIX/bin/pygobject-codegen-2.0.bak &&
+# sed -e "s?$INSTALLPREFIX?\$MINGWPREFIX?" $INSTALLPREFIX/bin/pygobject-codegen-2.0.bak > $INSTALLPREFIX/bin/pygobject-codegen-2.0 &&
+# rm $INSTALLPREFIX/bin/pygobject-codegen-2.0.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pygobject-$VERSION
+
+
+

@@ -1,0 +1,655 @@
+#export NAME="rrdtool"
+#export STATUS=
+#export URL=http://oss.oetiker.ch/rrdtool/pub/
+#export BASENAME=rrdtool
+#export DESCRIPTION="RRDtool is the OpenSource industry standard, high performance data logging and graphing system for time series data."
+#export CATEGORY=db
+#export TYPE=library
+##export VERSION=1.2.27
+##export VERSION=1.2.28
+#export VERSION=1.2.29
+##export VERSION=1.3.2
+##export VERSION=1.3.5
+##export VERSION=1.3.6
+##export VERSION=1.3.7
+##export VERSION=1.3.8
+#export VERSIONDATE=
+#wl-showstatus --package-version
+#export DEPENDANCIES=zlib,pthreads,freetype2,libart
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="http://oss.oetiker.ch/rrdtool/pub/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-`echo $VERSION|sed -e 's/\./-/'`
+#export DOWNLOADSOURCEURL=http://oss.oetiker.ch/rrdtool/pub/$BASENAME-$VERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix to use ctime_r from pthread.h
+#mv configure configure.bak1
+#sed -e 's/ctime_r(/#include <pthread.h>\
+#ctime_r(/' configure.bak1 > configure
+## fix IEEE math (version > 1.2.29)
+#mv configure configure.bak2
+#sed -e "s/-std=c99//g; s/FP_SNAN/_FPCLASS_SNAN/; s/FP_QNAN/_FPCLASS_QNAN/" configure.bak2 > configure
+## enable building of shared libraries (.DLL)
+##mv configure.ac configure.ac.bak
+##echo "AC_LIBTOOL_WIN32_DLL" > configure.ac
+##cat configure.ac.bak >> configure.ac
+##wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python
+## fix for pthread.h looking for config.h if HAVE_CONFIG_H is defined
+#touch src/config.h
+## fix for isnan error
+#mv rrd_config.h rrd_config.h.bak
+#sed -e 's/\(#  define isnan(a) (fpclass(a) == FP_SNAN || fpclass(a) == FP_QNAN)\)/\/\/\1/' rrd_config.h.bak > rrd_config.h
+## fix missing definitions of localtime_r and ctime_r
+#echo "#include <pthread.h>" >> rrd_config.h
+## fix localtime_r, ctime_r
+#mv src/rrd_tool.h src/rrd_tool.h.bak
+#sed -e 's/^\(struct tm\* localtime_r\|char\* ctime_r\|struct tm\* gmtime_r\|char \*strtok_r\)/\/\/\1/' src/rrd_tool.h.bak > src/rrd_tool.h
+## fixes for getuid and mkdir errors
+#mv src/rrd_tool.c src/rrd_tool.c.bak
+#sed -e 's/#if ! defined(HAVE_CHROOT) || ! defined(HAVE_GETUID)/#if defined(HAVE_CHROOT) \&\& defined(HAVE_GETUID)/' -e 's/\(mkdir([^),]*\),[^),]*)/\1)/' src/rrd_tool.c.bak > src/rrd_tool.c
+## fix mkdir errors
+#mv src/rrd_utils.c src/rrd_utils.c.bak &&
+#sed -e 's/\(mkdir([^),]*\),[^),]*)/\1)/' src/rrd_utils.c.bak > src/rrd_utils.c
+## remove patch for gettimeofday
+#mv src/rrd_update.c src/rrd_update.c.bak
+#sed -e 's/^static int gettimeofday/static int gettimeofday_/' src/rrd_update.c.bak > src/rrd_update.c
+## fix for strtok_r
+#mv src/rrd_create.c src/rrd_create.c.bak
+#echo '#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))' > src/rrd_create.c
+#cat src/rrd_create.c.bak >> src/rrd_create.c
+## fix missing fsync in src/rrd_config_bottom.h (version >= 1.3.6)
+#mv src/rrd_config_bottom.h src/rrd_config_bottom.h.bak
+#cat > src/rrd_config_bottom.h << EOF
+##define HAVE_FSYNC
+##define fsync(fd) _commit(fd)
+#EOF
+#cat src/rrd_config_bottom.h.bak >> src/rrd_config_bottom.h
+#
+## fix missing fsync src/rrd_config_bottom.h (version >= 1.3.8)
+#mv src/rrd_config_bottom.h src/rrd_config_bottom.h.bak
+#sed -e "s/#error \"Can't compile with without fsync and fdatasync\"/#define fsync(fd) _commit(fd)/" src/rrd_config_bottom.h.bak > src/rrd_config_bottom.h
+#
+## fix redeclaration of ssize_t (version >= 1.3.6)
+#mv src/rrd.h src/rrd.h.bak
+#sed -e "s?^typedef size_t ssize_t;??" src/rrd.h.bak > src/rrd.h
+#
+## fix missing GF_PART (should really fix src/rrd_graph.c #ifdef WITH_PIECHART -> #if WITH_PIECHART) (version >= 1.3.6)
+#mv rrd_config.h rrd_config.h.bak
+#sed -e 's/^#define\( WITH_PIECHART \)0$/#undef \1/' rrd_config.h.bak > rrd_config.h
+#
+## fix missing struct timeval (version >= 1.3.6)
+#mv src/rrd_update.c src/rrd_update.c.bak
+#sed -e "s/#ifndef __MINGW32__/#if 1/" src/rrd_update.c.bak > src/rrd_update.c
+#
+## fix undefined __MINGW_NOTHROW
+#mv src/rrd_graph.h src/rrd_graph.h.bak
+#cat > src/rrd_graph.h << EOF
+##ifndef __cdecl
+##define __cdecl
+##endif
+##ifndef __MINGW_NOTHROW
+##define __MINGW_NOTHROW
+##endif
+##include <windows.h>
+##include <libgen.h>
+#EOF
+#cat src/rrd_graph.h.bak >> src/rrd_graph.h
+#? ? ? ? ? ? ? ? ? ? ?
+#
+## fix missing struct tm (version >= 1.3.6)
+#mv src/rrd_tool.h src/rrd_tool.h.bak
+#echo "#include <time.h>" > src/rrd_tool.h
+#cat src/rrd_tool.h.bak >> src/rrd_tool.h
+#
+## skip building documentation
+#cp Makefile Makefile.bak
+#sed -e 's/^\(SUBDIRS =.*\) doc \(.*\)$/\1 \2/' Makefile.bak > Makefile
+#make install
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+## TO DO: no DLLs are built
+
+
+
+#export NAME="rrdtool"
+#export STATUS=
+#export URL=http://oss.oetiker.ch/rrdtool/
+#export BASENAME=rrdtool
+#export DESCRIPTION="RRDtool is the OpenSource industry standard, high performance data logging and graphing system for time series data."
+#export CATEGORY=db
+#export TYPE=library
+#export VERSION=1.3.8
+##export VERSION=1.4.1
+##export VERSION=1.4.2
+##export VERSION=1.4.3
+##export VERSION=1.4.4
+#export VERSIONDATE=
+##export VERSION=1.4.5
+##export VERSIONDATE=20101227
+##export VERSION=1.4.6
+##export VERSIONDATE=20110116
+##export VERSION=1.4.7
+##export VERSIONDATE=20120124
+#####checking for gnroff... no
+#####checking for nroff... no
+#####configure: error: I need a copy of *nroff to format the documentation
+##export VERSION=1.4.8
+##export VERSIONDATE=20130523
+##export VERSION=1.4.9
+##export VERSIONDATE=20140930
+#####src/rrd_client.c:89:5: warning: nested extern declaration of 'realpath' [-Wnested-externs]
+#####src/rrd_client.c:316:13: error: 'ENOTCONN' undeclared (first use in this function)
+##export VERSION=1.5.0
+##export VERSIONDATE=20150417
+##export VERSION=1.5.1
+##export VERSIONDATE=20150422
+##export VERSION=1.5.2
+##export VERSIONDATE=20150424
+##export VERSION=1.5.3
+##export VERSIONDATE=20150501
+#####configure: error: I need a copy of *nroff to format the documentation
+##export VERSION=1.5.4
+##export VERSIONDATE=20150811
+#####rrd_restore.c:29:17: error: conflicting types for 'ssize_t'
+##export VERSION=1.5.5
+##export VERSIONDATE=20151111
+#####src/rrd_client.c:(.text+0xdc): undefined reference to `realpath'
+#wl-showstatus --package-version
+#export DEPENDANCIES=zlib,pthreads,freetype2,libart,cairo,pango,glib2,gettext,libpng,libxml2
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=intltool
+##export BUILDDEPENDANCIES=intltool,groff
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://oss.oetiker.ch/rrdtool/pub/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-`echo $VERSION|sed -e 's/\./-/'`
+#export DOWNLOADSOURCEURL=http://oss.oetiker.ch/rrdtool/pub/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix missing fsync
+#mv src/rrd_config_bottom.h src/rrd_config_bottom.h.bak
+#cat > src/rrd_config_bottom.h << EOF
+##define HAVE_FSYNC
+##define fsync(fd) _commit(fd)
+##include <pthread.h>
+##define strtok_r(_s,_sep,_lasts) (*(_lasts) = strtok((_s), (_sep)))
+#EOF
+#cat src/rrd_config_bottom.h.bak >> src/rrd_config_bottom.h
+## fix redefinition of ssize_t
+#mv src/rrd.h src/rrd.h.bak
+#sed -e "s?\(typedef size_t ssize_t;\)?/*\1*/?" src/rrd.h.bak > src/rrd.h
+### fix redefinition of ssize_t (version >= 1.4.2)
+##mv src/rrd_restore.c src/rrd_restore.c.bak
+##sed -e "s?\(typedef size_t ssize_t;\)?/*\1*/?" src/rrd_restore.c.bak > src/rrd_restore.c
+## fix redefinition of MAXPATH (version <= 1.3.8)
+#mv src/rrd_graph.h src/rrd_graph.h.bak
+##echo "#include <_mingw.h>" > src/rrd_graph.h
+#sed -e "s?^\(# *define MAXPATH MAX_PATH.*\)?/*\1*/?" src/rrd_graph.h.bak >> src/rrd_graph.h
+## don't abort on errors
+#mv src/Makefile src/Makefile.bak
+#sed -e "s/-Wall -pedantic//" src/Makefile.bak > src/Makefile
+## fix redefinition of basename and dirname
+#mv src/plbasename.h src/plbasename.h.bak
+#echo "#include <libgen.h>" > src/plbasename.h
+#mv src/plbasename.c src/plbasename.c.bak
+#touch src/plbasename.c
+## fix redefinition of gettimeofday
+#mv src/rrd_update.c src/rrd_update.c.bak
+#sed -e "s/^\(static int gettimeofday\)/\1_/" src/rrd_update.c.bak > src/rrd_update.c
+## fix redefinitions of localtime_r/ctime_r/gmtime_r
+#mv src/rrd_tool.h src/rrd_tool.h.bak
+#sed -e "s/\(localtime_r\|ctime_r\|gmtime_r\|strtok_r\)/\1_/" src/rrd_tool.h.bak > src/rrd_tool.h
+## fixes for missing getuid and mkdir having only 1 parameter
+#mv src/rrd_tool.c src/rrd_tool.c.bak
+##sed -e 's/\(mkdir([^),]*\),[^),]*)/\1)/' src/rrd_tool.c.bak > src/rrd_tool.c
+#sed -e 's/#if ! defined(HAVE_CHROOT) || ! defined(HAVE_GETUID)/#if defined(HAVE_CHROOT) \&\& defined(HAVE_GETUID)/' -e 's/\(mkdir([^),]*\),[^),]*)/\1)/' src/rrd_tool.c.bak > src/rrd_tool.c
+## fix missing gmtime_r src/rrd_rpncalc.c (version >= 1.3.8)
+#mkdir -p win32fix
+#cat > win32fix/my_ctime_r.h << EOF
+##include <time.h>
+#inline char* ctime_r (const time_t* tim_p, char* result)
+#{
+#  struct tm tm;
+#  return asctime_r (localtime_r (tim_p, &tm), result);
+#}
+#EOF
+#mv src/rrd_rpncalc.c src/rrd_rpncalc.c.bak
+#echo "#include <my_ctime_r.h>" > src/rrd_rpncalc.c
+#cat src/rrd_rpncalc.c.bak >> src/rrd_rpncalc.c
+## fix undefined reference to localtime_r in src/rrd_graph.c (version >= 1.3.8)
+#mv src/rrd_graph.c src/rrd_graph.c.bak
+#cat > src/rrd_graph.c << EOF
+##define localtime_r(clock,result) (*(result) = *localtime(clock),result)
+#EOF
+#cat src/rrd_graph.c.bak >> src/rrd_graph.c
+## fix undefined reference to localtime_r in src/rrd_graph_helper.c (version >= 1.3.8)
+#mv src/rrd_graph_helper.c src/rrd_graph_helper.c.bak
+#cat > src/rrd_graph_helper.c << EOF
+##define localtime_r(clock,result) (*(result) = *localtime(clock),result)
+#EOF
+#cat src/rrd_graph_helper.c.bak >> src/rrd_graph_helper.c
+## fix undefined reference to localtime_r in src/rrd_dump.c (version >= 1.3.8)
+#mv src/rrd_dump.c src/rrd_dump.c.bak
+#cat > src/rrd_dump.c << EOF
+##define localtime_r(clock,result) (*(result) = *localtime(clock),result)
+#EOF
+#cat src/rrd_dump.c.bak >> src/rrd_dump.c
+## fix undefined reference to localtime_r in src/rrd_rpncalc.c (version >= 1.3.8)
+#mv src/rrd_rpncalc.c src/rrd_rpncalc.c.bak
+#cat > src/rrd_rpncalc.c << EOF
+##include <stdlib.h>
+##include <string.h>
+##include <time.h>
+#struct tm* localtime_r (const time_t* timer, struct tm* result)
+#{
+#  struct tm* local_result;
+#  if ((local_result = localtime(timer)) == NULL || result == NULL)
+#    return NULL;
+#  memcpy(result, local_result, sizeof (result));
+#  return result;
+#}
+#inline struct tm* gmtime_r (const time_t* timer, struct tm* result)
+#{
+#  struct tm* local_result;
+#  if ((local_result = gmtime (timer)) == NULL || result == NULL)
+#    return NULL;
+#  memcpy (result, local_result, sizeof (result));
+#  return result;
+#}
+##define asctime_r(_tm,_buf ) ( strcpy( (_buf), asctime( (_tm) ) ), (_buf) )
+#EOF
+#cat src/rrd_rpncalc.c.bak >> src/rrd_rpncalc.c
+### fix redefinition of integer types (version >= 1.4.2)
+##patch -ulbf src/rrd_client.h << EOF
+##--- src/rrd_client.h  Sun Oct 11 18:00:14 2009
+##+++ src/rrd_client.h  Mon Nov 16 14:53:44 2009
+##@@ -29,4 +29,4 @@
+##
+##-#ifndef WIN32
+##-# ifdef HAVE_STDINT_H
+##+#if !defined(WIN32) || defined(__MINGW32__)
+##+# if defined(HAVE_STDINT_H) || defined(__MINGW32__)
+## #  include <stdint.h>
+##EOF
+### fix redefinition of ssize_t (version >= 1.4.5)
+##patch -ulbf src/rrd_restore.c << EOF
+##--- src/rrd_restore.c  2010-12-26 20:24:48 +0100
+##+++ src/rrd_restore.c  2011-01-08 17:18:34 +0100
+##@@ -21,3 +21,3 @@
+##
+##-#ifndef WIN32
+##+#if !defined(WIN32) || defined(__MINGW32__)
+## #      include <unistd.h>     /* for off_t */
+##EOF
+### fix network includes in src/rrd_client.c (version >= 1.4.5)
+##patch -ulbf src/rrd_client.c << EOF
+##--- src/rrd_client.c  2010-10-25 07:40:26 +0200
+##+++ src/rrd_client.c  2011-01-08 17:22:18 +0100
+##@@ -38,2 +38,3 @@
+## #include <pthread.h>
+##+#ifndef WIN32
+## #include <sys/types.h>
+##@@ -42,2 +43,5 @@
+## #include <netdb.h>
+##+#else
+##+#include <winsock2.h>
+##+#endif
+## #include <limits.h>
+##EOF
+##patch -ulbf win32/config.h << EOF
+##--- win32/config.h  2011-12-15 17:07:06 +0100
+##+++ win32/config.h  2012-01-24 20:33:10 +0100
+##@@ -55,3 +55,5 @@
+##
+##+#ifndef __MINGW32__
+## #define RRD_DEFAULT_FONT "Courier"
+##+#endif
+##
+##@@ -59,3 +61,7 @@
+##
+##+#ifndef __MINGW32__
+## __inline int round(double a){int x = (a + 0.5); return x;}
+##+#else
+##+#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))
+##+#endif
+##EOF
+### fix win32/config.h (version >= 1.4.8)
+##patch -ulbf win32/config.h << EOF
+##--- win32/config.h  2013-05-23 09:55:08 +0200
+##+++ win32/config.h  2013-05-25 11:48:38 +0200
+##@@ -33,3 +33,5 @@
+##
+##+#ifndef NUMVERS
+## #define NUMVERS 1.4050
+##+#endif
+## #define PACKAGE_NAME "rrdtool"
+##@@ -38,4 +40,6 @@
+##
+##+#ifndef __MINGW32__
+## #define isinf(a) (_fpclass(a) == _FPCLASS_NINF || _fpclass(a) == _FPCLASS_PINF)
+## #define isnan _isnan
+##+#endif
+## #define finite _finite
+##@@ -55,3 +59,5 @@
+##
+##+#ifndef RRD_DEFAULT_FONT
+## #define RRD_DEFAULT_FONT "Courier"
+##+#endif
+##
+##@@ -59,3 +65,5 @@
+##
+##+#ifndef __MINGW32__
+## __inline int round(double a){int x = (a + 0.5); return x;}
+##+#endif
+##
+##EOF
+### fix src/rrd_restore.c (version >= 1.4.8)
+##patch -ulbf src/rrd_restore.c << EOF
+##--- src/rrd_restore.c  2013-05-23 09:55:08 +0200
+##+++ src/rrd_restore.c  2013-05-25 11:53:06 +0200
+##@@ -11,2 +11,3 @@
+##
+##+#include "rrd_config.h"
+## #include "rrd_tool.h"
+##@@ -21,3 +22,3 @@
+##
+##-#ifndef WIN32
+##+#if !defined(WIN32) || defined(__MINGW32__)
+## #      include <unistd.h>     /* for off_t */
+##EOF
+### fix src/rrd_client.h (version >= 1.4.8)
+##patch -ulbf src/rrd_client.h << EOF
+##@@ -29,4 +29,4 @@
+##
+##-#ifndef WIN32
+##-# ifdef HAVE_STDINT_H
+##+#if !defined(WIN32) || defined(__MINGW32__)
+##+# if defined(HAVE_STDINT_H) || defined(__MINGW32__)
+## #  include <stdint.h>
+##EOF
+### fix missing realpath in src/rrd_client.c (version >= 1.5.5)
+##mv src/rrd_client.c src/rrd_client.c.bak
+##echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > src/rrd_client.c
+##cat src/rrd_client.c.bak >> src/rrd_client.c
+### fix missing gmtime_r in src/rrd_graph.c (version >= 1.5.5)
+##mv src/rrd_graph.c src/rrd_graph.c.bak2
+##cat > src/rrd_graph.c << EOF
+###include <time.h>
+##struct tm* gmtime_r (const time_t* timer, struct tm* result)
+##{
+##  struct tm* local_result;
+##  if ((local_result = gmtime (timer)) == NULL || result == NULL)
+##    return NULL;
+##  memcpy (result, local_result, sizeof(*result));
+##  return result;
+##} 
+##EOF
+##cat src/rrd_graph.c.bak2 >> src/rrd_graph.c
+### fix IEEE detection (version >= 1.5.5)
+##mv src/rrd_config_bottom.h src/rrd_config_bottom.h.bak &&
+###sed -e "s/^#error\(.*without fsync and fdatasync\)/#warning \1/" src/rrd_config_bottom.h.bak >> src/rrd_config_bottom.h
+##cat > src/rrd_config_bottom.h << EOF
+###ifdef __MINGW32__
+###define fdatasync _commit
+###define HAVE_FDATASYNC
+###endif
+##EOF
+##cat src/rrd_config_bottom.h.bak >> src/rrd_config_bottom.h
+### fix redefinition of ssize_t in src/rrd.h (version >= 1.5.5)
+##patch -ulbf src/rrd.h << EOF
+##--- src/rrd.h  2015-11-10 18:15:18.000000000 +0100
+##+++ src/rrd.h  2016-02-29 09:16:20.849097600 +0100
+##@@ -56,3 +56,3 @@
+##
+##-#ifndef WIN32
+##+#if !defined(WIN32) || defined(__MINGW32__)
+## #include <unistd.h>     /* for off_t */
+##EOF
+### fix redefinition of gettimeofday in src/rrd_update.c (version >= 1.5.5)
+##patch -ulbf src/rrd_update.c << EOF
+##--- src/rrd_update.c  2015-11-10 18:15:19.000000000 +0100
+##+++ src/rrd_update.c  2016-02-29 09:21:09.639097600 +0100
+##@@ -32,3 +32,3 @@
+##
+##-#if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
+##+#if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__CYGWIN32__) && !defined(__MINGW32__)
+##
+##EOF
+### fix missing localtime_r in src/rrd_tool.h (version >= 1.5.5)
+##echo "#define localtime_r(clock,result) (*(result) = *localtime(clock),result)" >> src/rrd_tool.h
+## enable building of shared libraries (.DLL)
+##mv configure.ac configure.ac.bak
+##echo "AC_LIBTOOL_WIN32_DLL" > configure.ac
+##cat configure.ac.bak >> configure.ac
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# mkdir -p m4
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+## fix to use ctime_r from pthread.h
+#mv configure configure.bak1
+##sed -e 's/ctime_r(/#include <pthread.h>\
+##ctime_r(/' configure.bak1 > configure
+#sed -e "s?\(ctime_r(.*)\)?//\1?" configure.bak1 > configure
+## fix IEEE math (version > 1.2.29)
+#mv configure configure.bak2
+#sed -e "s/-std=c99//g; s/FP_SNAN/_FPCLASS_SNAN/; s/FP_QNAN/_FPCLASS_QNAN/" configure.bak2 > configure
+## fix problem detecting GNU gettext tools on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# mv configure configure.bak
+# sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+#fi
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python
+##INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python CFLAGS="-I$(pwd)/win32fix" LDFLAGS="-Wl,-no-undefined" &&
+##INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python CFLAGS="-I$(pwd)/win32fix" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32" &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# wl-showstatus build-install &&
+# #LIBS="-lpng.dll" make install &&
+# ( make all install-strip || make all install-strip ) &&
+# #make check &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="rrdtool"
+export STATUS=
+export URL=http://oss.oetiker.ch/rrdtool/
+export BASENAME=rrdtool
+export DESCRIPTION="RRDtool is the OpenSource industry standard, high performance data logging and graphing system for time series data."
+export CATEGORY=db
+export TYPE=library
+#export VERSION=1.5.5
+#export VERSIONDATE=20151111
+#export VERSION=1.5.6
+#export VERSIONDATE=20160420
+#export VERSION=1.6.0
+#export VERSIONDATE=20160420
+####src/rrd_client.c:908:13: error: 'ENOBUFS' undeclared (first use in this function)
+#export VERSION=1.7.0
+#export VERSIONDATE=20170516
+#export VERSION=1.7.1
+#export VERSIONDATE=20190204
+export VERSION=1.7.2
+export VERSIONDATE=20190528
+####No package 'systemd' found
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,pthreads,freetype2,libart,cairo,pango,glib2,gettext,libpng,libxml2,lua,libdbi
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=intltool
+#export BUILDDEPENDANCIES=intltool,groff
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://oss.oetiker.ch/rrdtool/pub/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-`echo $VERSION|sed -e 's/\./-/'`
+export DOWNLOADSOURCEURL=http://oss.oetiker.ch/rrdtool/pub/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix IEEE detection (version >= 1.5.5)
+mv src/rrd_config_bottom.h src/rrd_config_bottom.h.bak &&
+#sed -e "s/^#error\(.*without fsync and fdatasync\)/#warning \1/" src/rrd_config_bottom.h.bak >> src/rrd_config_bottom.h
+cat > src/rrd_config_bottom.h << EOF
+#ifdef __MINGW32__
+#define fdatasync _commit
+#define HAVE_FDATASYNC
+#endif
+EOF
+cat src/rrd_config_bottom.h.bak >> src/rrd_config_bottom.h
+# fix redefinition of ssize_t in src/rrd.h (version >= 1.5.5)
+patch -ulbf src/rrd.h << EOF
+--- src/rrd.h  2015-11-10 18:15:18.000000000 +0100
++++ src/rrd.h  2016-02-29 09:16:20.849097600 +0100
+@@ -56,3 +56,3 @@
+
+-#ifndef WIN32
++#if !defined(WIN32) || defined(__MINGW32__)
+ #include <unistd.h>     /* for off_t */
+EOF
+# fix redefinition of ssize_t (version >= 1.4.5)
+patch -ulbf src/rrd_restore.c << EOF
+--- src/rrd_restore.c  2010-12-26 20:24:48 +0100
++++ src/rrd_restore.c  2011-01-08 17:18:34 +0100
+@@ -21,3 +21,3 @@
+
+-#ifndef WIN32
++#if !defined(WIN32) || defined(__MINGW32__)
+ #      include <unistd.h>     /* for off_t */
+EOF
+# fix mkdir errors
+mv src/rrd_utils.c src/rrd_utils.c.bak &&
+sed -e 's/\(mkdir([^),]*\),[^),]*)/\1)/' src/rrd_utils.c.bak > src/rrd_utils.c
+# fixes for getuid and mkdir errors
+mv src/rrd_tool.c src/rrd_tool.c.bak
+sed -e 's/#if ! defined(HAVE_CHROOT) || ! defined(HAVE_GETUID)/#if defined(HAVE_CHROOT) \&\& defined(HAVE_GETUID)/' -e 's/\(mkdir([^),]*\),[^),]*)/\1)/' src/rrd_tool.c.bak > src/rrd_tool.c
+# fix redefinition of gettimeofday in src/rrd_update.c (version >= 1.5.5)
+patch -ulbf src/rrd_update.c << EOF
+--- src/rrd_update.c  2015-11-10 18:15:19.000000000 +0100
++++ src/rrd_update.c  2016-02-29 09:21:09.639097600 +0100
+@@ -32,3 +32,3 @@
+
+-#if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)
++#if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__CYGWIN32__) && !defined(__MINGW32__)
+
+EOF
+# fix missing localtime_r in src/rrd_tool.h (version >= 1.5.5)
+echo "#define localtime_r(clock,result) ((*(result) = *localtime(clock)),result)" >> src/rrd_tool.h
+# fix missing realpath in src/rrd_client.c (version >= 1.5.5)
+mv src/rrd_client.c src/rrd_client.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > src/rrd_client.c &&
+cat src/rrd_client.c.bak >> src/rrd_client.c
+## fix missing ENOBUFS/ENOTCONN in src/rrd_client.c (version >= 1.6.0)
+#mv src/rrd_client.c src/rrd_client.c.bak2
+#cat > src/rrd_client.c << EOF
+##include <winsock2.h>
+##ifndef ENOBUFS
+##define ENOBUFS WSAENOBUFS
+##endif
+##ifndef ENOTCONN
+##define ENOTCONN WSAENOTCONN
+##endif
+#//#define strtok_r(_s,_sep,_lasts) (*(_lasts) = strtok((_s), (_sep)))
+#EOF
+#cat src/rrd_client.c.bak2 >> src/rrd_client.c
+# fix missing gmtime_r in src/rrd_graph.c (version >= 1.5.5)
+mv src/rrd_graph.c src/rrd_graph.c.bak2
+cat > src/rrd_graph.c << EOF
+#include <time.h>
+struct tm* gmtime_r (const time_t* timer, struct tm* result)
+{
+  struct tm* local_result;
+  if ((local_result = gmtime (timer)) == NULL || result == NULL)
+    return NULL;
+  memcpy (result, local_result, sizeof(*result));
+  return result;
+} 
+EOF
+cat src/rrd_graph.c.bak2 >> src/rrd_graph.c
+## fix missing gmtime_r src/rrd_rpncalc.c (version >= 1.3.8)
+#mv src/rrd_rpncalc.c src/rrd_rpncalc.c.bak
+#cat > src/rrd_rpncalc.c << EOF
+##include <time.h>
+##define localtime_r(clock,result) ((*(result) = *localtime(clock)),result)
+#inline char* ctime_r (const time_t* tim_p, char* result)
+#{
+#  struct tm tm;
+#  return asctime_r (localtime_r (tim_p, &tm), result);
+#}
+#EOF
+#cat src/rrd_rpncalc.c.bak >> src/rrd_rpncalc.c
+# avoid glob.h in src/rrd_list.c (version >= 1.7.0)
+patch -ulbf src/rrd_list.c << EOF
+--- src/rrd_list.c  2017-05-16 23:21:44.674585600 +0200
++++ src/rrd_list.c  2017-05-16 23:23:02.763273000 +0200
+@@ -2,5 +2,7 @@
+ #include <stdio.h>
+ #include <string.h>
++#ifndef _WIN32
+ #include <glob.h>
++#endif
+ #include <dirent.h>
+ #include <sys/types.h>
+@@ -139,5 +141,7 @@
+
+        char *out = NULL, *tmp;
++#ifndef _WIN32
+        glob_t buf;
++#endif
+        char *ptr;
+        unsigned int i;
+@@ -153,4 +157,8 @@
+        if (strchr(dirname, '*') || strchr(dirname, '?')) {
+
++#ifdef _WIN32
++               errno = EINVAL;
++               return NULL;
++#else
+                /* recursive list + globbing forbidden */
+                if (recursive) {
+@@ -187,4 +195,5 @@
+                }
+                return out;
++#endif
+        }
+EOF
+# fix missing file (version >= 1.7.1)
+touch etc/rrdcached.socket.in etc/rrdcached.service.in etc/Makefile.in
+# fix missing gmtime_r
+mv src/Makefile.in src/Makefile.in.bak &&
+sed -e "s/am__append_1\s*=\s*/&win32comp.c /; s/^am_rrdupdate_OBJECTS\s*=.*$/& win32comp.c/" src/Makefile.in.bak > src/Makefile.in
+# fix to use ctime_r from pthread.h
+mv configure configure.bak1
+#sed -e 's/ctime_r(/#include <pthread.h>\
+#ctime_r(/' configure.bak1 > configure
+sed -e "s?\(ctime_r(.*)\)?//\1?" configure.bak1 > configure
+## fix IEEE math (version > 1.2.29)
+#mv configure configure.bak2 &&
+#sed -e "s/-std=c99//g; s/FP_SNAN/_FPCLASS_SNAN/; s/FP_QNAN/_FPCLASS_QNAN/" configure.bak2 > configure
+wl-showstatus configure &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python CFLAGS="-I$(pwd)/win32fix" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-docs --disable-examples --disable-rrdcgi --disable-mmap --disable-perl --disable-ruby --disable-tcl --disable-python CFLAGS="-I$(pwd)/win32fix" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix missing strftime_ (version >= 1.7.2)
+ sed -i.bak -e "s/^#\(am__objects_4 = \).*$/\1librrd_la-strftime.lo/" src/Makefile &&
+ wl-showstatus build-install &&
+ ( make all install-strip || ( make -Csrc librrd.la && make -i all install-strip )) &&
+ #make check &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

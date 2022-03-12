@@ -1,0 +1,179 @@
+export NAME="MikMod"
+export STATUS=
+export URL=http://mikmod.raphnet.net/
+#export URL=http://sourceforge.net/projects/mikmod/
+export BASENAME=libmikmod
+export DESCRIPTION="Mikmod is a module player and library supporting many formats, including mod, s3m, it, and xm."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=3.1.11
+####drivers/drv_nos.c:72:19: error: variable 'drv_nos' definition is marked dllimport
+#export VERSION=3.1.12
+#export VERSIONDATE=20120326
+#export VERSION=3.1.13
+#export VERSIONDATE=20131006
+#export VERSION=3.1.14
+#export VERSIONDATE=20131016
+#export VERSION=3.1.15
+#export VERSIONDATE=20131209
+#export VERSION=3.1.16
+#export VERSIONDATE=20140110
+#export VERSION=3.1.17
+#export VERSIONDATE=20140322
+#export VERSION=3.1.18
+#export VERSIONDATE=20140907
+#export VERSION=3.1.20
+#export VERSIONDATE=20160902
+#export VERSION=3.1.21
+#export VERSIONDATE=20170614
+#export VERSION=3.1.21.1
+#export VERSIONDATE=20170621
+#export VERSION=3.2.0
+#export VERSIONDATE=20130403
+#export VERSION=3.3.2
+#export VERSIONDATE=20131006
+#export VERSION=3.3.3
+#export VERSIONDATE=20131016
+#export VERSION=3.3.4
+#export VERSIONDATE=20131209
+#export VERSION=3.3.5
+#export VERSIONDATE=20140110
+#export VERSION=3.3.6
+#export VERSIONDATE=20140322
+#export VERSION=3.3.7
+#export VERSIONDATE=20140907
+#export VERSION=3.3.8
+#export VERSIONDATE=20151115
+#export VERSION=3.3.9
+#export VERSIONDATE=20160817
+#export VERSION=3.3.10
+#export VERSIONDATE=20160901
+#export VERSION=3.3.11
+#export VERSIONDATE=20170614
+export VERSION=3.3.11.1
+export VERSIONDATE=20170621
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://mikmod.raphnet.net/"
+#export DOWNLOADURL="http://sourceforge.net/projects/mikmod/files/libmikmod%20%28source%29/"
+#export DOWNLOADURL="http://mikmod.shlomifish.org/"
+export DOWNLOADURL="http://sourceforge.net/projects/mikmod/files/libmikmod/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://mikmod.raphnet.net/files/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/mikmod/libmikmod%20%28source%29/$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://mikmod.shlomifish.org/files/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/mikmod/libmikmod/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing libmikmod/.libs/pthreadGC2.dll-def
+mkdir -p libmikmod/.libs
+pexports.exe `which pthreadGC2.dll` > libmikmod/.libs/pthreadGC2.dll-def
+# fix missing libmikmod/.libs/libmikmod-2.dll-def
+mkdir -p libmikmod/.libs
+cp win32/mikmod.def libmikmod/.libs/libmikmod-2.dll-def
+## fix include/mikmod_build.h for 64-bit (version <= 3.1.12)
+#patch -ulbf include/mikmod_build.h << EOF
+#--- include/mikmod_build.h  2012-10-16 16:03:42 +0200
+#+++ include/mikmod_build.h  2012-10-16 16:04:50 +0200
+#@@ -1 +1,2 @@
+#+#define WIN32
+# /*     MikMod sound library
+#@@ -95,3 +96,5 @@
+# typedef signed int      SLONG;      /* 4 bytes, signed */
+#+#ifndef __MINGW64__
+# typedef unsigned int    ULONG;      /* 4 bytes, unsigned */
+#+#endif
+# typedef int             BOOL;       /* 0=false, <>0 true */
+#EOF
+# fix include/mikmod_internals.h for 64-bit
+patch -ulbf include/mikmod_internals.h << EOF
+--- include/mikmod_internals.h  2004-01-21 18:43:54 +0100
++++ include/mikmod_internals.h  2011-12-02 21:38:42 +0100
+@@ -71,2 +71,4 @@
+
++#undef _mm_malloc
++#undef _mm_free
+ extern void* _mm_malloc(size_t);
+EOF
+# fix dllimport issues for 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ for F in $(grep "^MIKMODAPI[ \t]*\(MDRIVER\|MLOADER\|.*_mm_.*\|.*md_.*\) .*=" . -rl); do
+  mv $F $F.bak
+  sed -e "s/^MIKMODAPI[ \t]*\(MDRIVER\|MLOADER\|.*_mm_.*\|.*md_.*\)\( .*=\)/\1\2/" $F.bak > $F
+ done
+fi
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# mv configure.in configure.in.bak
+# grep -v "AM_PATH_ESD" configure.in.bak > configure.in
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+# fix missing DllMainCRTStartup
+mv configure configure.bak
+sed -e "s/\(dll_exclude_symbols=\).*/\1/" configure.bak > configure
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads LDFLAGS="-Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
+ echo "#undef unix" >> config.h &&
+ # fix building DLLs on 64-bit
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  #mv libtool libtool.bak &&
+  #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+  echo "#define WIN32" >> config.h &&
+  # fix include/mikmod_build.h (version <= 3.1.12)
+  #mv include/mikmod_build.h include/mikmod_build.h.bak &&
+  #echo "#define WIN32" > include/mikmod_build.h &&
+  #grep -v "typedef unsigned int *ULONG" include/mikmod_build.h.bak >> include/mikmod_build.h
+# fix include/mikmod_build.h for 64-bit (version >= 3.3.2)
+patch -ulbf include/mikmod_build.h << EOF
+--- include/mikmod_build.h  2013-10-06 21:24:52 +0200
++++ include/mikmod_build.h  2013-10-06 21:41:02 +0200
+@@ -1 +1,2 @@
++#define WIN32
+ /*  MikMod sound library
+@@ -90,2 +91,10 @@
+ #include <mmsystem.h>
++#ifdef __MINGW32__
++#include <stdint.h>
++typedef int8_t SBYTE;
++typedef uint8_t UBYTE;
++typedef int16_t SWORD;
++typedef uint16_t UWORD;
++typedef int32_t SLONG;
++#else
+ /* Avoid conflicts with windef.h */
+@@ -100,2 +109,3 @@
+ #endif
++#endif
+ 
+@@ -118,3 +128,5 @@
+ typedef signed int      SLONG;  /* 4 bytes, signed */
++#ifndef __MINGW64__
+ typedef unsigned int    ULONG;  /* 4 bytes, unsigned */
++#endif
+ typedef int             BOOL;   /* 0=false, <>0 true */
+EOF
+true
+ fi &&
+ # don't set DLL entry point to _DllMainCRTStartup@12 (version <= 3.1.12)
+ #mv libtool libtool.bak &&
+ #sed -e "s/-Wl,-e,_DllMainCRTStartup@12/-mdll/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ #make install LDFLAGS="-mdll" LIBRARY_LIB="-lpthread -ldl -no-undefined -Wl,-no-undefined" && ( make install-strip || true ) &&
+ make install LIBRARY_LIB="-Wl,--as-needed -lpthread -ldl -no-undefined -Wl,-no-undefined" && ( make install-strip || true ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://mikmod.raphnet.net/files/libmikmod-3.1.11-a.diff
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#patch -p1 -ulbf < $TARBALLDIR/$BASENAME/libmikmod-3.1.11-a.diff
+
+
+

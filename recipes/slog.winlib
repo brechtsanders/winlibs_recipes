@@ -1,0 +1,107 @@
+#export NAME="slog"
+#export STATUS=
+#export URL=https://github.com/kala13x/slog
+#export BASENAME=slog
+#export DESCRIPTION="Slog is simple and thread safe logging library for C/C++."
+#export CATEGORY=
+#export TYPE=library
+#export VERSION=1.6.2
+#export VERSIONDATE=20201130
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/kala13x/slog/releases/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/kala13x/slog/archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#wl-showstatus build &&
+# make -Csrc CC="gcc -D_POSIX_THREAD_SAFE_FUNCTIONS" &&
+# ( echo "EXPORTS" && nm -f posix --defined-only -p src/libslog.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > src/slog.def &&
+# gcc -shared -s -mwindows -def src/slog.def -o src/slog.dll src/libslog.a -Wl,--out-implib,src/libslog.dll.a &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp -f src/*.h $INSTALLPREFIX/include/ &&
+# cp -f src/*.a src/*.def $INSTALLPREFIX/lib/ &&
+# cp -f src/*.dll $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="slog"
+export STATUS=
+export URL=https://github.com/kala13x/slog
+export BASENAME=slog
+export DESCRIPTION="Slog is simple and thread safe logging library for C/C++."
+export CATEGORY=
+export TYPE=library
+export VERSION=1.8.22
+export VERSIONDATE=20201214
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/kala13x/slog/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/kala13x/slog/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/slog.c (version >= 1.8.22)
+patch -ulbf src/slog.c << EOF
+@@ -24,2 +24,5 @@
+
++#if defined(_WIN32)
++#define _POSIX_THREAD_SAFE_FUNCTIONS
++#endif
+ #include <stdio.h>
+@@ -35,3 +38,3 @@
+
+-#ifndef DARWIN
++#if !defined(DARWIN) && !defined(_WIN32)
+ #include <syscall.h>
+@@ -169,3 +172,3 @@
+ {
+-#ifdef DARWIN
++#if !defined(DARWIN) || defined(_WIN32)
+     return (uint32_t)pthread_self();
+EOF
+# fix to also build shared library
+sed -i.bak -e "s/\(add_library\s*(\s*[^ ]* \)STATIC/\1/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/*.dll &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f src/*.h $INSTALLPREFIX/include/ &&
+ cp -f build_*/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

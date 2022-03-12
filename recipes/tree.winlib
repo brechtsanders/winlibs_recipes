@@ -1,0 +1,152 @@
+export NAME="tree"
+export STATUS=
+export URL=http://mama.indstate.edu/users/ice/tree/
+export BASENAME=tree
+export DESCRIPTION="Tree is a recursive directory listing command that produces a depth indented listing of files, which is colorized ala dircolors if the LS_COLORS environment variable is set and output is to tty."
+export CATEGORY=system
+export TYPE=application
+#export VERSION=1.8.0
+#export VERSIONDATE=20191117
+#export VERSION=2.0.0
+#export VERSIONDATE=20211222
+#export VERSION=2.0.1
+#export VERSIONDATE=20220104
+export VERSION=2.0.2
+export VERSIONDATE=20220217
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://mama.indstate.edu/users/ice/tree/src/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://mama.indstate.edu/users/ice/tree/src/$BASENAME-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+cd $BASENAME-$VERSION
+# fix tree.h
+patch -ulbf tree.h << EOF
+@@ -33,4 +33,29 @@
+ #include <limits.h>
++#ifdef _WIN32
++#define u_char unsigned char
++#define u_short unsigned short
++#define u_int unsigned int
++#define u_long unsigned long
++#define uid_t unsigned int
++#define gid_t unsigned int
++#define S_ISUID 0
++#define S_ISGID 0
++#define S_IFLNK 0
++#define S_IFSOCK 0
++#define S_ISVTX 0
++#define nl_langinfo(s) "UTF-8"
++#define getpwuid(uid) NULL
++#define getgrgid(gid) NULL
++struct passwd {
++  //char *pw_dir;
++  char *pw_name;
++};
++struct group {
++ //int gr_gid;
++ char *gr_name;
++};
++#else
+ #include <pwd.h>
+ #include <grp.h>
++#endif
+ #ifdef __EMX__  /* for OS/2 systems */
+@@ -54,3 +79,5 @@
+ #include <locale.h>
++#ifndef _WIN32
+ #include <langinfo.h>
++#endif
+ #include <wchar.h>
+EOF
+# fix tree.c (version >= 2.0.0)
+patch -ulbf tree.c << EOF
+@@ -690,3 +690,7 @@
+ 
++#ifdef _WIN32
++  if (stat(path,&lst) < 0) return NULL;
++#else
+   if (lstat(path,&lst) < 0) return NULL;
++#endif
+ 
+@@ -750,2 +754,3 @@
+ 
++#ifndef _WIN32
+   if ((lst.st_mode & S_IFMT) == S_IFLNK) {
+@@ -764,2 +769,3 @@
+ #endif
++#endif
+ 
+EOF
+# fix list.c (version >= 2.0.0)
+patch -ulbf list.c << EOF
+@@ -59,3 +59,7 @@
+ 
++#ifdef _WIN32
++    if ((n = stat(dirname[i],&st)) >= 0) {
++#else
+     if ((n = lstat(dirname[i],&st)) >= 0) {
++#endif
+       saveino(st.st_ino, st.st_dev);
+EOF
+## fix color.c (version >= 2.0.0)
+#patch -ulbf color.c << EOF
+#@@ -303,2 +303,3 @@
+#       return TRUE;
+#+  #ifndef _WIN32
+#     case S_IFLNK:
+#@@ -307,2 +308,3 @@
+#       return TRUE;
+#+  #endif
+#   #ifdef S_IFDOOR
+#@@ -314,2 +316,3 @@
+# #endif
+#+#ifndef _WIN32
+#     case S_IFSOCK:
+#@@ -318,2 +321,3 @@
+#       return TRUE;
+#+#endif
+#     case S_IFREG:
+#EOF
+# fix color.c (version >= 2.0.1)
+patch -ulbf color.c << EOF
+@@ -251,4 +251,6 @@
+ #endif
++#if defined(S_IFSOCK) && (!defined(S_IFLNK) || S_IFSOCK != S_IFLNK)
+     case S_IFSOCK:
+       return print_color(COL_SOCK);
++#endif
+     case S_IFREG:
+@@ -303,2 +305,3 @@
+          sprintf(buffer,"IBM%03lu",codepage);
++  #ifndef _WIN32
+          break;
+@@ -307,2 +310,3 @@
+        case 813:
++  #endif
+          return"ISO-8859-7";
+@@ -314,2 +318,3 @@
+        case  858: case  924:
++#ifndef _WIN32
+          sprintf(buffer,"IBM%05lu",codepage);
+@@ -318,2 +323,3 @@
+          return"TIS-620";
++#endif
+        case 897: case 932: case 942: case 943:
+EOF
+# fix conflicting INSTALL and install
+mv INSTALL INSTALL.txt
+wl-showstatus build-install &&
+ make install PREFIX=$INSTALLPREFIX &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,112 @@
+export NAME="Libsyncml"
+export STATUS=
+export URL=http://libsyncml.opensync.org
+export BASENAME=libsyncml
+export DESCRIPTION="Libsyncml is an implementation of the SyncML protocol."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=0.5.4
+export VERSIONDATE=20110719
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,libsoup-2.4,libwbxml,libxml2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/libsyncml/files/libsyncml/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/libsyncml/libsyncml/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing index function in libsyncml/data_sync_api/data_sync.c
+mv libsyncml/data_sync_api/data_sync.c libsyncml/data_sync_api/data_sync.c.bak
+echo "#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})" > libsyncml/data_sync_api/data_sync.c
+cat libsyncml/data_sync_api/data_sync.c.bak >> libsyncml/data_sync_api/data_sync.c
+# fix missing index function in libsyncml/data_sync_api/data_sync_callbacks.c
+mv libsyncml/data_sync_api/data_sync_callbacks.c libsyncml/data_sync_api/data_sync_callbacks.c.bak
+echo "#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})" > libsyncml/data_sync_api/data_sync_callbacks.c
+cat libsyncml/data_sync_api/data_sync_callbacks.c.bak >> libsyncml/data_sync_api/data_sync_callbacks.c
+# fix missing GetVersion in libsyncml/objects/sml_devinf_obj.c
+mv libsyncml/objects/sml_devinf_obj.c libsyncml/objects/sml_devinf_obj.c.bak
+echo "#include <windows.h>" > libsyncml/objects/sml_devinf_obj.c
+cat libsyncml/objects/sml_devinf_obj.c.bak >> libsyncml/objects/sml_devinf_obj.c
+## fix tests/support.c
+#mv tests/support.c tests/support.c.bak
+#cat > tests/support.c << EOF
+##define setuid(uid) 0
+##define nanosleep(ts,p) (Sleep((ts)->tv_sec * 1000 + (ts)->tv_nsec / 1000000000), 0)
+##define mkdtemp(template) NULL
+#EOF
+#cat tests/support.c.bak >> tests/support.c
+patch -ulbf tests/support.c << EOF
+--- tests/support.c  2009-06-04 11:16:56 +0200
++++ tests/support.c  2012-03-06 14:16:40 +0100
+@@ -23,2 +23,5 @@
+ #include <libxml/parser.h>
++#ifdef __MINGW32__
++#include <windows.h>
++#endif
+
+@@ -76,3 +79,5 @@
+        char *testbed = NULL;
++#ifndef __MINGW32__
+        setuid(65534);
++#endif
+
+@@ -87,2 +92,3 @@
+        if (fkt_name) {
++#ifndef __MINGW32__
+                testbed = g_strdup_printf("%s/testbed.XXXXXX", g_get_tmp_dir());
+@@ -91,2 +97,5 @@
+                }
++#else
++               sml_fail_unless(FALSE, "mkdtemp() is not implemented on Windows.");
++#endif
+
+@@ -155,2 +164,5 @@
+ {
++#ifdef __MINGW32__
++       Sleep(nanoseconds / 1000);
++#else
+        long seconds = nanoseconds / 1000000000;
+@@ -161,2 +173,3 @@
+        return nanosleep(&timestr, NULL);
++#endif
+ }
+EOF
+# fix missing sleep in tests/check_data_sync_api.c
+mv tests/check_data_sync_api.c tests/check_data_sync_api.c.bak
+echo "#define sleep(t) _sleep((t) * 1000)" > tests/check_data_sync_api.c
+cat tests/check_data_sync_api.c.bak >> tests/check_data_sync_api.c
+## fix errno in libsyncml/syncml_internals.h
+#patch libsyncml/syncml_internals.h << EOF
+#@@ -56,3 +56,5 @@
+# #include <errno.h>
+#+#ifdef __MINGW32__
+# extern int errno;
+#+#endif
+#
+#EOF
+# fix missing fnmatch.h
+touch fnmatch.h
+mkdir build
+cd build
+wl-showstatus configure &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release .. &&
+ # fix linkage with libpthread
+ mv libsyncml/CMakeFiles/syncml.dir/build.make libsyncml/CMakeFiles/syncml.dir/build.make.bak &&
+ sed -e "s/\(-ladvapi32\)/\1 -lpthread/" libsyncml/CMakeFiles/syncml.dir/build.make.bak > libsyncml/CMakeFiles/syncml.dir/build.make &&
+ ## fix missing pthread_self
+ #mv libsyncml/CMakeFiles/syncml.dir/linklibs.rsp libsyncml/CMakeFiles/syncml.dir/linklibs.rsp.bak &&
+ #sed -e "s/\(-ladvapi32\)/\1 -lpthread/" libsyncml/CMakeFiles/syncml.dir/linklibs.rsp.bak > libsyncml/CMakeFiles/syncml.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ ( make install/strip || C_INCLUDE_PATH=$C_INCLUDE_PATH:$MINGWPREFIX/include/libwbxml-1.0/wbxml make install/strip ) &&
+ cd .. &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: build static archive
+
+
+

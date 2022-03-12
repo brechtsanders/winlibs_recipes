@@ -1,0 +1,146 @@
+export NAME="evolution-data-server-dbus"
+export STATUS=
+export URL=http://www.gnome.org/projects/evolution-data-server-dbus
+export BASENAME=evolution-data-server-dbus
+export DESCRIPTION=""
+export CATEGORY=
+export TYPE=library
+export VERSION=2.20.0
+export VERSIONDATE=20101008
+wl-showstatus --package-version
+export DEPENDANCIES=bdb,libiconv,nspr,libsoup-2.4,openldap
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/evolution-data-server-dbus/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p netinet sys
+echo "#include <winsock2.h>" > netinet/in.h
+echo "#include <winsock2.h>" > sys/socket.h
+touch netdb.h
+# fix camel/camel-file-utils.c
+patch -ulbf camel/camel-file-utils.c << EOF
+--- camel/camel-file-utils.c  2008-09-10 16:26:44 +0200
++++ camel/camel-file-utils.c  2011-08-30 16:52:10 +0200
+@@ -340,3 +340,7 @@
+                if (access(copy, F_OK) == -1) {
++#ifndef _WIN32
+                        if (mkdir(copy, mode) == -1)
++#else
++                       if (mkdir(copy) == -1)
++#endif
+                                return -1;
+@@ -398,3 +402,7 @@
+                        nread = read (fd, buf, n);
++#ifndef _WIN32
+                } while (nread == -1 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK));
++#else
++               } while (nread == -1 && (errno == WSAEINTR || errno == EAGAIN || errno == WSAEWOULDBLOCK));
++#endif
+        } else {
+@@ -403,4 +411,9 @@
+
++#ifndef _WIN32
+                flags = fcntl (fd, F_GETFL);
+                fcntl (fd, F_SETFL, flags | O_NONBLOCK);
++#else
++               unsigned long wflags = 1;
++               ioctlsocket (fd, FIONBIO, &wflags);
++#endif
+
+@@ -422,3 +435,7 @@
+                        else if (res == 0)
++#ifndef _WIN32
+                                errno = ETIMEDOUT;
++#else
++                               errno = WSAETIMEDOUT;
++#endif
+                        else if (FD_ISSET (cancel_fd, &rdset)) {
+@@ -431,4 +448,9 @@
+                        }
++#ifndef _WIN32
+                } while (nread == -1 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK));
++#else
++               } while (nread == -1 && (errno == WSAEINTR || errno == EAGAIN || errno == WSAEWOULDBLOCK));
++#endif
+        failed:
++#ifndef _WIN32
+                errnosav = errno;
+@@ -436,2 +458,6 @@
+                errno = errnosav;
++#else
++               wflags = 0;
++               ioctlsocket (fd, FIONBIO, &wflags);
++#endif
+        }
+@@ -469,3 +495,7 @@
+                                w = write (fd, buf + written, n - written);
++#ifndef _WIN32
+                        } while (w == -1 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK));
++#else
++                       } while (w == -1 && (errno == WSAEINTR || errno == EAGAIN || errno == WSAEWOULDBLOCK));
++#endif
+
+@@ -477,5 +507,10 @@
+                fd_set rdset, wrset;
+-
++
++#ifndef _WIN32
+                flags = fcntl (fd, F_GETFL);
+                fcntl (fd, F_SETFL, flags | O_NONBLOCK);
++#else
++               unsigned long wflags = 1;
++               ioctlsocket (fd, FIONBIO, &wflags);
++#endif
+
+@@ -499,3 +534,7 @@
+                        } else if (res == 0)
++#ifndef _WIN32
+                                errno = ETIMEDOUT;
++#else
++                               errno = WSAETIMEDOUT;
++#endif
+                        else if (FD_ISSET (cancel_fd, &rdset))
+@@ -508,3 +547,7 @@
+                                if (w == -1) {
++#ifndef _WIN32
+                                        if (errno == EAGAIN || errno == EWOULDBLOCK)
++#else
++                                       if (errno == EAGAIN || errno == WSAEWOULDBLOCK)
++#endif
+                                                w = 0;
+@@ -515,2 +558,3 @@
+
++#ifndef _WIN32
+                errnosav = errno;
+@@ -518,2 +562,6 @@
+                errno = errnosav;
++#else
++               wflags = 0;
++               ioctlsocket (fd, FIONBIO, &wflags);
++#endif
+        }
+EOF
+# fix detection of bdb and libsoup
+mv configure configure.bak
+sed -e "s/-ldb\"/-ldb-4.8\"/g; s/libsoup-2.2/libsoup-2.4/" configure.bak > configure
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LIBS="-Wl,--as-needed -lws2_32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-no-undefined -Wl,-no-undefined" LIBS="-Wl,--as-needed -lws2_32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lglib-2.0 -lgmodule-2.0" ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

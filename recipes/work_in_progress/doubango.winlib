@@ -1,0 +1,97 @@
+export NAME="Doubango"
+export STATUS=
+export URL=https://github.com/DoubangoTelecom/doubango
+export BASENAME=doubango
+export DESCRIPTION="Doubango VoIP framework"
+export CATEGORY=audio,video,communication
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20170715
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=Licensing.md
+export LICENSETYPE="GPL/Commercial"
+export DOWNLOADURL="https://github.com/DoubangoTelecom/doubango/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/DoubangoTelecom/doubango/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of struct timezone in tinySAK/src/tsk_time.c
+patch -ulbf tinySAK/src/tsk_time.c << EOF
+@@ -66,8 +66,10 @@
+ #endif
+
++#ifndef __MINGW32__
+ struct timezone {
+     int  tz_minuteswest; // minutes W of Greenwich
+     int  tz_dsttime;     // type of dst correction
+ };
++#endif
+
+ static int gettimeofday(struct timeval *tv, struct timezone *tz)
+EOF
+# fix missing pipe in tinyNET/src/tnet_transport_poll.c
+mv tinyNET/src/tnet_transport_poll.c tinyNET/src/tnet_transport_poll.c.bak
+cat > tinyNET/src/tnet_transport_poll.c << EOF
+#include <io.h>
+#include <fcntl.h>
+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+EOF
+cat tinyNET/src/tnet_transport_poll.c.bak >> tinyNET/src/tnet_transport_poll.c
+# fix missing InetNtopA in tinyNET/src/tnet_utils.c
+mv tinyNET/src/tnet_utils.c tinyNET/src/tnet_utils.c.bak &&
+echo "#define _WIN32_WINNT 0x0600" > tinyNET/src/tnet_utils.c &&
+cat tinyNET/src/tnet_utils.c.bak >> tinyNET/src/tnet_utils.c
+# fix missing definition of TINYHTTP_EXPORTS when building tinyHTTP
+mv tinyHTTP/Makefile.am tinyHTTP/Makefile.am.bak &&
+sed -e "s/^libtinyHTTP_la_CPPFLAGS\s*=\s*/&-DTINYHTTP_EXPORTS /" tinyHTTP/Makefile.am.bak > tinyHTTP/Makefile.am
+# fix missing definition of TINYXCAP_EXPORTS when building tinyXCAP
+mv tinyXCAP/Makefile.am tinyHTTP/Makefile.am.bak &&
+sed -e "s/^libtinyXCAP_la_CPPFLAGS\s*=\s*/&-DTINYXCAP_EXPORTS /" tinyXCAP/Makefile.am.bak > tinyXCAP/Makefile.am
+# fix missing definition of TINYSMS_EXPORTS when building tinySMS
+mv tinySMS/Makefile.am tinySMS/Makefile.am.bak &&
+sed -e "s/^libtinySMS_la_CPPFLAGS\s*=\s*/&-DTINYSMS_EXPORTS /" tinySMS/Makefile.am.bak > tinySMS/Makefile.am
+# fix missing definition of TINYSDP_EXPORTS when building tinySDP
+mv tinySDP/Makefile.am tinySDP/Makefile.am.bak &&
+sed -e "s/^libtinySDP_la_CPPFLAGS\s*=\s*/&-DTINYSDP_EXPORTS /" tinySDP/Makefile.am.bak > tinySDP/Makefile.am
+# fix missing definition of TINYBFCP_EXPORTS when building tinyBFCP
+mv tinyBFCP/Makefile.am tinyBFCP/Makefile.am.bak &&
+sed -e "s/^libtinyBFCP_la_CPPFLAGS\s*=\s*/&-DTINYBFCP_EXPORTS /" tinyBFCP/Makefile.am.bak > tinyBFCP/Makefile.am
+# fix missing definition of TINYMEDIA_EXPORTS when building tinyMEDIA
+mv tinyMEDIA/Makefile.am tinyMEDIA/Makefile.am.bak &&
+sed -e "s/^libtinyMEDIA_la_CPPFLAGS\s*=\s*/&-DTINYMEDIA_EXPORTS /" tinyMEDIA/Makefile.am.bak > tinyMEDIA/Makefile.am
+# fix missing definition of TINYRTP_EXPORTS when building tinyRTP
+mv tinyRTP/Makefile.am tinyRTP/Makefile.am.bak &&
+sed -e "s/^libtinyRTP_la_CPPFLAGS\s*=\s*/&-DTINYRTP_EXPORTS /" tinyRTP/Makefile.am.bak > tinyRTP/Makefile.am
+wl-showstatus configure &&
+mkdir -p m4 &&
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-debug=no LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -lwinmm" &&
+####--disable-gpl --disable-nonfree
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#export BUILDDEPENDANCIES=cmake
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,81 @@
+export NAME="liblognorm"
+export STATUS=
+export URL=http://www.liblognorm.com/
+export BASENAME=liblognorm
+export DESCRIPTION="Liblognorm shall help to make sense out of syslog data, or, actually, any event data that is present in text form."
+export CATEGORY=dataprocessing
+export TYPE=library,application
+export VERSION=2.0.6
+export VERSIONDATE=20190213
+wl-showstatus --package-version
+export DEPENDANCIES=json,libestr,pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://www.liblognorm.com/download/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.liblognorm.com/files/download/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/pdag.c
+patch -ulbf src/pdag.c << EOF
+@@ -1217,3 +1217,3 @@
+
+-static char *
++char *
+ strrev(char *const __restrict__ str)
+EOF
+# fix missing strndup in src/parser.c
+mv src/parser.c src/parser.c.bak
+cat > src/parser.c << EOF
+#include <malloc.h>
+#include <string.h>
+char* strndup (const char *str, size_t maxlen)
+{
+  char* s;
+  int l = strnlen(str, maxlen);
+  if ((s = (char*)malloc(l + 1)) != NULL) {
+    memcpy(s, str, l);
+    s[l] = 0;
+  }
+  return s;
+}
+EOF
+cat src/parser.c.bak >> src/parser.c
+# fix missing gmtime_r in src/parser.c
+if ! gcc --version | grep -q posix; then
+mv src/parser.c src/parser.c.bak2
+echo "#include <pthread.h>" > src/parser.c
+if ( gcc --version | grep -q "MinGW-W64" ); then
+cat > src/parser.c << EOF
+#include <pthread.h>
+#define gmtime_r( _clock, _result ) ( *(_result) = *gmtime( (_clock) ), (_result) )
+EOF
+fi
+cat src/parser.c.bak2 >> src/parser.c
+else
+mv src/parser.c src/parser.c.bak2 &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > src/parser.c &&
+#echo "#include <time.h>" >> src/parser.c &&
+cat src/parser.c.bak2 >> src/parser.c
+fi
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-regexp --enable-advanced-stats --enable-tools --disable-docs --disable-testbench --disable-debug &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix redefinition of asprintf
+ if echo -e "#define _GNU_SOURCE\n#include <stdio.h>\nvoid* p = asprintf;" | gcc -c -xc - -o /dev/null &> /dev/null; then
+  echo "#define _GNU_SOURCE" >> config.h &&
+  echo "#define HAVE_ASPRINTF" >> config.h
+ fi &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

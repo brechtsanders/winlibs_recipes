@@ -1,0 +1,86 @@
+export NAME="gmrender-resurrect"
+export STATUS=
+export URL=https://github.com/hzeller/gmrender-resurrect
+export BASENAME=gmrender-resurrect
+export DESCRIPTION="Resource efficient UPnP/DLNA renderer, optimal for Raspberry Pi, CuBox or a general MediaServer. Fork of GMediaRenderer to add some features to make it usable."
+export CATEGORY=multimedia
+export TYPE=application
+#export VERSION=0.0.8
+#export VERSIONDATE=20191222
+export VERSION=0.0.9
+export VERSIONDATE=20210131
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,libupnp,gstreamer
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/hzeller/gmrender-resurrect/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/hzeller/gmrender-resurrect/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/logging.c
+patch -ulbf src/logging.c << EOF
+@@ -33,3 +33,7 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++//#define _POSIX_THREAD_SAFE_FUNCTIONS
++#else
+ #include <sys/uio.h>
++#endif
+ #include <time.h>
+@@ -83,2 +87,3 @@
+                         va_list ap) {
++#ifndef _WIN32
+        struct timeval now;
+@@ -106,2 +111,3 @@
+        free(parts[1].iov_base);
++#endif
+ }
+EOF
+# fix missing daemon() in src/main.c
+patch -ulbf src/main.c << EOF
+@@ -37,2 +37,3 @@
+ #include <unistd.h>
++#include <gst/gst.h>
+
+@@ -248,2 +249,3 @@
+        init_logging(log_file);
++       gst_init(NULL, NULL);
+
+@@ -260,2 +262,5 @@
+        if (daemon_mode) {
++#ifdef _WIN32
++               perror("Daemon mode not supported on Windows");
++#else
+                if (daemon(0, 0) < 0) {
+@@ -264,2 +269,3 @@
+                }
++#endif
+        }
+@@ -331,2 +337,3 @@
+        upnp_device_shutdown(device);
++       gst_deinit();
+
+EOF
+# fix missing files
+mkdir -p winfix/sys winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/arpa/inet.h
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libupnp --with-gstreamer CFLAGS="-I$(pwd)/winfix" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####glib-compile-schemas.exe $MINGWPREFIX/share/glib-2.0/schemas
+####GST_DEBUG=2 GST_PLUGIN_PATH=$MINGWPREFIX/lib/gstreamer-1.0 gmediarender.exe --logfile=stdout
+
+
+

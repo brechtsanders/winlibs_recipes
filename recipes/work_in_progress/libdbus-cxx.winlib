@@ -1,0 +1,151 @@
+export NAME="DBus-C++"
+export STATUS=
+export URL=http://dbus-cplusplus.sourceforge.net/
+#export URL=https://github.com/andreas-volz/dbus-cplusplus
+export BASENAME=libdbus-cxx
+export DESCRIPTION="DBus-C++ attempts to provide a C++ API for D-BUS."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.9.0
+#export VERSIONDATE=20170913
+####src/eventloop.cpp:31:10: fatal error: sys/poll.h: No such file or directory
+export VERSION=0.9.1pw
+export VERSIONDATE=20180624
+####pipe.cpp:64:21: error: 'F_SETFL' was not declared in this scope
+wl-showstatus --package-version
+#export DEPENDANCIES=dbus,glib2,gtkmm2,libecore,expat,pthreads
+export DEPENDANCIES=dbus,glib2,gtkmm2,expat,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://sourceforge.net/projects/dbus-cplusplus/files/dbus-c%2B%2B/ libdbus-c%2B%2B-"
+#export DOWNLOADURL="https://github.com/andreas-volz/dbus-cplusplus/releases"
+export DOWNLOADURL="https://github.com/andreas-volz/dbus-cplusplus/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/dbus-cplusplus/dbus-c%2B%2B/$VERSION/libdbus-c%2B%2B-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/andreas-volz/dbus-cplusplus/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/andreas-volz/dbus-cplusplus/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/libdbus-c++-$VERSION.tar.gz
+#cd libdbus-c++-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd dbus-cplusplus-$VERSION
+patch -ulbf src/eventloop.cpp << EOF
+@@ -30,3 +30,13 @@
+
++#ifdef _WIN32
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#include <winsock2.h>
++#include <bits/gthr-default.h>
++#ifndef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
++#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER
++#endif
++#else
+ #include <sys/poll.h>
++#endif
+ #include <sys/time.h>
+@@ -158,3 +168,7 @@
+
++#ifdef _WIN32
++  WSAPOLLFD fds[nfd];
++#else
+   pollfd fds[nfd];
++#endif
+
+@@ -202,3 +216,7 @@
+
++#ifdef _WIN32
++  WSAPoll(fds, nfd, wait_min);
++#else
+   poll(fds, nfd, wait_min);
++#endif
+
+EOF
+patch -ulbf src/eventloop-integration.cpp << EOF
+@@ -28,2 +28,13 @@
+ /* Project */
++#ifdef _WIN32
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#include <winsock2.h>
++#include <io.h>
++#include <fcntl.h>
++inline int pipe (int* fds) { return _pipe(fds, 4096, _O_BINARY); }
++#define _pipe evtl_pipe
++#undef interface
++#define interface iface
++#endif
+ #include <dbus-c++/eventloop-integration.h>
+@@ -38,3 +49,5 @@
+ #include <cassert>
++#ifndef _WIN32
+ #include <sys/poll.h>
++#endif
+ #include <fcntl.h>
+EOF
+patch -ulbf src/pipe.cpp << EOF
+@@ -34,3 +34,12 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#include <winsock2.h>
++#include <io.h>
++#include <fcntl.h>
++inline int pipe (int* fds) { return _pipe(fds, 4096, _O_BINARY); }
++#else
+ #include <sys/poll.h>
++#endif
+ #include <fcntl.h>
+@@ -54,3 +63,8 @@
+     _fd_write = fd[1];
++#if _WIN32
++    DWORD mode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
++    SetNamedPipeHandleState((HANDLE)_get_osfhandle(_fd_read), &mode, NULL, NULL);
++#else
+     fcntl(_fd_read, F_SETFL, O_NONBLOCK);
++#endif
+   }
+@@ -85,3 +99,4 @@
+   // TODO: ignoring return of read/write generates warning; maybe relevant for eventloop work...
+-  ::write(_fd_write, '\0', 1);
++  char c = 0;
++  ::write(_fd_write, &c, 1);
+ }
+EOF
+patch -ulbf tools/introspect.cpp << EOF
+@@ -49,3 +49,5 @@
+   signal(SIGINT, niam);
++#ifdef SIGALRM
+   signal(SIGALRM, niam);
++#endif
+
+@@ -72,3 +74,5 @@
+
++#ifdef SIGALRM
+     alarm(1);
++#endif
+
+EOF
+wl-showstatus configure &&
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#PKG_CONFIG=$(which pkg-config) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-tests --disable-examples PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH &&
+PKG_CONFIG=$(which pkg-config) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-glib --disable-ecore --disable-tests --disable-examples PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH &&
+#--disable-shared
+#PKG_CONFIG=$(which pkg-config) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-glib --disable-ecore --disable-tests --disable-examples PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libdbus-c++-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf dbus-cplusplus-$VERSION
+
+
+

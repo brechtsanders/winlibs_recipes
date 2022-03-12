@@ -1,0 +1,115 @@
+export NAME="liboil"
+export STATUS=
+export URL=http://liboil.freedesktop.org/
+export BASENAME=liboil
+export DESCRIPTION="Liboil is a library of simple functions that are optimized for various CPUs. These functions are generally loops implementing simple algorithms, such as converting an array of N integers to floating-point numbers or multiplying and summing an array of N numbers. Such functions are candidates for significant optimization using various techniques, especially by using extended instructions provided by modern CPUs (Altivec, MMX, SSE, etc.)."
+export CATEGORY=math
+export TYPE=library
+#export VERSION=0.3.15
+#export VERSION=0.3.16
+export VERSION=0.3.17
+export VERSIONDATE=20100205
+wl-showstatus --package-version
+export DEPENDANCIES=gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://liboil.freedesktop.org/download/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://liboil.freedesktop.org/download/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix for 64-bit
+patch -ulbf liboil/amd64/wavelet.c << EOF
+--- liboil/amd64/wavelet.c  2009-08-18 11:36:57.000000000 +0200
++++ liboil/amd64/wavelet.c  2009-08-18 11:38:00.000000000 +0200
+@@ -2,7 +2,7 @@
+ #include <liboil/liboilfunction.h>
+ #include <liboil/liboilclasses.h>
+ #include <stddef.h>
+-
++#include <stdint.h>
+  
+ void
+ deinterleave2_asm (int16_t *d1, int16_t *d2, int16_t *s_2xn, int n)
+@@ -1409,7 +1409,7 @@
+       "  jnz 1b\n"
+       "  emms\n"
+       : "+r" (i1), "+r" (s1), "+r" (s2), "+r" (n)
+-      : "r" ((long)is1), "r" ((long)ss1), "r" ((long)ss2)
++      : "r" ((intptr_t)is1), "r" ((intptr_t)ss1), "r" ((intptr_t)ss2)
+       );
+ }
+ OIL_DEFINE_IMPL_FULL (multiply_and_acc_12xn_s16_u8_mmx,
+@@ -1596,7 +1596,7 @@
+         [s2_nx4_off] "+r" (s2_nx4_off),
+         [n] "+m" (n),
+         [s1] "+r" (s1)
+-      : [sstr] "r" ((long)(sstr2))
++      : [sstr] "r" ((intptr_t)(sstr2))
+       );
+ }
+ OIL_DEFINE_IMPL_FULL (mas4_across_add_s16_mmx, mas4_across_add_s16,
+@@ -1753,8 +1753,8 @@
+         [s3_8] "+r" (s3_8),
+         [d] "+r" (d),
+         [n] "+m" (n),
+-        [s1] "+r" ((long)(s1))
+-      : [sstr] "r" ((long)(sstr2))
++        [s1] "+r" ((intptr_t)(s1))
++      : [sstr] "r" ((intptr_t)(sstr2))
+       );
+ }
+ OIL_DEFINE_IMPL_FULL (mas8_across_add_s16_mmx, mas8_across_add_s16,
+EOF
+patch -ulbf liboil/i386_amd64/mas.c << EOF
+--- liboil/i386_amd64/mas.c  2009-10-15 17:24:12 +0200
++++ liboil/i386_amd64/mas.c  2011-10-26 11:37:06 +0200
+@@ -1108,3 +1108,3 @@
+       : [p] "+r" (p)
+-      : [d] "r" (d), [ss1] "r" ((long)ss1));
++      : [d] "r" (d), [ss1] "r" ((intptr_t)ss1));
+     d+=4;
+EOF
+patch -ulbf liboil/i386_amd64/multiply_and_acc.c << EOF
+--- liboil/i386_amd64/multiply_and_acc.c  2008-09-26 00:36:18 +0200
++++ liboil/i386_amd64/multiply_and_acc.c  2011-10-26 11:38:56 +0200
+@@ -34,3 +34,3 @@
+ #else
+-      : "r" ((long)is1), "r" ((long)ss1), "r" ((long)ss2)
++      : "r" ((intptr_t)is1), "r" ((intptr_t)ss1), "r" ((intptr_t)ss2)
+ #endif
+@@ -70,3 +70,3 @@
+ #else
+-      : "r" ((long)is1), "r" ((long)ss1), "r" ((long)ss2)
++      : "r" ((intptr_t)is1), "r" ((intptr_t)ss1), "r" ((intptr_t)ss2)
+ #endif
+@@ -116,3 +116,3 @@
+ #else
+-      : "r" ((long)is1), "r" ((long)ss1), "r" ((long)ss2)
++      : "r" ((intptr_t)is1), "r" ((intptr_t)ss1), "r" ((intptr_t)ss2)
+ #endif
+@@ -172,3 +172,3 @@
+ #else
+-      : "r" ((long)is1), "r" ((long)ss1), "r" ((long)ss2)
++      : "r" ((intptr_t)is1), "r" ((intptr_t)ss1), "r" ((intptr_t)ss2)
+ #endif
+EOF
+#make check
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM && 
+ wl-showstatus build-install &&
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # mv liboil/amd64/Makefile liboil/amd64/Makefile.bak &&
+ # sed -e "s/-Wall/-Wno-pointer-to-int-cast/" liboil/amd64/Makefile.bak > liboil/amd64/Makefile
+ #fi &&
+ make install-strip && 
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

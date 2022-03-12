@@ -1,0 +1,72 @@
+export NAME="libhandy"
+export STATUS=
+export URL=https://gitlab.gnome.org/GNOME/libhandy
+export BASENAME=libhandy
+export DESCRIPTION="Building blocks for modern adaptive GNOME apps. The aim of the Handy library is to help with developing UI for mobile devices using GTK/GNOME."
+export CATEGORY=framework
+export TYPE=library
+#export VERSION=1.0.3
+#export VERSIONDATE=20210214
+#export VERSION=1.2.0
+#export VERSIONDATE=20210319
+#export VERSION=1.2.1
+#export VERSIONDATE=20210414
+#export VERSION=1.2.2
+#export VERSIONDATE=20210427
+#export VERSION=1.2.3
+#export VERSIONDATE=20210621
+#export VERSION=1.4.0
+#export VERSIONDATE=20210905
+export VERSION=1.5.0
+export VERSIONDATE=20211112
+wl-showstatus --package-version
+#export DEPENDANCIES=glib2,gtk3,pango,cairo,atk,gettext
+export DEPENDANCIES=glib2,gtk3,pango,cairo,atk,gettext,gobject-introspection,vala
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://gitlab.gnome.org/GNOME/libhandy/-/releases"
+export DOWNLOADURL="https://gitlab.gnome.org/GNOME/libhandy/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.gnome.org/GNOME/libhandy/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+# fix missing __stack_chk_fail/__stack_chk_guard  in meson.build (version >= 1.0.3)
+patch -ulbf meson.build << EOF
+@@ -84,3 +84,2 @@
+   if target_system == 'windows'
+-    test_c_args += '-fstack-protector'
+   else
+EOF
+# fix also building static library
+sed -i.bak -e "s/shared_library/library/" src/meson.build #glade/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dglade_catalog=enabled -Dintrospection=disabled -Dvapi=false -Dgtk_doc=false -Dprofiling=false -Dexamples=false -Dtests=false . build_both &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dglade_catalog=enabled -Dintrospection=enabled -Dvapi=true -Dgtk_doc=false -Dprofiling=false -Dexamples=false -Dtests=false . build_both &&
+ # fix execution of Python scripts
+ sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\(\"\{0,1\} \)?\1\2python.exe \3\4\5?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/lib:$PYTHONPATH ninja -Cbuild_both install &&
+ PATH=$PATH:$PYDIR PKG_CONFIG= PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH ninja -Cbuild_both install &&
+ # manually move static library
+ mv -f $INSTALLPREFIX/bin/*.a $INSTALLPREFIX/lib &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

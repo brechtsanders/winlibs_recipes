@@ -1,0 +1,56 @@
+export NAME="sregex"
+export STATUS=
+export URL=https://github.com/openresty/sregex
+export BASENAME=sregex
+export DESCRIPTION="A non-backtracking NFA/DFA-based Perl-compatible regex engine matching on large data streams"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=0.0.1
+export VERSIONDATE=20181121
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/openresty/sregex/releases"
+export DOWNLOADURL="https://github.com/openresty/sregex/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/openresty/sregex/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/openresty/sregex/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing posix_memalign in src/sregex/sre_palloc.c
+patch -ulbf src/sregex/sre_palloc.c << EOF
+@@ -376,4 +376,7 @@
+ sre_memalign(size_t alignment, size_t size)
+ {
++#ifdef _WIN32
++    return _aligned_malloc(size, alignment);
++#else
+     void  *p;
+     int    err;
+@@ -386,4 +389,5 @@
+
+     return p;
++#endif
+ }
+ #endif
+EOF
+# fix building DLL
+sed -e "s/^\(\s*FILE_SO\s*=\s*\)libsregex\.so/\1sregex.dll/; s/^\(\s*\)\(INSTALL_SONAME\|TARGET_SONAME\)\(\s*=\s*\)libsregex\.so.*$/\1\2\3sregex.dll/; s/-Wl,-soname,[^\s]*/-Wl,--out-implib,libsregex.dll.a/; s/\$(CC).*\s-o.*$/& -lmman/; s/ln -s/echo Skipping: &/" Makefile > Makefile.mingw
+wl-showstatus build &&
+ make -fMakefile.mingw CC="gcc -I$MINGWPREFIX/include/mman-win32 -DBUILDING_DLL" &&
+ wl-showstatus install &&
+ make -fMakefile.mingw install PREFIX=$INSTALLPREFIX &&
+ cp -u *.a $INSTALLPREFIX/lib/ &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

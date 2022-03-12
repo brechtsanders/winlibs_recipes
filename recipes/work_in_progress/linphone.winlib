@@ -1,0 +1,269 @@
+export NAME="Linphone (includes oRTP)"
+export STATUS=
+export URL=http://www.linphone.org/
+export BASENAME=linphone
+export DESCRIPTION=""
+export CATEGORY=audio,communication
+export TYPE=application
+#export VERSION=3.1.1
+export VERSION=3.1.2
+#export VERSION=3.2.0
+#export VERSION=3.2.1
+#export VERSION=3.3.0
+####configure: error: Could not find libavcodec (from ffmpeg) headers and library. This is mandatory for video suppor
+#export VERSION=3.3.1
+#export VERSION=3.3.2
+#export VERSIONDATE=
+####oRTP/src/port.c:567: error: expected ';', ',' or ')' before '{' token
+#export VERSION=3.3.4
+#export VERSIONDATE=20110207
+#export VERSION=3.4.0
+#export VERSIONDATE=20110209
+#export VERSION=3.4.1
+#export VERSIONDATE=20110217
+#export VERSION=3.4.2
+#export VERSIONDATE=20110304
+#export VERSION=3.4.3
+#export VERSIONDATE=20110330
+#export VERSION=3.5.0
+#export VERSIONDATE=20111224
+#export VERSION=3.5.1
+#export VERSIONDATE=20120217
+export VERSION=3.5.2
+export VERSIONDATE=20120223
+export DEPENDANCIES=libosip2,exosip,ffmpeg2,gettext,libspeex,libtheora
+#export VERSION=3.7.0
+#export VERSIONDATE=20140702
+#export VERSION=3.8.0
+#export VERSIONDATE=20150314
+#export VERSION=3.8.1
+#export VERSIONDATE=20150403
+#export VERSION=3.8.2
+#export VERSIONDATE=20150515
+#export VERSION=3.8.3
+#export VERSIONDATE=20150609
+#export VERSION=3.8.4
+#export VERSIONDATE=20150611
+#export VERSION=3.8.5
+#export VERSIONDATE=20150702
+#export VERSION=3.11.1
+#export VERSIONDATE=20170906
+#export VERSION=3.12.0
+#export VERSIONDATE=20200406
+####No package 'belle-sip' found
+wl-showstatus --package-version
+#export DEPENDANCIES=libosip2,exosip,ffmpeg2,gettext,libspeex,libtheora,belle-sip
+#,libavcodec,libswscale,
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://mirrors.zerg.biz/nongnu/linphone/stable/sources/"
+#export DOWNLOADURL="http://www.linphone.org/technical-corner/linphone/downloads"
+export DOWNLOADURL="https://www.linphone.org/releases/sources/linphone/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/linphone/stable/sources/linphone-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://mirrors.zerg.biz/nongnu/linphone/stable/sources/linphone-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://www.linphone.org/releases/sources/linphone/linphone-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://www.linphone.org/releases/sources/linphone/linphone-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/linphone-$VERSION.tar.gz
+cd linphone-$VERSION
+# fix configure test for eXosip_subscribe_remove
+patch -ulbf configure << EOF
+--- configure  Mon Apr  6 16:21:57 2009
++++ configure  Wed Apr 15 22:10:24 2009
+@@ -25649,3 +25649,3 @@
+ echo "$as_me: error: Could not find eXosip2 library with version >= 3.0.2 !" >&2;}
+-   { (exit 1); exit 1; }; }
++   }
+ fi
+EOF
+# fix missing definition of O_RDONLY in mediastreamer2/src/msfileplayer.c
+cp mediastreamer2/src/msfileplayer.c mediastreamer2/src/msfileplayer.c.bak
+echo "#include <fcntl.h>" > mediastreamer2/src/msfileplayer.c
+cat mediastreamer2/src/msfileplayer.c.bak >> mediastreamer2/src/msfileplayer.c
+## fix oRTP/include/ortp/stun_udp.h to avoid redefinition of snprintf and WSANOTINITIALISED
+#patch -ulbf oRTP/include/ortp/stun_udp.h << EOF
+#--- oRTP/include/ortp/stun_udp.h  Mon Jan 12 16:25:52 2009
+#+++ oRTP/include/ortp/stun_udp.h  Thu Apr 30 09:48:16 2009
+#@@ -47,3 +47,5 @@
+# #if defined(WIN32) || defined(_WIN32_WCE)
+#+#if !defined(snprintf)
+# #define snprintf _snprintf
+#+#endif
+# 
+#@@ -96,2 +98,3 @@
+# typedef int Socket;
+#+#if !defined(__MINGW32__)
+# #define INVALID_SOCKET -1
+#@@ -102,2 +105,3 @@
+# #define WSANOTINITIALISED  EPROTONOSUPPORT
+#+#endif
+#EOF
+# fix missing setlinebuf and uninialized sock in console/linphonec.c
+patch -ulbf console/linphonec.c << EOF
+--- console/linphonec.c  Sat Mar 14 21:40:44 2009
++++ console/linphonec.c  Thu Apr 30 14:15:57 2009
+@@ -415,2 +415,3 @@
+                fprintf(stderr,"Window pipe implementation not written yet.\n");
++               sock = INVALID_SOCKET;
+ #endif
+@@ -882,3 +883,5 @@
+        /* printf("Readline initialized.\n"); */
++#ifndef __MINGW32__
+         setlinebuf(stdout); 
++#endif
+        return 0;
+EOF
+# fix for missing getaddrinfo/freeaddrinfo and type errors (version >= 3.1.2)
+patch -ulbf oRTP/src/rtpsession_inet.c << EOF
+--- oRTP/src/rtpsession_inet.c  Wed Apr  8 11:39:50 2009
++++ oRTP/src/rtpsession_inet.c  Mon Jul  6 20:13:42 2009
+@@ -19,2 +19,3 @@
+ 
++#define _WIN32_WINNT 0x0501
+ #include "ortp/ortp.h"
+@@ -723,6 +724,6 @@
+                
+-           while (session->rtp.tr->t_recvfrom(session->rtp.tr,trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
++           while (session->rtp.tr->t_recvfrom(session->rtp.tr,(void*)trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
+ 
+            if (session->rtcp.tr)
+-             while (session->rtcp.tr->t_recvfrom(session->rtcp.tr,trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
++             while (session->rtcp.tr->t_recvfrom(session->rtcp.tr,(void*)trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
+                freemsg(trashmp);
+@@ -732,6 +733,6 @@
+        if (session->rtp.socket>=0){
+-               while (recvfrom(session->rtp.socket,trash,sizeof(trash),0,(struct sockaddr *)&from,&fromlen)>0){};
++               while (recvfrom(session->rtp.socket,(void*)trash,sizeof(trash),0,(struct sockaddr *)&from,&fromlen)>0){};
+        }
+        if (session->rtcp.socket>=0){
+-               while (recvfrom(session->rtcp.socket,trash,sizeof(trash),0,(struct sockaddr*)&from,&fromlen)>0){};
++               while (recvfrom(session->rtcp.socket,(void*)trash,sizeof(trash),0,(struct sockaddr*)&from,&fromlen)>0){};
+        }
+@@ -813,3 +814,3 @@
+                        msgpullup(m,-1);
+-               error = sendto (sockfd, m->b_rptr, (int) (m->b_wptr - m->b_rptr),
++               error = sendto (sockfd, (void*)m->b_rptr, (int) (m->b_wptr - m->b_rptr),
+                         0,destaddr,destlen);
+@@ -857,3 +858,3 @@
+                        }
+-                       error = sendto (sockfd, m->b_rptr,
++                       error = sendto (sockfd, (void*)m->b_rptr,
+                        (int) (m->b_wptr - m->b_rptr), 0,
+@@ -898,3 +899,3 @@
+                if (sock_connected){
+-                       error=recv(sockfd,mp->b_wptr,bufsz,0);
++                       error=recv(sockfd,(void*)mp->b_wptr,bufsz,0);
+                }else if (rtp_session_using_transport(session, rtp)) 
+@@ -903,3 +904,3 @@
+                                  &addrlen);
+-               else error = recvfrom(sockfd, mp->b_wptr,
++               else error = recvfrom(sockfd, (void*)mp->b_wptr,
+                                  bufsz, 0,
+@@ -979,3 +980,3 @@
+                if (sock_connected){
+-                       error=recv(session->rtcp.socket,mp->b_wptr,RTCP_MAX_RECV_BUFSIZE,0);
++                       error=recv(session->rtcp.socket,(void*)mp->b_wptr,RTCP_MAX_RECV_BUFSIZE,0);
+                }else {
+@@ -988,3 +989,3 @@
+                        else
+-                         error=recvfrom (session->rtcp.socket, mp->b_wptr,
++                         error=recvfrom (session->rtcp.socket, (void*)mp->b_wptr,
+                                  RTCP_MAX_RECV_BUFSIZE, 0,
+EOF
+# fix missing include of mmreg.h in mediastreamer2/src/winsnd3.c (version >= 3.5.2)
+patch -ulbf mediastreamer2/src/winsnd3.c << EOF
+--- mediastreamer2/src/winsnd3.c  2012-02-22 12:54:58.000000000 +0100
++++ mediastreamer2/src/winsnd3.c  2015-01-23 09:36:25.362078100 +0100
+@@ -24,3 +24,3 @@
+ #include <mmsystem.h>
+-#ifdef _MSC_VER
++#if defined(_MSC_VER) || defined(__MINGW32__)
+ #include <mmreg.h>
+EOF
+# don't build oRTP/src/tests to avoid errors
+cat > oRTP/src/tests/Makefile.in << EOF
+all:
+depend:
+install:
+EOF
+# don't build mediastreamer2/tests to avoid errors
+cat > mediastreamer2/tests/Makefile.in << EOF
+all:
+depend:
+install:
+EOF
+# fix missing file
+mkdir -p mediastreamer2/src/sys
+touch mediastreamer2/src/sys/ipc.h mediastreamer2/src/sys/shm.h
+## continue building console on warnings
+#mv console/Makefile.in console/Makefile.in.bak
+#sed -e "s/-Wall//" console/Makefile.in.bak > console/Makefile.in
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+wl-showstatus configure &&
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+#mv mediastreamer2/libtool mediastreamer2/libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" mediastreamer2/libtool.bak > mediastreamer2/libtool &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio LDFLAGS="-lws2_32 -liphlpapi" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-console_ui=no --enable-gtk_ui=no --with-ffmpeg=$MINGWPREFIX LDFLAGS="-lws2_32 -liphlpapi" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-video --enable-portaudio --enable-console_ui=no --enable-gtk_ui=no --with-ffmpeg=$MINGWPREFIX --disable-strict LIBS="-lws2_32 -liphlpapi -ldnsapi -lplibc -lssl -lcrypto" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-console_ui=no --enable-gtk_ui=no --with-ffmpeg=$MINGWPREFIX --disable-strict LIBS="-lws2_32 -liphlpapi -ldnsapi -lplibc -lssl -lcrypto" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-console_ui=no --enable-gtk_ui=no --disable-x11 --with-ffmpeg=$MINGWPREFIX --disable-strict LIBS="-lws2_32 -liphlpapi -ldnsapi -lplibc -lssl -lcrypto" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-console_ui=no --enable-gtk_ui=yes --with-ffmpeg=$MINGWPREFIX --disable-strict LIBS="-lws2_32 -liphlpapi -ldnsapi -lplibc -lssl -lcrypto" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-console_ui=no --enable-gtk_ui=no --disable-x11 --disable-video --with-ffmpeg=$MINGWPREFIX --disable-strict LIBS="-Wl,--as-needed -lws2_32 -liphlpapi -ldnsapi -lplibc -lssl -lcrypto -lwinmm" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-console_ui=no --enable-gtk_ui=no --disable-x11 --disable-video --with-ffmpeg=$MINGWPREFIX --disable-strict LIBS="-Wl,--as-needed -lws2_32 -liphlpapi -ldnsapi -lssl -lcrypto -lwinmm -Wl,--allow-multiple-definition" &&
+#### --disable-shared because exosip is not available in DLL
+ wl-showstatus build-install &&
+ # fix bad path in mediastreamer2/src/Makefile
+ mv mediastreamer2/src/Makefile mediastreamer2/src/Makefile.bak &&
+ #sed -e "s?[A-Z]:[^ ]*/lib\([^ ]*\)\.a?\\1?g" mediastreamer2/src/Makefile.bak > mediastreamer2/src/Makefile &&
+ sed -e "s?[A-Z]:[^ ]*/lib/pkgconfig/lib\([^ ]*\)\.a?-l\1?g" mediastreamer2/src/Makefile.bak > mediastreamer2/src/Makefile &&
+ # fix problems in share/C/Makefile
+ mv share/C/Makefile share/C/Makefile.bak &&
+ echo "DESTDIR=$INSTALLPREFIX"> share/C/Makefile &&
+ cat share/C/Makefile.bak >> share/C/Makefile &&
+ mv share/fr/Makefile share/fr/Makefile.bak &&
+ echo "DESTDIR=$INSTALLPREFIX"> share/fr/Makefile &&
+ cat share/fr/Makefile.bak >> share/fr/Makefile &&
+ mv share/it/Makefile share/it/Makefile.bak &&
+ echo "DESTDIR=$INSTALLPREFIX"> share/it/Makefile &&
+ cat share/it/Makefile.bak >> share/it/Makefile &&
+ mv share/ja/Makefile share/ja/Makefile.bak &&
+ echo "DESTDIR=$INSTALLPREFIX"> share/ja/Makefile &&
+ cat share/ja/Makefile.bak >> share/ja/Makefile &&
+ # in libtool you may need to remove the line below in order to link coreapi
+ #   var_value=`$echo "X$var_value" | $Xsed -e "$sed_quote_subst"`
+ #( make install-strip || ( touch mediastreamer2/src/.libs/libmediastreamer.lai && make install-strip )) &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -leXosip2 -lintl -lws2_32" ) &&
+ rm -rf $INSTALLPREFIX/home &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf linphone-$VERSION
+# To do: GTK+ UI
+
+
+
+#export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_SHARED:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK

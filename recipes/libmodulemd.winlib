@@ -1,0 +1,103 @@
+export NAME="libmodulemd"
+export STATUS=
+export URL=https://github.com/fedora-modularity/libmodulemd
+export BASENAME=libmodulemd
+export DESCRIPTION="C Library for manipulating module metadata files"
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=2.9.4
+#export VERSIONDATE=20201109
+#export VERSION=2.10.0
+#export VERSIONDATE=20201121
+####modulemd\meson.build:36:4: ERROR: Program 'black' not found
+#export VERSION=2.11.0
+#export VERSIONDATE=20201211
+#export VERSION=2.11.1
+#export VERSIONDATE=20201218
+#export VERSION=2.11.2
+#export VERSIONDATE=20210108
+#export VERSION=2.12.0
+#export VERSIONDATE=20210115
+#export VERSION=2.12.1
+#export VERSIONDATE=20210504
+#export VERSION=2.13.0
+#export VERSIONDATE=20210709
+export VERSION=2.14.0
+export VERSIONDATE=20220204
+####modulemd\meson.build:32:4: ERROR: Program 'clang-format' not found
+wl-showstatus --package-version
+export DEPENDANCIES=pygobject
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja,black
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/fedora-modularity/libmodulemd/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/fedora-modularity/libmodulemd/releases/download/libmodulemd-$VERSION/modulemd-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://github.com/fedora-modularity/libmodulemd/releases/download/$VERSION/modulemd-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/modulemd-$VERSION.tar.xz
+cd modulemd-$VERSION
+# fix undefined uint in modulemd/modulemd-module.c (version >= 2.14.0)
+sed -i.bak -e "s/\buint\b/unsigned int/g" modulemd/modulemd-module.c
+# avoid missing strptime modulemd/modulemd-util.c (version >= 2.14.0)
+####TO DO: fix this properly
+patch -ulbf modulemd/modulemd-util.c << EOF
+@@ -581,2 +581,5 @@
+ {
++#if _WIN32
++  return 0;
++#else
+   struct tm tm = { 0 };
+@@ -592,2 +595,3 @@
+   return g_ascii_strtoull (buf, NULL, 0);
++#endif
+ }
+@@ -598,5 +602,8 @@
+ {
++#if _WIN32
++  return NULL;
++#else
+   char date_str[32];
+   sprintf (date_str, "%" PRIu64, date);
+-  struct tm tm = { 0 };
++  struct tm tm = { 0 };
+   char *s = strptime (date_str, "%Y%m%d%H%M", &tm);
+@@ -611,2 +618,3 @@
+   return buf;
++#endif
+ }
+EOF
+# skip building tests in modulemd/meson.build (version >= 2.14.0)
+patch -ulbf modulemd/meson.build << EOF
+@@ -363,2 +363,3 @@
+
++c_tests = {}
+ foreach name, sources : c_tests
+EOF
+## ignore printf format errors
+#sed -i.bak -e "s/'-Werror=format-security', '-Werror=format=2'//" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Ddeveloper_build=false -Dskip_formatters=true -Dskip_introspection=true -Drpmio=disabled -Dwith_manpages=disabled -Dwith_docs=false -Dverbose_tests=false -Dwith_py2=false -Dwith_py3=false -Dpython_name=$PYDIR/python.exe -Dgobject_overrides_dir_py3=$(ls -1d $MINGWPREFIX/lib/python3*/site-packages/gi/overrides|sort -V|tail -n1) -Dcpp_args="-Wno-error=format" . build_both &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibmagic=disabled -Dskip_introspection=true -Drpmio=disabled -Dwith_manpages=disabled -Dwith_docs=false -Dverbose_tests=false -Dwith_py2=false -Dwith_py3=false -Dpython_name=$PYDIR/python.exe -Dgobject_overrides_dir_py3=$(ls -1d $MINGWPREFIX/lib/python3*/site-packages/gi/overrides|sort -V|tail -n1) -Dc_args="-I$(cygpath -m $MINGWPREFIX/include/fnmatch)" -Dcpp_args="-Wno-error=format" -Dc_link_args="-lfnmatch" . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf modulemd-$VERSION
+
+
+

@@ -1,0 +1,55 @@
+export NAME="LZDoom"
+export STATUS=
+export URL=https://zdoom.org/about
+export BASENAME=lzdoom
+export DESCRIPTION="ZDoom is a family of enhanced ports of the Doom engine for running on modern operating systems. It runs on Windows, Linux, and OS X, and adds new features not found in the games as originally published by id Software. LZDoom is based on an older version of GZDoom. It does not provide all features currently supported by GZDoom but in turn is capable of running the hardware renderer on older hardware which does not support modern OpenGL features."
+export CATEGORY=games
+export TYPE=application
+#export VERSION=3.87b
+#export VERSIONDATE=20201203
+#export VERSION=3.87c
+#export VERSIONDATE=20210125
+#export VERSION=3.88
+#export VERSIONDATE=20210801
+#export VERSION=3.88a
+#export VERSIONDATE=20210808
+export VERSION=3.88b
+export VERSIONDATE=20220226
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libbz2,libjpeg,zmusic
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=docs/licenses/README.TXT
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/drfrag666/gzdoom/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/drfrag666/gzdoom/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd gzdoom-$VERSION
+# fix missing S_IFDIR/S_IFREG/S_IREAD/S_IWRITE in src/win32/i_system.cpp (version >= 3.87c)
+mv src/win32/i_system.cpp src/win32/i_system.cpp.bak &&
+echo "#include <sys/stat.h>" > src/win32/i_system.cpp &&
+cat src/win32/i_system.cpp.bak >> src/win32/i_system.cpp
+# fix multiple definition of signbit in src/math/isnan.c (version >= 3.87c)
+mv src/math/isnan.c src/math/isnan.c.bak &&
+echo "#define signbit GZDOOM_signbit" > src/math/isnan.c &&
+cat src/math/isnan.c.bak >> src/math/isnan.c
+# fix for GCC 11 in src/scripting/types.cpp (version >= 3.87c)
+mv src/scripting/types.cpp src/scripting/types.cpp.bak &&
+echo "#include <limits>" > src/scripting/types.cpp &&
+cat src/scripting/types.cpp.bak >> src/scripting/types.cpp
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/lzdoom -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -ldxguid/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gzdoom-$VERSION
+####$MINGWPREFIX/share/lzdoom/lzdoom.exe
+
+
+

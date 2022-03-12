@@ -1,0 +1,138 @@
+export NAME="FreeImage"
+export STATUS=
+export URL=http://freeimage.sourceforge.net/
+export BASENAME=freeimage
+export DESCRIPTION="FreeImage is an Open Source library project for developers who would like to support popular graphics image formats like PNG, BMP, JPEG, TIFF and others as needed by today's multimedia applications. FreeImage is easy to use, fast, multithreading safe, compatible with all 32-bit or 64-bit versions of Windows, and cross-platform (works both with Linux and Mac OS X)."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=3.15.0
+#export VERSIONDATE=20110427
+#export VERSION=3.15.1
+#export VERSIONDATE=20110725
+#export VERSION=3.15.2
+#export VERSIONDATE=20120220
+#export VERSION=3.15.3
+#export VERSIONDATE=20120318
+export VERSION=3.15.4
+export VERSIONDATE=20121028
+#export VERSION=3.16.0
+#export VERSIONDATE=20140324
+#export VERSION=3.17.0
+#export VERSIONDATE=20150316
+#export VERSION=3.18.0
+#export VERSIONDATE=20180801
+####\include\unknwnbase.h:74:29: error: '__mingw_uuidof' was not declared in this scope
+wl-showstatus --package-version
+export DEPENDANCIES=libraw,libopenjpeg
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://sourceforge.net/projects/freeimage/files/Source%20Distribution/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/freeimage/Source%20Distribution/$VERSION/FreeImage$(echo $VERSION|sed -e 's/\.//g').zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+unzip -oq -d $BASENAME-$VERSION $TARBALLDIR/$BASENAME/FreeImage`echo $VERSION|sed -e 's/\.//g'`.zip
+cd $BASENAME-$VERSION/FreeImage
+# fix duplicate case in Source/OpenEXR/Iex/IexThrowErrnoExc.cpp
+patch -ulbf Source/OpenEXR/Iex/IexThrowErrnoExc.cpp << EOF
+--- Source/OpenEXR/Iex/IexThrowErrnoExc.cpp  2011-01-24 05:06:08 +0100
++++ Source/OpenEXR/Iex/IexThrowErrnoExc.cpp  2011-07-21 23:30:32 +0200
+@@ -412,3 +412,3 @@
+
+-      #if defined (EOVERFLOW)
++      #if defined (EOVERFLOW) && ( !defined(E2BIG) || EOVERFLOW != E2BIG )
+          case EOVERFLOW:
+EOF
+# fix missing std::runtime_error and ::GetFileSizeEx in Source/LibRawLite/src/libraw_datastream.cpp (version >= 3.15.2)
+mv Source/LibRawLite/src/libraw_datastream.cpp Source/LibRawLite/src/libraw_datastream.cpp.bak
+cat > Source/LibRawLite/src/libraw_datastream.cpp << EOF
+//#include <cln/exception.h>
+#include <stdexcept>
+#define _WIN32_WINNT 0x0500
+EOF
+cat Source/LibRawLite/src/libraw_datastream.cpp.bak >> Source/LibRawLite/src/libraw_datastream.cpp
+# fix missing Source/LibTIFF4/tif_stream.cxx (version >= 3.15.2)
+touch Source/LibTIFF4/tif_stream.cxx
+mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin
+# fix missing memset Source/OpenEXR/IlmImf/ImfAutoArray.h (version >= 3.15.4)
+mv Source/OpenEXR/IlmImf/ImfAutoArray.h Source/OpenEXR/IlmImf/ImfAutoArray.h.bak
+echo "#include <string.h>" > Source/OpenEXR/IlmImf/ImfAutoArray.h
+cat Source/OpenEXR/IlmImf/ImfAutoArray.h.bak >> Source/OpenEXR/IlmImf/ImfAutoArray.h
+# fix redefinition of snprintf in Source/LibTIFF4/tif_config.h (version >= 3.15.4)
+mv Source/LibTIFF4/tif_config.h Source/LibTIFF4/tif_config.h.bak &&
+sed -e "s/#ifdef _WIN32/#if defined(_WIN32) \&\& \!defined(__MINGW32__)/" Source/LibTIFF4/tif_config.h.bak > Source/LibTIFF4/tif_config.h &&
+# avoid using OPJ_API which is already used in libopenjpeg header (version >= 3.15.4)
+sed -i.bak -e "s/\bOPJ_API\b/FREEIMAGE_&/g" Source/LibOpenJPEG/openjpeg.h
+## fix missing getc_unlocked() in Source/LibRawLite/libraw/libraw_datastream.h (version >= 3.15.4)
+#sed -i.bak -e "s/getc_unlocked/getc/" Source/LibRawLite/libraw/libraw_datastream.h
+# remove -DOPJ_STATIC option to allow shared builds
+#sed -i.bak -e "s/-DOPJ_STATIC\|-DLIBRAW_NODLL//g; s/-Wl,-soname,\$(SOLIBNAME)/-Wl,--out-implib,libFreeImage.dll.a/" Makefile.mingw
+#sed -i.bak -e "s/-DOPJ_STATIC\|-DLIBRAW_NODLL//g; s/\(-shared\) -static/\1/; s/-Wl,-soname,\$(SOLIBNAME)/-Wl,--leading-underscore -Wl,--kill-at -Wl,--out-implib,libFreeImage.dll.a -Wl,--output-def,FreeImage.def/" Makefile.mingw
+sed -i.bak -e "s/-DOPJ_STATIC\|-DLIBRAW_NODLL//g; s/\(-shared\) -static/\1/; s/-Wl,-soname,\$(SOLIBNAME)/-Wl,--kill-at -Wl,--out-implib,libFreeImage.dll.a -Wl,--output-def,FreeImage.def/" Makefile.mingw
+# fix for 64-bit with WIN32_CXXFLAGS
+if ( echo $RUNPLATFORM | grep -qv x86_64 ); then
+ wl-showstatus build &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC &&
+ #make -j1 -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED &&
+ #make -j1 -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CXXFLAGS="-Wno-narrowing" &&
+ #pexports FreeImage.dll | sed "s/^_//" > FreeImage.def &&
+ #dlltool --add-underscore -d FreeImage.def -l $INSTALLPREFIX/lib/libFreeImage.dll.a &&
+ ##cp -f Dist/FreeImage.lib $INSTALLPREFIX/lib/libFreeImage.dll.a &&
+ #cp -f Dist/FreeImage.dll $INSTALLPREFIX/bin/ &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw" &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -std=c++11 -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw" &&
+ ( make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -std=c++11 -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw" || (
+  make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC &&
+  make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -std=c++11 -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw"
+ )) &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f libFreeImage.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f FreeImage.dll $INSTALLPREFIX/bin/ &&
+ wl-showstatus build &&
+ make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED clean &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-Wno-narrowing"
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-Wno-narrowing -Wno-error=attributes"
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-DOPJ_STATIC -DLIBRAW_NODLL -Wno-narrowing -Wno-error=attributes"
+ make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-DWIN32 -DOPJ_STATIC -DLIBRAW_NODLL -std=c++11 -Wno-narrowing -Wno-error=attributes"
+else
+ wl-showstatus build &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC &&
+ #make -j1 -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CXXFLAGS="-fpermissive -Wwrite-strings" &&
+ #make -j1 -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CXXFLAGS="-fpermissive -Wwrite-strings -Wno-narrowing -fvisibility-ms-compat" &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -fpermissive -Wwrite-strings -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw" &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -std=c++11 -fpermissive -Wwrite-strings -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw" &&
+ ( make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -std=c++11 -fpermissive -Wwrite-strings -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw" || (
+  make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC &&
+  make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED WIN32_CFLAGS="-DWIN32 -DFREEIMAGE_EXPORTS -DOPJ_EXPORTS -DLIBRAW_BUILDLIB -DLIBSMRAW_DLL_IMPORT -std=c++11 -fpermissive -Wwrite-strings -Wno-narrowing -Wno-error=attributes" LIBRARIES="-Wl,--as-needed -lws2_32 -lopenjp2 -lraw"
+ )) &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f libFreeImage.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f FreeImage.dll $INSTALLPREFIX/bin/ &&
+ wl-showstatus build &&
+ make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=SHARED clean &&
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-fpermissive -Wwrite-strings"
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-fpermissive -Wwrite-strings -Wno-narrowing"
+ #make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-fpermissive -Wwrite-strings -Wno-narrowing -Wno-error=attributes"
+ make -fMakefile.mingw FREEIMAGE_LIBRARY_TYPE=STATIC WIN32_CXXFLAGS="-DWIN32 -std=c++11 -fpermissive -Wwrite-strings -Wno-narrowing -Wno-error=attributes"
+fi &&
+ ## fix DLL exports
+ #mv FreeImage.def FreeImage.def.bak &&
+ #( echo EXPORTS; sed -ne "s/^\(\s*FreeImage_[^ ]*\)\s.*$/\1/p" FreeImage.def.bak ) > FreeImage.def &&
+ #dlltool -D $INSTALLPREFIX/bin/FreeImage.dll -l $INSTALLPREFIX/lib/libFreeImage.dll.a -d FreeImage.def &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include &&
+ cp -f Dist/FreeImage.h $INSTALLPREFIX/include/ &&
+ #( cp -f Dist/FreeImage.a $INSTALLPREFIX/lib/libFreeImage.a || cp -f Dist/libFreeImage.a $INSTALLPREFIX/lib/libFreeImage.a ) &&
+ cp -f libFreeImage.a $INSTALLPREFIX/lib/ &&
+ cp -f FreeImage.def $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

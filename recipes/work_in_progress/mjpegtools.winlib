@@ -1,0 +1,131 @@
+export NAME="MJPEG Tools"
+export STATUS=
+export URL=http://mjpeg.sourceforge.net/
+export BASENAME=mjpegtools
+export DESCRIPTION="The mjpeg programs are a set of tools that can do recording of videos and playback, simple cut-and-paste editing and the MPEG compression of audio and video under Linux."
+export CATEGORY=multimedia
+export TYPE=application
+#export VERSION=2.1.0
+#export VERSIONDATE=20200815
+####lavtools/liblavplay.c:40:10: fatal error: sys/ioctl.h: No such file or directory
+#export VERSION=2.2.0
+#export VERSIONDATE=20210222
+export VERSION=2.2.1
+export VERSIONDATE=20210905
+####lavtools/lavpipe.c:(.text+0x25f): undefined reference to `fork'
+wl-showstatus --package-version
+export DEPENDANCIES=libpng,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/mjpeg/files/mjpegtools/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/mjpeg/mjpegtools/$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/mjpeg/mjpegtools/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix utils/cpu_accel.c (version >= 2.1.0)
+patch -ulbf utils/cpu_accel.c << EOF
+@@ -31,2 +31,5 @@
+ #include "mjpeg_logging.h"
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -79,3 +82,3 @@
+
+-#ifdef HAVE_X86CPU
++#if defined(HAVE_X86CPU) && !defined(_WIN32)
+
+@@ -265,3 +268,3 @@
+ {
+-#ifdef HAVE_X86CPU
++#if defined(HAVE_X86CPU) && !defined(_WIN32)
+     static int got_accel = 0;
+@@ -367,3 +370,9 @@
+
++#ifdef _WIN32
++       SYSTEM_INFO sysinfo;
++       GetSystemInfo(&sysinfo);
++       pgsize = sysinfo.dwPageSize;
++#else
+        pgsize = sysconf(_SC_PAGESIZE);
++#endif
+ /*
+EOF
+# fix missing realpath in lavtools/editlist.c
+mv lavtools/editlist.c lavtools/editlist.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > lavtools/editlist.c &&
+cat lavtools/editlist.c.bak >> lavtools/editlist.c
+# fix lavtools/liblavplay.c (version >= 2.1.0)
+patch -ulbf lavtools/liblavplay.c << EOF
+@@ -39,7 +39,11 @@
+ #include <sys/stat.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <sys/mman.h>
+ #include <sys/time.h>
++#ifndef _WIN32
+ #include <sys/resource.h>
+ #include <sys/wait.h>
++#endif
+ #ifdef HAVE_V4L
+EOF
+# fix lavtools/audiolib.c (version >= 2.1.0)
+patch -ulbf lavtools/audiolib.c << EOF
+@@ -46,7 +46,11 @@
+ #include <sys/time.h>
++#ifndef _WIN32
+ #include <sys/resource.h>
++#endif
+ #include <sys/mman.h>
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <sys/wait.h>
+ #include <sys/ioctl.h>
++#endif
+
+@@ -54,4 +58,6 @@
+
++#ifndef _WIN32
+ #include <sys/ipc.h>
+ #include <sys/shm.h>
++#endif
+
+EOF
+# fix lavtools/lavpipe.c (version >= 2.2.1)
+patch -ulbf lavtools/lavpipe.c << EOF
+@@ -36,2 +36,8 @@
+ #include <signal.h>
++#ifdef _WIN32
++#include <signal.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#define kill(pid,sig)
++#endif
+
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-dga --without-v4l --without-x CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ echo "typedef unsigned char u_char;" >> config.h &&
+ wl-showstatus build-install &&
+ ( make install-strip || (
+  make -Cutils install-strip &&
+  make -Cmplex install-strip &&
+  make -Cmpeg2enc install-strip &&
+  make -Cyuvfilters install-strip
+ )) &&
+ make install-pkgconfigDATA &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build and install everything
+
+
+

@@ -1,0 +1,59 @@
+export NAME="g2clib"
+export STATUS=
+#export URL="http://www.nco.ncep.noaa.gov/pmb/docs/grib2/download/g2clib.readme"
+export URL="http://www.nco.ncep.noaa.gov/pmb/codes/GRIB2/"
+export BASENAME=g2clib
+export DESCRIPTION="This library contains \"C\" decoder/encoder routines for GRIB edition 2"
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=1.2.2
+#export VERSIONDATE=20110901
+#export VERSION=1.2.3
+#export VERSIONDATE=20111115
+#export VERSION=1.4.0
+#export VERSIONDATE=20120717
+####cp: cannot stat 'libgrib2c.a': No such file or directory
+#export VERSION=1.6.0
+#export VERSIONDATE=20160219
+#export VERSION=1.6.2
+#export VERSIONDATE=20201217
+export VERSION=1.6.3
+export VERSIONDATE=20210309
+wl-showstatus --package-version
+export DEPENDANCIES=jasper,libpng,zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://www.nco.ncep.noaa.gov/pmb/codes/GRIB2/ g2clib- .tar"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.nco.ncep.noaa.gov/pmb/codes/GRIB2/$BASENAME-$VERSION.tar
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xf $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar
+cd $BASENAME-$VERSION
+# fix missing inmem_
+sed -i.bak -e "s?^\(\s*\)\(.*inmem_\)?\1//\2?" enc_jpeg2000.c
+sed -i.bak -e "s?^\(\s*\)\(.*inmem_\)?\1//\2?" dec_jpeg2000.c
+# fix platform
+sed -e "s/-m64//" makefile > Makefile.mingw
+wl-showstatus build &&
+####Note: default is LIB=libg2c_v$VERSION.a
+#make -f Makefile.mingw -j1 CC=gcc &&
+make -f Makefile.mingw -j1 CC=gcc LIB=libgrib2c.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include &&
+ cp -f libgrib2c.a $INSTALLPREFIX/lib/ &&
+ cp -f grib2.h $INSTALLPREFIX/include/ &&
+ # build shared library manually
+ mkdir -p $INSTALLPREFIX/bin &&
+ echo "LIBRARY grib2c.dll" > grib2c.def &&
+ echo "EXPORTS" >> grib2c.def &&
+ sed -ne "s/^[^/].* \**\([^ ]*\)(.*$/\1/p" grib2.h >> grib2c.def &&
+ dlltool -D $INSTALLPREFIX/bin/grib2c.dll -l $INSTALLPREFIX/lib/libgrib2c.dll.a -d grib2c.def &&
+ gcc -shared -s -mwindows -def grib2c.def -o $INSTALLPREFIX/bin/grib2c.dll libgrib2c.a -lpng -ljasper &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

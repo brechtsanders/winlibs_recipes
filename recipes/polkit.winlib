@@ -1,0 +1,165 @@
+export NAME="PolicyKit"
+export STATUS=
+export URL="http://www.freedesktop.org/wiki/Software/PolicyKit"
+export BASENAME=polkit
+export DESCRIPTION="PolicyKit is an application-level toolkit for defining and handling the policy that allows unprivileged processes to speak to privileged processes: It is a framework for centralizing the decision making process with respect to granting access to privileged operations for unprivileged applications. PolicyKit is specifically targeting applications in rich desktop environments on multi-user UNIX-like operating systems. It does not imply or rely on any exotic kernel features."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.99
+#export VERSIONDATE=20101117
+#export VERSION=0.100
+#export VERSIONDATE=20110222
+#export VERSION=0.101
+#export VERSIONDATE=20110304
+####configure: error: Could not find pam/pam-devel, please install the needed packages.
+#export VERSION=0.102
+#export VERSIONDATE=20110801
+#export VERSION=0.103
+#export VERSIONDATE=20111206
+export VERSION=0.104
+export VERSIONDATE=20120104
+wl-showstatus --package-version
+export DEPENDANCIES=expat
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=intltool
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://hal.freedesktop.org/releases/"
+export DOWNLOADURL="https://gitlab.freedesktop.org/polkit/polkit/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://hal.freedesktop.org/releases/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+cat > pwd.h << EOF
+typedef int uid_t;
+#define getuid() 0
+#define geteuid() 0
+#define getpwuid(uid) NULL
+#define getpwnam(username) NULL
+struct passwd {
+ int pw_uid;
+ int pw_gid;
+ char *pw_name;
+};
+EOF
+cat > grp.h << EOF
+typedef int gid_t;
+#define getgrgid(gid) NULL
+#define getgrnam(groupname) NULL
+#define getgrouplist(user,group,groups,ngroups) 0
+struct group {
+ int gr_gid;
+ char *gr_name;
+ char **gr_mem;
+};
+EOF
+cat > syslog.h << EOF
+#define LOG_NOTICE  5    //normal but significant condition
+#define LOG_INFO    6    //informational
+#define LOG_DAEMON   (3<<3)    //system daemons
+#define LOG_AUTHPRIV (10<<3)   //security/authorization messages (private)
+#define LOG_PID    0x01    //log the pid with each message
+static void openlog (const char *ident, int option, int facility) {}
+static void syslog (int priority, const char *format, ...) {}
+static void closelog (void) {}
+#include <stdarg.h>
+static void vsyslog (int priority, const char *format, va_list ap) {}
+EOF
+mkdir -p sys
+touch sys/wait.h
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+# fix src/polkit/polkitunixprocess.c for 64-bit
+patch -ulbf src/polkit/polkitunixprocess.c << EOF
+--- src/polkit/polkitunixprocess.c  2011-08-01 15:42:02 +0200
++++ src/polkit/polkitunixprocess.c  2011-12-07 17:57:42 +0100
+@@ -82,3 +82,3 @@
+
+-static guint64 get_start_time_for_pid (gint    pid,
++static guint64 get_start_time_for_pid (pid_t    pid,
+                                        GError **error);
+EOF
+####You must have XML::Parser installed to run /bin/intltool-merge
+#$PERLDIR/bin/perl.exe $PERLDIR/bin/cpan install XML::Parser
+wl-showstatus configure &&
+ #PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-authdb=dummy --with-authfw=none --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-authdb=dummy --with-authfw=none --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ( PATH=$PYDIR:$PATH make install-strip || ( PATH=$PYDIR:$PATH make -Csrc/polkit install-strip && make -i install-strip; rm $INSTALLPREFIX/lib/pkgconfig/polkit-agent-1.pc ) ) &&
+ ls -1 $INSTALLPREFIX/bin/libpolkit-gobject*.dll &> /dev/null &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export NAME="PolicyKit"
+#export STATUS=
+#export URL="https://gitlab.freedesktop.org/polkit/polkit/"
+#export BASENAME=polkit
+#export DESCRIPTION="PolicyKit is an application-level toolkit for defining and handling the policy that allows unprivileged processes to speak to privileged processes: It is a framework for centralizing the decision making process with respect to granting access to privileged operations for unprivileged applications. PolicyKit is specifically targeting applications in rich desktop environments on multi-user UNIX-like operating systems. It does not imply or rely on any exotic kernel features."
+#export CATEGORY=security
+#export TYPE=library
+##export VERSION=0.119
+##export VERSIONDATE=20210611
+#export VERSION=0.120
+#export VERSIONDATE=20211005
+#####Run-time dependency mozjs-78 found: NO (tried pkgconfig and cmake)
+#wl-showstatus --package-version
+#export DEPENDANCIES=glib2,expat
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=meson,ninja,intltool
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://gitlab.freedesktop.org/polkit/polkit/-/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://gitlab.freedesktop.org/polkit/polkit/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#cd $BASENAME-$VERSION
+### fix missing file
+##echo "CLEANFILES =" > gtk-doc.make
+### fix missing gio-unix
+##sed -i.bak -e "s/gio-unix-/gio-windows-/" configure.ac
+##wl-showstatus configure &&
+## mkdir -p m4 &&
+## autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+## ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-libsystemd-login --disable-libelogind --with-authfw=none --disable-introspection --disable-examples --disable-test &&
+## wl-showstatus build-install &&
+## make install-strip &&
+##    echo OK
+#
+##-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS
+### fix location of Perl
+##sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+### fix detection of Python
+##sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix missing gio-unix
+#sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dsession_tracking=libelogind -Dauthfw=shadow -Dintrospection=true -Dman=false -Dgtk_doc=false -Dexamples=false -Dtests=false . build_both &&
+# ## fix slash/backslash path issue when calling Python from Ninja
+# #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+# ## fix Python path issues in meson_exe
+# #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+# ## fix executing shell scripts
+# #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+# #PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+#    echo OK && find . -name '*.a'
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

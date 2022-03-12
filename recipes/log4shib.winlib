@@ -1,0 +1,78 @@
+export NAME="log4shib"
+export STATUS=
+export URL=https://wiki.shibboleth.net/confluence/display/OpenSAML/log4shib
+export BASENAME=log4shib
+export DESCRIPTION="log4shib is a forked version of log4cpp that has been created for the Shibboleth project to ensure a consistent, working snapshot that builds reliably on the necessary platforms."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=1.0.9
+#export VERSIONDATE=20180131
+#export VERSION=2.0.0
+#export VERSIONDATE=20180707
+export VERSION=2.0.1
+export VERSIONDATE=20211020
+####configure: error: cannot find socket() function
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://shibboleth.net/downloads/log4shib/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://shibboleth.net/downloads/log4shib/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing mode_t and in_addr_t in include/log4shib/config-win32.h (version <= 1.0.9)
+#sed -i.bak -e "s?^typedef int mode_t;?//&\n#include <sys/types.h>\n#include <stdint.h>\ntypedef int32_t in_addr_t;?" include/log4shib/config-win32.h
+# fix redefinition of mode_t in include/log4shib/config-win32.h (version >= 2.0.0)
+sed -i.bak -e "s?^typedef int mode_t;?//&?" include/log4shib/config-win32.h
+# fix include/log4shib/RemoteSyslogAppender.hh
+patch -ulbf include/log4shib/RemoteSyslogAppender.hh << EOF
+@@ -19,2 +19,3 @@
+ #include <winsock2.h>
++#include <log4shib/config-win32.h>
+ #else
+EOF
+# fix already define ERROR in include/log4shib/Priority.hh
+patch -ulbf include/log4shib/Priority.hh << EOF
+@@ -31,4 +31,3 @@
+ #else  // LOG4SHIB_FIX_ERROR_COLLISION
+-#error Naming collision for 'ERROR' detected. Please read the FAQ for a \\
+-       workaround.
++#define ERROR ERROR
+ #endif // LOG4SHIB_FIX_ERROR_COLLISION
+EOF
+# fix DLL exports in include/log4shib/Export.hh
+patch -ulbf include/log4shib/Export.hh << EOF
+@@ -4 +4 @@
+-#ifdef LOG4SHIB_HAS_DLL
++#if defined(LOG4SHIB_HAS_DLL) || defined(DLL_EXPORT)
+EOF
+# fix detection of socket() in configure (version >= 2.0.0)
+#patch -ulbf configure << EOF
+#@@ -16252 +16252 @@
+#-for ac_lib in '' socket; do
+#+for ac_lib in '' socket ws2_32; do
+#EOF
+sed -i.bak -e "s/as_fn_error\(.*cannot find \)\(socket\|gethostbyname\)\(() function\)/echo\1\2\3/" configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-doxygen --disable-dot --disable-html-docs --disable-latex-docs LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-doxygen --disable-dot --disable-html-docs --disable-latex-docs CXXFLAGS="-std=c++11 -DWIN32 -DLOG4SHIB_BUILD_DLL" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make -Csrc CXXFLAGS="-DLOG4SHIB_BUILD_DLL" &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ ## fix absolute paths in log4shib-config (version <= 1.0.9)
+ #sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/log4shib-config &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

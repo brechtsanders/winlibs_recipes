@@ -1,0 +1,145 @@
+export NAME="Rasqal"
+export STATUS=
+export URL=http://librdf.org/rasqal/
+export BASENAME=librasqal
+export DESCRIPTION="Rasqal is a free software / Open Source C library that handles Resource Description Framework (RDF) query language syntaxes, query construction and execution of queries returning results as bindings, boolean, RDF graphs/triples or syntaxes. The supported query languages are SPARQL 1.0, RDQL, Draft SPARQL Query 1.1, Update 1.1 Syntax and Experimental SPARQL extensions (LAQRS). Rasqal can write binding query results in the SPARQL XML, SPARQL JSON, CSV, TSV, HTML and ASCII tables."
+export CATEGORY=db
+export TYPE=library
+#export VERSION=0.9.20
+#export VERSIONDATE=20100927
+#export VERSION=0.9.21
+#export VERSIONDATE=20101205
+#export VERSION=0.9.22
+#export VERSIONDATE=20110115
+#export VERSION=0.9.23
+#export VERSIONDATE=20110128
+#export VERSION=0.9.24
+#export VERSIONDATE=20110202
+#export VERSION=0.9.25
+#export VERSIONDATE=20110223
+####src/rasqal_datetime.c:1168: undefined reference to `timegm'
+#export DEPENDANCIES=libraptor,mpfr,libcurl,fbopenssl,libidn,gettext,libssh2,libgcrypt,libgpg-error,openssl,libxml2,libxslt,zlib,pthreads,libiconv,pcre,gmp
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+export VERSION=0.9.26
+export VERSIONDATE=20110628
+#export VERSION=0.9.27
+#export VERSIONDATE=20110824
+#export VERSION=0.9.28
+#export VERSIONDATE=20111118
+#export VERSION=0.9.29
+#export VERSIONDATE=20120514
+####/include/sys/time.h:27: error: redefinition of 'struct timezone'
+####src/rasqal_general.c:1063: undefined reference to `rasqal_gettimeofday'
+####src/timegm.c:41: undefined reference to `_mkgmtime'
+#export VERSION=0.9.30
+#export VERSIONDATE=20130123
+#export VERSION=0.9.31
+#export VERSIONDATE=20131213
+####src/rasqal_general.c:1056: undefined reference to `_rasqal_gettimeofday'
+#export VERSION=0.9.32
+#export VERSIONDATE=20140224
+#export VERSION=0.9.33
+#export VERSIONDATE=20141216
+####src/rasqal_decimal.c:177:12: error: incompatible types when assigning to type 'mpfr_t' from type 'double'
+wl-showstatus --package-version
+export DEPENDANCIES=libraptor,mpfr,libcurl,libidn,gettext,libssh2,libgcrypt,libgpg-error,openssl,libxml2,libxslt,zlib,pthreads,libiconv,pcre,gmp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL/LGPL
+export DOWNLOADURL="http://download.librdf.org/source/ rasqal-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.librdf.org/source/rasqal-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/rasqal-$VERSION.tar.gz
+cd rasqal-$VERSION
+# fix missing setenv/unsetenv in src/timegm.c (version >= 0.9.22)
+patch -ulbf src/timegm.c << EOF
+--- src/timegm.c  2011-06-06 22:10:32 +0200
++++ src/timegm.c  2011-06-28 08:31:54 +0200
+@@ -48,3 +48,7 @@
+
++#ifndef __MINGW32__
+   setenv("TZ", "UTC", 1);
++#else
++  putenv("TZ=UTC");
++#endif
+   tzset();
+@@ -53,2 +57,3 @@
+
++#ifndef __MINGW32__
+   if(zone)
+@@ -57,2 +62,12 @@
+     unsetenv("TZ");
++#else
++  if(zone) {
++               char* s = (char*)malloc(4 + strlen(zone));
++               strcpy(s, "TZ=");
++               strcpy(s + 3, zone);
++               putenv(s);
++               free(s);
++  } else
++               putenv("TZ=");
++#endif
+   tzset();
+EOF
+# fix rasqal_query_set_store_results in src/rasqal.h.in (version >= 0.9.26)
+patch -ulbf src/rasqal.h.in << EOF
+--- src/rasqal.h.in  2011-06-12 00:03:14 +0200
++++ src/rasqal.h.in  2011-06-28 22:45:44 +0200
+@@ -1196,2 +1196,3 @@
+ /* results */
++RASQAL_API
+ int rasqal_query_set_store_results(rasqal_query* query, int store_results);
+EOF
+# fix rasqal_row_print in src/rasqal_internal.h (version >= 0.9.26)
+patch -ulbf src/rasqal_internal.h << EOF
+--- src/rasqal_internal.h  2011-06-27 06:36:22 +0200
++++ src/rasqal_internal.h  2011-06-28 10:41:00 +0200
+@@ -1287,3 +1287,3 @@
+ rasqal_row* rasqal_new_row_from_row(rasqal_row* row);
+-int rasqal_row_print(rasqal_row* row, FILE* fh);
++RASQAL_API int rasqal_row_print(rasqal_row* row, FILE* fh);
+ raptor_sequence* rasqal_new_row_sequence(rasqal_world* world, rasqal_variables_table* vt, const char* const row_data[], int vars_count, raptor_sequence** vars_seq_p);
+EOF
+# fix missing int16_t in src/rasqal_expr_numerics.c (version >= 0.9.30)
+mv src/rasqal_expr_numerics.c src/rasqal_expr_numerics.c.bak
+echo "#include <stdint.h>" > src/rasqal_expr_numerics.c
+cat src/rasqal_expr_numerics.c.bak >> src/rasqal_expr_numerics.c
+# fix redefinition of DELETE and IN and conflicting round in src/win32_rasqal_config.h
+mv src/win32_rasqal_config.h.in src/win32_rasqal_config.h.in.bak
+echo "#include <math.h>" > src/win32_rasqal_config.h.in
+#sed -e "s/^\(#include <windows.h>\)/\/\/\1/" src/win32_rasqal_config.h.in.bak >> src/win32_rasqal_config.h.in
+sed -e "s/^\(#include <windows.h>\)/\/\/\1/; s/\(struct timezone\)/\1_DUMMY/" src/win32_rasqal_config.h.in.bak >> src/win32_rasqal_config.h.in
+## fix missing int16_t in src/rasqal_expr_numerics.c (version >= 0.9.29)
+#mv src/rasqal_expr_numerics.c src/rasqal_expr_numerics.c.bak
+#echo "#include <stdint.h>" > src/rasqal_expr_numerics.c
+#cat src/rasqal_expr_numerics.c.bak >> src/rasqal_expr_numerics.c
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+fi
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-raptor2 LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-raptor2 LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix undefined reference to __imp__snprintf.constprop.0
+ echo "#undef snprintf" >> src/win32_rasqal_config.h &&
+ #( make all install-strip || (
+ # mv src/sparql_parser.h src/sparql_parser.h.bak &&
+ # echo "#undef DELETE" > src/sparql_parser.h &&
+ # echo "#undef IN" >> src/sparql_parser.h &&
+ # cat src/sparql_parser.h.bak >> src/sparql_parser.h &&
+ # make all install-strip
+ #) || make -Csrc all install-strip ) &&
+ ( make all install-strip || make -j1 all install-strip ) &&
+ make install-pkgconfigDATA &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf rasqal-$VERSION
+
+
+

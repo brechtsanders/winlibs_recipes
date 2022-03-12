@@ -1,0 +1,59 @@
+export NAME="libpndman"
+export STATUS=
+export URL=https://github.com/Cloudef/libpndman
+export BASENAME=libpndman
+export DESCRIPTION="Package management library for PND files."
+export CATEGORY=dataprocessing,fileformat
+export TYPE=library
+export VERSION=1.1
+export VERSIONDATE=20170703
+wl-showstatus --package-version
+export DEPENDANCIES=libcurl,expat,libjansson
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=WTFPL
+#export DOWNLOADURL="https://github.com/Cloudef/libpndman/releases"
+export DOWNLOADURL="https://github.com/Cloudef/libpndman/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/Cloudef/libpndman/archive/v1.1.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/Cloudef/libpndman/archive/refs/tags/v1.1.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix lib/pxml.c
+patch -ulbf lib/pxml.c << EOF
+@@ -1284,3 +1284,3 @@
+       }
+-#if 1 /* skip hidden . (dot) files? */
++#if __linux__ /* skip hidden . (dot) files? */
+       if (ep->d_name[0] == '.') continue;
+EOF
+# customize Makefile
+sed -e "s/-m32//; s/^\s*X86.*=/#&/; s/^\(DEBUG.*=\s\).*/\10/; s/^\(STATIC.*=\s\).*/#&/; s/LIB_INC.*=.*$/& -D_PNDMAN_BUILD_DLL/; s/LIB_LIBS\s*:=\s*/&-lws2_32 /; s/ifeq (\${MINGW}/&_DISABLED_/; s/\.so/.dll/g; s/-lrt//; s/-lc/-Wl,--out-implib,\${LIB_TARGET}.a -lexpat -lcurl -ljansson -lcrypto -lws2_32/; s/\(\s*\)\(LIB_LIBS.*=.*static.*pkg-config\s*\)\(--libs\)/\1CFLAGS+=-DCURL_STATICLIB\n\1\2--static \3/; s?^\(PREFIX.*=\s\).*?\1$INSTALLPREFIX?" Makefile > Makefile.mingw
+# avoid -fPIC (useless on Windows and not supported by clang) in Makefile.mingw
+sed -i.bak -e "s/-fPIC//" Makefile.mingw
+wl-showstatus build &&
+ # create lib/version.h
+ make -f Makefile.mingw VERSION="$VERSION" COMMIT="" version &&
+ # create empty version object file
+ echo "" | gcc -c -xc - -o version
+ make -f Makefile.mingw MINGW=1 CC=gcc AR=ar STATIC=0 libpndman.dll &&
+ cp -f libpndman.dll.a libpndman.a &&
+ make -f Makefile.mingw MINGW=1 CC=gcc AR=ar STATIC=0 &&
+ rm -f libpndman.a lib/*.o &&
+ make -f Makefile.mingw MINGW=1 CC=gcc AR=ar STATIC=1 libpndman.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f include/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp *.dll bin/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

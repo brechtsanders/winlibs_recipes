@@ -1,0 +1,195 @@
+export NAME="readline"
+export STATUS=
+export URL=http://tiswww.case.edu/php/chet/readline/rltop.html
+export BASENAME=readline
+export DESCRIPTION="The GNU Readline library provides a set of functions for use by applications that allow users to edit command lines as they are typed in."
+export CATEGORY=console
+export TYPE=library
+#export VERSION=5.2
+#export VERSION=6.0
+#export VERSION=6.1
+#export VERSIONDATE=20100102
+#export VERSION=6.2
+#export VERSIONDATE=20110214
+#export VERSION=6.3
+#export VERSIONDATE=20140226
+#export VERSION=7.0
+#export VERSIONDATE=20160916
+#export VERSION=8.0
+#export VERSIONDATE=20190107
+#export VERSION=8.1
+#export VERSIONDATE=20201207
+export VERSION=8.1.2
+export VERSIONDATE=20220106
+#export DEPENDANCIES=termcap
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+wl-showstatus --package-version
+#export DEPENDANCIES=pdcurses
+export DEPENDANCIES=ncurses
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/readline/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/readline/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## (version <= 5.2)
+#mkdir -p $INSTALLPREFIX/bin
+## fix undefined SIGQUIT (version = 6.0)
+#patch -ulbf signals.c << EOF
+#--- signals.c  Fri Jan 23 16:57:00 2009
+#+++ signals.c  Fri Mar 27 15:51:19 2009
+#@@ -594,4 +594,8 @@
+#     case SIGINT:  c = _rl_intr_char; break;
+#+#if defined (SIGQUIT)
+#     case SIGQUIT: c = _rl_quit_char; break;
+#+#endif
+#+#if defined (SIGTSTP)
+#     case SIGTSTP: c = _rl_susp_char; break;
+#+#endif
+#     default: return;
+#EOF
+## fix missing semicolon in util.c (version = 6.2)
+#patch -ulbf util.c << EOF
+#--- util.c  2010-05-31 00:36:02 +0200
+#+++ util.c  2013-11-14 23:44:56 +0100
+#@@ -391,3 +391,3 @@
+#     }
+#-  while (--count != 0)
+#+  while (--count != 0);
+#
+#EOF
+## fix undefined SIGHUP in signals.c (version >= 6.3)
+#patch -ulbf signals.c << EOF
+#--- signals.c  2014-01-10 21:06:48 +0100
+#+++ signals.c  2014-02-26 20:20:56 +0100
+#@@ -218,3 +218,5 @@
+#     case SIGTERM:
+#+#if defined (SIGHUP)
+#     case SIGHUP:
+#+#endif
+# #if defined (SIGTSTP)
+#@@ -428,3 +430,5 @@
+#       rl_maybe_set_sighandler (SIGTERM, rl_signal_handler, &old_term);
+#+#if defined (SIGHUP)
+#       rl_maybe_set_sighandler (SIGHUP, rl_signal_handler, &old_hup);
+#+#endif
+# #if defined (SIGQUIT)
+#@@ -493,3 +497,5 @@
+#       rl_maybe_restore_sighandler (SIGTERM, &old_term);
+#+#if defined (SIGHUP)
+#       rl_maybe_restore_sighandler (SIGHUP, &old_hup);
+#+#endif
+# #if defined (SIGQUIT)
+#EOF
+# fix undefined SIGHUP in signals.c (version >= 8.1)
+patch -ulbf signals.c << EOF
+@@ -212,3 +212,3 @@
+
+-#if defined (HAVE_POSIX_SIGNALS)
++#if defined (HAVE_POSIX_SIGNALS) && defined(SIG_BLOCK)
+   /* Get the current set of blocked signals. If we want to block a signal for
+@@ -268,4 +268,6 @@
+
++#if defined (SIG_BLOCK)
+       if (block_sig)
+        sigprocmask (SIG_BLOCK, &set, &oset);
++#endif
+
+@@ -480,4 +482,6 @@
+ #if defined (SIGHUP)
++#if defined (SIGHUP)
+       rl_maybe_set_sighandler (SIGHUP, rl_signal_handler, &old_hup);
+ #endif
++#endif
+ #if defined (SIGQUIT)
+@@ -552,4 +556,6 @@
+ #if defined (SIGHUP)
++#if defined (SIGHUP)
+       rl_maybe_restore_sighandler (SIGHUP, &old_hup);
+ #endif
++#endif
+ #if defined (SIGQUIT)
+EOF
+# fix undefined SIGHUP/SIGQUIT in input.c (version >= 6.3)
+patch -ulbf input.c << EOF
+--- input.c  2014-01-10 21:07:08 +0100
++++ input.c  2014-02-26 21:26:02 +0100
+@@ -534,5 +534,13 @@
+        return (RL_ISSTATE (RL_STATE_READCMD) ? READERR : EOF);
++#if defined (SIGHUP)
+       else if (_rl_caught_signal == SIGHUP || _rl_caught_signal == SIGTERM)
++#else
++      else if (_rl_caught_signal == SIGTERM)
++#endif
+        return (RL_ISSTATE (RL_STATE_READCMD) ? READERR : EOF);
++#if defined (SIGQUIT)
+       else if (_rl_caught_signal == SIGINT || _rl_caught_signal == SIGQUIT)
++#else
++      else if (_rl_caught_signal == SIGINT)
++#endif
+         RL_CHECK_SIGNALS ();
+EOF
+# fix colors.c (version >= 6.3)
+mv colors.c colors.c.bak
+cat > colors.c << EOF
+#define S_ISUID 0
+#define S_ISGID 0
+#define S_IXOTH 0
+#define S_IWOTH 0
+#define S_IXGRP 0
+#define S_ISLNK(mode) 0
+#define S_ISSOCK(mode) 0
+EOF
+cat colors.c.bak >> colors.c
+# fix missing chown in histfile.c (version >= 7.0)
+patch -ulbf histfile.c << EOF
+--- histfile.c  2016-01-25 16:34:03.000000000 +0100
++++ histfile.c  2016-09-16 10:48:46.786565200 +0200
+@@ -612,4 +612,6 @@
+      owned by root. */
++#ifndef _WIN32
+   if (rv == 0 && exists)
+     r = chown (filename, finfo.st_uid, finfo.st_gid);
++#endif
+
+@@ -759,4 +761,6 @@
+      owned by root. */
++#ifndef _WIN32
+   if (rv == 0 && exists)
+     mode = chown (histname, finfo.st_uid, finfo.st_gid);
++#endif
+
+EOF
+# make sure to use ncurses instead of termcap
+sed -i.bak -e "s/-ltermcap/-lncurses/" configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte LDFLAGS="-lcurses" && make
+ #mv shlib/Makefile shlib/Makefile.bak
+ #sed -e "s/\${SHLIB_XLDFLAGS}\(.*\)$/\1 \${SHLIB_XLDFLAGS}/" shlib/Makefile.bak > shlib/Makefile
+ #make install
+ ## (version >= 6.0)
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte && make install
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte --with-curses LIBS="-L$MINGWPREFIX/lib -lcurses.dll" && make install
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte LIBS="-L$MINGWPREFIX/lib" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte --with-curses &&
+ #make install SHLIB_LIBS="-Wl,--as-needed -L$MINGWDIR/lib -lcurses.dll" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte --with-curses &&
+ #make install SHLIB_LIBS="-Wl,--as-needed -lcurses.dll" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte --with-curses CFLAGS="-I$MINGWPREFIX/include/ncurses -I$MINGWPREFIX/include/ncursesw" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-multibyte --with-curses --disable-install-examples CFLAGS="-I$MINGWPREFIX/include/ncurses -I$MINGWPREFIX/include/ncursesw" &&
+ wl-showstatus build-install &&
+ #make install &&
+ make install TERMCAP_LIB="-lncurses" &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ ( mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ || true ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

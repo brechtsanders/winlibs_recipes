@@ -1,0 +1,95 @@
+export NAME="scrypt"
+export STATUS=
+export URL=http://www.tarsnap.com/scrypt.html
+#export URL=https://github.com/Tarsnap/scrypt
+export BASENAME=scrypt
+export DESCRIPTION="The scrypt key derivation function was originally developed for use in the Tarsnap online backup system and is designed to be far more secure against hardware brute-force attacks than alternative functions such as PBKDF2 or bcrypt."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.3.0
+#export VERSIONDATE=20200530
+export VERSION=1.3.1
+export VERSIONDATE=20200828
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/Tarsnap/scrypt/releases"
+export DOWNLOADURL="https://github.com/Tarsnap/scrypt/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/Tarsnap/scrypt/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/Tarsnap/scrypt/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing sigsetjmp in libcperciva/util/getopt.h (version >= 1.3.0)
+patch -ulbf libcperciva/util/getopt.h << EOF
+@@ -32,3 +32,3 @@
+ /* Work around LLVM bug. */
+-#ifdef __clang__
++#if defined(__clang__) || defined(__MINGW32__)
+ #warning Working around bug in LLVM optimizer
+EOF
+# fix missing getrlimit lib/util/memlimit.c (version >= 1.3.0)
+patch -ulbf lib/util/memlimit.c << EOF
+@@ -36,3 +36,5 @@
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <sys/resource.h>
++#endif
+
+@@ -154,2 +156,6 @@
+ {
++#ifdef _WIN32
++       *memlimit = 0;//TO DO: replace with stack size
++       return (0);
++#else
+        struct rlimit rl;
+@@ -199,2 +205,3 @@
+        return (0);
++#endif
+ }
+EOF
+# fix missing suseconds_t in libcperciva/util/monoclock.c (version >= 1.3.0)
+patch -ulbf libcperciva/util/monoclock.c << EOF
+@@ -79,3 +79,3 @@
+                tv->tv_sec = tp.tv_sec;
+-               tv->tv_usec = (suseconds_t)(tp.tv_nsec / 1000);
++               tv->tv_usec = (long)(tp.tv_nsec / 1000);
+        } else if ((errno != ENOSYS) && (errno != EINVAL)) {
+EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./autogen.sh &&
+#    echo OK
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

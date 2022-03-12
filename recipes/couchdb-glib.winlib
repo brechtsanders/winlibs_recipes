@@ -1,0 +1,151 @@
+export NAME="couchdb-glib"
+export STATUS=
+export URL=http://www.gnome.org/projects/couchdb-glib
+export BASENAME=couchdb-glib
+export DESCRIPTION="CouchDB-glib is a GLib-based implementation of the client side protocol for CouchDB (http://couchdb.apache.org), a replication and synchronization database from the Apache project."
+export CATEGORY=db
+export TYPE=library
+#export VERSION=0.6.3
+#export VERSIONDATE=20101008
+#export VERSION=0.7.0
+#export VERSIONDATE=20101124
+#export VERSION=0.7.1
+#export VERSIONDATE=20110324
+#export VERSION=0.7.2
+#export VERSIONDATE=20110402
+#export VERSION=0.7.3
+#export VERSIONDATE=20110723
+export VERSION=0.7.4
+export VERSIONDATE=20110823
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,glib2,dbus,dbus-glib,libsoup-2.4,gnome-keyring,libjson-glib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/couchdb-glib/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing uuid/uuid.h
+mkdir -p uuid
+cat > uuid/uuid.h << EOF
+#include <windows.h>
+#define uuid_generate_random(uuid) UuidCreate(&uuid)
+#define uuid_unparse(uuid,uuid_string) { UCHAR* buf = NULL; UuidToString(&uuid, &buf); strcpy(uuid_string, (char*)buf); RpcStringFree(&buf); }
+EOF
+# fix missing files (version >= 0.7.3)
+mkdir -p sys
+cat > sys/wait.h << EOF
+#define WEXITSTATUS(status) (((status)  & 0xFF00) >> 8)
+#define WIFEXITED(status) (WTERMSIG(status) == 0)
+#define WIFSTOPPED(status) (((status) & 0xFF) == 0x7F)
+#define WIFSIGNALED(status) (!WIFSTOPPED(status) && !WIFEXITED(status))
+#define WSTOPSIG(status) WEXITSTATUS(status)
+#define WTERMSIG(status) ((status) & 0x7F)
+EOF
+# support newer openssl in couchdb-glib/oauth.c (version >= 0.7.4)
+patch -ulbf couchdb-glib/oauth.c << EOF
+@@ -332,3 +332,3 @@
+   unsigned int len=0;
+-  EVP_MD_CTX md_ctx;
++  EVP_MD_CTX *md_ctx;
+
+@@ -348,5 +348,5 @@
+
+-  EVP_SignInit(&md_ctx, EVP_sha1());
+-  EVP_SignUpdate(&md_ctx, m, strlen(m));
+-  if (EVP_SignFinal (&md_ctx, sig, &len, pkey)) {
++  EVP_SignInit(md_ctx, EVP_sha1());
++  EVP_SignUpdate(md_ctx, m, strlen(m));
++  if (EVP_SignFinal (md_ctx, sig, &len, pkey)) {
+          char *tmp;
+@@ -356,4 +356,6 @@
+          EVP_PKEY_free(pkey);
++    EVP_MD_CTX_free(md_ctx);
+                return tmp;
+   }
++  EVP_MD_CTX_free(md_ctx);
+   return xstrdup("liboauth/ssl: rsa-sha1 signing failed");
+@@ -373,3 +375,3 @@
+ int oauth_verify_rsa_sha1 (const char *m, const char *c, const char *s) {
+-  EVP_MD_CTX md_ctx;
++  EVP_MD_CTX *md_ctx;
+   EVP_PKEY *pkey;
+@@ -397,6 +399,6 @@
+
+-       EVP_VerifyInit(&md_ctx, EVP_sha1());
+-       EVP_VerifyUpdate(&md_ctx, m, strlen(m));
+-       err = EVP_VerifyFinal(&md_ctx, b64d, slen, pkey);
+-       EVP_MD_CTX_cleanup(&md_ctx);
++       EVP_VerifyInit(md_ctx, EVP_sha1());
++       EVP_VerifyUpdate(md_ctx, m, strlen(m));
++       err = EVP_VerifyFinal(md_ctx, b64d, slen, pkey);
++       EVP_MD_CTX_free(md_ctx);
+        EVP_PKEY_free(pkey);
+@@ -903,3 +905,3 @@
+   unsigned char fb[BUFSIZ];
+-  EVP_MD_CTX ctx;
++  EVP_MD_CTX *ctx;
+   size_t len=0;
+@@ -909,6 +911,6 @@
+
+-  EVP_MD_CTX_init(&ctx);
+-  EVP_DigestInit(&ctx,EVP_sha1());
++  EVP_MD_CTX_init(ctx);
++  EVP_DigestInit(ctx,EVP_sha1());
+   while (!feof(F) && (len=fread(fb,sizeof(char),BUFSIZ, F))>0) {
+-    EVP_DigestUpdate(&ctx, fb, len);
++    EVP_DigestUpdate(ctx, fb, len);
+   }
+@@ -917,4 +919,4 @@
+   md=(unsigned char*) calloc(EVP_MD_size(EVP_sha1()),sizeof(unsigned char));
+-  EVP_DigestFinal(&ctx, md, &len);
+-  EVP_MD_CTX_cleanup(&ctx);
++  EVP_DigestFinal(ctx, md, &len);
++  EVP_MD_CTX_free(ctx);
+   return oauth_body_hash_encode(len, md);
+@@ -923,3 +925,3 @@
+ char *oauth_body_hash_data(size_t length, const char *data) {
+-  EVP_MD_CTX ctx;
++  EVP_MD_CTX *ctx;
+   size_t len=0;
+@@ -927,7 +929,7 @@
+   md=(unsigned char*) calloc(EVP_MD_size(EVP_sha1()),sizeof(unsigned char));
+-  EVP_MD_CTX_init(&ctx);
+-  EVP_DigestInit(&ctx,EVP_sha1());
+-  EVP_DigestUpdate(&ctx, data, length);
+-  EVP_DigestFinal(&ctx, md, &len);
+-  EVP_MD_CTX_cleanup(&ctx);
++  EVP_MD_CTX_init(ctx);
++  EVP_DigestInit(ctx,EVP_sha1());
++  EVP_DigestUpdate(ctx, data, length);
++  EVP_DigestFinal(ctx, md, &len);
++  EVP_MD_CTX_free(ctx);
+   return oauth_body_hash_encode(len, md);
+EOF
+# skip making tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --disable-gtk-doc-html --enable-introspection=no LDFLAGS="-static-libgcc -static-libstdc++ -Wl,--enable-auto-import -Wl,--as-needed -lrpcrt4 -no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --disable-gtk-doc-html --enable-introspection=no LDFLAGS="-static-libgcc -static-libstdc++ -Wl,--enable-auto-import -Wl,--as-needed -lrpcrt4 -Wl,-no-undefined" &&
+ # fix building DLLs on 64-bit
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix missing reference to libuuid
+ sed -i.bak -e "s/-luuid//g" couchdb-glib/Makefile desktopcouch-glib/Makefile tests/Makefile &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ PATH=$PYDIR:$PATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

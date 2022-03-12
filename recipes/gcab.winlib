@@ -1,0 +1,84 @@
+export NAME="Gcab"
+export STATUS=
+export URL=https://wiki.gnome.org/msitools
+export BASENAME=gcab
+export DESCRIPTION="Gcab is a utility and library mainly made to create Cabinet files, using GObject/GIO API and provides GIR bindings."
+export CATEGORY=compression
+export TYPE=library,application
+#export VERSION=0.6
+#export VERSIONDATE=20150330
+#export VERSION=0.7
+#export VERSIONDATE=20160310
+#export VERSION=0.8
+#export VERSIONDATE=20180123
+#export DEPENDANCIES=gettext,glib2,zlib,vala
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export VERSION=1.0
+#export VERSIONDATE=20180123
+#export VERSION=1.1
+#export VERSIONDATE=20180209
+#export VERSION=1.2
+#export VERSIONDATE=20181210
+#export VERSION=1.3
+#export VERSIONDATE=20191008
+export VERSION=1.4
+export VERSIONDATE=20200106
+wl-showstatus --package-version
+#export DEPENDANCIES=gettext,glib2,zlib
+export DEPENDANCIES=gettext,glib2,zlib,vala,gobject-introspection
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gcab/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/gcab/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+#wl-showstatus configure &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+# fix meson.build (version >= 1.4)
+patch -ulbf meson.build << EOF
+@@ -75,5 +75,5 @@
+
+-if not meson.is_cross_build()
+-  add_project_arguments('-fstack-protector-strong', language : 'c')
+-endif
++#if not meson.is_cross_build()
++#  add_project_arguments('-fstack-protector-strong', language : 'c')
++#endif
+
+EOF
+# fix to also build static library
+sed -i.bak -e "s/shared_library/library/" libgcab/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dintrospection=false -Dvapi=false -Ddocs=false -Dtests=false -Dc_link_args="-fstack-protector" . build_both &&
+ PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dintrospection=true -Dvapi=true -Ddocs=false -Dtests=false -Dc_link_args="-fstack-protector" . build_both &&
+ # fix slash/backslash path issue when calling Python from Ninja
+ sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ PATH=$PATH:$PYDIR PKG_CONFIG= PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH ninja -C build_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

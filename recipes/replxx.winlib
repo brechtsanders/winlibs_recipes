@@ -1,0 +1,76 @@
+export NAME="replxx"
+export STATUS=
+export URL=https://github.com/AmokHuginnsson/replxx
+export BASENAME=replxx
+export DESCRIPTION="A readline and libedit replacement that supports UTF-8, syntax highlighting, hints and Windows and is BSD licensed."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.0.1
+#export VERSIONDATE=20180810
+#export VERSION=0.0.2
+#export VERSIONDATE=20190923
+#export VERSION=0.0.3
+#export VERSIONDATE=20201203
+export VERSION=0.0.4
+export VERSIONDATE=20211021
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/AmokHuginnsson/replxx/releases"
+export DOWNLOADURL="https://github.com/AmokHuginnsson/replxx/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/AmokHuginnsson/replxx/archive/release-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/AmokHuginnsson/replxx/archive/refs/tags/release-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/release-$VERSION.tar.gz
+cd replxx-release-$VERSION
+## fix src/prompt.cxx (version <= 0.0.1)
+#patch -ulbf src/prompt.cxx << EOF
+#@@ -5,3 +5,3 @@
+# #include <io.h>
+#-#if _MSC_VER < 1900
+#+#if _MSC_VER < 1900 && !defined(__MINGW32__)
+# #define snprintf _snprintf     // Microsoft headers use underscores in some names
+#EOF
+## fix mising readUnicodeCharacter in src/io.cxx (version <= 0.0.1)
+#patch -ulbf src/io.cxx << EOF
+#@@ -228 +228 @@
+#-#ifndef _WIN32
+#+#if !defined(_WIN32) || defined(__MINGW32__)
+#EOF
+## also build shared library (version <= 0.0.1)
+#mv CMakeLists.txt CMakeLists.txt.bak &&
+#cat CMakeLists.txt.bak > CMakeLists.txt &&
+#echo "add_library(replxx_shared SHARED $(grep src/ CMakeLists.txt.bak))" >> CMakeLists.txt &&
+##echo "add_library(replxx_shared SHARED \${replxx-sources})" >> CMakeLists.txt &&
+#echo "set_target_properties(replxx_shared PROPERTIES OUTPUT_NAME replxx)" >> CMakeLists.txt &&
+#echo "target_include_directories(replxx_shared PUBLIC \${PROJECT_SOURCE_DIR}/include PRIVATE \${PROJECT_SOURCE_DIR}/src)" >> CMakeLists.txt &&
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+# strip *.dll &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# cp -f *.dll $INSTALLPREFIX/bin/ &&
+# cp -u *.a $INSTALLPREFIX/lib/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf replxx-release-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DREPLXX_BUILD_EXAMPLES:BOOL=OFF -DREPLXX_BUILD_PACKAGE:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DREPLXX_BUILD_EXAMPLES:BOOL=OFF -DREPLXX_BUILD_PACKAGE:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf replxx-release-$VERSION
+
+
+

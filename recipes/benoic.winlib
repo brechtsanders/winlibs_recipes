@@ -1,0 +1,69 @@
+export NAME="benoic"
+export STATUS=
+export URL=https://github.com/babelouest/benoic
+export BASENAME=benoic
+export DESCRIPTION="House automation device controller with REST/Json interface"
+export CATEGORY=hardware
+export TYPE=library,application
+#export VERSION=2.0
+#export VERSIONDATE=20180121
+export VERSION=2.1.0
+export VERSIONDATE=20180307
+wl-showstatus --package-version
+export DEPENDANCIES=yder,ulfius,hoel,libjansson,libdl,libconfig,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/babelouest/benoic/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/babelouest/benoic/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/select.h
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/sys/wait.h winfix/netinet/in.h winfix/arpa/inet.h
+# fix missing uint
+for F in benoic.h benoic-standalone.c device-modules/device-zwave.cpp; do
+ sed -i.bak -e "s/\buint\b/unsigned int/g" $F
+done
+# fix missing sleep()
+if ( gcc --version | grep -q MinGW-W64 ); then
+ for F in benoic.c benoic-standalone.c; do
+  mv $F $F.bak2 &&
+  #echo "#define sleep(t) _sleep((t) * 1000)" > $F &&
+  echo "#define sleep(s) Sleep((s) * 1000)" > $F &&
+  cat $F.bak2 >> $F
+ done
+fi
+# fix missing SIGQUIT/SIGHUP in benoic-standalone.c
+sed -i.bak3 -e "s/^.*\(SIGQUIT\|SIGHUP\).*$/#ifdef \1\n&\n#endif/" benoic-standalone.c
+# fix missing -lc in Makefile
+sed -e "s/ -lc / /" Makefile > Makefile.mingw
+wl-showstatus build &&
+ make -f Makefile.mingw CC="gcc -I$(pwd)/winfix -I$MINGWPREFIX/include/libdl-win32" &&
+ strip *.exe &&
+ ar cru libbenoic.a benoic.o &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libbenoic.a  | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > benoic.def &&
+ #gcc -shared -s -mwindows -def benoic.def -o benoic.dll libbenoic.a -Wl,--out-implib,libbenoic.dll.a -ljansson -lyder &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/benoic $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/etc $INSTALLPREFIX/share/benoic &&
+ cp -f benoic.h $INSTALLPREFIX/include/benoic/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ #cp -f *.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ cp -f docs/benoic.conf.sample $INSTALLPREFIX/etc/ &&
+ cp -f docs/*.sql docs/*.md $INSTALLPREFIX/share/benoic/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: benoic.dll
+
+
+

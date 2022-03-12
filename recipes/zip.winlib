@@ -1,0 +1,50 @@
+export NAME="Zip"
+export STATUS=
+export URL=http://www.info-zip.org/Zip.html
+export BASENAME=zip
+export DESCRIPTION="Zip is a compression and file packaging/archive utility. Although highly compatible both with PKWARE's PKZIP and PKUNZIP utilities for MS-DOS and with Info-ZIP's own UnZip, our primary objectives have been portability and other-than-MSDOS functionality."
+export CATEGORY=compression
+export TYPE=application
+export VERSION=3.0
+export VERSIONDATE=20101214
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="ftp://ftp.info-zip.org/pub/infozip/src/ zip"
+#export DOWNLOADURL="http://sourceforge.net/projects/infozip/files/Zip%203.x%20%28latest%29/3.0/"
+export DOWNLOADURL="http://sourceforge.net/projects/infozip/files/Zip%203.x%20%28latest%29/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.info-zip.org/pub/infozip/src/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tgz
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/infozip/Zip%20$(echo $VERSION|sed -e "s/\..*$//g").x%20%28latest%29/$VERSION/zip$(echo $VERSION|sed -e "s/\.//g").tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME`echo $VERSION|sed -e "s/\.//g"`.tgz
+tar xfz $TARBALLDIR/$BASENAME/zip$(echo $VERSION|sed -e "s/\.//g").tar.gz
+cd $BASENAME$(echo $VERSION|sed -e "s/\.//g")
+# fix redefinition of CR in zip.h
+mv zip.h zip.h.bak
+cat > zip.h << EOF
+#ifdef FORCE_WIN32_OVER_UNIX
+#define CR myCR
+#include <windows.h>
+#undef CR
+#endif
+EOF
+cat zip.h.bak >> zip.h
+wl-showstatus build &&
+if ( echo $RUNPLATFORM | grep -qv x86_64 ); then
+ make -f win32/makefile.gcc
+else
+ make -f win32/makefile.gcc NOASM=1 USEZLIB=1 LOCAL_ZIP="-DNO_UNICODE_SUPPORT -DMB_CUR_MAX=1 -DNOASM -DUSEZLIB"
+fi &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME$(echo $VERSION|sed -e "s/\.//g")
+
+
+

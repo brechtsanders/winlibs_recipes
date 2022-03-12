@@ -1,0 +1,170 @@
+export NAME="OpenPAM"
+export STATUS=
+#export URL=http://trac.des.no/openpam
+export URL=https://www.openpam.org/
+export BASENAME=openpam
+export DESCRIPTION="OpenPAM is an open source PAM library that focuses on simplicity, correctness, and cleanliness. Its aim is to gather the best features of Solaris PAM, XSSO and Linux-PAM, plus some innovations of its own. In areas where these implementations disagree, OpenPAM tries to remain compatible with Solaris, at the expense of XSSO conformance and Linux-PAM compatibility."
+export CATEGORY=security
+export TYPE=library
+## version name: Hydrangea
+#export VERSION=Hydrangea-20071221
+#export VERSIONDATE=20111019
+# version name: Tabebuia
+export VERSION=20190224
+export VERSIONDATE=20200503
+wl-showstatus --package-version
+export DEPENDANCIES=libdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="http://sourceforge.net/projects/openpam/files/openpam/"
+export DOWNLOADURL="https://www.openpam.org/downloads"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/openpam/openpam/Hydrangea/$BASENAME-20071221.tar.gz
+#export DOWNLOADSOURCEURL=https://www.openpam.org/downloads/38
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/openpam/openpam/Tabebuia/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/38 $TARBALLDIR/$BASENAME/openpam-20190224.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-20071221.tar.gz
+#mv $BASENAME-20071221 $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys
+cat > winfix/pwd.h << EOF
+#ifndef WINFIX_PWD_H_INCLUDED
+#define WINFIX_PWD_H_INCLUDED
+typedef int uid_t;
+#define geteuid() 0
+#define seteuid(u) -1
+struct passwd {
+ int pw_uid;
+ int pw_gid;
+ char *pw_name;
+// char* pw_passwd;
+// char *pw_dir;
+// char *pw_gecos;
+// char *pw_shell;
+};
+#endif
+EOF
+cat > winfix/grp.h << EOF
+#include "pwd.h"
+typedef int gid_t;
+#define NGROUPS_MAX 32
+#define getegid(g) 0
+#define setegid(g) -1
+#define getgroups(s,l) -1
+#define initgroups(u,g) -1
+EOF
+cat > winfix/syslog.h << EOF
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_NOTICE  5
+#define LOG_INFO    6
+#define LOG_DEBUG   7
+#define vsyslog(priority,format,ap)
+EOF
+# fix lib/libpam/openpam_ttyconv.c (version >= 20190224)
+patch -ulbf lib/libpam/openpam_ttyconv.c << EOF
+@@ -42,3 +42,5 @@
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <sys/poll.h>
++#endif
+ #include <sys/time.h>
+@@ -51,3 +53,36 @@
+ #include <string.h>
++#ifdef _WIN32
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
++#include <winsock2.h>
++#define poll(x,y,z) WSAPoll(x,y,z)
++#ifndef timeradd
++#define timeradd(a,b,result)                          \\
++  do {                                                \\
++    (result)->tv_sec = (a)->tv_sec + (b)->tv_sec;     \\
++    (result)->tv_usec = (a)->tv_usec + (b)->tv_usec;  \\
++    if ((result)->tv_usec >= 1000000)                 \\
++      {                                               \\
++        ++(result)->tv_sec;                           \\
++        (result)->tv_usec -= 1000000;                 \\
++      }                                               \\
++  } while (0)
++#endif
++
++#ifndef timersub
++#define timersub(a,b,result)                          \\
++  do {                                                \\
++    (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;     \\
++    (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;  \\
++    if ((result)->tv_usec < 0) {                      \\
++      --(result)->tv_sec;                             \\
++      (result)->tv_usec += 1000000;                   \\
++    }                                                 \\
++  } while (0)
++#endif
++#else
+ #include <termios.h>
++#endif
+ #include <unistd.h>
+@@ -72,3 +107,5 @@
+        case SIGINT:
++#ifdef SIGQUIT
+        case SIGQUIT:
++#endif
+        case SIGTERM:
+@@ -85,2 +122,3 @@
+ {
++#ifndef _WIN32
+        struct sigaction action;
+@@ -88,5 +126,8 @@
+        struct termios tcattr;
++#endif
+        struct timeval now, target, remaining;
+        int remaining_ms;
++#ifndef _WIN32
+        tcflag_t slflag;
++#endif
+        struct pollfd pfd;
+@@ -102,2 +143,3 @@
+
++#ifndef _WIN32
+        /* turn echo off if requested */
+@@ -138,2 +180,3 @@
+        }
++#endif
+
+@@ -184,2 +227,3 @@
+        /* restore tty state */
++#ifndef _WIN32
+        if (!echo) {
+@@ -204,2 +248,3 @@
+        }
++#endif
+
+EOF
+# fix missing gethostname in lib/libpam/pam_start.c (version >= 20190224)
+mv lib/libpam/pam_start.c lib/libpam/pam_start.c.bak &&
+echo "#include <winsock2.h>" > lib/libpam/pam_start.c &&
+cat lib/libpam/pam_start.c.bak >> lib/libpam/pam_start.c
+# fix issue with .exe extension in pkg-config.exe (version >= 20200503)
+sed -i.bak -e "s/\(\*pkg-config\))/\1\*)/" configure
+# fix lib/libpam/openpam_check_owner_perms.c
+mv lib/libpam/openpam_check_owner_perms.c lib/libpam/openpam_check_owner_perms.c.bak &&
+echo "#include <pwd.h>" > lib/libpam/openpam_check_owner_perms.c &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" >> lib/libpam/openpam_check_owner_perms.c &&
+cat lib/libpam/openpam_check_owner_perms.c.bak >> lib/libpam/openpam_check_owner_perms.c
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-system-libpam --without-pam-unix --without-su --without-pamtest PKG_CONFIG=$(which pkg-config.exe) CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

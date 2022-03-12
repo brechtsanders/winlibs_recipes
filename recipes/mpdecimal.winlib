@@ -1,0 +1,54 @@
+export NAME="mpdecimal"
+export STATUS=
+export URL=https://www.bytereef.org/mpdecimal/
+export BASENAME=mpdecimal
+export DESCRIPTION="mpdecimal is a package for correctly-rounded arbitrary precision decimal floating point arithmetic. Starting from version 2.4.0, mpdecimal includes only the libmpdec library. Further mpdecimal development will focus exclusively on libmpdec."
+export CATEGORY=math
+export TYPE=library
+#export VERSION=2.4.2
+#export VERSIONDATE=20200316
+#export VERSION=2.5.0
+#export VERSIONDATE=20200629
+export VERSION=2.5.1
+export VERSIONDATE=20210129
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=
+export DOWNLOADURL="https://www.bytereef.org/mpdecimal/download.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.bytereef.org/software/mpdecimal/releases/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix shared object name (version <= 2.4.2)
+#sed -i.bak -e "s/\(LIBSHARED\s*=\s*libmpdec\)\.so\.[0-9]*\.[0-9]*\.[0-9]*\s*$/\1.dll/" configure
+# don't create symbolic links
+sed -i.bak -e "s/ln -sf /cp -f /g" Makefile.in libmpdec/Makefile.in libmpdec++/Makefile.in
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-cxx &&
+ # fix exported symbols (version >= 2.5.0)
+ sed -i.bak -e "s/^\(LIBSHARED[^=]*\s*=\s*\)lib\([^. ]*\)\..*$/\1\2.dll/; s/ln -sf/echo &/" Makefile &&
+ sed -i.bak -e "s/^\(LIBSHARED[^=]*\s*=\s*\)lib\([^. ]*\)\..*$/\1\2.dll/; s/MPD_CFLAGS_SHARED\s*=\s*/&-DBUILD_DLL /; s/-Wl,-soname,\(lib[^. ]*\)\.[^ ]*/-s -mwindows -Wl,--out-implib,\1.dll.a/; s/ln -sf/#&/" libmpdec/Makefile &&
+ sed -i.bak -e "s/^\(LIBSHARED[^=]*\s*=\s*\)lib\([^. ]*\)\..*$/\1\2.dll/; s/MPD_CXXFLAGS_SHARED\s*=\s*/&-DUSE_DLL /; s/-Wl,-soname,\(lib[^. ]*\)\.[^ ]*/-s -mwindows -Wl,--out-implib,\1.dll.a/; s/ln -sf/#&/; s?\$(SHARED_OBJS) -lm?& ../libmpdec/libmpdec.dll.a?" libmpdec++/Makefile &&
+ # fix missing ../libmpdec/libmpdec.dll.apdec (version >= 2.5.1)
+ sed -i.bak -e "s/libmpdec\(\.dll\)\.apdec/mpdec\1/" libmpdec++/Makefile &&
+ wl-showstatus build &&
+ #make MPD_SOFLAGS="-shared -s -mwindows -Wl,--out-implib,libmpdec.dll.a" &&
+ make &&
+ wl-showstatus build-install &&
+ make install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin &&
+ rm -rf $INSTALLPREFIX/lib/libmpdec*.so* &&
+ cp -f */*.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,53 @@
+export NAME="cpuinfo"
+export STATUS=
+export URL=https://github.com/pytorch/cpuinfo
+export BASENAME=cpuinfo
+export DESCRIPTION="CPU INFOrmation library (x86/x86-64/ARM/ARM64, Linux/Windows/Android/macOS/iOS) - cpuinfo is a library to detect essential for performance optimization information about host CPU."
+export CATEGORY=hardware
+export TYPE=library,application
+export VERSION=master
+export VERSIONDATE=20210225
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/pytorch/cpuinfo/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/pytorch/cpuinfo/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix deps/clog/CMakeLists.txt (version >= master)
+patch -ulbf deps/clog/CMakeLists.txt << EOF
+@@ -53,3 +53,3 @@
+ # ---[ clog library
+-ADD_LIBRARY(clog STATIC src/clog.c)
++ADD_LIBRARY(clog src/clog.c)
+ SET_TARGET_PROPERTIES(clog PROPERTIES
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DINSTALL_GTEST:BOOL=OFF -DCPUINFO_BUILD_UNIT_TESTS:BOOL=OFF -DCPUINFO_BUILD_MOCK_TESTS:BOOL=OFF -DCPUINFO_BUILD_BENCHMARKS:BOOL=OFF -DCPUINFO_BUILD_MOCK_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINSTALL_GTEST:BOOL=OFF -DCPUINFO_BUILD_UNIT_TESTS:BOOL=OFF -DCPUINFO_BUILD_MOCK_TESTS:BOOL=OFF -DCPUINFO_BUILD_BENCHMARKS:BOOL=OFF -DCPUINFO_BUILD_MOCK_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/*.dll build_shared/deps/clog/*.dll &&
+ cp -f build_shared/*.dll build_shared/deps/clog/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

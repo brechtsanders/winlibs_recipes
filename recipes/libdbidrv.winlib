@@ -1,0 +1,196 @@
+#export NAME="libdbi-drivers"
+#export STATUS=
+#export URL=http://libdbi-drivers.sourceforge.net/
+#export BASENAME=libdbidrv
+#export DESCRIPTION="libdbi implements a database-independent abstraction layer in C, similar to the DBI/DBD layer in Perl. Writing one generic set of code, programmers can leverage the power of multiple databases and multiple simultaneous database connections by using this framework."
+#export CATEGORY=db
+#export TYPE=library
+#export VERSION=0.8.3-1
+#export VERSIONDATE=
+##export VERSION=0.9.0
+##export VERSIONDATE=20130312
+#wl-showstatus --package-version
+#export DEPENDANCIES=libdbi,pthreads,sqlite3,mysql,postgresql
+#export OPTIONALDEPENDANCIES=freetds,firebird
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=LGPL
+##export DOWNLOADURL="http://sourceforge.net/projects/libdbi-drivers/files/ libdbi-drivers-"
+#export DOWNLOADURL="http://sourceforge.net/projects/libdbi-drivers/files/libdbi-drivers/ libdbi-drivers-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/libdbi-drivers/libdbi-drivers-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/libdbi-drivers-$VERSION.tar.gz
+#cd libdbi-drivers-$VERSION
+## patch for Firebird2, see: http://www.mail-archive.com/libdbi-drivers-devel@lists.sourceforge.net/msg00058.html and fix for missing FB_ALIGN
+#mv drivers/firebird/dbd_firebird.c drivers/firebird/dbd_firebird.c.bak
+#echo "#define FB_ALIGN(n,b) ((n+1) & ~1)" > drivers/firebird/dbd_firebird.c
+#sed -e 's/\(#include <gds.h>\)/\/\/\1/' -e 's/TEXT errbuf/ISC_SCHAR errbuf/' drivers/firebird/dbd_firebird.c.bak >> drivers/firebird/dbd_firebird.c
+#mv drivers/firebird/utility.c drivers/firebird/utility.c.bak
+#sed -e 's/\(#include <gds.h>\)/\/\/\1/' drivers/firebird/utility.c.bak > drivers/firebird/utility.c
+#mv configure configure.bak
+#sed -e "s/-lfbembed/-lfbclient/" configure.bak > configure
+## patch for strptime in Oracle driver
+#mv drivers/oracle/dbd_oracle.c drivers/oracle/dbd_oracle.c.bak
+##sed -e "s/\(char *stime.*\)$/\/\* \1 \*\//; s/\(memset(stime\)/\/\* \1/; s/\(strptime.*\)$/\1 *\/ memset(\&tmt, 0, sizeof(tmt)); tmt.tm_sec = obuff[6]-1; tmt.tm_min = obuff[5]-1; tmt.tm_hour = obuff[4]-1; tmt.tm_mday = obuff[3]; tmt.tm_mon = obuff[2]; tmt.tm_year = (obuff[0]-100)*100 + (obuff[1]-100); /" drivers/oracle/dbd_oracle.c.bak > drivers/oracle/dbd_oracle.c
+#sed -e "s/\(loct =\)/time_t \1/" drivers/oracle/dbd_oracle.c.bak > drivers/oracle/dbd_oracle.c
+## patch for _dbi_internal_error_handler in sqlite3
+#mv drivers/sqlite3/dbd_sqlite3.c drivers/sqlite3/dbd_sqlite3.c.bak
+#sed -e "s/_dbi_internal_error_handler/_dbd_internal_error_handler/" drivers/sqlite3/dbd_sqlite3.c.bak > drivers/sqlite3/dbd_sqlite3.c
+## fix for missing /usr/local/lib/libtds.so
+#ln -s $MINGWPREFIX/bin/libsybdb-5.dll $MINGWPREFIX/lib/libtds.so
+#wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# #aclocal --force -I $MINGWPREFIX/share/aclocal &&
+# #libtoolize --force -i -c &&
+# #autoconf --force
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi &&
+## fix for building .DLL files
+##mv configure.in configure.in.bak
+##echo "AC_LIBTOOL_WIN32_DLL" > configure.in
+##cat configure.in.bak >> configure.in
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-docs --with-dbi-incdir=$MINGWPREFIX/include \
+##  --with-sqlite3 --with-sqlite3-dir=$MINGWPREFIX \
+##  --with-mysql --with-mysql-dir=$MINGWPREFIX \
+##  --with-pgsql --with-pgsql-dir=$MINGWPREFIX \
+##  --with-freetds --with-freetds-dir=$MINGWPREFIX \
+##  --with-firebird --with-firebird-incdir=$MINGWPREFIX/include --with-firebird-libdir=$MINGWPREFIX/lib \
+##  --with-oracle --with-oracle-incdir=$MINGWPREFIX/include/oracle --with-oracle-libdir=$MINGWPREFIX/lib \
+##  CPPFLAGS="-D_POSIX_PATH_MAX=256 -DSOCKET=int -I$MINGWPREFIX/include/oracle" LDFLAGS="-no-undefined -ldbi"
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-docs \
+#  --with-dbi-libdir=$MINGWPREFIX/lib --with-dbi-incdir=$MINGWPREFIX/include \
+#  --with-sqlite3 --with-sqlite3-dir=$MINGWPREFIX \
+#  --with-mysql --with-mysql-dir=$MINGWPREFIX \
+#  --with-pgsql --with-pgsql-dir=$MINGWPREFIX \
+#  --with-freetds --with-freetds-dir=$MINGWPREFIX \
+#  --with-firebird --with-firebird-incdir=$MINGWPREFIX/include --with-firebird-libdir=$MINGWPREFIX/lib \
+#  CPPFLAGS="-D_POSIX_PATH_MAX=256 -I$MINGWPREFIX/include/oracle" LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -ldbi -Wl,-no-undefined" &&
+#  #--with-oracle --with-oracle-incdir=$MINGWPREFIX/include/oracle --with-oracle-libdir=$MINGWPREFIX/lib \
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+#rm $MINGWPREFIX/lib/libtds.so
+## fix firebird library
+#mv drivers/firebird/Makefile drivers/firebird/Makefile.bak
+#sed -e "s/-lfbembed/-lfbclient/" drivers/firebird/Makefile.bak > drivers/firebird/Makefile
+#wl-showstatus build-install &&
+#make install-strip &&
+##mv tests/test_dbi.c tests/test_dbi.c.bak
+##echo "#define sleep(t) _sleep((t) * 1000)" > tests/test_dbi.c
+##cat tests/test_dbi.c.bak >> tests/test_dbi.c
+###make -C tests test_dbi.exe
+###tests/test_dbi.exe
+##make check
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libdbi-drivers-$VERSION
+
+
+
+export NAME="libdbi-drivers"
+export STATUS=
+export URL=http://libdbi-drivers.sourceforge.net/
+export BASENAME=libdbidrv
+export DESCRIPTION="libdbi implements a database-independent abstraction layer in C, similar to the DBI/DBD layer in Perl. Writing one generic set of code, programmers can leverage the power of multiple databases and multiple simultaneous database connections by using this framework."
+export CATEGORY=db
+export TYPE=library
+export VERSION=0.9.0
+export VERSIONDATE=20130312
+wl-showstatus --package-version
+export DEPENDANCIES=libdbi,pthreads,sqlite3,freetds,mariadb-client,postgresql
+export OPTIONALDEPENDANCIES=firebird
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/libdbi-drivers/files/libdbi-drivers/ libdbi-drivers-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/libdbi-drivers/libdbi-drivers-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/libdbi-drivers-$VERSION.tar.gz
+cd libdbi-drivers-$VERSION
+# fix missing bzero in drivers/firebird/utility.c (version >= 0.9.0)
+mv drivers/firebird/utility.c drivers/firebird/utility.c.bak
+sed -e "s/bzero\(([^,]*\),/memset\1, 0,/" drivers/firebird/utility.c.bak > drivers/firebird/utility.c
+## fix missing bzero in drivers/freetds/dbd_freetds.c (version >= 0.9.0)
+#mv drivers/freetds/dbd_freetds.c drivers/freetds/dbd_freetds.c.bak
+#sed -e "s/bzero\(([^,]*\),/memset\1, 0,/" drivers/freetds/dbd_freetds.c.bak > drivers/freetds/dbd_freetds.c
+# fix missing bzero and CS_TDS_80 in drivers/freetds/dbd_freetds.c (version >= 0.9.0)
+patch -ulbf drivers/freetds/dbd_freetds.c << EOF
+--- drivers/freetds/dbd_freetds.c  2013-01-09 22:21:11.000000000 +0100
++++ drivers/freetds/dbd_freetds.c  2017-05-13 11:13:19.058605500 +0200
+@@ -235,3 +235,7 @@
+        case '8':
++#ifdef CS_TDS_80
+            num = CS_TDS_80;
++#else
++           num = CS_TDS_74;
++#endif
+            break;
+@@ -1077,3 +1081,3 @@
+            /* Prepare union to data copy */
+-           bzero((addr = &row->field_values[idx]), sizeof(dbi_data_t));
++           memset((addr = &row->field_values[idx]), 0, sizeof(dbi_data_t));
+        }
+EOF
+# fix drivers/sqlite3/dbd_sqlite3.c (version >= 0.9.0)
+patch -ulbf drivers/sqlite3/dbd_sqlite3.c << EOF
+--- drivers/sqlite3/dbd_sqlite3.c  2013-01-23 00:29:14 +0100
++++ drivers/sqlite3/dbd_sqlite3.c  2013-04-20 23:07:52 +0200
+@@ -377,6 +377,10 @@
+   int retval;
++#ifndef __MINGW32__
+   size_t entry_size;
++#endif
+   DIR *dp;
+   struct dirent *entry;
++#ifndef __MINGW32__
+   struct dirent *result;
++#endif
+   struct stat statbuf;
+@@ -407,2 +411,3 @@
+
++#ifndef __MINGW32__
+   /* allocate memory for readdir_r(3) */
+@@ -419,2 +424,3 @@
+   memset (entry, 0, entry_size);
++#endif
+
+@@ -424,2 +430,3 @@
+   while (1) {
++#ifndef __MINGW32__
+     result = NULL;
+@@ -429,2 +436,8 @@
+     }
++#else
++    entry = readdir(dp);
++    if (entry == NULL) {
++      break;
++    }
++#endif
+
+EOF
+# fix missing strtok_r in drivers/sqlite3/dbd_sqlite3.c (version >= 0.9.0)
+mv drivers/sqlite3/dbd_sqlite3.c drivers/sqlite3/dbd_sqlite3.c.bak
+echo "#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))" > drivers/sqlite3/dbd_sqlite3.c
+cat drivers/sqlite3/dbd_sqlite3.c.bak >> drivers/sqlite3/dbd_sqlite3.c
+# skip making tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+# --with-firebird \
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-docs --with-dbi-incdir=$MINGWPREFIX/include/dbi --with-dbi-libdir=$MINGWPREFIX/lib --with-pgsql --with-sqlite3 --with-freetds &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-docs --with-dbi-incdir=$MINGWPREFIX/include/dbi --with-dbi-libdir=$MINGWPREFIX/lib --with-pgsql --with-sqlite3 --with-freetds --with-mysql --with-mysql-incdir=$MINGWPREFIX/include/mariadb &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libdbi-drivers-$VERSION
+
+
+

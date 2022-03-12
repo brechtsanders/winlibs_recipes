@@ -1,0 +1,64 @@
+export NAME="bx"
+export STATUS=
+export URL=https://github.com/bkaradzic/bx
+export BASENAME=bx
+export DESCRIPTION="Base library used across multiple projects"
+export CATEGORY=portability
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20170608
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=genie
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/bkaradzic/bx/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/bkaradzic/bx/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# remove missing alloca.h from include/bx/bx.h
+sed -i.bak -e "s?^#include <alloca\.h>?#include <malloc.h>?" include/bx/bx.h
+# fix makefile
+patch -ulbf makefile << EOF
+@@ -8,16 +8,3 @@
+ all:
+-       \$(GENIE)                       vs2017
+-       \$(GENIE)                       vs2019
+-       \$(GENIE) --gcc=android-arm     gmake
+-       \$(GENIE) --gcc=android-arm64   gmake
+-       \$(GENIE) --gcc=android-x86     gmake
+        \$(GENIE) --gcc=mingw-gcc       gmake
+-       \$(GENIE) --gcc=linux-gcc       gmake
+-       \$(GENIE) --gcc=haiku           gmake
+-       \$(GENIE) --gcc=osx-x64         gmake
+-       \$(GENIE) --gcc=osx-arm64       gmake
+-       \$(GENIE) --gcc=ios-arm         gmake
+-       \$(GENIE) --gcc=ios-simulator   gmake
+-       \$(GENIE) --gcc=ios-simulator64 gmake
+-       \$(GENIE)                       xcode8
+
+EOF
+wl-showstatus configure &&
+ #make OS=windows GENIE=tools/bin/windows/genie &&
+ make OS=windows GENIE=$(which genie.exe) &&
+ wl-showstatus build &&
+ #make mingw-gcc-release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CC=gcc CXX=g++ &&
+ make mingw-gcc-release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CC=gcc CXX=g++ MINGW=$(dirname $(dirname $(which ar.exe))) &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include/bx &&
+ cp -f .build/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)_mingw-gcc/bin/*.a $INSTALLPREFIX/lib/ &&
+ cp -rf include/bx/* $INSTALLPREFIX/include/bx/ &&
+ cp -rf scripts $INSTALLPREFIX/include/bx/ &&
+ rm -f $INSTALLPREFIX/include/bx/*.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

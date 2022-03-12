@@ -1,0 +1,104 @@
+export NAME="Multifast"
+export STATUS=
+export URL=http://multifast.sourceforge.net/
+export BASENAME=multifast
+export DESCRIPTION="Multifast is an open-source software that provides you with efficient library and tool, to search and manipulate data streams on the fly. It can search for a huge number of strings and replace them in one pass. It contains a tidy and efficient implementation of the Aho-Corasick algorithm as a C library."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=2.0.0
+export VERSIONDATE=20180825
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://sourceforge.net/projects/multifast/files/ multifast-v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/multifast/multifast-v$VERSION/multifast-v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/multifast-v$VERSION.tar.gz
+cd multifast-v$VERSION
+# fix multifast/multifast.c
+patch -ulbf multifast/multifast.c << EOF
+@@ -33,2 +33,5 @@
+ #include "multifast.h"
++#ifdef _WIN32
++#define rindex(haystack,needle) strrchr(haystack,needle)
++#endif
+
+@@ -145,3 +148,3 @@
+     if(config.verbosity)
+-        printf("Total Patterns: %lu\\n", trie->patterns_count);
++        printf("Total Patterns: %lu\\n", (unsigned long)trie->patterns_count);
+
+@@ -165,3 +168,3 @@
+             if (config.verbosity)
+-                printf("Searching %ld files\\n", config.input_files_num);
++                printf("Searching %ld files\\n", (long)config.input_files_num);
+
+@@ -219,3 +222,7 @@
+     }
++#ifdef _WIN32
++    else if ((fd_input = open(filename, O_RDONLY)) == -1)
++#else
+     else if ((fd_input = open(filename, O_RDONLY|O_NONBLOCK)) == -1)
++#endif
+     {
+@@ -284,3 +291,7 @@
+     }
++#ifdef _WIN32
++    else if ((fd_input = open(infile, O_RDONLY)) == -1)
++#else
+     else if ((fd_input = open(infile, O_RDONLY|O_NONBLOCK)) == -1)
++#endif
+     {
+@@ -401,3 +412,7 @@
+         /* Create folder from path to '\\0' inserted at p */
++#ifdef _WIN32
++        if(mkdir(path) == -1 && errno != EEXIST)
++#else
+         if(mkdir(path, mode) == -1 && errno != EEXIST)
++#endif
+         {
+@@ -427,3 +442,7 @@
+
++#ifdef _WIN32
++    _mode_t md = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH; /* Default mode */
++#else
+     __mode_t md = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH; /* Default mode */
++#endif
+
+@@ -515,6 +534,6 @@
+         if (config.output_show_item)
+-            printf("#%ld ", ++mparm->item);
++            printf("#%ld ", (long)++mparm->item);
+
+         if (config.output_show_dpos)
+-            printf("@%ld ", m->position - m->patterns[j].ptext.length + 1);
++            printf("@%ld ", (long)(m->position - m->patterns[j].ptext.length + 1));
+
+EOF
+#
+sed -i.bak -e "s/\(#include \)\"\(.*\)\"/\1<ahocorasick\/\2>/" $(grep -l 'include "' ahocorasick/*.h)
+wl-showstatus build &&
+ make -Cahocorasick COMPILER="gcc -I$(pwd)" &&
+ make -Cmultifast COMPILER="gcc -I$(pwd)" &&
+ strip multifast/build/*.exe &&
+ # manually build DLL
+ ( echo EXPORTS && gcc -E ahocorasick/ahocorasick.h|sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(ac_trie_\|multifast_\)\(.*\)$/\1\2/p" ) > ahocorasick.def &&
+ gcc -shared -s -mwindows -def ahocorasick.def -o ahocorasick/build/ahocorasick.dll ahocorasick/build/libahocorasick.a -Wl,--out-implib,ahocorasick/build/libahocorasick.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/ahocorasick $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f ahocorasick/*.h $INSTALLPREFIX/include/ahocorasick/ &&
+ cp -f ahocorasick/build/*.a $INSTALLPREFIX/lib/ &&
+ cp -f ahocorasick/build/*.dll multifast/build/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf multifast-v$VERSION
+####TO DO: check if DLL version actually works
+####TO DO: link multifast.exe against shared (DLL) library
+
+
+

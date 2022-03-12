@@ -1,0 +1,196 @@
+export NAME="babeltrace"
+export STATUS=
+export URL=https://diamon.org/babeltrace/
+#export URL=https://github.com/efficios/babeltrace
+export BASENAME=babeltrace
+export DESCRIPTION="Babeltrace - an open-source trace manipulation framework"
+export CATEGORY=debugging
+export TYPE=library
+#export VERSION=1.5.7
+#export VERSIONDATE=20191122
+export VERSION=1.5.8
+export VERSIONDATE=20210913
+wl-showstatus --package-version
+#export DEPENDANCIES=pthreads,glib2,libiconv,gettext,popt,pcre,libuuid,mman-win32
+export DEPENDANCIES=pthreads,glib2,libiconv,gettext,popt,pcre,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=asciidoc,xmlto
+export LICENSEFILE=COPYING
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT/BSD/LGPL/GPL
+#export DOWNLOADURL="https://github.com/efficios/babeltrace/releases"
+export DOWNLOADURL="https://www.efficios.com/files/babeltrace/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/efficios/babeltrace/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://www.efficios.com/files/babeltrace/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# force disabling Python
+sed -i.bak -e "s/\(enable_python=\)yes/\1no/" configure.ac
+patch -ulbf configure.ac << EOF
+@@ -239 +239 @@
+-AM_CONDITIONAL([USE_PYTHON], [test "x\${enable_python:-yes}" = xyes])
++AM_CONDITIONAL([USE_PYTHON], [test "x\${enable_python:-yesDISABLE}" = xyes])
+EOF
+# don't replace libuuid
+mv compat/compat_uuid.c compat/compat_uuid.c.bak &&
+touch compat/compat_uuid.c
+mv include/babeltrace/compat/uuid.h include/babeltrace/compat/uuid.h.bak &&
+grep "#define BABELTRACE_UUID_" include/babeltrace/compat/uuid.h.bak > include/babeltrace/compat/uuid.h &&
+echo "#define bt_uuid_parse uuid_parse" >> include/babeltrace/compat/uuid.h
+echo "#define bt_uuid_compare uuid_compare" >> include/babeltrace/compat/uuid.h
+# fix compat/compat_uuid.c
+patch -ulbf compat/compat_uuid.c << EOF
+@@ -45,4 +45,4 @@
+-       swap(ptr, 0, 3)
+-       swap(ptr, 1, 2)
+-       swap(ptr, 4, 5)
+-       swap(ptr, 6, 7)
++       swap(ptr, 0, 3);
++       swap(ptr, 1, 2);
++       swap(ptr, 4, 5);
++       swap(ptr, 6, 7);
+EOF
+# fix missing sysconf(_SC_PAGE_SIZE) in include/babeltrace/align.h
+patch -ulbf include/babeltrace/align.h << EOF
+@@ -32,4 +32,19 @@
+ #ifndef PAGE_SIZE              /* Cygwin limits.h defines its own PAGE_SIZE */
++#ifdef __MINGW32__
++#define UUID WIN32_UUID
++#define uuid_t WIN32_uuid_t
++#include <windows.h>
++#undef UUID
++#undef uuid_t
++static inline DWORD win_get_pagesize ()
++{
++  SYSTEM_INFO sysinfo;
++  GetSystemInfo(&sysinfo);
++  return sysinfo.dwPageSize;
++}
++#define PAGE_SIZE              win_get_pagesize()
++#else
+ #define PAGE_SIZE              sysconf(_SC_PAGE_SIZE)
+ #endif
++#endif
+
+EOF
+# fix missing _PC_NAME_MAX in formats/ctf/ctf.c
+mv formats/ctf/ctf.c formats/ctf/ctf.c.bak
+cat > formats/ctf/ctf.c << EOF
+#ifdef __MINGW32__
+#define _PC_NAME_MAX 128
+#endif
+EOF
+cat formats/ctf/ctf.c.bak >> formats/ctf/ctf.c
+# fix missing files
+mkdir -p winfix/sys winfix/netinet
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+#touch winfix/netinet/in.h winfix/netdb.h
+# fix converter/babeltrace.c (version >= 1.5.8)
+patch -ulbf converter/babeltrace.c << EOF
+@@ -478,3 +478,6 @@
+ {
+-       int dirfd, metafd;
++#ifndef _WIN32
++       int dirfd;
++#endif
++       int metafd;
+        int closeret;
+@@ -484,2 +487,12 @@
+
++#ifdef _WIN32
++       char* metafilepath;
++       size_t fpathlen = strlen(fpath);
++       if ((metafilepath = (char*)malloc(fpathlen + 10)) == NULL)
++               return -1;
++       memcpy(metafilepath, fpath, fpathlen);
++       strcpy(metafilepath + fpathlen, "\\\\metadata");
++       metafd = open(metafilepath, O_RDONLY);
++       free(metafilepath);
++#else
+        dirfd = open(fpath, 0);
+@@ -491,3 +504,5 @@
+        metafd = openat(dirfd, "metadata", O_RDONLY);
++#endif
+        if (metafd < 0) {
++#ifndef _WIN32
+                closeret = close(dirfd);
+@@ -497,2 +512,3 @@
+                }
++#endif
+                /* No meta data, just return */
+@@ -507,2 +523,3 @@
+                }
++#ifndef _WIN32
+                closeret = close(dirfd);
+@@ -512,2 +529,3 @@
+                }
++#endif
+                if (err_close) {
+EOF
+# fix formats/lttng-live/lttng-live-comm.c (version >= 1.5.8)
+patch -ulbf formats/lttng-live/lttng-live-comm.c << EOF
+@@ -23,6 +23,16 @@
+
+-#include <sys/socket.h>
+ #include <sys/types.h>
++#ifdef _WIN32
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
++#include <winsock2.h>
++#define poll(x,y,z) WSAPoll(x,y,z)
++#else
++#include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <netdb.h>
++#include <poll.h>
++#endif
+ #include <stdio.h>
+@@ -33,3 +43,2 @@
+ #include <fcntl.h>
+-#include <poll.h>
+
+EOF
+# fix include/babeltrace/endian.h (version >= 1.5.8)
+patch -ulbf include/babeltrace/endian.h << EOF
+@@ -68,2 +68,4 @@
+ #elif defined(__MINGW32__)
++#define be32toh(x) ntohl(x)
++#define be64toh(x) ((1==ntohl(1)) ? (x) : (((uint64_t)ntohl((x) & 0xFFFFFFFFUL)) << 32) | ntohl((uint32_t)((x) >> 32)))
+ #ifndef __BIG_ENDIAN
+EOF
+# skip building doc
+cat > doc/Makefile.am << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-debug-info --disable-glibtest --disable-python --disable-python-bindings PYTHON=$PYDIR/python.exe CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lrpcrt4 -lmman" &&
+ #echo "#undef BABELTRACE_HAVE_LIBUUID" >> config.h &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-debug-info --disable-glibtest --disable-python --disable-python-bindings PYTHON=$PYDIR/python.exe CFLAGS="-I$MINGWPREFIX/include/portable-uuid -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lportable-uuid -lmman -lrpcrt4" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-debug-info --disable-glibtest --disable-python --disable-python-bindings PYTHON=$PYDIR/python.exe UUID_CFLAGS="-I$MINGWPREFIX/include/portable-uuid" UUID_LIBS="-Wl,--as-needed -lportable-uuid " CFLAGS="-I$MINGWPREFIX/include/mman-win32 -I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lmman -lws2_32 -lrpcrt4" &&
+ echo "#define HAVE_MMAP 1" >> config.h &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build &&
+ #make &&
+ # fix redefinitions of Windows definitions in formats/ctf/metadata/ctf-parser.h
+ (( make || make -Cformats/ctf/metadata || sed -i.bak -e "s/^\s*\([A-Z_]*\) = /#undef \1\n#define \1 babeltrace\1\n&/; s/^\(#define\s*\)\([A-Z_]*\)/\1babeltrace\2/" formats/ctf/metadata/ctf-parser.h ) && ( make -Cformats/ctf/metadata || make -j1) ) &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( PATH=$PYDIR:$PATH make install-strip || PATH=$PYDIR:$PATH make -j1 install-strip ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

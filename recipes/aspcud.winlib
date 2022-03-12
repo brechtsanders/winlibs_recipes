@@ -1,0 +1,45 @@
+export NAME="Aspcud"
+export STATUS=
+export URL=https://potassco.org/aspcud/
+#export URL=https://github.com/potassco/aspcud
+export BASENAME=aspcud
+export DESCRIPTION="A solver for package problems in CUDF format using ASP"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=1.9.5
+export VERSIONDATE=20210324
+wl-showstatus --package-version
+export DEPENDANCIES=boost,re2c
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/potassco/aspcud/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/potassco/aspcud/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix to also allow building shared library
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" libcudf/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DASPCUD_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DASPCUD_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/bin/*.dll &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib &&
+ cp -rf libcudf/cudf $INSTALLPREFIX/include/ &&
+ cp -f build_static/lib/*.a build_shared/lib/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/bin/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

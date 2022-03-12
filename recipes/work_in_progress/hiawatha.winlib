@@ -1,0 +1,88 @@
+export NAME="Hiawatha"
+export STATUS=
+export URL=https://www.hiawatha-webserver.org/
+export BASENAME=hiawatha
+export DESCRIPTION="An advanced and secure webserver for Unix"
+export CATEGORY=
+export TYPE=application
+#export VERSION=10.2
+#export VERSIONDATE=20160518
+#export VERSION=10.3
+#export VERSIONDATE=20160605
+#export VERSION=10.4
+#export VERSIONDATE=20161006
+#export VERSION=10.5
+#export VERSIONDATE=20170127
+#export VERSION=10.6
+#export VERSIONDATE=20170417
+#export VERSION=10.7
+#export VERSIONDATE=20171017
+#export VERSION=10.8
+#export VERSIONDATE=20180322
+#export VERSION=10.8.1
+#export VERSIONDATE=20180411
+#export VERSION=10.8.2
+#export VERSIONDATE=20180728
+#export VERSION=10.8.3
+#export VERSIONDATE=20180916
+#export VERSION=10.8.4
+#export VERSIONDATE=20190213
+#export VERSION=10.9
+#export VERSIONDATE=20190219
+#export VERSION=10.10
+#export VERSIONDATE=20190920
+#export VERSION=10.11
+#export VERSIONDATE=20200709
+#export VERSION=10.12
+#export VERSIONDATE=20210326
+#export VERSION=11.0
+#export VERSIONDATE=20210723
+export VERSION=11.1
+export VERSIONDATE=20211224
+####src/cgi-wrapper.c:20:17: fatal error: pwd.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,mbedtls,libxslt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://www.hiawatha-webserver.org/download"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.hiawatha-webserver.org/files/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix mising sys/socket.h in src/ip.c
+mv src/ip.c src/ip.c.bak &&
+sed -e "s?sys/socket\.h?winsock2.h?; s?.*netdb\.h?//&?" src/ip.c.bak > src/ip.c
+# fix mising sys/socket.h in src/ip.h
+mv src/ip.h src/ip.h.bak &&
+sed -e "s?sys/socket\.h?winsock2.h?" src/ip.h.bak > src/ip.h
+# fix src/serverconfig.h
+patch -ulbf src/serverconfig.h << EOF
+@@ -17,3 +17,8 @@
+ #include <pthread.h>
++#ifdef _WIN32
++#include <windows.h>
++#define interface iface
++#else
+ #include <poll.h>
++#endif
+ #include <regex.h>
+EOF
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLINK_WITH_PTHREAD:BOOL=ON -DENABLE_ZLIB_SUPPORT:BOOL=ON -DENABLE_XSLT:BOOL=ON -DENABLE_TLS:BOOL=ON -DENABLE_IPV6:BOOL=OFF -DUSE_SHARED_MBEDTLS_LIBRARY:BOOL=ON -DUSE_STATIC_MBEDTLS_LIBRARY:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$(pwd)/winfix" -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

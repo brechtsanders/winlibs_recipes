@@ -1,0 +1,180 @@
+#export NAME="CFITSIO"
+#export STATUS=
+#export URL=http://heasarc.gsfc.nasa.gov/fitsio/
+#export BASENAME=cfitsio
+#export DESCRIPTION="CFITSIO is a library of C and Fortran subroutines for reading and writing data files in FITS (Flexible Image Transport System) data format. CFITSIO provides simple high-level routines for reading and writing FITS files that insulate the programmer from the internal complexities of the FITS format. CFITSIO also provides many advanced features for manipulating and filtering the information in FITS files."
+#export CATEGORY=fileformat
+#export TYPE=library
+##export VERSION=3.350
+##export VERSIONDATE=20131115
+##export VERSION=3.360
+##export VERSIONDATE=20131207
+##export VERSION=3.370
+##export VERSIONDATE=20140611
+##export VERSION=3.380
+##export VERSIONDATE=20160209
+##export VERSION=3.390
+##export VERSIONDATE=20160428
+##export VERSION=3.400
+##export VERSIONDATE=20161122
+##export VERSION=3.410
+##export VERSIONDATE=20161203
+##export DEPENDANCIES=
+##export OPTIONALDEPENDANCIES=
+##export BUILDDEPENDANCIES=
+##export VERSION=3.420
+##export VERSIONDATE=20170921
+#####fitsio.h:214:22: error: expected identifier or '(' before numeric constant
+##export VERSION=3.430
+##export VERSIONDATE=20180303
+##export VERSION=3.440
+##export VERSIONDATE=20180413
+#export VERSION=3.450
+#export VERSIONDATE=20180511
+#wl-showstatus --package-version
+#export DEPENDANCIES=libcurl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+#export LICENSEFILE=License.txt
+#export LICENSETYPE=
+##export DOWNLOADURL="http://heasarc.gsfc.nasa.gov/fitsio/ cfitsio .tar.gz"
+##export DOWNLOADURL="ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/ cfitsio .tar.gz"
+#export DOWNLOADURL="https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/ cfitsio .tar.gz"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tar.gz
+#export DOWNLOADSOURCEURL=https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME$(echo $VERSION|sed -e "s/\.//g").tar.gz -C$BASENAME-$VERSION
+#cd $BASENAME-$VERSION/cfitsio
+## fix windumpexts.c
+#patch -ulbf windumpexts.c << EOF
+#--- windumpexts.c  2003-05-20 19:48:16 +0200
+#+++ windumpexts.c  2013-11-15 23:19:36 +0100
+#@@ -301,3 +301,3 @@
+#     (*ppBuffer)++;             /* Skip over the type.*/
+#-    length = *((WORD*)(*ppBuffer))++; /* Retrieve the length. */
+#+    length = *((WORD*)(*ppBuffer++)); /* Retrieve the length. */
+#     *ppBuffer += length;       /* Skip over the rest. */
+#@@ -321,3 +321,3 @@
+#     while (1) {
+#-       type = SkipToNextRecord(&(BYTE*)pBuffer);
+#+       type = SkipToNextRecord((BYTE**)&pBuffer);
+#        if (type == 0x90) {     /* PUBDEF */
+#EOF
+## fix already defined TBYTE in fitsio.h (version >= 3.420)
+#mv fitsio.h fitsio.h.bak
+#cat > fitsio.h << EOF
+##ifndef _FITSIO_H
+##undef TBYTE
+##define TBYTE stdio
+##include <tchar.h>
+##undef TBYTE
+##endif
+#EOF
+#cat fitsio.h.bak >> fitsio.h
+#### fix missing netinet/in.h in drvrnet.c (version >= 3.430)
+###patch -ulbf drvrnet.c << EOF
+###@@ -163,2 +163,5 @@
+### #include <sys/types.h>
+###+#ifdef _WIN32
+###+#include <winsock2.h>
+###+#else
+### #include <netinet/in.h>
+###@@ -168,2 +171,3 @@
+### #include <netdb.h>
+###+#endif
+### #include <errno.h>
+###EOF
+##wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+## wl-showstatus build &&
+## gcc -o windumpexts.exe windumpexts.c &&
+## windumpexts -o cfitsio1.def cfitsio.dll $(sed -n 's/^.*"$(INTDIR)\\\(.*\)\.obj" *\\$/\1.o/p' makefile.vcc) &&
+## grep -v "^\(EXETYPE\|CODE\|DATA\)" cfitsio1.def | tr '\t' " " | sed -e "s/^ *_/        /" > cfitsio.def &&
+## wl-showstatus build-install &&
+## make install &&
+## dlltool -d cfitsio.def -D cfitsio.dll -l $INSTALLPREFIX/lib/libcfitsio.dll.a libcfitsio.a &&
+## mkdir -p $INSTALLPREFIX/bin &&
+## gcc -shared -s -mwindows -def cfitsio.def -o $INSTALLPREFIX/bin/cfitsio.dll libcfitsio.a && 
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_PTHREADS:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_PTHREADS:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: -DUSE_PTHREADS:BOOL=ON
+
+
+
+export NAME="CFITSIO"
+export STATUS=
+export URL=http://heasarc.gsfc.nasa.gov/fitsio/
+export BASENAME=cfitsio
+export DESCRIPTION="CFITSIO is a library of C and Fortran subroutines for reading and writing data files in FITS (Flexible Image Transport System) data format. CFITSIO provides simple high-level routines for reading and writing FITS files that insulate the programmer from the internal complexities of the FITS format. CFITSIO also provides many advanced features for manipulating and filtering the information in FITS files."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=3.49
+#export VERSIONDATE=20201014
+export VERSION=4.0.0
+export VERSIONDATE=20210721
+wl-showstatus --package-version
+export DEPENDANCIES=libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=License.txt
+export LICENSETYPE=
+#export DOWNLOADURL="http://heasarc.gsfc.nasa.gov/fitsio/ cfitsio .tar.gz"
+export DOWNLOADURL="https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix already defined TBYTE in fitsio.h (version >= 3.420)
+mv fitsio.h fitsio.h.bak
+cat > fitsio.h << EOF
+#ifndef _FITSIO_H
+#undef TBYTE
+#define TBYTE stdio
+#include <tchar.h>
+#undef TBYTE
+#endif
+EOF
+cat fitsio.h.bak >> fitsio.h
+# fix type conversion issue in group.c (version >= 3.49)
+sed -i.bak -e "s/(long)tmp/tmp/g" group.c
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_PTHREADS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_PTHREADS:BOOL=OFF -S. -Bbuild_shared &&
+ # fix undefined reference to __imp_curl_global_init/__imp_curl_global_cleanup (version >= 3.49)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lcurl/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: -DUSE_PTHREADS:BOOL=ON
+
+
+

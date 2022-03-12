@@ -1,0 +1,124 @@
+export NAME="libtirpc"
+export STATUS=
+#export URL=http://libtirpc.sourceforge.net
+export URL=https://sourceforge.net/projects/libtirpc/
+export BASENAME=libtirpc
+export DESCRIPTION="Libtirpc is a port of Suns Transport-Independent RPC library to Linux. It's being developed by the Bull GNU/Linux NFSv4 project."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.0.1
+#export VERSIONDATE=20161124
+#export VERSION=1.0.2
+#export VERSIONDATE=20170706
+#export VERSION=1.0.3
+#export VERSIONDATE=20180314
+#export VERSION=1.1.4
+#export VERSIONDATE=20180828
+#export VERSION=1.2.5
+#export VERSIONDATE=20191221
+#export VERSION=1.2.6
+#export VERSIONDATE=20200410
+#export VERSION=1.3.1
+#export VERSIONDATE=20201202
+export VERSION=1.3.2
+export VERSIONDATE=20210511
+####src/auth_unix.c:46:17: fatal error: err.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://sourceforge.net/projects/libtirpc/files/libtirpc/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/libtirpc/libtirpc/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing types in src/auth_none.c
+mv src/auth_none.c src/auth_none.c.bak
+cat > src/auth_none.c << EOF
+#include <stdint.h>
+#define u_int32_t uint32_t
+#define __u_char unsigned char
+#define __u_short unsigned short
+#define __u_int unsigned int
+#define __u_long unsigned long
+#define __quad_t int64_t
+#define __u_quad_t uint64_t
+EOF
+cat src/auth_none.c.bak >> src/auth_none.c
+# fix missing files
+mkdir -p winfix/sys/ winfix/netinet winfix/arpa
+#echo "#include <winsock2.h>" winfix/sys/socket.h
+cat > winfix/sys/socket.h << EOF
+#include <winsock2.h>
+#include <stdint.h>
+#define u_int unsigned int
+EOF
+touch winfix/netinet/in.h winfix/netdb.h winfix/arpa/inet.h winfix/sys/poll.h winfix/poll.h
+patch -ulbf config.guess << EOF
+@@ -894,2 +894,5 @@
+        exit ;;
++    amd64:MSYS*:*:* | x86_64:MSYS*:*:*)
++       echo x86_64-unknown-msys
++       exit ;;
+     amd64:CYGWIN*:*:* | x86_64:CYGWIN*:*:*)
+EOF
+patch -ulbf compile << EOF
+@@ -52,6 +52,6 @@
+        case \`uname -s\` in
+-         MINGW*)
++         MINGW*|MSYS*)
+            file_conv=mingw
+            ;;
+-         CYGWIN*)
++  CYGWIN*|MSYS*)
+            file_conv=cygwin
+@@ -69,3 +69,3 @@
+          ;;
+-       cygwin/*)
++       cygwin/*|msys/*)
+          file=\`cygpath -m "\$file" || echo "\$file"\`
+EOF
+# fix missing types
+sed -i.bak -e "s/\bu_\(char\|short\|int\|long\)\b/unsigned \1/g; s/\bu_\(int[0-9]*_t\)\b/u\1/g; s/\bu_quad_t\b/uint64_t/g; s/\bquad_t\b/int64_t/g; s/\bcaddr_t\b/char*/g" $(grep -lw "u_char\|u_short\|u_int\|u_long\|u_quad_t\|quad_t\|u_int[0-9]*_t\|caddr_t" $(find -name '*.h' -or -name '*.c'))
+for F in $(grep -l "u*int[0-9]*_t" $(find -name '*.h')); do
+ mv $F $F.bak2 &&
+ echo "#include <stdint.h>" > $F &&
+ cat $F.bak2 >> $F
+done
+wl-showstatus configure &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+ #--disable-gssapi
+ #--disable-ipv6
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWMREFIX/include/gssglue" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gssapi --disable-ipv6 CFLAGS="-I$(pwd)/winfix" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

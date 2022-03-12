@@ -1,0 +1,126 @@
+export NAME="GNU Common C++ / libcommoncpp2 (also known as libccgnu2)"
+export STATUS=
+export URL=http://www.gnu.org/software/commoncpp/
+export BASENAME=libcommoncpp2
+export DESCRIPTION="GNU Common C++ is a very portable and highly optimized class framework for writing C++ applications that need to use threads and support concurrent sychronization, and that use sockets, XML parsing, object serialization, thread-optimized String and data structure classes, etc. This framework offers a class foundation that hides platform differences from your C++ application so that you need not write platform specific code."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=1.6.1
+#export VERSION=1.6.2
+#export VERSION=1.6.3
+#export VERSION=1.7.0
+#export VERSION=1.7.3
+#export VERSIONDATE=
+####configure: error: no library for posix threads found!
+####C:\DOCUME~1\bsanders\LOCALS~1\Temp\ccgRTYHf.o:conftest.cpp:(.eh_frame+0x11): undefined reference to `__gxx_personality_v0'
+#export VERSION=1.8.0
+#export VERSIONDATE=20100225
+export VERSION=1.8.1
+export VERSIONDATE=20101102
+####D:/Prog/MinGW-mSys.newer/lib/libiberty.a(getopt.o):getopt.c:(.text+0x691): undefined reference to `_impure_ptr'
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/commoncpp/ commoncpp2-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/commoncpp/commoncpp2-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/commoncpp2-$VERSION.tar.gz
+cd commoncpp2-$VERSION
+# fix redefinition of already existing sleep (rename to mysleep)
+mv inc/cc++/thread.h inc/cc++/thread.h.bak
+echo "#undef sleep" > inc/cc++/thread.h
+sed -e "s/^\#ifndef.*\(HAVE_LOCALTIME_R\)/#if \!defined(\1) \&\& \!defined(__MINGW32__)/" inc/cc++/thread.h.bak >> inc/cc++/thread.h
+# fix missing FIOREAD in src/socket.cpp (version >= 1.8.1)
+patch -ulbf src/socket.cpp << EOF
+--- src/socket.cpp  2010-11-01 01:33:56 +0100
++++ src/socket.cpp  2010-11-02 17:36:52 +0100
+@@ -2855,11 +2855,12 @@
+ size_t  DCCPSocket::available()
+ {
+-    size_t readsize;
+ #ifndef WIN32
++    size_t readsize;
+      if (ioctl (so, FIONREAD, &readsize) < 0) {
+          error(errInput,(char *)"Error on retrieve the FIONREAD option.",socket_errno);
+      }
+ #else
+-    if (ioctlsocket(so, FIOREAD, &readsize)){
++    u_long readsize;
++    if (ioctlsocket(so, FIONREAD, &readsize)){
+         error(errInput,(char *)"Error on retrieve the FIONREAD option.",socket_errno);
+     }
+EOF
+# fix src/applog.cpp (version >= 1.8.1)
+patch -ulbf src/applog.cpp << EOF
+--- src/applog.cpp  2010-11-01 00:11:56 +0100
++++ src/applog.cpp  2010-11-02 20:40:26 +0100
+@@ -96,3 +96,3 @@
+
+-#ifdef WIN32
++#if defined(WIN32) && !defined(__MINGW32__)
+ template class std::map<string, Slog::Level >;
+EOF
+# fix error: ordered comparison of pointer with integer zero ('HANDLE' {aka 'void*'} and 'int') in inc/cc++/serial.h (version >= 1.8.1)
+patch -ulbf inc/cc++/serial.h << EOF
+@@ -574,3 +574,3 @@
+     inline bool operator!()
+-        {return (dev < 0);};
++        {return ((uintptr_t)dev < 0);};
+ };
+EOF
+# fix error: ordered comparison of pointer with integer zero ('HANDLE' {aka 'void*'} and 'int') in src/serial.cpp (version >= 1.8.1)
+patch -ulbf src/serial.cpp << EOF
+@@ -408,3 +408,3 @@
+
+-    if(ser.dev < 0)
++    if((uintptr_t)ser.dev < 0)
+         return *this;
+EOF
+# fix building DLLs
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+sed -i.bak -e "s/-liberty//" configure
+####buffer.cpp:281: error: `force_unlock_after_cancellation' is not a member of `ost::Semaphore'
+####make -C w32 -f Makefile.gcc
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-linuxthreads --with-pthread=pthreadGC2 CPPFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-linuxthreads --with-pthread=pthreadGC2 CPPFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-linuxthreads --with-pthread=pthreadGC2 CPPFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-linuxthreads --with-pthread=pthread CPPFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix for localtime_r which is already defined in pthread.h
+ echo "#define HAVE_LOCALTIME_R 1" >> config.h &&
+ # fix missing signal stuff in thread.cpp (version >= 1.8.1)
+ #echo "#undef CCXX_SIG_THREAD_CANCEL" >> config.h &&
+ echo "#undef CCXX_SIG_THREAD_CANCEL" >> inc/cc++/config.h &&
+ # fix invalid -llthread
+ sed -i.bak s/-llthread//g $(grep -l "\-llthread" `find . -iname Makefile`) &&
+ # fix for syslog which is missing on Windows
+ #echo "#undef HAVE_SYSLOG_H" >> config.h &&
+ #echo "#undef CCXX_SIG_THREAD_CANCEL" >> config.h &&
+ echo "#undef HAVE_SYSLOG_H" >> inc/cc++/config.h &&
+ echo "#undef CCXX_SIG_THREAD_CANCEL" >> inc/cc++/config.h &&
+ #make -j1 &&
+ #( make || make -j1 || make -j1 CXX="g++ -fpermissive" ) &&
+ ( make || make -j1 || make -j1 CXX="g++ -fpermissive" || make -j1 CXX="g++ -fpermissive -std=c++11" ) &&
+ make install-strip &&
+ # fix absolute paths in ccgnu2-config
+ sed -i.bak -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/ccgnu2-config &&
+ rm -f $INSTALLPREFIX/bin/ccgnu2-config.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf commoncpp2-$VERSION
+####D:/Prog/MinGW-mSys.newer/lib/libiberty.a(getopt.o):getopt.c:(.text+0x691): undefined reference to `_impure_ptr'
+# fix: http://www.codesourcery.com/archives/arm-gnu/msg03556.html If this is a C++ or mixed C/C++ application then link your application with g++ and do not use -lstdc++ e.g.
+# cause: toolchain mismatch (gcc - g++ - different versions)
+####To do: build DLL
+
+
+

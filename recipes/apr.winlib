@@ -1,0 +1,276 @@
+export NAME="Apache Portable Runtime (APR)"
+export STATUS=
+export URL=http://apr.apache.org/
+export BASENAME=apr
+export DESCRIPTION="The mission of the Apache Portable Runtime (APR) project is to create and maintain software libraries that provide a predictable and consistent interface to underlying platform-specific implementations. The primary goal is to provide an API to which software developers may code and be assured of predictable if not identical behaviour regardless of the platform on which their software is built, relieving them of the need to code special-case conditions to work around or take advantage of platform-specific deficiencies or features."
+export CATEGORY=portability
+export TYPE=library
+#export VERSION=1.4.2
+#export VERSIONDATE=20101005
+#export VERSION=1.4.4
+#export VERSIONDATE=20110508
+#export VERSION=1.4.5
+#export VERSIONDATE=20110521
+#export VERSION=1.4.6
+#export VERSIONDATE=20120215
+#export VERSION=1.4.8
+#export VERSIONDATE=20130621
+#export VERSION=1.5.0
+#export VERSIONDATE=20131117
+#export VERSION=1.5.1
+#export VERSIONDATE=20140420
+#export VERSION=1.5.2
+#export VERSIONDATE=20150429
+#export VERSION=1.6.2
+#export VERSIONDATE=20170613
+#export VERSION=1.6.3
+#export VERSIONDATE=20171023
+#export VERSION=1.6.5
+#export VERSIONDATE=20180915
+export VERSION=1.7.0
+export VERSIONDATE=20190405
+####/include/objidl.h:10935:1: error: unknown type name 'CLIPFORMAT'
+wl-showstatus --package-version
+export DEPENDANCIES=nspr,sqlite3
+export OPTIONALDEPENDANCIES=sqlite2
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="http://archive.apache.org/dist/apr/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://archive.apache.org/dist/apr/apr-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/apr-$VERSION.tar.bz2
+cd apr-$VERSION
+# fix missing CreateHardLinkW in file_io/win32/open.c
+mv file_io/win32/open.c file_io/win32/open.c.bak
+echo "#define _WIN32_WINNT 0x0500" > file_io/win32/open.c
+cat file_io/win32/open.c.bak >> file_io/win32/open.c
+## fix objidl.h issues in MinGW 4.8.0
+#mv include/arch/win32/apr_private.h include/arch/win32/apr_private.h.bak
+##echo "#include <wtypes.h>" > include/arch/win32/apr_private.h
+#cat > include/arch/win32/apr_private.h << EOF
+##include <windows.h>
+##include <winuser.h>
+##include <wtypes.h>
+##include <objidl.h>
+#EOF
+#cat include/arch/win32/apr_private.h.bak >> include/arch/win32/apr_private.h
+## fix missing LPMSG in strings/apr_cpystrn.c
+#mv strings/apr_cpystrn.c strings/apr_cpystrn.c.bak
+#echo "#include <wtypes.h>" > strings/apr_cpystrn.c
+#cat strings/apr_cpystrn.c.bak >> strings/apr_cpystrn.c
+## fix missing LPMSG in strings/apr_snprintf.c
+#mv strings/apr_snprintf.c strings/apr_snprintf.c.bak
+#echo "#include <wtypes.h>" > strings/apr_snprintf.c
+#cat strings/apr_snprintf.c.bak >> strings/apr_snprintf.c
+## fix missing LPMSG in strings/apr_strings.c
+#mv strings/apr_strings.c strings/apr_strings.c.bak
+#echo "#include <wtypes.h>" > strings/apr_strings.c
+#cat strings/apr_strings.c.bak >> strings/apr_strings.c
+## fix missing LPMSG in */win32/*.c
+#for F in */win32/*.c; do
+# mv $F $F.bak
+# echo "#include <winsock2.h>" > $F
+# echo "#include <wtypes.h>" >> $F
+# cat $F.bak >> $F
+#done
+## fix missing LPMSG in */unix/*.c
+#for F in */unix/*.c; do
+# mv $F $F.bak
+# echo "#include <winsock2.h>" > $F
+# echo "#include <wtypes.h>" >> $F
+# echo "#include <apr_arch_misc.h>" >> $F
+# cat $F.bak >> $F
+#done
+## fix missing TRANSMIT_FILE_BUFFERS/TF_REUSE_SOCKET in network_io/win32/sendrecv.c
+#mv network_io/win32/sendrecv.c network_io/win32/sendrecv.c.bak2
+#echo "#include <winsock2.h>" > network_io/win32/sendrecv.c
+#echo "#include <mswsock.h>" > network_io/win32/sendrecv.c
+#echo "#include <psdk_inc/_xmitfile.h>" >> network_io/win32/sendrecv.c
+#echo "#define TF_DISCONNECT 0x01" >> network_io/win32/sendrecv.c
+#echo "#define TF_REUSE_SOCKET 0x02" >> network_io/win32/sendrecv.c
+#cat network_io/win32/sendrecv.c.bak2 >> network_io/win32/sendrecv.c
+# fix redefinition of sleep in include/arch/win32/apr_private.h (version >= 1.5.1)
+if ! gcc --version | grep -q MinGW-W64; then
+ mv include/arch/win32/apr_private.h include/arch/win32/apr_private.h.bak &&
+ sed -e "s/^\(#define sleep.*\)$/\/*\1*\//" include/arch/win32/apr_private.h.bak > include/arch/win32/apr_private.h
+fi
+## fix configure for 64-bit (see also: http://code.google.com/p/mingw-w64-dgn/source/browse/branches/br_loongson/patch/apr-w64.patch?spec=svn65&r=38)
+#patch -ulbf configure << EOF
+#--- configure  2009-11-08 20:04:27.000000000 +0800
+#+++ configure  2009-11-08 20:04:35.000000000 +0800
+#@@ -38350,6 +38350,10 @@
+#     ssize_t_fmt="ld"
+#     { \$as_echo "\$as_me:\$LINENO: result: %ld" >&5
+# \$as_echo "%ld" >&6; }
+#+elif test "\$ac_cv_sizeof_ssize_t" = "\$ac_cv_sizeof_long_long"; then
+#+ ssize_t_fmt="lld"
+#+ { \$as_echo "\$as_me:\$LINENO: result: %lld" >&5
+#+\$as_echo "%lld" >&6; }
+# else
+#     { { \$as_echo "\$as_me:\$LINENO: error: could not determine the proper format for apr_ssize_t" >&5
+# \$as_echo "\$as_me: error: could not determine the proper format for apr_ssize_t" >&2;}
+#@@ -38441,6 +38445,10 @@
+#     size_t_fmt="ld"
+#     { \$as_echo "\$as_me:\$LINENO: result: %ld" >&5
+# \$as_echo "%ld" >&6; }
+#+elif test "\$ac_cv_sizeof_size_t" = "\$ac_cv_sizeof_long_long"; then
+#+ size_t_fmt="lld"
+#+ { \$as_echo "\$as_me:\$LINENO: result: %lld" >&5
+#+\$as_echo "%lld" >&6; }
+# else
+#     { { \$as_echo "\$as_me:\$LINENO: error: could not determine the proper format for apr_size_t" >&5
+# \$as_echo "\$as_me: error: could not determine the proper format for apr_size_t" >&2;}
+#EOF
+#patch -ulbf configure << EOF
+#--- configure  2011-05-20 02:09:22 +0200
+#+++ configure  2011-09-09 20:57:48 +0200
+#@@ -30225,8 +30225,12 @@
+#     ssize_t_fmt="ld"
+#     { \$as_echo "\$as_me:\${as_lineno-\$LINENO}: result: %ld" >&5
+# \$as_echo "%ld" >&6; }
+#+elif test "\$ac_cv_sizeof_size_t" = "\$ac_cv_sizeof_long_long"; then
+#+    size_t_fmt="lld"
+#+    { \$as_echo "\$as_me:\$LINENO: result: %lld" >&5
+#+\$as_echo "%lld" >&6; }
+# else
+#-    as_fn_error "could not determine the proper format for apr_ssize_t" "\$LINENO" 5
+#+    size_t_fmt="lld"
+# fi
+#
+# ssize_t_fmt="#define APR_SSIZE_T_FMT \\"\$ssize_t_fmt\\""
+#@@ -30283,8 +30287,12 @@
+#     size_t_fmt="ld"
+#     { \$as_echo "\$as_me:\${as_lineno-\$LINENO}: result: %ld" >&5
+# \$as_echo "%ld" >&6; }
+#+elif test "\$ac_cv_sizeof_ssize_t" = "\$ac_cv_sizeof_long_long"; then
+#+ ssize_t_fmt="lld"
+#+ { \$as_echo "\$as_me:\$LINENO: result: %lld" >&5
+#+\$as_echo "%lld" >&6; }
+# else
+#-    as_fn_error "could not determine the proper format for apr_size_t" "\$LINENO" 5
+#+    ssize_t_fmt="lld"
+# fi
+#
+# size_t_fmt="#define APR_SIZE_T_FMT \\"\$size_t_fmt\\""
+#EOF
+patch -ulbf configure << EOF
+@@ -23741,6 +23741,10 @@
+     ssize_t_fmt="ld"
+     { \$as_echo "\$as_me:\${as_lineno-\$LINENO}: result: %ld" >&5
+ \$as_echo "%ld" >&6; }
++elif test "\$ac_cv_sizeof_ssize_t" = "\$ac_cv_sizeof_long_long"; then
++    ssize_t_fmt="lld"
++    { \$as_echo "\$as_me:\$LINENO: result: %lld" >&5
++\$as_echo "%lld" >&6; }
+ else
+     as_fn_error \$? "could not determine the proper format for apr_ssize_t" "\$LINENO" 5
+ fi
+@@ -23799,6 +23803,10 @@
+     size_t_fmt="ld"
+     { \$as_echo "\$as_me:\${as_lineno-\$LINENO}: result: %ld" >&5
+ \$as_echo "%ld" >&6; }
++elif test "\$ac_cv_sizeof_size_t" = "\$ac_cv_sizeof_long_long"; then
++    size_t_fmt="lld"
++    { \$as_echo "\$as_me:\$LINENO: result: %lld" >&5
++\$as_echo "%lld" >&6; }
+ else
+     as_fn_error \$? "could not determine the proper format for apr_size_t" "\$LINENO" 5
+ fi
+EOF
+## fix undefined CLIPFORMAT/LPMSG (version >= 1.7.0)
+#patch -ulbf include/arch/win32/apr_private.h << EOF
+#@@ -45,13 +45,9 @@
+#  */
+# #ifndef _WIN32_WCE
+# #define HAVE_ACLAPI 1
+#-#ifdef __wtypes_h__
+#+#define COM_NO_WINDOWS_H
+# #include <accctrl.h>
+#-#else
+#-#define __wtypes_h__
+#-#include <accctrl.h>
+#-#undef __wtypes_h__
+#-#endif
+#+#undef COM_NO_WINDOWS_H
+# #else
+# #define HAVE_ACLAPI 0
+# #endif
+#EOF
+#patch -ulbf file_io/win32/filestat.c << EOF
+#@@ -15,7 +15,9 @@
+#  */
+# 
+# #include "apr.h"
+#+#define COM_NO_WINDOWS_H
+# #include <aclapi.h>
+#+#undef COM_NO_WINDOWS_H
+# #include "apr_private.h"
+# #include "apr_arch_file_io.h"
+# #include "apr_file_io.h"
+#EOF
+# fix missing NET_IFINDEX in include/arch/win32/apr_arch_misc.h (version >= 1.7.0)
+patch -ulbf include/arch/win32/apr_arch_misc.h << EOF
+@@ -49,2 +49,5 @@
+
++#ifdef __MINGW32__
++#include <ifdef.h>
++#endif
+ #if defined(HAVE_IF_INDEXTONAME) && defined(_MSC_VER)
+@@ -195,3 +198,3 @@
+ #define APR_DECLARE_LATE_DLL_FUNC(lib, rettype, calltype, fn, ord, args, names) \\
+-    typedef rettype (calltype *apr_winapi_fpt_##fn) args; \\
++    typedef rettype (*apr_winapi_fpt_##fn) args; \\
+     static apr_winapi_fpt_##fn apr_winapi_pfn_##fn = NULL; \\
+EOF
+# fix missing LPMSG in */win32/*.c (version >= 1.7.0)
+for F in */win32/*.c poll/unix/*.c misc/unix/errorcodes.c misc/unix/getopt.c misc/unix/otherchild.c support/unix/waitio.c; do
+ mv $F $F.bak &&
+ echo "#include <winsock2.h>" > $F &&
+ echo "#include <netioapi.h>" >> $F &&
+ echo "#include <mswsock.h>" >> $F &&
+ cat $F.bak >> $F
+done
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-installbuilddir=$INSTALLPREFIX/build --enable-threads LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-installbuilddir=$INSTALLPREFIX/build --enable-threads LDFLAGS="-Wl,-no-undefined" &&
+#if grep -q "struct sockaddr_in6" $MINGWDIR/include/ws2tcpip.h $MINGWDIR/*mingw32/include/ws2tcpip.h &>/dev/null; then
+#if grep -q "struct sockaddr_in6" $MINGWDIR/include/ws2tcpip.h &>/dev/null; then
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-installbuilddir=$INSTALLPREFIX/build --enable-threads --enable-ipv6 LDFLAGS="-Wl,-no-undefined"
+#else
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-installbuilddir=$INSTALLPREFIX/build --enable-threads --disable-ipv6 LDFLAGS="-Wl,-no-undefined"
+#fi &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-installbuilddir=$INSTALLPREFIX/build --enable-threads --$(if grep -q "struct sockaddr_in6" $MINGWDIR/include/ws2tcpip.h &>/dev/null; then echo enable; else echo disable; fi)-ipv6 LDFLAGS="-Wl,-no-undefined" &&
+ # fix for building DLL
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ##  
+ #echo "#define HAVE_IF_INDEXTONAME 1" >> include/arch/unix/apr_private.h &&
+ #echo "#include <winsock2.h>" >> include/arch/unix/apr_private.h &&
+ #echo "#include <ifdef.h>" >> include/arch/unix/apr_private.h &&
+ wl-showstatus build &&
+ ( make || make CC="gcc -DCOM_NO_WINDOWS_H" CXX="g++ -DCOM_NO_WINDOWS_H" ) &&
+ #( make -j1 || make -j1 CC="gcc -DCOM_NO_WINDOWS_H" CXX="g++ -DCOM_NO_WINDOWS_H" ) &&
+ wl-showstatus build-install &&
+ make install &&
+ #make -j1 install &&
+ mkdir -p $INSTALLPREFIX/include/apr-1/arch/win32 &&
+ cp -f include/arch/*.h $INSTALLPREFIX/include/apr-1/arch/ &&
+ cp -f include/arch/win32/*.h $INSTALLPREFIX/include/apr-1/arch/win32 &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ mv $INSTALLPREFIX/bin/apr-1-config $INSTALLPREFIX/bin/apr-1-config.bak &&
+ sed -e "s?$INSTALLPREFIX?\$MINGWPREFIX?g; s?^\(installbuilddir=\"\).*?\1\${prefix}/share/apr/build\"?" $INSTALLPREFIX/bin/apr-1-config.bak > $INSTALLPREFIX/bin/apr-1-config &&
+ rm $INSTALLPREFIX/bin/apr-1-config.bak &&
+ # move build to share/apr/build and add required files
+ mkdir -p $INSTALLPREFIX/share/apr &&
+ mv -f $INSTALLPREFIX/build $INSTALLPREFIX/share/apr/ &&
+ cp -uf build/apr_common.m4 build/find_apr.m4 build/install.sh build/config.guess build/config.sub build/get-version.sh build/gen-build.py $INSTALLPREFIX/share/apr/build/ &&
+ sed -e "s?$INSTALLPREFIX?\$MINGWPREFIX?g" build/apr_rules.mk > $INSTALLPREFIX/share/apr/build/rules.mk &&
+ cp $INSTALLPREFIX/share/apr/build/rules.mk $INSTALLPREFIX/share/apr/build/apr_rules.mk &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf apr-$VERSION
+
+
+

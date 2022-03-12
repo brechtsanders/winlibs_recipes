@@ -1,0 +1,82 @@
+export NAME="OpenPnP Capture"
+export STATUS=
+export URL=https://github.com/openpnp/openpnp-capture
+export BASENAME=openpnp-capture
+export DESCRIPTION="A cross platform video capture library with a focus on machine vision."
+export CATEGORY=hardware,video
+export TYPE=library
+export VERSION=0.0.22
+export VERSIONDATE=20210317
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/openpnp/openpnp-capture/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/openpnp/openpnp-capture/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix win/platformstream.h
+patch -ulbf win/platformstream.h << EOF
+@@ -33,4 +33,3 @@
+ #include <dshow.h>
+-#include <Vidcap.h>
+-#include <Ksmedia.h>
++#include <ksmedia.h>
+
+EOF
+# fix missing pow() in win/platformstream.cpp
+mv win/platformstream.cpp win/platformstream.cpp.bak &&
+echo "#include <math.h>" > win/platformstream.cpp &&
+cat win/platformstream.cpp.bak >> win/platformstream.cpp
+## fix invalid compiler flags
+#sed -i.bak -e "s? /MT[^ \"]*??" CMakeLists.txt
+# fix CMakeLists.txt (version >= 0.0.22)
+patch -ulbf CMakeLists.txt << EOF
+@@ -61,3 +61,3 @@
+ # create our capture library
+-add_library(openpnp-capture SHARED common/libmain.cpp
++add_library(openpnp-capture common/libmain.cpp
+                                    common/context.cpp
+@@ -74,4 +74,6 @@
+        # don't have to distribute it
++    IF(MSVC)
+        set(CMAKE_CXX_FLAGS_RELEASE "\${CMAKE_CXX_FLAGS_RELEASE} /MT")
+        set(CMAKE_CXX_FLAGS_DEBUG "\${CMAKE_CXX_FLAGS_DEBUG} /MTd")
++    ENDIF(MSVC)
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lstrmiids/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lstrmiids/" build_shared/build.ninja &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/libopenpnp-capture.dll build_shared/win/tests/*.exe &&
+ wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f include/*.h $INSTALLPREFIX/include/ &&
+ cp -f build_static/*.a build_shared/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll build_shared/win/tests/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####openpnp-capture-test
+
+
+

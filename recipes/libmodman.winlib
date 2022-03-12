@@ -1,0 +1,64 @@
+export NAME="libmodman"
+export STATUS=
+export URL=http://code.google.com/p/libmodman/
+export BASENAME=libmodman
+export DESCRIPTION="libmodman - a simple library for managing modules"
+export CATEGORY=system
+export TYPE=library
+export VERSION=2.0.1
+export VERSIONDATE=20130220
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://code.google.com/p/libmodman/downloads/list"
+export DOWNLOADURL="https://code.google.com/archive/p/libmodman/downloads"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://libmodman.googlecode.com/files/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix libmodman/module_manager.cpp
+patch -ulbf libmodman/module_manager.cpp << EOF
+--- libmodman/module_manager.cpp  2010-09-01 22:19:38 +0200
++++ libmodman/module_manager.cpp  2013-02-20 14:12:58 +0100
+@@ -25,2 +25,5 @@
+ #include <windows.h>
++#ifdef __MINGW32__
++#include <typeinfo>
++#endif
+ #else
+@@ -44,3 +47,3 @@
+ static void* pdlsym(pdlmtype mod, string sym) {
+-       return GetProcAddress(mod, sym.c_str());
++       return (void*)(uintptr_t)GetProcAddress(mod, sym.c_str());
+ }
+EOF
+# fix libmodman/module.hpp
+patch -ulbf libmodman/module.hpp << EOF
+--- libmodman/module.hpp  2010-09-01 22:19:38 +0200
++++ libmodman/module.hpp  2013-02-20 14:16:46 +0100
+@@ -81,3 +81,3 @@
+ public:
+-#ifdef WIN32
++#if defined(WIN32) && !defined(__MINGW32__)
+        static  const char*     base_type() { return __FUNCSIG__; }
+EOF
+echo "add_library(modman_s STATIC module.hpp module_manager.hpp module_manager.cpp)" >> libmodman/CMakeLists.txt
+wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DINCLUDE_INSTALL_DIR:PATH=$INSTALLPREFIX/include -DLIB_INSTALL_DIR:PATH=$INSTALLPREFIX/lib -DLIBEXEC_INSTALL_DIR:PATH=$INSTALLPREFIX/libexec -DBIN_INSTALL_DIR:PATH=$INSTALLPREFIX/bin -DSHARE_INSTALL_DIR:PATH=$INSTALLPREFIX/share -DSYSCONF_INSTALL_DIR:PATH=$INSTALLPREFIX/etc . &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DINCLUDE_INSTALL_DIR:PATH=$INSTALLPREFIX/include -DLIB_INSTALL_DIR:PATH=$INSTALLPREFIX/lib . &&
+ wl-showstatus build-install &&
+ make install &&
+ cp -f libmodman/libmodman_s.a $INSTALLPREFIX/lib/libmodman.a &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

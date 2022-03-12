@@ -1,0 +1,151 @@
+#export NAME="liboqs"
+#export STATUS=
+#export URL=https://openquantumsafe.org/
+##export URL=https://github.com/open-quantum-safe/liboqs
+#export BASENAME=liboqs
+#export DESCRIPTION="C library for quantum-safe cryptography."
+#export CATEGORY=security
+#export TYPE=library
+#export VERSION=0.2.0
+#export VERSIONDATE=20191028
+#export DEPENDANCIES=openssl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#####configure: error: Your CPU is not currently supported
+#wl-showstatus --package-version
+#export DEPENDANCIES=openssl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=LICENSE.txt
+#export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/open-quantum-safe/liboqs/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/open-quantum-safe/liboqs/archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix missing posix_memalign in src/sig/picnic/external/aligned_alloc.c
+#patch -ulbf src/sig/picnic/external/aligned_alloc.c << EOF
+#@@ -29,2 +29,5 @@
+# #include <stdlib.h>
+#+#if defined(__MINGW32__)
+#+#undef HAVE_POSIX_MEMALIGN
+#+#endif
+# #if !defined(HAVE_POSIX_MEMALIGN) || defined(__MING32__) || defined(__MING64__) || defined(_MSC_VER)
+#EOF
+## fix strcasecmp issue in src/kem/kem.c
+#patch -ulbf src/kem/kem.c << EOF
+#@@ -3,3 +3,6 @@
+# #if defined(_WIN32)
+#+#include <string.h>
+#+#ifndef strcasecmp
+# #define strcasecmp _stricmp
+#+#endif
+# #else
+#EOF
+## fix strcasecmp issue in src/sig/sig.c
+#patch -ulbf src/sig/sig.c << EOF
+#@@ -3,3 +3,6 @@
+# #if defined(_WIN32)
+#+#include <string.h>
+#+#ifndef strcasecmp
+# #define strcasecmp _stricmp
+#+#endif
+# #else
+#EOF
+## fix missing oqs/winconfig.h
+#mkdir -p include/oqs
+#echo "#include \"oqsconfig.h\"" > include/oqs/winconfig.h
+#wl-showstatus configure &&
+# mkdir -p m4 &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# #sed -i.bak -e "s/as_fn_error\(.*Your platform is not currently supported\)/echo\1/" configure &&
+# sed -i.bak -e "s/as_fn_error\(.*Your \)\(platform\|CPU\)\( is not currently supported\)/echo\1\2\3/" configure &&
+# if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl=$MINGWPREFIX --disable-kem-sike --disable-kem-frodokem
+# else
+#  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl=$MINGWPREFIX
+# fi &&
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# wl-showstatus build-install &&
+# ( make install-strip || make -j1 install-strip ) &&
+# cp include/oqs/winconfig.h $INSTALLPREFIX/include/oqs/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####Not completely supported on 32-bit
+
+
+
+export NAME="liboqs"
+export STATUS=
+export URL=https://openquantumsafe.org/
+#export URL=https://github.com/open-quantum-safe/liboqs
+export BASENAME=liboqs
+export DESCRIPTION="C library for quantum-safe cryptography."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.3.0
+#export VERSIONDATE=20200611
+#export VERSION=0.4.0
+#export VERSIONDATE=20200812
+#export VERSION=0.5.0
+#export VERSIONDATE=20210311
+#export VERSION=0.6.0
+#export VERSIONDATE=20210609
+#export VERSION=0.7.0
+#export VERSIONDATE=20210812
+export VERSION=0.7.1
+export VERSIONDATE=20211217
+wl-showstatus --package-version
+export DEPENDANCIES=openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/open-quantum-safe/liboqs/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/open-quantum-safe/liboqs/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix for 32-bit in src/common/common.h (version >= 0.3.0)
+#patch -ulbf src/common/common.h << EOF
+#@@ -131,2 +131,6 @@
+# } OQS_CPU_EXTENSIONS;
+#+#else
+#+typedef struct {
+#+       unsigned int DUMMY;
+#+} OQS_CPU_EXTENSIONS;
+# #endif
+#EOF
+# don't treat warnings as errors
+sed -i.bak -e "s/add_compile_options(\(-Werror\|-Wall\|-Wextra\|-Wpedantic\))/#^/" .CMake/compiler_opts.cmake
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOQS_PORTABLE_BUILD:BOOL=ON -DOQS_USE_CPU_EXTENSIONS:BOOL=ON -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOQS_PORTABLE_BUILD:BOOL=ON -DOQS_USE_CPU_EXTENSIONS:BOOL=ON $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DOQS_ENABLE_SIG_PICNIC:BOOL=OFF -DOQS_ENABLE_KEM_FRODOKEM:BOOL=OFF -DOQS_ENABLE_SIG_QTESLA:BOOL=OFF -DOQS_ENABLE_KEM_SIKE:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sidh_p503:BOOL=OFF -DOQS_ENABLE_KEM_sidh_p503_compressed:BOOL=OFF -DOQS_ENABLE_KEM_CLASSIC_MCELIECE:BOOL=OFF -DOQS_ENABLE_KEM_KYBER:BOOL=OFF"; fi) -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOQS_PORTABLE_BUILD:BOOL=ON -DOQS_USE_CPU_EXTENSIONS:BOOL=ON $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DOQS_ENABLE_KEM_CLASSIC_MCELIECE:BOOL=ON -DOQS_ENABLE_KEM_FRODOKEM:BOOL=ON -DOQS_ENABLE_KEM_KYBER:BOOL=ON -DOQS_ENABLE_KEM_NEWHOPE:BOOL=ON -DOQS_ENABLE_KEM_NTRU:BOOL=ON -DOQS_ENABLE_KEM_SABER:BOOL=ON -DOQS_ENABLE_KEM_SIDH:BOOL=ON -DOQS_ENABLE_KEM_SIKE:BOOL=ON -DOQS_ENABLE_KEM_THREEBEARS:BOOL=ON -DOQS_ENABLE_KEM_sike_p751:BOOL=OFF -DOQS_ENABLE_KEM_sike_p751_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p751:BOOL=OFF -DOQS_ENABLE_KEM_sike_p751_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p434_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p610_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sidh_p503:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503_compressed:BOOL=OFF"; fi) -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOQS_DIST_BUILD:BOOL=ON -DOQS_USE_OPENSSL:BOOL=ON -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOQS_PORTABLE_BUILD:BOOL=ON -DOQS_USE_CPU_EXTENSIONS:BOOL=ON -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOQS_PORTABLE_BUILD:BOOL=ON -DOQS_USE_CPU_EXTENSIONS:BOOL=ON $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DOQS_ENABLE_SIG_PICNIC:BOOL=OFF -DOQS_ENABLE_KEM_FRODOKEM:BOOL=OFF -DOQS_ENABLE_SIG_QTESLA:BOOL=OFF -DOQS_ENABLE_KEM_SIKE:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sidh_p503:BOOL=OFF -DOQS_ENABLE_KEM_sidh_p503_compressed:BOOL=OFF -DOQS_ENABLE_KEM_CLASSIC_MCELIECE:BOOL=OFF -DOQS_ENABLE_KEM_KYBER:BOOL=OFF"; fi) -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOQS_PORTABLE_BUILD:BOOL=ON -DOQS_USE_CPU_EXTENSIONS:BOOL=ON $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DOQS_ENABLE_KEM_CLASSIC_MCELIECE:BOOL=ON -DOQS_ENABLE_KEM_FRODOKEM:BOOL=ON -DOQS_ENABLE_KEM_KYBER:BOOL=ON -DOQS_ENABLE_KEM_NEWHOPE:BOOL=ON -DOQS_ENABLE_KEM_NTRU:BOOL=ON -DOQS_ENABLE_KEM_SABER:BOOL=ON -DOQS_ENABLE_KEM_SIDH:BOOL=ON -DOQS_ENABLE_KEM_SIKE:BOOL=ON -DOQS_ENABLE_KEM_THREEBEARS:BOOL=ON -DOQS_ENABLE_KEM_sike_p751:BOOL=OFF -DOQS_ENABLE_KEM_sike_p751_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p751:BOOL=OFF -DOQS_ENABLE_KEM_sike_p751_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p434_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p610_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sidh_p503:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503_compressed:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503:BOOL=OFF -DOQS_ENABLE_KEM_sike_p503_compressed:BOOL=OFF"; fi) -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOQS_DIST_BUILD:BOOL=ON -DOQS_USE_OPENSSL:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/bin/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_shared/bin/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: is 32-bit supported?
+
+
+

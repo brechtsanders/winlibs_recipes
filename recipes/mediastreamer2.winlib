@@ -1,0 +1,335 @@
+#export NAME="mediastreamer2"
+#export STATUS=
+#export URL=http://www.antisip.com/as/toolkit.php
+#export BASENAME=mediastreamer2
+#export DESCRIPTION="mediastreamer2 toolkit for RTP streaming"
+#export CATEGORY=audio,communication
+#export TYPE=library
+##export VERSION=4.3.3-rc2
+##export VERSIONDATE=
+##export VERSION=2.5.0
+##export VERSIONDATE=20111214
+##export DEPENDANCIES=libortp,srtp,libspeex,libgsm,portaudio,libdl,pthreads,openssl
+######src/base/msfactory.c:169:27: error: passing argument 1 of 'ortp_set_log_level_mask' makes pointer from integer without a cast [-Werror=int-conversion]
+#export VERSION=2.14.0
+#export VERSIONDATE=20170720
+#wl-showstatus --package-version
+#export DEPENDANCIES=libortp,libopus,srtp,libspeex,libspeexdsp,libgsm,portaudio,libdl,pthreads,openssl,bctoolbox
+#export OPTIONALDEPENDANCIES=pulseaudio
+##export OPTIONALDEPENDANCIES=pulseaudio,libupnp
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+##export DOWNLOADURL="http://www.antisip.com/download/mediastreamer2/ mediastreamer2-antisip-"
+##export DOWNLOADURL="http://www.antisip.com/download/mediastreamer2/ mediastreamer-"
+#export DOWNLOADURL="http://download.savannah.gnu.org/releases/linphone/mediastreamer/ mediastreamer-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#wl-wait4deps
+##export DOWNLOADSOURCEURL=http://www.antisip.com/download/mediastreamer2/$BASENAME-antisip-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=http://www.antisip.com/download/mediastreamer2/mediastreamer-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/linphone/mediastreamer/mediastreamer-$VERSION.tar.gz
+#wl-showstatus download
+##wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+##tar xfz $TARBALLDIR/$BASENAME/$BASENAME-antisip-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/mediastreamer-$VERSION.tar.gz
+##cd $BASENAME-antisip-$VERSION/mediastreamer2
+#cd mediastreamer-$VERSION
+## fix missing includes in src/msfileplayer.c
+#mv src/msfileplayer.c src/msfileplayer.c.bak
+#echo "#include <fcntl.h>" > src/msfileplayer.c
+#cat src/msfileplayer.c.bak >> src/msfileplayer.c
+## fix missing UInt16 in src/ice.c
+#mv src/ice.c src/ice.c.bak
+#sed -e "s/UInt16/uint16_t/g" src/ice.c.bak > src/ice.c
+## fix missin alloca in src/msresample.c (version >= 2.5.0)
+#mv src/msresample.c src/msresample.c.bak
+#echo "#include <malloc.h>" > src/msresample.c
+#cat src/msresample.c.bak >> src/msresample.c
+## fix missin alloca in src/pasnd.c (version >= 2.5.0)
+#mv src/pasnd.c src/pasnd.c.bak
+#echo "#include <malloc.h>" > src/pasnd.c
+#cat src/pasnd.c.bak >> src/pasnd.c
+## fix missin alloca in src/gsm.c (version >= 2.5.0)
+#mv src/gsm.c src/gsm.c.bak
+#echo "#include <malloc.h>" > src/gsm.c
+#cat src/gsm.c.bak >> src/gsm.c
+## fix missing swprintf_s in src/mscommon.c (version >= 2.5.0)
+#patch -ulbf src/mscommon.c << EOF
+#--- src/mscommon.c  2011-02-16 13:56:06 +0100
+#+++ src/mscommon.c  2012-11-05 13:32:36 +0100
+#@@ -297,3 +297,3 @@
+#
+#-               swprintf_s(wUnicodePluginFile, 2048, L"%s\\\\%s", wUnicodeDirPath, FileData.cFileName);
+#+               swprintf(wUnicodePluginFile, 2048, L"%s\\\\%s", wUnicodeDirPath, FileData.cFileName);
+#                WideCharToMultiByte(CP_UTF8,0,wUnicodePluginFile,-1,szPluginFile,sizeof(szPluginFile),0,0);
+#EOF
+### fix missing ortp_strerror in include/mediastreamer2/mscommon.h (version >= 2.5.0)
+##echo "#define ortp_strerror strerror" >> include/mediastreamer2/mscommon.h
+## fix missing parameter to ortp_set_log_level_mask in src/mscommon.c (version >= 2.5.0)
+#mv src/mscommon.c src/mscommon.c.bak &&
+#sed -e "s/\(ortp_set_log_level_mask(\)\([^,]*\)$/\1NULL, \2/" src/mscommon.c.bak > src/mscommon.c
+## fix missing parameter to ortp_logv in include/mediastreamer2/mscommon.h (version >= 2.5.0)
+#mv include/mediastreamer2/mscommon.h include/mediastreamer2/mscommon.h.bak &&
+#sed -e "s/\(ortp_logv(\)\([^,]*,[^,]*,[^,]*\)$/\1NULL, \2/" include/mediastreamer2/mscommon.h.bak > include/mediastreamer2/mscommon.h
+## fix format issue in src/voip/stun.c (version >= 2.14.0)
+#patch -ulbf src/voip/stun.c << EOF
+#@@ -727,4 +727,4 @@
+#        if ((ms_stun_message_get_length(msg) + STUN_MESSAGE_HEADER_LENGTH) != bufsize) {
+#-               ms_warning("STUN message header length does not match message size: %i - %zd",
+#-                       ms_stun_message_get_length(msg), bufsize);
+#+               ms_warning("STUN message header length does not match message size: %i - %ld",
+#+                       ms_stun_message_get_length(msg), (long)bufsize);
+#                goto error;
+#EOF
+## fix extra argument to bctbx_ssl_config_set_ca_chain in src/crypto/dtls_srtp.c (version >= 2.14.0)
+#patch -ulbf src/crypto/dtls_srtp.c << EOF
+#@@ -708 +708 @@
+#-       bctbx_ssl_config_set_ca_chain(dtlsContext->ssl_config, dtlsContext->crt, NULL);
+#+       bctbx_ssl_config_set_ca_chain(dtlsContext->ssl_config, dtlsContext->crt);
+#EOF
+## fix pointer conversion issues in src/audiofilters/winsnd3.c (version >= 2.5.0)
+#mv src/audiofilters/winsnd3.c src/audiofilters/winsnd3.c.bak
+#cat > src/audiofilters/winsnd3.c << EOF
+##define UNICODE
+##define _UNICODE
+##include <winsock2.h>
+##include <windows.h>
+##include <mmreg.h>
+#EOF
+#sed -e "s/incaps.szPname/(LPCWCH)&/; s/(DWORD)/(DWORD_PTR)/g; s/DWORD \(dwInstance\|dwParam\)/DWORD_PTR \1/g" src/audiofilters/winsnd3.c.bak >> src/audiofilters/winsnd3.c
+### fix missing winsock2.h include in include/mediastreamer2/upnp_igd.h (version >= 2.14.0)
+##mv include/mediastreamer2/upnp_igd.h include/mediastreamer2/upnp_igd.h.bak &&
+##echo "#include <winsock2.h>" > include/mediastreamer2/upnp_igd.h &&
+##cat include/mediastreamer2/upnp_igd.h.bak >> include/mediastreamer2/upnp_igd.h
+### fix _FILE_OFFSET_BITS in src/upnp/upnp_igd.c (version >= 2.14.0)
+##mv src/upnp/upnp_igd.c src/upnp/upnp_igd.c.bak &&
+##echo "#define _FILE_OFFSET_BITS 64" > src/upnp/upnp_igd.c &&
+##cat src/upnp/upnp_igd.c.bak >> src/upnp/upnp_igd.c
+## fix src/audiofilters/pasnd.c (version >= 2.14.0)
+#patch -ulbf src/audiofilters/pasnd.c << EOF
+#@@ -78,3 +78,3 @@
+#     ms_warning("Extra data for sound card (total:%i %ims)",
+#-              device->bufferizer->size, (device->bufferizer->size*20)/320);
+#+              (int)device->bufferizer->size, (int)(device->bufferizer->size*20)/320);
+#     err=ms_bufferizer_read(device->bufferizer,wtmpbuff, framesPerBuffer*2);
+#@@ -85,3 +85,3 @@
+#     ms_warning("Extra data for sound card removed (total:%i %ims)",
+#-              device->bufferizer->size, (device->bufferizer->size*20)/320);
+#+              (int)device->bufferizer->size, (int)(device->bufferizer->size*20)/320);
+#   }
+#EOF
+## fix deprecated bctbx_list_remove_link (version >= 2.14.0)
+#sed -i.bak -e "s/bctbx_list_remove_link(/bctbx_list_unlink(/" $(grep -l "bctbx_list_remove_link(" -r $(find -name '*.c'))
+## skip building test
+#cat > tests/Makefile.in << EOF
+#all:
+#depend:
+#links:
+#generate:
+#install:
+#EOF
+## fix invalid use of -pthread and -rdynamic
+#mv configure configure.bak
+#sed -e "s/-pthread/-lpthread/g; s/-rdynamic/--export-dynamic/g" configure.bak > configure
+## fix invalid use of -pthread and -rdynamic
+#sed -i.bak2 -e "s/\n\(-Wall\|-Werror\)\b//g" configure
+### remove dependancy on dynamic libstdc++ (GCC 4)
+##mv libtool libtool.bak &&
+##sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-external-ortp --disable-video &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-external-ortp --disable-video LDFLAGS="-Wl,--enable-auto-import" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --disable-external-ortp --disable-video LDFLAGS="-Wl,--enable-auto-import" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-external-ortp --disable-upnp --disable-video --disable-spandsp --disable-zrtp --disable-documentation CFLAGS="-Dbctbx_list_remove_link=bctbx_list_erase_link" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lsrtp2" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-portaudio --enable-external-ortp --disable-video --disable-spandsp --disable-zrtp --disable-documentation CFLAGS="-Dbctbx_list_remove_link=bctbx_list_erase_link" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lsrtp2" &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# wl-showstatus build-install &&
+# ( make install-strip || make install-strip CC="gcc -Wno-error=implicit-function-declaration -Wno-error=int-conversion" || make install-strip CC="gcc -Wno-error=implicit-function-declaration -Wno-error=int-conversion -Wno-error=stringop-truncation -Wno-error=stringop-overflow" ) &&
+# #make -j1 CC="gcc -Wno-strict-prototypes -Wno-error=incompatible-pointer-types"
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && rm -rf $BASENAME-antisip-$VERSION
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf mediastreamer-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mediastreamer-$VERSION
+
+
+
+export NAME="mediastreamer2"
+export STATUS=
+export URL=http://www.linphone.org/technical-corner/mediastreamer2
+#export URL=https://github.com/BelledonneCommunications/mediastreamer2
+export BASENAME=mediastreamer2
+export DESCRIPTION="Mediastreamer2 is a powerful and lightweight streaming engine for voice/video telephony applications. This media processing and streaming toolkit is responsible for receiving and sending all multimedia streams in Linphone, including voice/video capture, encoding and decoding, and rendering."
+export CATEGORY=
+export TYPE=library
+#export VERSION=4.4.24
+#export VERSIONDATE=20210127
+#export VERSION=4.4.25
+#export VERSIONDATE=20210204
+#export VERSION=4.4.26
+#export VERSIONDATE=20210204
+#export VERSION=4.4.27
+#export VERSIONDATE=20210206
+#export VERSION=4.4.28
+#export VERSIONDATE=20210212
+#export VERSION=4.4.29
+#export VERSIONDATE=20210216
+#export VERSION=4.4.31
+#export VERSIONDATE=20210218
+#export VERSION=4.4.32
+#export VERSIONDATE=20210220
+#export VERSION=4.4.33
+#export VERSIONDATE=20210304
+#export VERSION=4.4.34
+#export VERSIONDATE=20210309
+#export VERSION=4.4.35
+#export VERSIONDATE=20210319
+#export VERSION=4.5.0
+#export VERSIONDATE=20210329
+#export VERSION=4.5.1
+#export VERSIONDATE=20210401
+#export VERSION=4.5.3
+#export VERSIONDATE=20210415
+#export VERSION=4.5.7
+#export VERSIONDATE=20210421
+#export VERSION=4.5.10
+#export VERSIONDATE=20210427
+#export VERSION=4.5.13
+#export VERSIONDATE=20210504
+#export VERSION=4.5.14
+#export VERSIONDATE=20210511
+#export VERSION=4.5.15
+#export VERSIONDATE=20210513
+#export VERSION=4.5.16
+#export VERSIONDATE=20210518
+#export VERSION=4.5.20
+#export VERSIONDATE=20210615
+export VERSION=4.5.22
+export VERSIONDATE=20210625
+####src/videofilters/msmfoundationcap.cpp:406:30: error: 'MF_READWRITE_DISABLE_CONVERTERS' was not declared in this scope
+#export VERSION=5.0.0
+#export VERSIONDATE=20210708
+#export VERSION=5.0.3
+#export VERSIONDATE=20210730
+#export VERSION=5.0.6
+#export VERSIONDATE=20210811
+#export VERSION=5.0.8
+#export VERSIONDATE=20210819
+#export VERSION=5.0.10
+#export VERSIONDATE=20210827
+#export VERSION=5.0.11
+#export VERSIONDATE=20210827
+#export VERSION=5.0.13
+#export VERSIONDATE=20210831
+#export VERSION=5.0.16
+#export VERSIONDATE=20210902
+#export VERSION=5.0.18
+#export VERSIONDATE=20210906
+#export VERSION=5.0.22
+#export VERSIONDATE=20210910
+#export VERSION=5.0.23
+#export VERSIONDATE=20210917
+#export VERSION=5.0.24
+#export VERSIONDATE=20210922
+#export VERSION=5.0.26
+#export VERSIONDATE=20210925
+#export VERSION=5.0.27
+#export VERSIONDATE=20210928
+#export VERSION=5.0.28
+#export VERSIONDATE=20210930
+#export VERSION=5.0.32
+#export VERSIONDATE=20211005
+#export VERSION=5.0.35
+#export VERSIONDATE=20211015
+#export VERSION=5.0.37
+#export VERSIONDATE=20211022
+#export VERSION=5.0.66
+#export VERSIONDATE=20220122
+#export VERSION=5.0.67
+#export VERSIONDATE=20220201
+#export VERSION=5.0.68
+#export VERSIONDATE=20220202
+#export VERSION=5.0.70
+#export VERSIONDATE=20220216
+#export VERSION=5.0.71
+#export VERSIONDATE=20220309
+#export VERSION=5.1.0
+#export VERSIONDATE=20220209
+#export VERSION=5.1.2
+#export VERSIONDATE=20220216
+#export VERSION=5.1.3
+#export VERSIONDATE=20220225
+####include/mediastreamer2/msogl_functions.h:45:14: fatal error: GLES2/gl2.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=libdl,bcg729,bctoolbox,ffmpeg4,libbzrtp,libgsm,libopus,libortp,portaudio,pulseaudio,libspeex,libspeexdsp,sqlite3,srtp,libtheora,libxml2,libvpx
+#export DEPENDANCIES=libdl,bcg729,bctoolbox,ffmpeg4,libbzrtp,libgsm,libopus,libortp,portaudio,pulseaudio,libspeex,libspeexdsp,sqlite3,srtp,libtheora,libxml2,libvpx,khronos-opengl-registry
+export OPTIONALDEPENDANCIES=bv16-floatingpoint,libjpeg-turbo
+#bcmatroska2,zxingcpp
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/BelledonneCommunications/mediastreamer2/releases"
+export DOWNLOADURL="https://github.com/BelledonneCommunications/mediastreamer2/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/BelledonneCommunications/mediastreamer2/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/BelledonneCommunications/mediastreamer2/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix src/videofilters/msmfoundationcap.cpp (version >= 4.5.1)
+#patch -ulbf src/videofilters/msmfoundationcap.cpp << EOF
+#@@ -404,4 +404,6 @@
+#                hr = MFCreateAttributes(&attributes, 2);
+#+#ifdef MF_READWRITE_DISABLE_CONVERTERS
+#        if (SUCCEEDED(hr)) //get attributes
+#                hr = attributes->SetUINT32(MF_READWRITE_DISABLE_CONVERTERS, TRUE);
+#+#endif
+#        if (SUCCEEDED(hr)) // Set the callback pointer.
+#EOF
+# fix missing src/videofilters/drawdib-display.c (version >= 4.4.24)
+sed -i.bak -e "s/GWL_USERDATA/GWLP_USERDATA/" src/videofilters/drawdib-display.c
+# fix src/videofilters/msmfoundationcap.cpp (version >= 4.5.3)
+patch -ulbf src/videofilters/msmfoundationcap.cpp << EOF
+@@ -404,4 +404,6 @@
+                hr = MFCreateAttributes(&attributes, 2);
++#ifdef MF_READWRITE_DISABLE_CONVERTERS
+        if (SUCCEEDED(hr)) //get attributes
+                hr = attributes->SetUINT32(MF_READWRITE_DISABLE_CONVERTERS, TRUE);
++#endif
+        if (SUCCEEDED(hr)) // Set the callback pointer.
+EOF
+## fix undefined __in in src/utils/opengles_display.c (version >= 5.1.2)
+#patch -ulbf src/utils/opengles_display.c << EOF
+#@@ -996,3 +996,3 @@
+#
+#-LRESULT CALLBACK WindowProc(__in HWND hWindow,__in UINT uMsg,__in WPARAM wParam,__in LPARAM lParam) {
+#+LRESULT CALLBACK WindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+#     switch (uMsg)
+#EOF
+# fix invalid compiler flag -Wno-shorten-64-to-32 (version >= 4.5.0)
+sed -i.bak -e "s/-Wno-shorten-64-to-32//" CMakeLists.txt
+# avoid precompiled header issue
+sed -i.bak -e "s?videofilters/msmfoundationcap\.h??" src/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$C_INCLUDE_PATH PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig:$PKG_CONFIG_PATH PATH=$MINGWPREFIX/ffmpeg4/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_PORTAUDIO:BOOL=ON -DENABLE_PULSEAUDIO:BOOL=ON -DENABLE_GL:BOOL=OFF -DENABLE_BV16:BOOL=ON -DENABLE_QRCODE:BOOL=OFF -DENABLE_MKV:BOOL=OFF -DENABLE_TOOLS:BOOL=ON -DENABLE_DOC:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -DTURBOJPEG_INCLUDE_DIRS:PATH=$MINGWPREFIX/share/libjpeg-turbo/include -DTURBOJPEG_LIBRARIES:STRING="-L$MINGWPREFIX/share/libjpeg-turbo/lib -lturbojpeg" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DWIN32 -I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+ #C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$MINGWPREFIX/include/khronos:$C_INCLUDE_PATH PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig:$PKG_CONFIG_PATH PATH=$MINGWPREFIX/ffmpeg4/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_PORTAUDIO:BOOL=ON -DENABLE_PULSEAUDIO:BOOL=ON -DENABLE_GL:BOOL=OFF -DENABLE_BV16:BOOL=ON -DENABLE_QRCODE:BOOL=OFF -DENABLE_MKV:BOOL=OFF -DENABLE_TOOLS:BOOL=ON -DENABLE_DOC:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -DTURBOJPEG_INCLUDE_DIRS:PATH=$MINGWPREFIX/share/libjpeg-turbo/include -DTURBOJPEG_LIBRARIES:STRING="-L$MINGWPREFIX/share/libjpeg-turbo/lib -lturbojpeg" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32 -I$(cygpath -m $MINGWPREFIX/include/khronos)" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DWIN32 -I$MINGWPREFIX/include/libdl-win32 -I$(cygpath -m $MINGWPREFIX/include/khronos)" -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ #-DENABLE_QRCODE:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-Dzxing=ZXing"
+ #-DENABLE_MKV:BOOL=ON 
+ #-DENABLE_GL:BOOL=ON
+ # fix missing MFVideoFormat_NV12/MFCreateAttributes/MFEnumDeviceSources/QISearch
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.* -ladvapi32/& -Wl,--as-needed -lmfplat -lmf -lmfreadwrite -lmfuuid -lshlwapi/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$C_INCLUDE_PATH ninja -Cbuild_win install/strip &&
+ #C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$MINGWPREFIX/include/khronos:$C_INCLUDE_PATH CXX_INCLUDE_PATH=$MINGWPREFIX/include/khronos:$CXX_INCLUDE_PATH ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: fix bcmatroska2 with -DENABLE_MKV:BOOL=ON
+####TO DO: fix precompiled header issues with build_win/src/CMakeFiles/mediastreamer.dir/videofilters/msmfoundationcap.h.obj
+####echo ""|g++ -c -xc++ - -o build_win/src/CMakeFiles/mediastreamer.dir/videofilters/msmfoundationcap.h.obj
+
+
+

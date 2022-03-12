@@ -1,0 +1,62 @@
+export NAME="HTTP Parser"
+export STATUS=
+export URL=https://github.com/nodejs/http-parser
+export BASENAME=http-parser
+export DESCRIPTION="This is a parser for HTTP messages written in C. It parses both requests and responses. The parser is designed to be used in performance HTTP applications. It does not make any syscalls nor allocations, it does not buffer data, it can be interrupted at anytime. Depending on your architecture, it only requires about 40 bytes of data per message stream (in a web server that is per connection)."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=2.7.1
+#export VERSIONDATE=20161127
+#export VERSION=2.8.0
+#export VERSIONDATE=20180210
+#export VERSION=2.8.1
+#export VERSIONDATE=20180331
+#export VERSION=2.9.0
+#export VERSIONDATE=20181228
+#export VERSION=2.9.1
+#export VERSIONDATE=20190412
+#export VERSION=2.9.2
+#export VERSIONDATE=20190416
+#export VERSION=2.9.3
+#export VERSIONDATE=20200206
+export VERSION=2.9.4
+export VERSIONDATE=20200324
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE-MIT
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/nodejs/http-parser/releases"
+export DOWNLOADURL="https://github.com/nodejs/http-parser/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/nodejs/http-parser/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/nodejs/http-parser/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix Makefile
+mv Makefile Makefile.bak &&
+#sed -e "s/ln -s/#&/; s/-fPIC//; s/-shared/& -Wl,--out-implib,libhttp_parser.dll.a/" Makefile.bak > Makefile
+sed -e "s/ln -s/#&/; s/-fPIC//; s/-shared/& -Wl,--out-implib,libhttp_parser.dll.a/; s/^\(\(SONAME\|LIBNAME\).*= *\$(SOLIBNAME).\$(SOEXT)\).*$/\1/" Makefile.bak > Makefile
+# fix error: comparison between signed and unsigned integer expressions (version >= 2.9.1)
+patch -ulbf http_parser.c << EOF
+@@ -1500 +1500 @@
+-                const char* limit = p + MIN(data + len - p, max_header_size);
++                const char* limit = p + MIN(data - p + len, max_header_size);
+EOF
+wl-showstatus build-install &&
+ ( make CC=gcc SOEXT=dll SONAME=libhttp_parser.dll PREFIX=$INSTALLPREFIX install || make CC="gcc -Wno-error=implicit-fallthrough" SOEXT=dll SONAME=libhttp_parser.dll PREFIX=$INSTALLPREFIX install ) &&
+ ar cru libhttp_parser.a libhttp_parser.o &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

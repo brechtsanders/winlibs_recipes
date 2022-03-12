@@ -1,0 +1,119 @@
+export NAME="SLib.io"
+export STATUS=
+#export URL=http://slib.io/
+export URL=https://github.com/SLIBIO/SLib/
+export BASENAME=slibio
+export DESCRIPTION="SLib - A universal, efficient, light-weight framework for building cross-platform applications on Android/iOS/macOS/Tizen/Win32/Linux platforms, developed by SLIBIO. Based on C++, provides desktop/mobile widgets, OpenGL rendering and networking solutions."
+export CATEGORY=gui,portability
+export TYPE=library
+#export VERSION=0.23
+#export VERSIONDATE=20180911
+#export VERSION=0.24
+#export VERSIONDATE=20180922
+#export VERSION=0.24.1
+#export VERSIONDATE=20180926
+#export VERSION=0.25
+#export VERSIONDATE=20181015
+#export VERSION=0.26
+#export VERSIONDATE=20181129
+#export VERSION=0.27
+#export VERSIONDATE=20190110
+#export VERSION=0.27.1
+#export VERSIONDATE=20190120
+#export VERSION=0.27.2
+#export VERSIONDATE=20190203
+#export VERSION=0.28
+#export VERSIONDATE=20190205
+export VERSION=0.29
+export VERSIONDATE=20190328
+wl-showstatus --package-version
+export DEPENDANCIES=zxingcpp,hiredis
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MPL
+export DOWNLOADURL="https://github.com/SLIBIO/SLib/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/SLIBIO/SLib/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/SLIBIO/SLib/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd SLib-$VERSION
+patch -ulbf src/slib/core/system_windows.cpp << EOF
+@@ -1 +1,2 @@
++#include <float.h>
+ /*
+@@ -221,3 +222,5 @@
+                if (sig == SIGFPE) {
++#ifndef __MINGW32__
+                        _fpreset();
++#endif
+                }
+@@ -342,3 +345,3 @@
+                char line[512];
+-               char* l = ::gets_s(line);
++               char* l = ::gets_s(line,sizeof(line));
+                line[511] = 0;
+EOF
+# fix src/slib/network/net_capture_pcap.cpp
+mv src/slib/network/net_capture_pcap.cpp src/slib/network/net_capture_pcap.cpp.bak &&
+echo "#include <winsock2.h>" > src/slib/network/net_capture_pcap.cpp &&
+echo "#include <ws2tcpip.h>" >> src/slib/network/net_capture_pcap.cpp &&
+echo "#include <stdio.h>" >> src/slib/network/net_capture_pcap.cpp &&
+#echo "#define SLIB_PLATFORM_IS_WIN32" >> src/slib/network/net_capture_pcap.cpp &&
+sed -e "s?winpcap/\([^ ]*\.h\)?\1?" src/slib/network/net_capture_pcap.cpp.bak >> src/slib/network/net_capture_pcap.cpp
+# fix include paths for external dependancies
+sed -i.bak -e "s?zlib/\(zlib\.h\)?\1?" src/slib/crypto/compress_zlib.cpp
+sed -i.bak -e "s?sqlite/\(sqlite3\.h\)?\1?" src/slib/db/sqlite.cpp
+sed -i.bak -e "s?libmariadb/\([^ ]*\.h\)?mariadb/\1?" src/slib/db/mysql.cpp
+sed -i.bak -e "s?libpng/\(png.*\.h\)?\1?" src/slib/graphics/image_png.cpp
+sed -i.bak -e "s?libjpeg/\(jpeglib\.h\)?\1?" src/slib/graphics/image_jpeg.cpp
+sed -i.bak -e "s?stb/\(stb_image\.h\)?\1?" src/slib/graphics/image_stb.cpp
+sed -i.bak -e "s?freetype/\(ft2build\.h\)?\1?" src/slib/graphics/font_freetype.cpp
+sed -i.bak -e "s?gl/\([^ ]*\.h\)?\1?" src/slib/render/opengl_egl_entries.h
+sed -i.bak -e "s?gl/\([^ ]*\.h\)?\1?; s?gl\.h?GL/&?" src/slib/render/opengl_gl.h
+sed -i.bak -e "s?gl/\([^ ]*\.h\)?\1?" src/slib/render/opengl_gles.h
+# fix missing Gdiplus::Blur in src/slib/graphics/canvas_gdi.cpp
+patch -ulbf src/slib/graphics/canvas_gdi.cpp << EOF
+@@ -507,2 +507,3 @@
+                do {
++#ifndef _WIN32
+                        if (param.isBlur()) {
+@@ -519,2 +520,3 @@
+                        }
++#endif
+                        Gdiplus::RectF rcDst((Gdiplus::REAL)(rectDst.left), (Gdiplus::REAL)(rectDst.top), (Gdiplus::REAL)(rectDst.getWidth()), (Gdiplus::REAL)(rectDst.getHeight()));
+EOF
+# fix missing IDirectSoundNotify8 in src/slib/media/audio_recorder_dsound.cpp
+sed -i.bak -e "s/\(IDirectSoundNotify\)8/\1/g" src/slib/media/audio_recorder_dsound.cpp
+# fix stray / in src/slib/render/opengl_gl.h
+sed -i.bak -e "s///" src/slib/render/opengl_gl.h
+# don't rebuild external dependancies
+sed -i.bak2 -e "s?^.*/external/?#&?" build/CMake/SLib.cmake
+patch -ulbf build/CMake/SLib.cmake << EOF
+@@ -531,5 +531,5 @@
+  \${SLIB_EXTRA_PLATFORM_FILES}
+- \${ZLIB_FILES}
+- \${LIBPNG_FILES}
+- \${LIBJPEG_FILES}
++ #\${ZLIB_FILES}
++ #\${LIBPNG_FILES}
++ #\${LIBJPEG_FILES}
+ )
+EOF
+mkdir -p build_win &&
+wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-DSLIB_PLATFORM_IS_WIN32" -Sbuild/Linux -Bbuild_win &&
+ echo "-I$MINGWPREFIX/include/freetype2 -I$MINGWPREFIX/include/khronos" >> build_win/CMakeFiles/slib.dir/includes_CXX.rsp &&
+ #echo "-I$MINGWPREFIX/include/freetype2 -I$MINGWPREFIX/include/khronos" >> build_win/CMakeFiles/slib-core.dir/includes_CXX.rsp &&
+ wl-showstatus build &&
+ CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$MINGWPREFIX/include/freetype2:$MINGWPREFIX/include/khronos:$MINGWPREFIX/include/pcap make -Cbuild_win &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf SLib-$VERSION
+
+
+

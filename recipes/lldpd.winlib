@@ -1,0 +1,765 @@
+export NAME="lldpd"
+export STATUS=
+export URL=http://vincentbernat.github.io/lldpd/
+export BASENAME=lldpd
+export DESCRIPTION="lldpd is a 802.1ab implementation (LLDP) to help you locate neighbors of all your equipments."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.7.3
+#export VERSIONDATE=20130517
+#export VERSION=0.7.5
+#export VERSIONDATE=20130622
+#export VERSION=0.7.6
+#export VERSIONDATE=20130715
+####configure: error: *** unsupported OS mingw32
+####src/ctl.c:42:21: error: storage size of 'su' isn't known
+#export VERSION=0.7.7
+#export VERSIONDATE=20131110
+#export VERSION=0.7.8
+#export VERSIONDATE=20140413
+#export VERSION=0.7.9
+#export VERSIONDATE=20140528
+#export VERSION=0.7.10
+#export VERSIONDATE=20140722
+#export VERSION=0.7.11
+#export VERSIONDATE=20141009
+#export VERSION=0.7.12
+#export VERSIONDATE=20141123
+#export VERSION=0.7.13
+#export VERSIONDATE=20141230
+#export VERSION=0.7.14
+#export VERSIONDATE=20150405
+#export VERSION=0.7.15
+#export VERSIONDATE=20150521
+#export VERSION=0.7.16
+#export VERSIONDATE=20150811
+#export VERSION=0.7.17
+#export VERSIONDATE=20150910
+#export VERSION=0.7.18
+#export VERSIONDATE=20150925
+#export VERSION=0.7.19
+#export VERSIONDATE=20151018
+#export VERSION=0.9.1
+#export VERSIONDATE=20160222
+####src/daemon/edp.c:27:21: fatal error: fnmatch.h: No such file or directory
+#export VERSION=0.9.2
+#export VERSIONDATE=20160405
+#export VERSION=0.9.3
+#export VERSIONDATE=20160613
+####src/lib/helpers.c:48:2: error: 'for' loop initial declarations are only allowed in C99 mode
+####src/daemon/priv.c:263:9: error: variable 'ifr' has initializer but incomplete type
+#export VERSION=0.9.4
+#export VERSIONDATE=20160618
+#export VERSION=0.9.5
+#export VERSIONDATE=20161001
+#export VERSION=0.9.6
+#export VERSIONDATE=20170121
+#export VERSION=0.9.7
+#export VERSIONDATE=20170320
+#export VERSION=0.9.8
+#export VERSIONDATE=20170821
+#export VERSION=0.9.9
+#export VERSIONDATE=20171122
+#export VERSION=1.0.0
+#export VERSIONDATE=20180409
+#export VERSION=1.0.1
+#export VERSIONDATE=20180409
+#export VERSION=1.0.2
+#export VERSIONDATE=20181201
+#export VERSION=1.0.3
+#export VERSIONDATE=20181211
+#export VERSION=1.0.4
+#export VERSIONDATE=20190615
+#export VERSION=1.0.5
+#export VERSIONDATE=20200202
+#export VERSION=1.0.6
+#export VERSIONDATE=20200906
+#export VERSION=1.0.7
+#export VERSIONDATE=20201031
+#export VERSION=1.0.8
+#export VERSIONDATE=20210114
+####src/daemon/priv.c:272:9: error: variable 'ifr' has initializer but incomplete type
+#export VERSION=1.0.9
+#export VERSIONDATE=20210402
+#export VERSION=1.0.10
+#export VERSIONDATE=20210409
+#export VERSION=1.0.11
+#export VERSIONDATE=20210502
+#export VERSION=1.0.12
+#export VERSIONDATE=20210821
+export VERSION=1.0.13
+export VERSIONDATE=20211113
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2,libjansson,libevent,netsnmp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=README.md
+export LICENSETYPE="ISC license"
+#export DOWNLOADURL="http://vincentbernat.github.io/lldpd/installation.html"
+export DOWNLOADURL="https://github.com/vincentbernat/lldpd/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://media.luffy.cx/files/lldpd/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/vincentbernat/lldpd/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/vincentbernat/lldpd/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/net winfix/netinet winfix/arpa
+touch winfix/net/if.h winfix/netinet/in.h winfix/sys/un.h winfix/arpa/inet.h winfix/sys/ioctl.h
+cat > winfix/sys/socket.h << EOF
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#ifndef ENETDOWN
+#define ENETDOWN 116
+#endif
+EOF
+cat > winfix/syslog.h << EOF
+#define LOG_EMERG   0    //system is unusable
+#define LOG_ALERT   1    //action must be taken immediately
+#define LOG_CRIT    2    //critical conditions
+#define LOG_ERR     3    //error conditions
+#define LOG_WARNING 4    //warning conditions
+#define LOG_NOTICE  5    //normal but significant condition
+#define LOG_INFO    6    //informational
+#define LOG_DEBUG   7    //debug-level messages
+#define LOG_PID    0x01    //log the pid with each message
+#define LOG_NDELAY 0x08    //don't delay open
+#define LOG_DAEMON (3<<3)
+static void openlog (const char *ident, int option, int facility) {}
+#include <stdarg.h>
+static void vsyslog (int priority, const char *format, va_list ap) {}
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+int asprintf (char **strp, const char *fmt, ...)
+{
+  int size;
+  va_list args;
+  va_start(args, fmt);
+  if ((size = vsnprintf(NULL, 0, fmt, args)) < 0)
+    return size;
+  if ((*strp = (char*)malloc((size_t)size + 1)) == NULL)
+    return -1;
+  return vsnprintf(*strp, (size_t)size + 1, fmt, args);
+} 
+EOF
+cat > winfix/pwd.h << EOF
+typedef int uid_t;
+#define getuid() 0
+#define geteuid() 0
+EOF
+cat > winfix/grp.h << EOF
+typedef int gid_t;
+#define getgid() 0
+#define getegid() 0
+EOF
+touch winfix/sys/wait.h winfix/netdb.h
+cat > winfix/sys/utsname.h << EOF
+struct utsname {
+ char* nodename;
+};
+static int uname(struct utsname* ut)
+{
+ ut->nodename = NULL;
+ return -1;
+}
+struct sockaddr_un {};
+EOF
+# fix src/lldpd-structs.h
+patch -ulbf src/lldpd-structs.h << EOF
+--- src/lldpd-structs.h  2013-05-08 18:07:16 +0200
++++ src/lldpd-structs.h  2013-05-18 21:06:18 +0200
+@@ -25,3 +25,7 @@
+ #include <sys/types.h>
+-#include <sys/socket.h>
++#ifdef __MINGW32__
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#define IFNAMSIZ 128
++#endif
+
+EOF
+## fix already defined interface in src/lib/lldpctl.h (version <= 1.0.4 <= 1.0.8)
+#patch -ulbf src/lib/lldpctl.h << EOF
+#--- src/lib/lldpctl.h  2013-05-08 18:07:16 +0200
+#+++ src/lib/lldpctl.h  2013-05-28 22:32:42 +0200
+#@@ -442,3 +442,3 @@
+#     lldpctl_change_t type,
+#-    lldpctl_atom_t *interface,
+#+    lldpctl_atom_t *iface,
+#     lldpctl_atom_t *neighbor,
+#EOF
+# fix already defined interface in src/lib/lldpctl.h (version >= 1.0.9)
+patch -ulbf src/lib/lldpctl.h << EOF
+@@ -481 +481 @@
+-    lldpctl_atom_t *interface,
++    lldpctl_atom_t *iface,
+@@ -500 +500 @@
+-    lldpctl_atom_t *interface,
++    lldpctl_atom_t *iface,
+EOF
+## fix already defined interface in src/lib/lldpctl.h (version >= 1.0.6)
+#patch -ulbf src/lib/lldpctl.h << EOF
+#@@ -480,3 +480,3 @@
+#     lldpctl_change_t type,
+#-    lldpctl_atom_t *interface,
+#+    lldpctl_atom_t *iface,
+#     lldpctl_atom_t *neighbor,
+#@@ -499,3 +499,3 @@
+# typedef void (*lldpctl_change_callback2)(lldpctl_change_t type,
+#-    lldpctl_atom_t *interface,
+#+    lldpctl_atom_t *iface,
+#     lldpctl_atom_t *neighbor,
+#EOF
+## fix already defined interface in src/lib/connection.c (version >= 1.0.4 <= 1.0.8)
+#patch -ulbf src/lib/connection.c << EOF
+#--- src/lib/connection.c  2013-05-07 22:05:20 +0200
+#+++ src/lib/connection.c  2013-05-28 22:34:18 +0200
+#@@ -187,3 +187,3 @@
+#        lldpctl_change_t type;
+#-       lldpctl_atom_t *interface = NULL, *neighbor = NULL;
+#+       lldpctl_atom_t *iface = NULL, *neighbor = NULL;
+#        rc = ctl_msg_recv_unserialized(&conn->input_buffer,
+#@@ -207,5 +207,5 @@
+#                }
+#-               interface = _lldpctl_new_atom(conn, atom_interface,
+#+               iface = _lldpctl_new_atom(conn, atom_interface,
+#                    change->ifname);
+#-               if (interface == NULL) goto end;
+#+               if (iface == NULL) goto end;
+#                neighbor = _lldpctl_new_atom(conn, atom_port,
+#@@ -213,3 +213,3 @@
+#                if (neighbor == NULL) goto end;
+#-               conn->watch_cb(conn, type, interface, neighbor, conn->watch_data);
+#+               conn->watch_cb(conn, type, iface, neighbor, conn->watch_data);
+#                conn->watch_triggered = 1;
+#@@ -219,3 +219,3 @@
+# end:
+#-       if (interface) lldpctl_atom_dec_ref(interface);
+#+       if (iface) lldpctl_atom_dec_ref(iface);
+#        if (neighbor) lldpctl_atom_dec_ref(neighbor);
+#EOF
+# fix already defined interface in src/lib/connection.c (version >= 1.0.9)
+patch -ulbf src/lib/connection.c << EOF
+@@ -189 +189 @@
+-       lldpctl_atom_t *interface = NULL, *neighbor = NULL;
++       lldpctl_atom_t *iface = NULL, *neighbor = NULL;
+@@ -209 +209 @@
+-               interface = _lldpctl_new_atom(conn, atom_interface,
++               iface = _lldpctl_new_atom(conn, atom_interface,
+@@ -211 +211 @@
+-               if (interface == NULL) goto end;
++               if (iface == NULL) goto end;
+@@ -216 +216 @@
+-                       conn->watch_cb(conn, type, interface, neighbor, conn->watch_data);
++               conn->watch_cb(conn, type, iface, neighbor, conn->watch_data);
+@@ -218 +218 @@
+-                       conn->watch_cb2(type, interface, neighbor, conn->watch_data);
++                       conn->watch_cb2(type, iface, neighbor, conn->watch_data);
+@@ -224 +224 @@
+-       if (interface) lldpctl_atom_dec_ref(interface);
++       if (iface) lldpctl_atom_dec_ref(iface);
+EOF
+## fix already defined interface in src/lib/connection.c (version >= 1.0.6)
+#patch -ulbf src/lib/connection.c << EOF
+#@@ -188,3 +188,3 @@
+#        lldpctl_change_t type;
+#-       lldpctl_atom_t *interface = NULL, *neighbor = NULL;
+#+       lldpctl_atom_t *iface = NULL, *neighbor = NULL;
+#        rc = ctl_msg_recv_unserialized(&conn->input_buffer,
+#@@ -208,5 +208,5 @@
+#                }
+#-               interface = _lldpctl_new_atom(conn, atom_interface,
+#+               iface = _lldpctl_new_atom(conn, atom_interface,
+#                    change->ifname);
+#-               if (interface == NULL) goto end;
+#+               if (iface == NULL) goto end;
+#                neighbor = _lldpctl_new_atom(conn, atom_port, 0,
+#@@ -215,5 +215,5 @@
+#                if (conn->watch_cb)
+#-                       conn->watch_cb(conn, type, interface, neighbor, conn->watch_data);
+#+               conn->watch_cb(conn, type, iface, neighbor, conn->watch_data);
+#                else
+#-                       conn->watch_cb2(type, interface, neighbor, conn->watch_data);
+#+                       conn->watch_cb2(type, iface, neighbor, conn->watch_data);
+#                conn->watch_triggered = 1;
+#@@ -223,3 +223,3 @@
+# end:
+#-       if (interface) lldpctl_atom_dec_ref(interface);
+#+       if (iface) lldpctl_atom_dec_ref(iface);
+#        if (neighbor) lldpctl_atom_dec_ref(neighbor);
+#EOF
+# fix missing uint8_t in include/netinet/if_ether.h
+mv include/netinet/if_ether.h include/netinet/if_ether.h.bak
+echo "#include <stdint.h>" > include/netinet/if_ether.h
+cat include/netinet/if_ether.h.bak >> include/netinet/if_ether.h
+# fix src/ctl.c to avoid UNIX sockets
+patch -ulbf src/ctl.c << EOF
+--- src/ctl.c   2013-05-07 22:26:10 +0200
++++ src/ctl.c   2013-06-19 10:37:42 +0200
+@@ -39,4 +39,7 @@
+ ctl_create(const char *name)
+ {
++#ifdef __MINGW32__
++       return -1;
++#else
+        int s;
+        struct sockaddr_un su;
+@@ -61,4 +64,5 @@
+        }
+        return s;
++#endif
+ }
+
+@@ -72,4 +76,7 @@
+ ctl_connect(const char *name)
+ {
++#ifdef __MINGW32__
++       return -1;
++#else
+        int s;
+        struct sockaddr_un su;
+@@ -89,4 +96,5 @@
+        }
+        return s;
++#endif
+ }
+
+@@ -99,7 +107,9 @@
+ ctl_cleanup(const char *name)
+ {
++#ifndef __MINGW32__
+        log_debug("control", "cleanup control socket");
+        if (unlink(name) == -1)
+                log_warn("control", "unable to unlink %s", name);
++#endif
+ }
+
+EOF
+# fix src/client/lldpcli.c
+mv src/client/lldpcli.c src/client/lldpcli.c.bak
+cat > src/client/lldpcli.c << EOF
+#include <pwd.h>
+#include <grp.h>
+#define scandir(dirp,namelist,filter,compar) -1
+#include "../compat/compat.h"
+#include <malloc.h>
+#include <string.h>
+char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+EOF
+#cat src/client/lldpcli.c.bak >> src/client/lldpcli.c
+sed -e "s?\(signal(\)?//\1?" src/client/lldpcli.c.bak >> src/client/lldpcli.c
+# avoid struct sockaddr_un in src/daemon/lldpd.h
+patch -ulbf src/daemon/lldpd.h << EOF
+--- src/daemon/lldpd.h  2013-06-23 09:20:50 +0200
++++ src/daemon/lldpd.h  2013-06-23 09:21:04 +0200
+@@ -221,3 +221,5 @@
+ int     priv_iface_multicast(const char *, u_int8_t *, int);
++#ifdef HOST_OS_LINUX
+ int     priv_snmp_socket(struct sockaddr_un *);
++#endif
+
+EOF
+# fix missing uid_t/gid_t in src/daemon/frame.c
+mv src/daemon/frame.c src/daemon/frame.c.bak
+echo "#include <pwd.h>" > src/daemon/frame.c
+echo "#include <grp.h>" >> src/daemon/frame.c
+cat src/daemon/frame.c.bak >> src/daemon/frame.c
+# fix missing uid_t/gid_t in src/daemon/lldp.c
+mv src/daemon/lldp.c src/daemon/lldp.c.bak
+echo "#include <pwd.h>" > src/daemon/lldp.c
+echo "#include <grp.h>" >> src/daemon/lldp.c
+cat src/daemon/lldp.c.bak >> src/daemon/lldp.c
+# fix missing uid_t/gid_t in src/daemon/cdp.c
+mv src/daemon/cdp.c src/daemon/cdp.c.bak
+cat > src/daemon/cdp.c << EOF
+#include <pwd.h>
+#include <grp.h>
+#include <sys/socket.h>
+EOF
+cat src/daemon/cdp.c.bak >> src/daemon/cdp.c
+# fix missing uid_t/gid_t in src/daemon/sonmp.c
+mv src/daemon/sonmp.c src/daemon/sonmp.c.bak
+cat > src/daemon/sonmp.c << EOF
+#include <pwd.h>
+#include <grp.h>
+#include <sys/socket.h>
+EOF
+cat src/daemon/sonmp.c.bak >> src/daemon/sonmp.c
+# fix missing uid_t/gid_t in src/daemon/lldpd.h
+patch -ulbf src/daemon/lldpd.h << EOF
+--- src/daemon/lldpd.h  2013-06-23 09:20:50 +0200
++++ src/daemon/lldpd.h  2013-06-23 09:27:08 +0200
+@@ -212,3 +212,7 @@
+ /* priv.c */
++#ifdef HOST_OS_LINUX
+ void    priv_init(const char*, int, uid_t, gid_t);
++#else
++#define priv_init(s,n,u,g)
++#endif
+ void    priv_ctl_cleanup(const char *ctlname);
+@@ -221,3 +225,5 @@
+ int     priv_iface_multicast(const char *, u_int8_t *, int);
++#ifdef HOST_OS_LINUX
+ int     priv_snmp_socket(struct sockaddr_un *);
++#endif
+
+EOF
+## fix missing inet_ntop in src/lib/atom-private.c (version >= 0.7.6 <= 0.7.14)
+#mv src/lib/atom-private.c src/lib/atom-private.c.bak
+#cat > src/lib/atom-private.c << EOF
+##include <stdio.h>
+##include <winsock2.h>
+#const char* inet_ntop (int af, void const *src, char *dst, size_t size)
+#{
+#  switch (af) {
+#    case AF_INET:
+#    {
+#      char tmp[16];
+#      sprintf(tmp, "%u.%u.%u.%u", ((unsigned char*)src)[0], ((unsigned char*)src)[1], ((unsigned char*)src)[2], ((unsigned char*)src)[3]);
+#      return strcpy(dst, tmp);
+#    }
+#    default:
+#      return NULL;//to do: implement AF_INET6
+#  }
+#}
+#EOF
+#cat src/lib/atom-private.c.bak >> src/lib/atom-private.c
+## fix missing inet_ntop in src/lib/atoms/port.c (version >= 0.7.14)
+#mv src/lib/atoms/port.c src/lib/atoms/port.c.bak
+#cat > src/lib/atoms/port.c << EOF
+##include <stdio.h>
+##include <winsock2.h>
+#const char* inet_ntop (int af, void const *src, char *dst, size_t size)
+#{
+#  switch (af) {
+#    case AF_INET:
+#    {
+#      char tmp[16];
+#      sprintf(tmp, "%u.%u.%u.%u", ((unsigned char*)src)[0], ((unsigned char*)src)[1], ((unsigned char*)src)[2], ((unsigned char*)src)[3]);
+#      return strcpy(dst, tmp);
+#    }
+#    default:
+#      return NULL;//to do: implement AF_INET6
+#  }
+#}
+#EOF
+#cat src/lib/atoms/port.c.bak >> src/lib/atoms/port.c
+# fix missing inet_ntop in src/lib/atoms/port.c (version >= 0.7.14)
+mv src/lib/atoms/port.c src/lib/atoms/port.c.bak
+cat > src/lib/atoms/port.c << EOF
+#if _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat src/lib/atoms/port.c.bak >> src/lib/atoms/port.c
+## fix missing inet_ntop in src/lib/atoms/chassis.c (version >= 0.9.5)
+#mv src/lib/atoms/chassis.c src/lib/atoms/chassis.c.bak
+#cat > src/lib/atoms/chassis.c << EOF
+##include <stdio.h>
+##include <winsock2.h>
+##define inet_ntop CHASSIS_C_inet_ntop
+#const char* inet_ntop (int af, void const *src, char *dst, size_t size)
+#{
+#  switch (af) {
+#    case AF_INET:
+#    {
+#      char tmp[16];
+#      sprintf(tmp, "%u.%u.%u.%u", ((unsigned char*)src)[0], ((unsigned char*)src)[1], ((unsigned char*)src)[2], ((unsigned char*)src)[3]);
+#      return strcpy(dst, tmp);
+#    }
+#    default:
+#      return NULL;//to do: implement AF_INET6
+#  }
+#}
+#EOF
+#cat src/lib/atoms/chassis.c.bak >> src/lib/atoms/chassis.c
+# fix missing fnmatch.h
+echo "#define fnmatch(p,s,f) 0" > winfix/fnmatch.h
+# fix redefinition of vsyslog in src/compat/vsyslog.c (version >= 0.7.8)
+mv src/compat/vsyslog.c src/compat/vsyslog.c.bak
+touch src/compat/vsyslog.c
+# fix src/compat/daemon.c (version >= 0.7.8)
+mv src/compat/daemon.c src/compat/daemon.c.bak
+cat > src/compat/daemon.c << EOF
+#include <stdlib.h>
+#include <stdio.h>
+#define setsid() -1
+#define fork() -1
+EOF
+cat src/compat/daemon.c.bak >> src/compat/daemon.c
+# fix asprintf/vasprintf issues in src/log.c (version >= 0.7.9)
+if ( gcc --version | grep -q "MinGW-W64" ); then
+ mv src/compat/asprintf.c src/compat/asprintf.c.bak &&
+ touch src/compat/asprintf.c
+fi
+## fix asprintf/vasprintf issues in src/log.c (version >= 0.7.9)
+#mv src/log.c src/log.c.bak
+#cat > src/log.c << EOF
+##include "compat/asprintf.c.bak"
+#EOF
+#cat src/log.c.bak >> src/log.c
+## fix asprintf/vasprintf issues in src/log.c (version >= 0.7.9)
+#mv src/log.c src/log.c.bak
+#cat > src/log.c << EOF
+##include <libintl.h>
+##undef asprintf
+##define asprintf libintl_asprintf
+##undef vasprintf
+##define vasprintf libintl_vasprintf
+#EOF
+#cat src/log.c.bak >> src/log.c
+## fix asprintf/vasprintf issues in src/log.c (version >= 0.7.9)
+#mv src/log.c src/log.c.bak
+#echo "#include <libintl.h>" > src/log.c
+#cat src/log.c.bak >> src/log.c
+## fix missing vasprintf in src/log.c (version >= 0.7.9)
+#mv src/log.c src/log.c.bak
+#cat > src/log.c << EOF
+##include <stdlib.h>
+##include <stdarg.h>
+#int vasprintf (char **strp, const char *fmt, va_list ap)
+#{
+#  va_list args;
+#  int len;
+#  va_copy (args, ap);
+#  len = vsnprintf (NULL, 0, fmt, args);
+#  va_end (args);
+#  char *str = malloc (len + 1);
+#  if (str != NULL) {
+#    va_copy (args, ap);
+#    vsprintf (str, fmt, args);
+#    va_end (args);
+#  } else {
+#    len = -1;
+#  }
+#  *strp = str;
+#  return len;
+#}
+#EOF
+#cat src/log.c.bak >> src/log.c
+# create fake src/log.c (version >= 0.9.1)
+mv src/log.c src/log.c.bak
+cat > src/log.c << EOF
+void log_init(int n_syslog, int n_debug, const char *progname) {}
+void log_warn(const char *token, const char *emsg, ...) {}
+void log_warnx(const char *token, const char *emsg, ...) {}
+void log_info(const char *token, const char *emsg, ...) {}
+void log_debug(const char *token, const char *emsg, ...) {}
+void fatal(const char *token, const char *emsg) {}
+void fatalx(const char *token, const char *emsg) {}
+void log_register(void (*cb)(int, const char*)) {}
+void log_accept(const char *token) {}
+void log_level(int n_debug) {}
+EOF
+# fix missing ENETDOWN in src/daemon/edp.c
+patch -ulbf src/daemon/edp.c << EOF
+--- src/daemon/edp.c  2014-04-13 11:52:08 +0200
++++ src/daemon/edp.c  2014-06-02 15:04:16 +0200
+@@ -1 +1,5 @@
++#include <winsock2.h>
++#ifndef ENETDOWN
++#define ENETDOWN WSAENETDOWN
++#endif
+ /* -*- mode: c; c-file-style: "openbsd" -*- */
+EOF
+# fix redefinition of interface in src/lib/atoms/interface.c (version >= 0.7.15)
+patch -ulbf src/lib/atoms/interface.c << EOF
+--- src/lib/atoms/interface.c  2015-05-21 08:03:45.000000000 +0200
++++ src/lib/atoms/interface.c  2015-05-21 19:58:24.237666100 +0200
+@@ -113,3 +113,3 @@
+
+-static struct atom_builder interface =
++static struct atom_builder interfac =
+        { atom_interface, sizeof(struct _lldpctl_atom_interface_t),
+@@ -120,3 +120,3 @@
+ ATOM_BUILDER_REGISTER(interfaces_list, 2);
+-ATOM_BUILDER_REGISTER(interface,       3);
++ATOM_BUILDER_REGISTER(interfac,       3);
+
+EOF
+# fix redefinition of min in src/lib/atoms/custom.c (cersion >= 0.9.4)
+patch -ulbf src/lib/atoms/custom.c << EOF
+--- src/lib/atoms/custom.c  2016-03-01 19:46:54.000000000 +0100
++++ src/lib/atoms/custom.c  2016-06-20 08:45:02.196421100 +0200
+@@ -30,3 +30,5 @@
+
++#ifndef min
+ #define min(x,y)       ( (x > y) ? y : x )
++#endif
+
+EOF
+# fix for loop src/lib/helpers.c (version >= 0.9.4)
+####src/lib/helpers.c:48:2: error: 'for' loop initial declarations are only allowed in C99 or C11 mode
+patch -ulbf src/lib/helpers.c << EOF
+--- src/lib/helpers.c  2015-12-29 23:49:08.000000000 +0100
++++ src/lib/helpers.c  2016-06-20 09:05:29.480137200 +0200
+@@ -47,3 +47,4 @@
+
+-       for (unsigned int i = 0; list[i].string != NULL; i++) {
++       unsigned int i;
++       for (i = 0; list[i].string != NULL; i++) {
+                if (!strcasecmp(list[i].string, string))
+
+EOF
+## don't use UNIX sockets in src/client/commands.c (version >= 1.0.6)
+#patch -ulbf src/client/commands.c << EOF
+#@@ -447,2 +447,6 @@
+#                if (best->execute) {
+#+#ifdef _WIN32
+#+                       log_debug("lldpctl", "UNIX sockets not supported");
+#+                       goto end;
+#+#else
+#                        struct sockaddr_un su;
+#@@ -478,2 +482,3 @@
+#                        if (rc == -1) goto end;
+#+#endif
+#                }
+#EOF
+## fix src/lib/lldpctl.h (version >= 1.0.7)
+#patch -ulbf src/lib/lldpctl.h << EOF
+#@@ -499,3 +499,3 @@
+# typedef void (*lldpctl_change_callback2)(lldpctl_change_t type,
+#-    lldpctl_atom_t *interface,
+#+    lldpctl_atom_t *iface,
+#     lldpctl_atom_t *neighbor,
+#EOF
+## fix src/lib/connection.c (version >= 1.0.7)
+#patch -ulbf src/lib/connection.c << EOF
+#@@ -188,3 +188,3 @@
+#        lldpctl_change_t type;
+#-       lldpctl_atom_t *interface = NULL, *neighbor = NULL;
+#+       lldpctl_atom_t *iface = NULL, *neighbor = NULL;
+#        rc = ctl_msg_recv_unserialized(&conn->input_buffer,
+#@@ -208,5 +208,5 @@
+#                }
+#-               interface = _lldpctl_new_atom(conn, atom_interface,
+#+               iface = _lldpctl_new_atom(conn, atom_interface,
+#                    change->ifname);
+#-               if (interface == NULL) goto end;
+#+               if (iface == NULL) goto end;
+#                neighbor = _lldpctl_new_atom(conn, atom_port, 0,
+#@@ -215,5 +215,5 @@
+#                if (conn->watch_cb)
+#-                       conn->watch_cb(conn, type, interface, neighbor, conn->watch_data);
+#+               conn->watch_cb(conn, type, iface, neighbor, conn->watch_data);
+#                else
+#-                       conn->watch_cb2(type, interface, neighbor, conn->watch_data);
+#+                       conn->watch_cb2(type, iface, neighbor, conn->watch_data);
+#                conn->watch_triggered = 1;
+#@@ -223,3 +223,3 @@
+# end:
+#-       if (interface) lldpctl_atom_dec_ref(interface);
+#+       if (iface) lldpctl_atom_dec_ref(iface);
+#        if (neighbor) lldpctl_atom_dec_ref(neighbor);
+#EOF
+## fix src/client/commands.c (version >= 1.0.7)
+#patch -ulbf src/client/commands.c << EOF
+#@@ -447,2 +447,7 @@
+#                if (best->execute) {
+#+#if _WIN32
+#+                       log_warn("lldpctl", "UNIX sockets not supported on Windows");
+#+                       rc = -1;
+#+                       goto end;
+#+#else
+#                        struct sockaddr_un su;
+#@@ -478,2 +483,3 @@
+#                        if (rc == -1) goto end;
+#+#endif
+#                }
+#EOF
+# fix src/daemon/priv.c (version >= 1.0.9)
+patch -ulbf src/daemon/priv.c << EOF
+@@ -272,3 +272,5 @@
+        int sock = -1, add, rc = 0;
++#if defined HOST_OS_LINUX || defined HOST_OS_FREEBSD || defined HOST_OS_OSX || defined HOST_OS_DRAGONFLY || defined HOST_OS_OPENBSD || defined HOST_OS_NETBSD || defined HOST_OS_SOLARIS
+        struct ifreq ifr = { .ifr_name = {} };
++#endif
+        must_read(PRIV_PRIVILEGED, ifr.ifr_name, IFNAMSIZ);
+EOF
+## fix src/client/commands.c (version >= 1.0.9 <= 1.0.11)
+#patch -ulbf src/client/commands.c << EOF
+#@@ -447,2 +447,5 @@
+#                if (best->execute) {
+#+#ifdef _WIN32
+#+                       rc = -1;
+#+#else
+#                        struct sockaddr_un su;
+#@@ -477,2 +480,3 @@
+#                        }
+#+#endif
+#                        if (rc == -1) goto end;
+#EOF
+# fix unsupported lockf in src/client/commands.c (version >= 1.0.12)
+patch -ulbf src/client/commands.c << EOF
+@@ -468,3 +468,8 @@
+                                }
++#ifdef _WIN32
++                               {
++                                       log_warn("lldpctl", "cannot get lock (not supported on Windows) on %s", lockname);
++#else
+                                if (lockf(lockfd, F_LOCK, 0) == -1) {
++#endif
+                                        log_warn("lldpctl", "cannot get lock on
+%s", lockname);
+@@ -476,2 +481,3 @@
+                        rc = best->execute(conn, w, &env, best->arg) != 1 ? -1 : rc;
++#ifndef _WIN32
+                        if (needlock && lockf(lockfd, F_ULOCK, 0) == -1) {
+@@ -480,2 +486,3 @@
+                        }
++#endif
+                        if (rc == -1) goto end;
+EOF
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+# fix missing extension in src/client/Makefile
+mv src/client/Makefile.in src/client/Makefile.in.bak
+sed -e "s/\(rm -f lldpctl\)/\1\$(EXEEXT)/; s/\(lldpcli\)\( lldpctl\)/\1\$(EXEEXT)\2\$(EXEEXT)/" src/client/Makefile.in.bak > src/client/Makefile.in
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+# avoid supported OS detection failure
+patch -ulbf configure << EOF
+--- configure  2013-05-12 11:01:50 +0200
++++ configure  2013-05-17 17:09:12 +0200
+@@ -19656,3 +19656,3 @@
+ \$as_echo "no" >&6; }
+-     as_fn_error \$? "*** unsupported OS \$host_os" "\$LINENO" 5
++     as_fn_warning \$? "*** unsupported OS \$host_os" "\$LINENO" 5
+   fi
+EOF
+# don't use -fstack-protector compiler flags (version >= 0.7.9)
+sed -i.bak -e "s/\(-fstack-protector\)/\1BAD/g" configure
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-readline --with-snmp --with-xml --without-json CFLAGS="-I`pwd`/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -lintl" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-readline --with-snmp --with-xml CFLAGS="-I`pwd`/winfix" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -Wl,-lws2_32 -Wl,-lintl" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #( ( make && make install-strip ) || ( make -Csrc/lib install-strip && make -Csrc/client && mkdir -p $INSTALLPREFIX/sbin && cp -f src/client/lldpcli.exe $INSTALLPREFIX/sbin/ && make -j1 -Csrc/client install-strip ) ) &&
+ (( make CC="gcc -I$(pwd)/winfix" && make install-strip CC="gcc -I$(pwd)/winfix" ) || ( make -Csrc/lib install-strip CC="gcc -I$(pwd)/winfix" && make -Csrc/client CC="gcc -I$(pwd)/winfix" && mkdir -p $INSTALLPREFIX/sbin && cp -f src/client/lldpcli.exe $INSTALLPREFIX/sbin/ && make -j1 -Csrc/client install-strip CC="gcc -I$(pwd)/winfix" )) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####$MINGWPREFIX/sbin/lldpcli.exe --version
+####TO DO: also build src/daemon
+
+
+

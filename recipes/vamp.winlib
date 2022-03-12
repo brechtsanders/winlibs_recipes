@@ -1,0 +1,97 @@
+export NAME="The Vamp audio analysis plugin system"
+export STATUS=
+export URL=http://www.vamp-plugins.org/
+export BASENAME=vamp
+export DESCRIPTION="Vamp is an audio processing plugin system for plugins that extract descriptive information from audio data - typically referred to as audio analysis plugins or audio feature extraction plugins."
+export CATEGORY=audio,dataprocessing
+export TYPE=library
+#export VERSION=2.6
+#export VERSIONDATE=20160815
+#export VERSION=2.7
+#export VERSIONDATE=20170225
+#export VERSION=2.7.1
+#export VERSIONDATE=20170306
+#export VERSION=2.9.0
+#export VERSIONDATE=20191112
+export VERSION=2.10.0
+export VERSIONDATE=20200518
+wl-showstatus --package-version
+export DEPENDANCIES=libsndfile
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD-Style
+#export DOWNLOADURL="http://www.vamp-plugins.org/develop.html"
+export DOWNLOADURL="https://code.soundsoftware.ac.uk/projects/vamp-plugin-sdk/files"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://code.soundsoftware.ac.uk/attachments/download/1520/vamp-plugin-sdk-2.6.tar.gz
+#export DOWNLOADSOURCEURL=https://code.soundsoftware.ac.uk/attachments/download/2190/vamp-plugin-sdk-2.7.tar.gz
+#export DOWNLOADSOURCEURL=https://code.soundsoftware.ac.uk/attachments/download/2206/vamp-plugin-sdk-2.7.1.tar.gz
+#export DOWNLOADSOURCEURL=https://code.soundsoftware.ac.uk/attachments/download/2588/vamp-plugin-sdk-2.9.0.tar.gz
+export DOWNLOADSOURCEURL=https://code.soundsoftware.ac.uk/attachments/download/2691/vamp-plugin-sdk-2.10.0.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/vamp-plugin-sdk-$VERSION.tar.gz
+cd vamp-plugin-sdk-$VERSION
+# fix missing M_PI in src/vamp-hostsdk/Window.h (version >= 2.7)
+mv src/vamp-hostsdk/Window.h src/vamp-hostsdk/Window.h.bak
+cat > src/vamp-hostsdk/Window.h << EOF
+#define _USE_MATH_DEFINES
+#include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+EOF
+cat src/vamp-hostsdk/Window.h.bak >> src/vamp-hostsdk/Window.h
+## fix missing strdup in src/vamp-sdk/PluginAdapter.cpp (version >= 2.7.1)
+#mv src/vamp-sdk/PluginAdapter.cpp src/vamp-sdk/PluginAdapter.cpp.bak
+#cat > src/vamp-sdk/PluginAdapter.cpp << EOF
+##include <malloc.h>
+##include <string.h>
+##define strdup ::my_strdup
+#char* my_strdup (const char* s)
+#{
+#  char* result = NULL;
+#  if (s) {
+#    if ((result = (char*)malloc(strlen(s) + 1)) != NULL) {
+#      strcpy(result, s);
+#    }
+#  }
+#  return result;
+#}
+#EOF
+#cat src/vamp-sdk/PluginAdapter.cpp.bak >> src/vamp-sdk/PluginAdapter.cpp
+## fix missing strdup in src/vamp-hostsdk/host-c.cpp (version >= 2.7.1)
+#mv src/vamp-hostsdk/host-c.cpp src/vamp-hostsdk/host-c.cpp.bak
+#cat > src/vamp-hostsdk/host-c.cpp << EOF
+##include <malloc.h>
+##include <string.h>
+##define strdup ::my_strdup
+#char* my_strdup (const char* s)
+#{
+#  char* result = NULL;
+#  if (s) {
+#    if ((result = (char*)malloc(strlen(s) + 1)) != NULL) {
+#      strcpy(result, s);
+#    }
+#  }
+#  return result;
+#}
+#EOF
+#cat src/vamp-hostsdk/host-c.cpp.bak >> src/vamp-hostsdk/host-c.cpp
+# create .dll instead of .so shared libraries
+mv Makefile.in Makefile.in.bak &&
+sed -e "s/^\(INSTALL_SDK_LIBNAME\|INSTALL_SDK_LINK_ABI\)\(.*=.*libvamp-sdk\)\.so\.\(.*\)$/\1\2-\3.dll/; s/^\(INSTALL_SDK_LINK_DEV\s*=\s*libvamp-sdk\)\.so$/\1.dll/; s/^\(INSTALL_HOSTSDK_LIBNAME\|INSTALL_HOSTSDK_LINK_ABI\)\(.*=.*libvamp-hostsdk\)\.so\.\(.*\)$/\1\2-\3.dll/; s/^\(INSTALL_HOSTSDK_LINK_DEV\s*=\s*libvamp-hostsdk\)\.so$/\1.dll/" Makefile.in.bak > Makefile.in
+wl-showstatus configure &&
+#mkdir -p m4 &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf vamp-plugin-sdk-$VERSION
+
+
+

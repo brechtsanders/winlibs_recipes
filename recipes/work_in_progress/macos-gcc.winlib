@@ -1,0 +1,108 @@
+export NAME="GCC, the GNU Compiler Collection (targetting macOS)"
+export STATUS=
+export URL=https://gcc.gnu.org/
+export BASENAME=macos-gcc
+export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom. This build targets the Apple macOS / Darwin platform."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=10.2.0
+#export VERSIONDATE=20200723
+export VERSION=10.3.0
+export VERSIONDATE=20210408
+#export VERSION=11.1.0
+#export VERSIONDATE=20210427
+#export VERSION=11.2.0
+#export VERSIONDATE=20210728
+####configure: error: cannot compute suffix of object files: cannot compile
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=macos-binutils
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://gcc.gnu.org/releases.html gcc-"
+#export DOWNLOADURL="https://ftp.gnu.org/gnu/gcc/ gcc-"
+export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/releases/ gcc-"
+#export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/snapshots/ gcc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.mpi-sb.mpg.de/pub/gnu/mirror/gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/gcc/gcc-$VERSION/gcc-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/snapshots/$VERSION/gcc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/gcc $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfJlh $TARBALLDIR/gcc/gcc-$VERSION.tar.xz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/gcc-$VERSION
+# fix missing sys/wait.h fixincludes/fixincl.c (version >= 9.3.0)
+patch -ulbf fixincludes/fixincl.c << EOF
+@@ -28,4 +28,12 @@
+ #ifndef SEPARATE_FIX_PROC
++#ifdef _WIN32
++#include <Windows.h>
++#define wait(p) Sleep(0)
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#else
+ #include <sys/wait.h>
+ #endif
++#endif
+
+EOF
+# fix missing pipe in fixincludes/procopen.c (version >= 9.3.0)
+patch -ulbf fixincludes/procopen.c << EOF
+@@ -50,2 +50,7 @@
+ #include "server.h"
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#endif
+
+EOF
+# fix missing kill/alarm in fixincludes/server.c (version >= 9.3.0)
+patch -ulbf fixincludes/server.c << EOF
+@@ -50,2 +50,6 @@
+ #include "server.h"
++#ifdef _WIN32
++#define kill(pid,sig) -1
++#define alarm(n) 0
++#endif
+
+EOF
+
+
+
+## fix missing syslog in libssp/ssp.c
+#sed -i.bak -e "s?#ifdef HAVE_SYSLOG_H?#if 0 //&?" libssp/ssp.c
+## fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+#sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
+## fix printf format issues with MinGW-w64 >= 8.0.0 (version >= 10.2.0)
+#####See also: https://sourceforge.net/p/mingw-w64/bugs/853/
+#sed -i.bak -e "s/^\(\s*#\s*\)include <inttypes\.h>.*$/&\n\1ifdef __MINGW32__\n\1undef HAVE_INTTYPES_H\n\1endif/" libgomp/target.c libgomp/oacc-parallel.c
+## avoid looking for libiberty.a in a pic subdirectory
+#sed -i.bak -e "s?pic/\(libiberty\.a\)?\1?g" $(grep -l "pic/libiberty\.a" */Makefile.in)
+
+
+
+mkdir -p build_macos &&
+ wl-showstatus configure &&
+ cd build_macos &&
+ PATH=$MINGWPREFIX/share/macos-binutils/x86_64-apple-darwin/bin:$MINGWPREFIX/share/macos-binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/macos-gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=x86_64-apple-darwin --with-pkgversion="GCC targetting macOS, built by Brecht Sanders" --disable-bootstrap --enable-languages=c,c++,fortran,lto,objc,obj-c++ --disable-nls --disable-sjlj-exceptions --disable-version-specific-runtime-libs --without-included-gettext --with-diagnostics-color=auto --with-libiconv --with-system-zlib --disable-libstdcxx-pch --without-headers &&
+ #--with-sysroot=
+ #--with-newlib 
+ cd .. &&
+ # build for Apple macOS
+ wl-showstatus build &&
+ PATH=$(pwd)/build_macos/gcc:$(pwd)/build_macos/gcc/build:$MINGWPREFIX/share/macos-binutils/x86_64-apple-darwin/bin:$MINGWPREFIX/share/macos-binutils/bin:$PATH make -Cbuild_macos &&
+ wl-showstatus build-install &&
+ PATH=$(pwd)/build_macos/gcc:$(pwd)/build_macos/gcc/build:$MINGWPREFIX/share/macos-binutils/x86_64-apple-darwin/bin:$MINGWPREFIX/share/macos-binutils/bin:$PATH make -Cbuild_macos install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####See also: https://github.com/tpoechtrager/osxcross
+
+
+
+#x86_64-apple-darwinXX

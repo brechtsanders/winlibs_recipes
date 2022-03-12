@@ -1,0 +1,104 @@
+export NAME="Vortex Library"
+export STATUS=
+#export URL=http://sourceforge.net/projects/vortexlibrary/
+export URL=http://www.aspl.es/vortex/
+export BASENAME=vortex
+export DESCRIPTION="Vortex Library an implementation of the RFC 3080 / RFC 3081, known as the BEEP Core protocol, mapped into TCP/IP layer and written in C."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.1.7
+#export VERSIONDATE=20120209
+#export VERSION=1.1.11
+#export VERSIONDATE=20120209
+export VERSION=1.1.13
+export VERSIONDATE=20170313
+wl-showstatus --package-version
+export DEPENDANCIES=axl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://sourceforge.net/projects/vortexlibrary/files/"
+#export DOWNLOADURL="http://code.google.com/p/vortexlibrary/downloads/list"
+export DOWNLOADURL="https://code.google.com/archive/p/vortexlibrary/downloads"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/vortexlibrary/Vortex%20Library%201.1%20%28stable%29/1.1.7%20_Exogenesis%20Symphony%20Pt%201%20Overture_/vortex-1.1.7.b4612.g4612.tar.gz
+#export DOWNLOADSOURCEURL=http://vortexlibrary.googlecode.com/files/vortex-1.1.11.b4921.g4922.tar.gz
+#export DOWNLOADSOURCEURL=https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/vortexlibrary/vortex-1.1.11.b4921.g4922.tar.gz
+export DOWNLOADSOURCEURL=https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/vortexlibrary/vortex-1.1.13.b5215.g5215.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.*.tar.gz
+cd $BASENAME-$VERSION.*
+## fix missing pipe in test/vortex-client-without-cbs.c (version <= 1.1.11)
+#mv test/vortex-client-without-cbs.c test/vortex-client-without-cbs.c.bak
+#echo "#define pipe(fds) _pipe(fds, 4096, _O_BINARY)" > test/vortex-client-without-cbs.c
+#cat test/vortex-client-without-cbs.c.bak >> test/vortex-client-without-cbs.c
+# fix xml-rpc/vortex_xml_rpc_types.c for 64-bit
+patch -ulbf xml-rpc/vortex_xml_rpc_types.c << EOF
+--- xml-rpc/vortex_xml_rpc_types.c  2010-09-10 18:13:00 +0200
++++ xml-rpc/vortex_xml_rpc_types.c  2012-02-11 21:45:40 +0100
+@@ -537,3 +537,3 @@
+        /* create and return the xml method value */
+-       return vortex_xml_rpc_method_value_new (ctx, XML_RPC_BOOLEAN_VALUE, INT_TO_PTR (value ? 1 : 0));
++       return vortex_xml_rpc_method_value_new (ctx, XML_RPC_BOOLEAN_VALUE, INT_TO_PTR ((intptr_t)(value ? 1 : 0)));
+ }
+EOF
+# fix test/vortex-regression-client.c for 64-bit
+patch -ulbf test/vortex-regression-client.c << EOF
+--- test/vortex-regression-client.c  2012-01-03 12:09:40 +0100
++++ test/vortex-regression-client.c  2012-02-11 21:49:44 +0100
+@@ -12539,3 +12539,3 @@
+        if (axl_cmp (props->mech, VORTEX_SASL_PLAIN)) {
+-               return INT_TO_PTR (axl_cmp (props->auth_id, "aspl") && axl_cmp (props->password, "test"));
++               return INT_TO_PTR ((intptr_t)(axl_cmp (props->auth_id, "aspl") && axl_cmp (props->password, "test")));
+        }
+EOF
+# fix test/vortex-regression-listener.c for 64-bit
+patch -ulbf test/vortex-regression-listener.c << EOF
+--- test/vortex-regression-listener.c  2012-01-03 12:09:40 +0100
++++ test/vortex-regression-listener.c  2012-02-11 21:52:42 +0100
+@@ -868,3 +868,3 @@
+                /* check user and password */
+-               return INT_TO_PTR (axl_cmp (props->auth_id, "12345") && axl_cmp (props->password, "12345"));
++               return INT_TO_PTR ((intptr_t)(axl_cmp (props->auth_id, "12345") && axl_cmp (props->password, "12345")));
+        } /* end if */
+EOF
+## fix const issues in src/vortex_listener.c (version = 1.1.11)
+#patch -ulbf src/vortex_listener.c << EOF
+#--- src/vortex_listener.c  2011-12-13 14:01:06.000000000 +0100
+#+++ src/vortex_listener.c  2015-01-19 09:29:48.574104000 +0100
+#@@ -1425,4 +1425,4 @@
+#        /* host and port references */
+#-       char     * host;
+#-       char     * port;
+#+       const char     * host;
+#+       const char     * port;
+#
+#EOF
+# fix already defined __pause in test/vortex-client-connections.c (version >= 1.1.11)
+mv test/vortex-client-connections.c test/vortex-client-connections.c.bak
+sed -e "s/\(__pause\)/my\1/" test/vortex-client-connections.c.bak > test/vortex-client-connections.c
+# fix missing brackets in xml-rpc-gen/xml-rpc-gen-translate.c (version >= 1.1.13)
+mv xml-rpc-gen/xml-rpc-gen-translate.c xml-rpc-gen/xml-rpc-gen-translate.c.bak &&
+sed -e "s/\(if (\) *\! *\(.*\) > \(0) {\)$/\1\2 <= \3/" xml-rpc-gen/xml-rpc-gen-translate.c.bak > xml-rpc-gen/xml-rpc-gen-translate.c
+# skip making test (version >= 1.1.13)
+cat > test/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# remove stack protector flags (version >= 1.1.13)
+mv configure configure.bak &&
+sed -e "s/-fstack-protector-all\|-Wstack-protector//g" configure.bak > configure
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/axl" &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip compiler_options="-Wstrict-prototypes -g" ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION.*
+####To do: build 64-bit DLLs
+
+
+

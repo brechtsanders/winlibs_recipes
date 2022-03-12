@@ -1,0 +1,342 @@
+export NAME="kati"
+export STATUS=
+export URL=https://github.com/google/kati
+export BASENAME=kati
+export DESCRIPTION="kati is an experimental GNU make clone. The main goal of this tool is to speed-up incremental build of Android. Currently, kati does not offer a faster build by itself. It instead converts your Makefile to a ninja file."
+export CATEGORY=development
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20190916
+####fileutil.cc:21:10: fatal error: glob.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=sys_wait_h,unixem
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/google/kati/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/google/kati/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing pthread functions in src/eval.cc
+patch -ulbf src/eval.cc << EOF
+@@ -167,2 +167,8 @@
+   stack_addr_ = (char*)pthread_get_stackaddr_np(pthread_self()) - stack_size_;
++#elif defined(__MINGW32__)
++  pthread_attr_t attr;
++  CHECK(pthread_attr_init(&attr) == 0);
++  CHECK(pthread_attr_getstackaddr(&attr, &stack_addr_) == 0);
++  CHECK(pthread_attr_getstacksize(&attr, &stack_size_) == 0);
++  CHECK(pthread_attr_destroy(&attr) == 0);
+ #else
+EOF
+# fix missing realpath in src/func.cc
+mv src/func.cc src/func.cc.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > src/func.cc &&
+cat src/func.cc.bak >> src/func.cc
+# fix missing realpath in src/main.cc
+patch -ulbf src/main.cc << EOF
+@@ -46,2 +46,6 @@
+ #include "var.h"
++#ifdef _WIN32
++#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
++typedef struct siginfo_t;
++#endif
+
+@@ -164,4 +168,6 @@
+
++#ifndef _WIN32
+   struct sigaction orig_action_;
+   struct sigaction new_action_;
++#endif
+ };
+@@ -175,2 +181,3 @@
+   // Construct an alternate stack, so that we can handle stack overflows.
++#ifndef _WIN32
+   stack_t ss;
+@@ -196,2 +203,3 @@
+   sigaction(SIGSEGV, &new_action_, &orig_action_);
++#endif
+ }
+@@ -209,2 +217,3 @@
+   // or similar.
++#ifndef _WIN32
+   if (orig_action_.sa_sigaction != nullptr) {
+@@ -212,2 +221,3 @@
+   }
++#endif
+ }
+@@ -215,3 +225,5 @@
+ SegfaultHandler::~SegfaultHandler() {
++#ifndef _WIN32
+   sigaction(SIGSEGV, &orig_action_, nullptr);
++#endif
+   global_handler = nullptr;
+@@ -323,6 +335,16 @@
+       LOG("setenv(%s, %s)", name.c_str(), value.c_str());
++#ifdef __MINGW32__
++      const string env = string(name.c_str()) + "=" + value;
++      _putenv(env.c_str());
++#else
+       setenv(name.c_str(), value.c_str(), 1);
++#endif
+     } else {
+       LOG("unsetenv(%s)", name.c_str());
++#ifdef __MINGW32__
++      const string env = string(name.c_str()) + "=";
++      _putenv(env.c_str());
++#else
+       unsetenv(name.c_str());
++#endif
+     }
+EOF
+# fix src/flags.cc
+patch -ulbf src/flags.cc << EOF
+@@ -21,2 +21,5 @@
+
++#ifdef _WIN32
++#include <sysinfoapi.h>
++#endif
+ #include "log.h"
+@@ -52,3 +55,9 @@
+   subkati_args.push_back(argv[0]);
++#ifdef _WIN32
++  SYSTEM_INFO sysinfo;
++  GetSystemInfo(&sysinfo);
++  num_jobs = num_cpus = sysinfo.dwProcessorType;
++#else
+   num_jobs = num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
++#endif
+   const char* num_jobs_str;
+EOF
+# fix src/regen.cc
+patch -ulbf src/regen.cc << EOF
+@@ -332,3 +332,3 @@
+       struct stat st;
+-      if (lstat(dir.c_str(), &st) != 0) {
++      if (stat(dir.c_str(), &st) != 0) {
+         return true;
+@@ -339,2 +339,3 @@
+       }
++#if !defined(__MINGW32__)
+       if (S_ISLNK(st.st_mode)) {
+@@ -344,2 +345,3 @@
+       }
++#endif
+     }
+EOF
+# fix src/fileutil.cc
+patch -ulbf src/fileutil.cc << EOF
+@@ -20,3 +20,12 @@
+ #include <fcntl.h>
++#ifdef _WIN32
++#define byte WINDOWS_byte
++#include <sys/wait.h>
++#include <windows.h>
++#undef byte
++#undef ERROR
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#else
+ #include <glob.h>
++#endif
+ #include <limits.h>
+@@ -73,3 +82,7 @@
+     cmd_with_shell = shell + " " + shellflag + " \\"" + cmd_escaped + "\\"";
++#ifdef _WIN32
++    argv[0] = "sh.exe";
++#else
+     argv[0] = "/bin/sh";
++#endif
+     argv[1] = "-c";
+@@ -78,2 +91,7 @@
+     // If the shell isn't complicated, we don't need to wrap in /bin/sh
++#ifdef _WIN32
++    if (shell == "/bin/sh")
++      argv[0] = "sh.exe";
++    else
++#endif
+     argv[0] = shell.c_str();
+@@ -83,2 +101,60 @@
+
++#ifdef _WIN32
++  string fullcmd = string(argv[0]) + " " + argv[1] + " " + argv[2];
++  printf("cmd: %s %s %s\\n", argv[0], argv[1], argv[2]);/////
++  printf("cmd: %s\\n", fullcmd.c_str());/////
++  STARTUPINFO startupinfo;
++  PROCESS_INFORMATION procinfo;
++  SECURITY_ATTRIBUTES secattr;
++  HANDLE readprocessoutput;
++  ZeroMemory(&startupinfo, sizeof(startupinfo));
++  startupinfo.cb = sizeof(startupinfo);
++/*
++  startupinfo.lpReserved = NULL;
++  startupinfo.lpDesktop = NULL;
++  startupinfo.lpTitle = NULL;
++  startupinfo.dwFlags = 0;
++  startupinfo.cbReserved2 = 0;
++  startupinfo.lpReserved2 = NULL;
++*/
++  startupinfo.dwFlags = STARTF_USESTDHANDLES;
++  startupinfo.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
++  secattr.nLength = sizeof(secattr);
++  secattr.bInheritHandle = TRUE;
++  secattr.lpSecurityDescriptor = NULL;
++  if (!CreatePipe(&readprocessoutput, &startupinfo.hStdOutput, &secattr, 0))
++    PERROR("CreatePipe() failed");
++  if (redirect_stderr == RedirectStderr::STDOUT)
++    startupinfo.hStdError = startupinfo.hStdOutput;
++  else if (redirect_stderr == RedirectStderr::DEV_NULL)
++    startupinfo.hStdError = INVALID_HANDLE_VALUE;
++  else
++    startupinfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
++  if (!CreateProcessA(NULL, (char*)fullcmd.c_str(), NULL, NULL, TRUE, 0, NULL, NULL, &startupinfo, &procinfo))
++    PERROR("CreateProcessA() failed");
++  //CloseHandle(startupinfo.hStdOutput);
++
++  while (true) {
++    char buf[4096];
++    DWORD r;
++    //WaitForInputIdle(procinfo.hProcess, INFINITE);
++    //if (!GetExitCodeProcess(procinfo.hProcess, &r) || r != STILL_ACTIVE)
++    //  break;
++    if (!ReadFile(readprocessoutput, buf, sizeof(buf), &r, NULL))
++      PERROR("read failed");
++    if (r == 0)
++      break;
++    s->append(buf, buf + r);
++    if (r < sizeof(buf))
++      break;
++  }
++
++  if (WaitForSingleObject(procinfo.hProcess, INFINITE) == WAIT_FAILED)
++    PERROR("WaitForSingleObject() failed");
++
++  CloseHandle(readprocessoutput);
++  CloseHandle(procinfo.hProcess);
++  CloseHandle(procinfo.hThread);
++  //PERROR("no vfork() support on Windows");
++#else
+   int pipefd[2];
+@@ -132,2 +208,3 @@
+   }
++#endif
+ }
+@@ -151,2 +228,9 @@
+   *path = mypath;
++#elif defined(_WIN32)
++  char mypath[PATH_MAX + 1];
++  char* p;
++  if (!GetModuleFileNameA(NULL, mypath, MAX_PATH)) {
++    ERROR("GetModuleFileNameA failed");
++  }
++  *path = mypath;
+ #else
+@@ -167,2 +251,29 @@
+       if (strcspn(pat, "?*[\\\\") != strlen(pat)) {
++#ifdef _WIN32
++        HANDLE dir;
++        WIN32_FIND_DATAA filedata;
++       //determine containing directory
++        size_t basedirlen;
++        const char* p;
++        char* fullpath;
++        p = pat + strlen(pat);
++        while (p-- != pat) {
++          if (*p == '/' || *p == '\\\\' || *p == ':') {
++            p++;
++            break;
++         }
++        }
++        basedirlen = (p - pat);
++       //get all files matching wildcard
++        if ((dir = FindFirstFileA(pat, &filedata)) != INVALID_HANDLE_VALUE) {
++         do {
++            fullpath = (char*)malloc(basedirlen + strlen(filedata.cFileName) + 1);
++           memcpy(fullpath, pat, basedirlen);
++           strcpy(fullpath + basedirlen, filedata.cFileName);
++            files->push_back(fullpath);
++            free(fullpath);
++         } while (FindNextFileA(dir, &filedata));
++         FindClose(dir);
++       }
++#else
+         glob_t gl;
+@@ -173,2 +284,3 @@
+         globfree(&gl);
++#endif
+       } else {
+EOF
+# fix src/find.cc (version >= master)
+patch -ulbf src/find.cc << EOF
+@@ -19,3 +19,28 @@
+ #include <dirent.h>
++#ifdef _WIN32
++#define byte WINDOWS_byte
++#include <shlwapi.h>
++#undef byte
++#undef ERROR
++#define fnmatch(p,s,f) (PathMatchSpec(s,p) ? 0 : 1)
++#define DT_UNKNOWN      0
++#define DT_FIFO         1
++#define DT_CHR          2
++#define DT_DIR          4
++#define DT_BLK          6
++#define DT_REG          8
++#define DT_LNK          10
++#define DT_SOCK         12
++#define DT_WHT          14
++#ifndef S_ISLNK
++#define S_ISLNK(m) 0
++#endif
++#ifndef S_ISSOCK
++#define S_ISSOCK(m) 0
++#endif
++#define lstat stat
++#define readlink(name,buf,buflen) -1
++#else
+ #include <fnmatch.h>
++#endif
+ #include <limits.h>
+@@ -606,2 +631,11 @@
+     DirentNode* c = NULL;
++#ifdef _WIN32
++    struct stat filestat;
++    stat(npath.c_str(),&filestat);
++    if (S_ISDIR(filestat.st_mode)) {
++      c = new DirentDirNode(this, npath);
++    } else {
++      c = new DirentFileNode(npath, DT_REG);
++    }
++#else
+     auto d_type = ent->d_type;
+@@ -618,2 +652,3 @@
+     }
++#endif
+     find_emulator_node_cnt++;
+EOF
+# fix redefinition of ERROR in src/log.h
+patch -ulbf src/log.h << EOF
+@@ -72,2 +72,3 @@
+
++#undef ERROR
+ #define ERROR(...)                                                \\
+EOF
+# fix reference to 'byte' is ambiguous in src/exec.cc
+mv src/exec.cc src/exec.cc.bak &&
+echo "#include <windows.h>" > src/exec.cc &&
+cat src/exec.cc.bak >> src/exec.cc
+wl-showstatus build &&
+ #make &&
+ #make -f Makefile.ckati CC="gcc -I$MINGWPREFIX/win32ports/include" CXX="g++ -I$MINGWPREFIX/win32ports/include" &&
+ #make -f Makefile.ckati KATI_CXX="g++ -I$MINGWPREFIX/win32ports/include" KATI_LD="g++" KATI_LIBS="-lpthread -Wl,--as-needed -lshlwapi" &&
+ make -f Makefile.ckati KATI_CXX="g++ -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/unixemulation" KATI_LD="g++" KATI_LIBS="-lpthread -Wl,--as-needed -lshlwapi -lunixem" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

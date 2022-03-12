@@ -1,0 +1,282 @@
+export NAME="ResIL"
+export STATUS=
+export URL=http://sourceforge.net/projects/resil/
+export BASENAME=resil
+export DESCRIPTION="Resilient Image Library - successor to DevIL. Since DevIL is no longer active, this new project will create new builds of the source code with new patches. ResIL starts with at version 1.7.9, using sources from DevIL 1.7.8 and new patches. ResIL aims to display even corrupt image files as best as possible, and without crashing or exceptions."
+export CATEGORY=graphics
+export TYPE=library
+export VERSION=1.8.2
+export VERSIONDATE=20140530
+####src-ILUT/include/ilut_internal.h:95:45: error: 'IDirect3DCubeTexture9' has no member named 'lpVtbl'
+#export VERSION=1.8.3
+#export VERSIONDATE=20141115
+#export VERSION=1.8.4
+#export VERSIONDATE=20191224
+####/bin/m4: cannot remove temporary directory /tmp/ar6632.3876/m4-9OGsFK: Directory not empty
+wl-showstatus --package-version
+export DEPENDANCIES=sdl,pthreads,zlib,libsquish,libtiff,libpng,jasper,lcms1,libx11
+#export OPTIONALDEPENDANCIES=openexr,libmng,allegro,libx11,libxrender,libice
+export OPTIONALDEPENDANCIES=allegro
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/resil/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/resil/$VERSION/ResIL-$VERSION.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/ResIL-$VERSION.zip
+cd ResIL-$VERSION
+## fix missing type definition of variable read
+#for F in $(grep -l "auto[ \t]\(read\|toCopy\|headerEnd\)" src-IL/src/*.cpp); do
+# mv $F $F.bak &&
+# sed -e "s/\(auto\)[ \t]\(read\|toCopy\|headerEnd\)/\1 ILuint \2/" $F.bak > $F
+#done
+#patch -ulbf src-IL/src/il_io.cpp << EOF
+#--- src-IL/src/il_io.cpp  2014-05-14 15:53:30 +0200
+#+++ src-IL/src/il_io.cpp  2014-05-30 20:45:22 +0200
+#@@ -646,3 +646,8 @@
+#                        // Attempt to load the palette
+#-                       auto fnLen = wcslen(FileName);
+#+                       auto ILuint fnLen =
+#+#if defined(_UNICODE)
+#+                               wcslen(FileName);
+#+#else
+#+                               strlen(FileName);
+#+#endif
+#                        if (fnLen > 4) {
+#@@ -652,5 +657,10 @@
+#                                &&  FileName[fnLen-1] == 't') {
+#-                                       TCHAR* palFN = (TCHAR*) ialloc(2*fnLen+2);
+#+                                       TCHAR* palFN = (TCHAR*) ialloc(sizeof(TCHAR)*(fnLen+1));
+#+#if defined(_UNICODE)
+#                                        wcscpy(palFN, FileName);
+#                                        wcscpy(&palFN[fnLen-3], L"pal");
+#+#else
+#+                                       strcpy(palFN, FileName);
+#+                                       strcpy(&palFN[fnLen-3], "pal");
+#+#endif
+#                                        iCurImage->io.handle = iCurImage->io.openReadOnly(palFN);
+#EOF
+# fix missing type definition of variable read
+for F in $(grep -l "auto[ \t]\(read\)" src-IL/src/*.cpp); do
+ mv $F $F.bak &&
+ sed -e "s/\( \|-\|+\|(\)\(read\)\b/\1MY\2/" $F.bak > $F
+done
+patch -ulbf src-IL/src/il_io.cpp << EOF
+@@ -646,3 +646,8 @@
+                        // Attempt to load the palette
+-                       auto fnLen = wcslen(FileName);
++                       auto fnLen =
++#if defined(_UNICODE)
++                               wcslen(FileName);
++#else
++                               strlen(FileName);
++#endif
+                        if (fnLen > 4) {
+@@ -652,5 +657,10 @@
+                                &&  FileName[fnLen-1] == 't') {
+-                                       TCHAR* palFN = (TCHAR*) ialloc(2*fnLen+2);
++                                       TCHAR* palFN = (TCHAR*) ialloc(sizeof(TCHAR)*(fnLen+1));
++#if defined(_UNICODE)
+                                        wcscpy(palFN, FileName);
+                                        wcscpy(&palFN[fnLen-3], L"pal");
++#else
++                                       strcpy(palFN, FileName);
++                                       strcpy(&palFN[fnLen-3], "pal");
++#endif
+                                        iCurImage->io.handle = iCurImage->io.openReadOnly(palFN);
+EOF
+# fix invalid lpVtbl issue in SAFE_RELEASE
+mv src-ILUT/src/ilut_directx9.cpp src-ILUT/src/ilut_directx9.cpp.bak
+sed -e "s/SAFE_RELEASE(Texture)/IDirect3DCubeTexture9_Release(Texture);/g" src-ILUT/src/ilut_directx9.cpp.bak > src-ILUT/src/ilut_directx9.cpp
+# fix type conversion in src-ILUT/src/ilut_sdlsurface.cpp
+patch -ulbf src-ILUT/src/ilut_sdlsurface.cpp << EOF
+--- src-ILUT/src/ilut_sdlsurface.cpp  2009-03-25 13:30:40 +0100
++++ src-ILUT/src/ilut_sdlsurface.cpp  2014-05-31 12:08:36 +0200
+@@ -119,3 +119,3 @@
+        else {  // Must pad the lines on some images.
+-               Dest = Bitmap->pixels;
++               Dest = (ILubyte*)Bitmap->pixels;
+                for (i = 0; i < Image->Height; i++) {
+EOF
+## fix missing min in src-IL/src/il_cut.cpp
+#mv src-IL/src/il_cut.cpp src-IL/src/il_cut.cpp.bak2
+#cat > src-IL/src/il_cut.cpp << EOF
+##include <stdlib.h>
+##ifndef min
+##define min(a,b) (((a) < (b)) ? (a) : (b))
+##endif
+#EOF
+#cat src-IL/src/il_cut.cpp.bak2 >> src-IL/src/il_cut.cpp
+# fix missing min in src-IL/src/il_cut.cpp
+sed -i.bak2 -e "s/\bmin(/std::&/g" src-IL/src/il_cut.cpp
+# fix src-IL/src/il_rle.cpp for 64-bit
+patch -ulbf src-IL/src/il_rle.cpp << EOF
+--- src-IL/src/il_rle.cpp  2009-03-25 13:30:42.000000000 +0100
++++ src-IL/src/il_rle.cpp  2014-05-31 16:02:50.000000000 +0200
+@@ -11,2 +11,3 @@
+ #include "il_rle.h"
++#include <stdint.h>
+
+@@ -19,3 +20,3 @@
+        ILint           MaxRun;
+-       const ILint bmp_pad_to_even = 1 - ((ILint)q - *DestWidth) % 2;
++       const ILint bmp_pad_to_even = 1 - ((uintptr_t)q - *DestWidth) % 2;
+
+EOF
+# fix redefinition of stricmp/strnicmp in src-IL/src/il_internal.cpp
+patch -ulbf src-IL/src/il_internal.cpp << EOF
+--- src-IL/src/il_internal.cpp  2014-04-24 16:03:30.000000000 +0200
++++ src-IL/src/il_internal.cpp  2014-05-31 16:05:56.000000000 +0200
+@@ -24,3 +24,4 @@
+        it doesn't (anyone who knows why?) */
+-#if !_WIN32 || (_WIN32 && __GNUC__) // Cygwin
++#ifdef __MINGW32__
++#elif !_WIN32 || (_WIN32 && __GNUC__) // Cygwin
+        int stricmp(const char *src1, const char *src2)
+EOF
+# fix missing definition of CONST_RESTRICT/auto/uchar in src-IL/src/il_pic.cpp (version >= 1.8.2)
+#for F in $(grep -l "auto \|CONST_RESTRICT " src-IL/src/il_*.cpp); do
+# mv $F $F.orig &&
+# echo "#include \"IL/il.h\"" > $F
+# sed -e "s/\bauto //; s/uchar/unsigned char/" $F.orig >> $F
+#done
+# fix missing uchar in src-IL/src/il_jp2.cpp (version >= 1.8.2)
+mv src-IL/src/il_jp2.cpp src-IL/src/il_jp2.cpp.orig &&
+sed -e "s/uchar/unsigned char/" src-IL/src/il_jp2.cpp.orig >> src-IL/src/il_jp2.cpp
+## fix missing const in src-IL/src/il_ilbm.cpp (version >= 1.8.2)
+#mv src-IL/src/il_ilbm.cpp src-IL/src/il_ilbm.cpp.orig &&
+#sed -e "s/^\(\s*\)\(char\s*\*error;\)/\1const \2/" src-IL/src/il_ilbm.cpp.orig > src-IL/src/il_ilbm.cpp
+## fix src-IL/src/il_alloc.cpp for DLL (version >= 1.8.2)
+#mv src-IL/src/il_alloc.cpp src-IL/src/il_alloc.cpp.bak &&
+#sed -e "s/^void.*ILAPIENTRY\s*\(i[a-z]*alloc\|ifree\)/ILAPI &/" src-IL/src/il_alloc.cpp.bak > src-IL/src/il_alloc.cpp
+# fix build environment
+patch -ulbf configure.ac << EOF
+--- configure.ac  2009-03-25 14:30:36.000000000 +0300
++++ configure.ac  2014-05-29 07:58:53.398000000 +0400
+@@ -16,7 +16,7 @@
+ dnl What header will be generated by configure script
+ AC_CONFIG_HEADERS([include/IL/config.h])
+ dnl Where are some sources?
+-AC_CONFIG_SRCDIR([src-IL/src/il_main.c])
++AC_CONFIG_SRCDIR([src-IL/src/il_main.cpp])
+ dnl Where are other macro definitions?
+ AC_CONFIG_MACRO_DIR([m4])
+ dnl Where to put various auxiliary files
+EOF
+patch -ulbf lib/Makefile.am << EOF
+--- lib/Makefile.am  2014-03-17 14:43:09.182124900 +0400
++++ lib/Makefile.am  2014-05-29 08:01:02.722000000 +0400
+@@ -43,14 +43,14 @@
+ libIL_la_CFLAGS = \$(AM_CFLAGS) @IL_CFLAGS@
+ libIL_la_CXXFLAGS = \$(AM_CFLAGS) @IL_CFLAGS@
+ 
+-libIL_la_SOURCES = \$(il_src)/il_alloc.c \$(il_src)/il_doom.c \$(il_src)/il_stack.c \$(il_src)/il_pcx.c \$(il_src)/il_rle.c \$(il_src)/il_bits.c \$(il_src)/il_endian.c \$(il_src)/il_exr.cpp \$(il_src)/il_jpeg.c \$(il_src)/il_pic.c \$(il_src)/il_sgi.c \$(il_src)/il_bmp.c \$(il_src)/il_error.c \$(il_src)/il_lif.c \$(il_src)/il_png.c \$(il_src)/il_states.c \$(il_src)/il_convbuff.c \$(il_src)/il_files.c \$(il_src)/il_main.c \$(il_src)/il_pnm.c \$(il_src)/il_targa.c \$(il_src)/il_wdp.c \$(il_src)/il_convert.c \$(il_src)/il_gif.cpp \$(il_src)/il_manip.c \$(il_src)/il_profiles.c \$(il_src)/il_tiff.c \$(il_src)/il_cut.c \$(il_src)/il_header.c \$(il_src)/il_mdl.c \$(il_src)/il_quantizer.c \$(il_src)/il_utility.c \$(il_src)/il_dcx.c \$(il_src)/il_icon.c \$(il_src)/il_mng.c \$(il_src)/il_raw.c \$(il_src)/il_wal.c \$(il_src)/il_dds.c \$(il_src)/il_internal.c \$(il_src)/il_pal.c \$(il_src)/il_rawdata.c \$(il_src)/il_devil.c \$(il_src)/il_io.c \$(il_src)/il_pcd.c \$(il_src)/il_register.c \$(il_src)/il_psd.c \$(il_src)/il_fastconv.c \$(il_src)/il_neuquant.c \$(il_src)/il_dds-save.c \$(il_src)/il_psp.c \$(il_src)/il_pix.c \$(il_src)/il_pxr.c \$(il_src)/il_vtf.c \$(il_src)/il_xpm.c \$(il_src)/il_hdr.c \$(il_src)/il_icns.c \$(il_src)/il_jp2.c \$(il_src)/altivec_common.c \$(il_src)/altivec_typeconversion.c \$(il_src)/il_sun.c \$(il_src)/il_nvidia.cpp \$(il_src)/il_wbmp.c \$(il_src)/il_squish.cpp \$(il_src)/il_iff.c \$(il_src)/il_ilbm.c \$(il_src)/il_size.c \$(il_src)/il_tpl.c \$(il_src)/il_fits.c \$(il_src)/il_iwi.c \$(il_src)/il_blp.c \$(il_src)/il_ftx.c \$(il_src)/il_dicom.c \$(il_src)/il_rot.c \$(il_src)/il_texture.c \$(il_src)/il_dpx.c \$(il_src)/il_utx.cpp \$(il_src)/il_mp3.c
++libIL_la_SOURCES = \$(il_src)/il_alloc.cpp \$(il_src)/il_doom.cpp \$(il_src)/il_stack.cpp \$(il_src)/il_pcx.cpp \$(il_src)/il_rle.cpp \$(il_src)/il_bits.cpp \$(il_src)/il_endian.cpp \$(il_src)/il_exr.cpp \$(il_src)/il_jpeg.cpp \$(il_src)/il_pic.cpp \$(il_src)/il_sgi.cpp \$(il_src)/il_bmp.cpp \$(il_src)/il_error.cpp \$(il_src)/il_lif.cpp \$(il_src)/il_png.cpp \$(il_src)/il_states.cpp \$(il_src)/il_convbuff.cpp \$(il_src)/il_files.cpp \$(il_src)/il_main.cpp \$(il_src)/il_pnm.cpp \$(il_src)/il_targa.cpp \$(il_src)/il_wdp.cpp \$(il_src)/il_convert.cpp \$(il_src)/il_gif.cpp \$(il_src)/il_manip.cpp \$(il_src)/il_profiles.cpp \$(il_src)/il_tiff.cpp \$(il_src)/il_cut.cpp \$(il_src)/il_header.cpp \$(il_src)/il_mdl.cpp \$(il_src)/il_quantizer.cpp \$(il_src)/il_utility.cpp \$(il_src)/il_dcx.cpp \$(il_src)/il_icon.cpp \$(il_src)/il_mng.cpp \$(il_src)/il_raw.cpp \$(il_src)/il_wal.cpp \$(il_src)/il_dds.cpp \$(il_src)/il_internal.cpp \$(il_src)/il_pal.cpp \$(il_src)/il_rawdata.cpp \$(il_src)/il_devil.cpp \$(il_src)/il_io.cpp \$(il_src)/il_pcd.cpp \$(il_src)/il_register.cpp \$(il_src)/il_psd.cpp \$(il_src)/il_fastconv.cpp \$(il_src)/il_neuquant.cpp \$(il_src)/il_dds-save.cpp \$(il_src)/il_psp.cpp \$(il_src)/il_pix.cpp \$(il_src)/il_pxr.cpp \$(il_src)/il_vtf.cpp \$(il_src)/il_xpm.cpp \$(il_src)/il_hdr.cpp \$(il_src)/il_icns.cpp \$(il_src)/il_jp2.cpp \$(il_src)/altivec_common.c \$(il_src)/altivec_typeconversion.c \$(il_src)/il_sun.cpp \$(il_src)/il_nvidia.cpp \$(il_src)/il_wbmp.cpp \$(il_src)/il_squish.cpp \$(il_src)/il_iff.cpp \$(il_src)/il_ilbm.cpp \$(il_src)/il_size.cpp \$(il_src)/il_tpl.cpp \$(il_src)/il_fits.cpp \$(il_src)/il_iwi.cpp \$(il_src)/il_blp.cpp \$(il_src)/il_ftx.cpp \$(il_src)/il_dicom.cpp \$(il_src)/il_rot.cpp \$(il_src)/il_texture.cpp \$(il_src)/il_dpx.cpp \$(il_src)/il_utx.cpp \$(il_src)/il_mp3.cpp
+ 
+ libIL_la_SOURCES += \$(il_include)/altivec_common.h \$(il_include)/altivec_typeconversion.h \$(il_include)/il_alloc.h \$(il_include)/il_bits.h \$(il_include)/il_bmp.h \$(il_include)/il_dcx.h \$(il_include)/il_dds.h \$(il_include)/il_doompal.h \$(il_include)/il_dpx.h \$(il_include)/il_endian.h \$(il_include)/il_exr.h \$(il_include)/il_files.h \$(il_include)/il_gif.h \$(il_include)/il_hdr.h \$(il_include)/il_icns.h \$(il_include)/il_icon.h \$(il_include)/il_internal.h \$(il_include)/il_jp2.h \$(il_include)/il_jpeg.h \$(il_include)/il_lif.h \$(il_include)/il_manip.h \$(il_include)/il_mdl.h \$(il_include)/il_pal.h \$(il_include)/il_pcx.h \$(il_include)/il_pic.h \$(il_include)/il_pnm.h \$(il_include)/il_psd.h \$(il_include)/il_psp.h \$(il_include)/il_q2pal.h \$(il_include)/il_register.h \$(il_include)/il_rle.h \$(il_include)/il_sgi.h \$(il_include)/il_stack.h \$(il_include)/il_states.h \$(il_include)/il_targa.h \$(il_include)/il_utx.h \$(il_include)/il_vtf.h \$(il_include)/il_wdp.h \$(all_include)/IL/devil_internal_exports.h
+ libIL_la_LDFLAGS = @IL_LIBS@ \$(AM_LDFLAGS)
+ 
+ libILU_la_CPPFLAGS = -I \$(ilu_include) -I \$(all_include)
+ libILU_la_CFLAGS = \$(AM_CFLAGS) @ILU_CFLAGS@
+-libILU_la_SOURCES = \$(ilu_src)/ilu_alloc.c \$(ilu_src)/ilu_internal.c \$(ilu_src)/ilu_noise.c \$(ilu_src)/ilu_scale.c \$(ilu_src)/ilu_error.c \$(ilu_src)/ilu_main.c \$(ilu_src)/ilu_rotate.c \$(ilu_src)/ilu_scaling.c \$(ilu_src)/ilu_filter.c \$(ilu_src)/ilu_manip.c \$(ilu_src)/ilu_scale2d.c \$(ilu_src)/ilu_states.c \$(ilu_src)/ilu_filter_rcg.c \$(ilu_src)/ilu_mipmap.c \$(ilu_src)/ilu_scale3d.c \$(ilu_src)/ilu_utilities.c \$(ilu_src)/ilu_region.c
++libILU_la_SOURCES = \$(ilu_src)/ilu_alloc.cpp \$(ilu_src)/ilu_internal.cpp \$(ilu_src)/ilu_noise.cpp \$(ilu_src)/ilu_scale.cpp \$(ilu_src)/ilu_error.cpp \$(ilu_src)/ilu_main.cpp \$(ilu_src)/ilu_rotate.cpp \$(ilu_src)/ilu_scaling.cpp \$(ilu_src)/ilu_filter.cpp \$(ilu_src)/ilu_manip.cpp \$(ilu_src)/ilu_scale2d.cpp \$(ilu_src)/ilu_states.cpp \$(ilu_src)/ilu_filter_rcg.cpp \$(ilu_src)/ilu_mipmap.cpp \$(ilu_src)/ilu_scale3d.cpp \$(ilu_src)/ilu_utilities.cpp \$(ilu_src)/ilu_region.cpp
+ 
+ libILU_la_SOURCES += \$(ilu_include)/ilu_alloc.h \$(ilu_include)/ilu_filter.h \$(ilu_include)/ilu_internal.h \$(ilu_include)/ilu_region.h \$(ilu_include)/ilu_states.h \$(all_include)/IL/devil_internal_exports.h \$(all_include)/IL/ilu_region.h \$(ilu_include)/ilu_error/ilu_err-arabic.h \$(ilu_include)/ilu_error/ilu_err-dutch.h \$(ilu_include)/ilu_error/ilu_err-english.h \$(ilu_include)/ilu_error/ilu_err-french.h \$(ilu_include)/ilu_error/ilu_err-german.h \$(ilu_include)/ilu_error/ilu_err-japanese.h \$(ilu_include)/ilu_error/ilu_err-spanish.h
+ 
+@@ -59,36 +59,36 @@
+ 
+ libILUT_la_CPPFLAGS = -I \$(ilut_include) -I \$(all_include)
+ libILUT_la_CFLAGS = \$(AM_CFLAGS) @ILUT_CFLAGS@
+-libILUT_la_SOURCES = \$(ilut_src)/ilut_main.c \$(ilut_src)/ilut_states.c \$(ilut_src)/ilut_internal.c
++libILUT_la_SOURCES = \$(ilut_src)/ilut_main.cpp \$(ilut_src)/ilut_states.cpp \$(ilut_src)/ilut_internal.cpp
+ libILUT_la_SOURCES += \$(ilut_include)/ilut_internal.h \$(ilut_include)/ilut_states.h \$(all_include)/IL/devil_internal_exports.h
+ libILUT_la_LDFLAGS = @ILUT_LIBS@ \$(AM_LDFLAGS)
+ libILUT_la_LIBADD = libILU.la
+ 
+ if USE_ALLEGRO
+-libILUT_la_SOURCES += \$(ilut_src)/ilut_allegro.c \$(ilut_include)/ilut_allegro.h
++libILUT_la_SOURCES += \$(ilut_src)/ilut_allegro.cpp \$(ilut_include)/ilut_allegro.h
+ endif #USE_ALLEG
+ 
+ if USE_DIRECTX
+-libILUT_la_SOURCES += \$(ilut_src)/ilut_directx.c
++libILUT_la_SOURCES += \$(ilut_src)/ilut_directx.cpp
+ endif #USE_DIRECTX
+ 
+ if USE_DIRECTX9
+-libILUT_la_SOURCES += \$(ilut_src)/ilut_directx9.c
++libILUT_la_SOURCES += \$(ilut_src)/ilut_directx9.cpp
+ endif #USE_DIRECTX
+ 
+ if USE_SDL
+-libILUT_la_SOURCES += \$(ilut_src)/ilut_sdlsurface.c
++libILUT_la_SOURCES += \$(ilut_src)/ilut_sdlsurface.cpp
+ endif #USE_SDL
+ 
+ if USE_OPENGL
+-libILUT_la_SOURCES += \$(ilut_include)/ilut_opengl.h \$(ilut_src)/ilut_opengl.c
++libILUT_la_SOURCES += \$(ilut_include)/ilut_opengl.h \$(ilut_src)/ilut_opengl.cpp
+ endif #USE_OPENGL
+ 
+ if USE_X11
+-libILUT_la_SOURCES += \$(ilut_src)/ilut_x11.c
++libILUT_la_SOURCES += \$(ilut_src)/ilut_x11.cpp
+ endif #USE_X11
+ 
+ if USE_W32
+-libILUT_la_SOURCES += \$(ilut_src)/ilut_win32.c
++libILUT_la_SOURCES += \$(ilut_src)/ilut_win32.cpp
+ endif #USE_W32
+
+EOF
+# fix missing min() in src-IL/src/il_cut.cpp (version >= 1.8.2)
+sed -i.bak -e "s/std::\(min\)/__\1/" src-IL/src/il_cut.cpp
+## fix missing include/IL/config.h.in
+#( ls include/IL/config.h.in &>/dev/null || cp -f include/IL/config.h include/IL/config.h.in )
+wl-showstatus configure &&
+ #mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ # fix DLL exports (version >= 1.8.2)
+ for F in Makefile.in */Makefile.in; do
+  mv $F $F.bak &&
+  sed -e "s/^\(ILU*T*\)\(_CFLAGS\s*=\s*\)/\1\2-D_\1_BUILD_LIBRARY /" $F.bak > $F
+ done &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-x11 --disable-shm --enable-ILU --enable-ILUT --disable-exr --disable-wdp --disable-mng CXXFLAGS="-I$MINGWPREFIX/include/SDL" &&
+ # fix CONST_RESTRICT issue (version >= 1.8.2)
+ echo "#undef RESTRICT_KEYWORD" >> include/IL/config.h &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix conflicting types between DirectX 8 and 9
+ (
+ cat >> include/IL/config.h << EOF
+#if defined(ILUT_USE_DIRECTX8) && defined(ILUT_USE_DIRECTX9)
+#undef ILUT_USE_DIRECTX8
+#endif
+EOF
+ ) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ResIL-$VERSION
+
+
+
+#export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DDEVIL_BUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DDEVIL_BUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
+# #wl-showstatus build &&
+# #make -Cbuild_static &&
+# #wl-showstatus build &&
+# #make -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK

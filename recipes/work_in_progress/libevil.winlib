@@ -1,0 +1,119 @@
+export NAME="Evil"
+export STATUS=
+export URL=http://trac.enlightenment.org/e/wiki/Evil
+export BASENAME=libevil
+export DESCRIPTION="Windows compatibility layer."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.7.0
+#export VERSIONDATE=20121020
+#export VERSION=1.7.2
+#export VERSIONDATE=20121123
+#export VERSION=1.7.4
+#export VERSIONDATE=20121221
+#export VERSION=1.7.5
+#export VERSIONDATE=20130104
+#export VERSION=1.7.6
+#export VERSIONDATE=20130405
+#export VERSION=1.7.7
+#export VERSIONDATE=20130514
+#export VERSION=1.7.8
+#export VERSIONDATE=20130730
+#export VERSION=1.7.9
+#export VERSIONDATE=20131105
+export VERSION=1.7.10
+export VERSIONDATE=20140107
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.enlightenment.org/p.php?p=download evil-"
+#export DOWNLOADURL="http://download.enlightenment.org/releases/ evil-"
+export DOWNLOADURL="https://download.enlightenment.org/att/releases/ evil-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.enlightenment.org/releases/evil-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://download.enlightenment.org/att/releases/evil-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/evil-$VERSION.tar.bz2
+cd evil-$VERSION
+# fix missing FNM_CASEFOLD
+patch -ulbf src/lib/fnmatch.h << EOF
+--- src/lib/fnmatch.h  2013-07-29 16:25:51 +0200
++++ src/lib/fnmatch.h  2015-04-11 21:26:54 +0200
+@@ -34,3 +34,3 @@
+
+-#if !defined (_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 2 || defined (_GNU_SOURCE)
++#if !defined (_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 2 || defined (_GNU_SOURCE) || defined (__MINGW32__)
+ #define        FNM_FILE_NAME   FNM_PATHNAME /* Preferred GNU name.  */
+EOF
+# fix missing EXTERN_C in src/lib/evil_link_xp.cpp (version >= 1.7.10)
+mv src/lib/evil_link_xp.cpp src/lib/evil_link_xp.cpp.bak
+echo "#include <windows.h>" > src/lib/evil_link_xp.cpp
+cat src/lib/evil_link_xp.cpp.bak >> src/lib/evil_link_xp.cpp
+# fix redefinitions in src/lib/Evil.h
+patch -ulbf src/lib/Evil.h << EOF
+@@ -152,8 +152,20 @@
+ # define S_IXUSR _S_IXUSR
++#ifndef S_IRGRP
+ # define S_IRGRP S_IRUSR
++#endif
++#ifndef S_IROTH
+ # define S_IROTH S_IRUSR
++#endif
++#ifndef S_IWGRP
+ # define S_IWGRP S_IWUSR
++#endif
++#ifndef S_IWOTH
+ # define S_IWOTH S_IWUSR
++#endif
++#ifndef S_IXGRP
+ # define S_IXGRP S_IXUSR
++#endif
++#ifndef S_IXOTH
+ # define S_IXOTH S_IXUSR
++#endif
+
+@@ -164,4 +176,8 @@
+
++#ifndef S_IRWXO
+ # define S_IRWXO _S_IRWXU
++#endif
++#ifndef S_IRWXG
+ # define S_IRWXG _S_IRWXU
++#endif
+
+EOF
+# fix redefinition of mkstemp (version >= 1.7.10)
+mv src/lib/evil_stdlib.h src/lib/evil_stdlib.h.bak &&
+echo "#define mkstemp EVIL_mkstemp" > src/lib/evil_stdlib.h &&
+cat src/lib/evil_stdlib.h.bak >> src/lib/evil_stdlib.h
+# skip building libdl
+sed -i.bak -e "s/ [^ ]*libdl\.la$//" src/lib/Makefile.in
+sed -i.bak -e "s?\(DEPENDENCIES.*\)\$(top_builddir)/src/lib/libdl\.la?\1?; s?\(LDADD.*\)\$(top_builddir)/src/lib/libdl\.la?\1 -ldl?" src/bin/Makefile.in
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-windows-version=xp &&
+./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-windows-version=win7 LDFLAGS="-Wl,--as-needed -ldl" &&
+ wl-showstatus build &&
+ make -j1 all &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ if [ ! -f $INSTALLPREFIX/enlightenment/lib/src/lib/libevil.la ]; then
+  cp -f src/lib/libevil.la $INSTALLPREFIX/enlightenment/lib/
+ fi &&
+ for F in $INSTALLPREFIX/enlightenment/lib/*.la; do
+  sed -i -e "s/\(dependency_libs='\)  */\1/; s?$(pwd -W|sed -e "s/^\([A-Z]\):/\/\1/i")/?../?g; s?\b[A-Z]:/[^ ]*/lib/\(../lib/\)?\1?g; s?\([' ]\)../lib/lib\([^ ]*\)\.la?\1-l\2?; s?\([' ]\)../lib/?\1?" $F
+ done &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf evil-$VERSION
+####conflicts with libdl => moved to enlightenment folder => removed libdl from build => ok to remove back to main installation folder
+####Now part of EFL (efl)
+
+
+

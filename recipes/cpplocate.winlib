@@ -1,0 +1,65 @@
+export NAME="cpplocate"
+export STATUS=
+export URL=https://github.com/cginternals/cpplocate
+export BASENAME=cpplocate
+export DESCRIPTION="cpplocate is an MIT licensed, cross-platform C++ library that provides tools for applications to locate themselves, their data assets, as well as dependend modules."
+export CATEGORY=
+export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20170430
+#export VERSION=2.0.0
+#export VERSIONDATE=20180712
+#export VERSION=2.1.0
+#export VERSIONDATE=20181013
+#export VERSION=2.2.0
+#export VERSIONDATE=20200323
+export VERSION=2.3.0
+export VERSIONDATE=20220227
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/cginternals/cpplocate/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/cginternals/cpplocate/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/cginternals/cpplocate/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing GetModuleHandleExA in source/cpplocate/source/cpplocate.cpp
+if ! gcc --version | grep -q MinGW-W64; then
+ mv source/cpplocate/source/cpplocate.cpp source/cpplocate/source/cpplocate.cpp.bak &&
+ echo "#define _WIN32_WINNT 0x0501" > source/cpplocate/source/cpplocate.cpp &&
+ cat source/cpplocate/source/cpplocate.cpp.bak >> source/cpplocate/source/cpplocate.cpp
+fi
+# fix missing file
+touch cmake/ModuleInformation.cmake
+mkdir -p build_static build_shared
+ wl-showstatus configure &&
+ cd build_static &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOPTION_BUILD_TESTS:BOOL=OFF .. &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOPTION_BUILD_TESTS:BOOL=OFF .. &&
+ cd .. &&
+ wl-showstatus build-install &&
+ ( make -Cbuild_static install/strip || make -j1 -Cbuild_static install/strip ) &&
+ wl-showstatus build-install &&
+ ( make -Cbuild_shared install/strip || make -j1 -Cbuild_shared install/strip ) &&
+ mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/lib/cmake/cpplocate &&
+ mv -f $INSTALLPREFIX/*.dll $INSTALLPREFIX/bin/ &&
+ mv -f $INSTALLPREFIX/*.cmake $INSTALLPREFIX/lib/cmake/cpplocate/ &&
+ rm -f $INSTALLPREFIX/LICENSE $INSTALLPREFIX/VERSION $INSTALLPREFIX/README.md $INSTALLPREFIX/AUTHORS &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

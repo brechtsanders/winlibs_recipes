@@ -1,0 +1,66 @@
+export NAME="libadns"
+export STATUS=
+export URL=http://www.chiark.greenend.org.uk/~ian/adns/
+export BASENAME=libadns
+export DESCRIPTION="Advanced, easy to use, asynchronous-capable DNS client library and utilities."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.4
+#export VERSIONDATE=
+#export VERSION=1.5.0
+#export VERSIONDATE=20141102
+export VERSION=1.5.1
+export VERSIONDATE=20160813
+#export VERSION=1.5.2
+#export VERSIONDATE=20200612
+export VERSION=1.6.0
+export VERSIONDATE=20200612
+####configure: error: cannot find library function socket
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://www.chiark.greenend.org.uk/~ian/adns/ftp/ adns-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.chiark.greenend.org.uk/~ian/adns/ftp/adns-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/adns-$VERSION.tar.gz
+cd adns-$VERSION
+
+mkdir win32fix win32fix/sys win32fix/netinet win32fix/arpa
+echo "#include <winsock2.h>" > win32fix/sys/socket.h
+touch win32fix/netinet/in.h win32fix/arpa/inet.h win32fix/netdb.h
+
+mv src/internal.h src/internal.h.bak
+cat > src/internal.h << EOF
+#ifndef ENOBUFS
+#define ENOBUFS WSAENOBUFS
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#define EINPROGRESS WSAEINPROGRESS
+struct sigaction {
+  void* sa_handler;
+};
+#endif
+EOF
+cat src/internal.h.bak >> src/internal.h
+
+# workaround for socket detection
+sed -i.bak -e "s/-lsocket\|-lnsl\|-lresolv/-lws2_32/; s?^\(socket();\)?//\1?; s?^\(inet_ntoa();\)?//\1?; s?^\(inet_aton();\)?//\1?" configure
+
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" &&
+ #make install-strip &&
+ XCFLAGS="-I`pwd`/win32fix" make all install &&
+    echo OK
+#mv settings.make settings.make.bak
+#sed -e "s?^\(CFLAGS=.*\)?\1 -I`pwd`/win32fix?" settings.make.bak > settings.make
+####types.c:1159: warning: implicit declaration of function 'nrand48'
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf adns-$VERSION
+####For IPv6 patch see: http://kaeso.wordpress.com/tag/libadns/
+
+
+

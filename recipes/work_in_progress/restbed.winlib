@@ -1,0 +1,79 @@
+export NAME="Restbed"
+export STATUS=
+export URL=https://github.com/corvusoft/restbed
+export BASENAME=restbed
+export DESCRIPTION="Corvusoft's Restbed framework brings asynchronous RESTful functionality to C++11 applications."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=4.6
+export VERSIONDATE=20171117
+####source/corvusoft/restbed/detail/socket_impl.hpp:25:10: fatal error: asio/io_service_strand.hpp: No such file or directory
+#export VERSION=4.7
+#export VERSIONDATE=20200401
+####source/corvusoft/restbed/detail/service_impl.cpp:150:67: error: 'using element_type = class asio::basic_socket_acceptor<asio::ip::tcp>' {aka 'class asio::basic_socket_acceptor<asio::ip::tcp>'} has no member named 'get_io_service'
+#export VERSION=4.8
+#export VERSIONDATE=20210825
+####source/corvusoft/restbed/http.hpp:43:123: note: in expansion of macro 'HTTP_EXPORT'
+####class [[deprecated("HTTP client is deprecated; we will release a complimentary client framework at a future date.")]] HTTP_EXPORT Http
+wl-showstatus --package-version
+export DEPENDANCIES=kashmir,openssl,asio
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE="AGPL/Commercial"
+export DOWNLOADURL="https://github.com/Corvusoft/restbed/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Corvusoft/restbed/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix to no longer use functions removed from asio 1.14.0
+#sed -i.bak -e "s/get_io_service/get_executor().context/g" source/corvusoft/restbed/detail/service_impl.cpp source/corvusoft/restbed/detail/socket_impl.cpp
+## fix missing get_io_service() in newer boost versions in source/corvusoft/restbed/detail/socket_impl.cpp
+#mv source/corvusoft/restbed/detail/socket_impl.cpp source/corvusoft/restbed/detail/socket_impl.cpp.bak
+#cat > source/corvusoft/restbed/detail/socket_impl.cpp << EOF
+##include <boost/version.hpp>
+##include <boost/asio/ssl.hpp>
+##if BOOST_VERSION >= 107000
+##define GET_IO_SERVICE(s) ((boost::asio::io_context&)(s).get_executor().context())
+##else
+##define GET_IO_SERVICE(s) ((s)->get_io_service())
+##endif
+#EOF
+#sed -e "s/\([^ ]*\)->get_io_service( *)/GET_IO_SERVICE(\1)/g; s/\([^ ]*->lowest_layer( *)\)\.get_io_service( *)/GET_IO_SERVICE(\1))/g" source/corvusoft/restbed/detail/socket_impl.cpp.bak >> source/corvusoft/restbed/detail/socket_impl.cpp
+## fix invalid compiler flag in CMakeLists.txt (version >= 4.8)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -70,3 +70,5 @@
+#        add_definitions( -DWIN_DLL_EXPORT )
+#+       if ( MSVC )
+#        set( CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} /wd4251" )
+#+       endif ( )
+# endif ( )
+#EOF
+## fix detection of openssl (version >= 4.8)
+#sed -i.bak -e "s/\([^ ]\)\.so/\1.dll.a &/" cmake/Findopenssl.cmake
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_INSTALL_LIBDIR:PATH=lib -DBUILD_SSL:BOOL=ON -Dcrypto_LIBRARY_STATIC:STRING="-lcrypto" -Dcrypto_LIBRARY_STATIC:STRING="-lcrypto" -Dssl_LIBRARY_STATIC:STRING="-lssl" -Dssl_LIBRARY_SHARED:STRING="-lssl" -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_INSTALL_LIBDIR:PATH=lib -DBUILD_SSL:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_INSTALL_LIBDIR:PATH=lib -DBUILD_SSL:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ #-Dcatch_INCLUDE:PATH=$MINGWPREFIX/include/catch2 
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_INSTALL_LIBDIR:PATH=lib -DBUILD_SSL:BOOL=ON -Dcrypto_LIBRARY_SHARED:STRING="-lcrypto" -Dssl_LIBRARY_SHARED:STRING="-lssl" -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_INSTALL_LIBDIR:PATH=lib -DBUILD_SSL:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_INSTALL_LIBDIR:PATH=lib -DBUILD_SSL:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ echo "-Wl,--as-needed -lws2_32 -lmswsock" >> build_shared/CMakeFiles/restbed.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+

@@ -1,0 +1,108 @@
+export NAME="mimetic"
+export STATUS=
+export URL=http://www.codesink.org/mimetic_mime_library.html
+export BASENAME=mimetic
+export DESCRIPTION="mimetic is a free, MIT licensed, Email library (MIME) written in C++ designed to be easy to use and integrate but yet fast and efficient."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.9.7
+#export VERSIONDATE=20120731
+export VERSION=0.9.8
+export VERSIONDATE=20140617
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+#export LICENSETYPE=GPLv2
+export LICENSETYPE=MIT
+export DOWNLOADURL="http://www.codesink.org/mimetic_mime_library.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.codesink.org/download/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of types in mimetic/config_win32.h
+#patch -ulbf mimetic/config_win32.h.in << EOF
+#--- mimetic/config_win32.h.in  2011-09-10 14:35:16 +0200
+#+++ mimetic/config_win32.h.in  2012-07-31 11:10:50 +0200
+#@@ -20,2 +20,5 @@
+#
+#+#ifdef __MINGW32__
+#+#include <stdint.h>
+#+#else
+# typedef __int16 int16_t;
+#@@ -26,2 +29,3 @@
+# typedef unsigned __int64 uint64_t;
+#+#endif
+#
+#EOF
+patch -ulbf mimetic/config_win32.h << EOF
+--- mimetic/config_win32.h  2011-09-10 14:38:32 +0200
++++ mimetic/config_win32.h  2012-07-31 11:14:04 +0200
+@@ -20,2 +20,5 @@
+
++#ifdef __MINGW32__
++#include <stdint.h>
++#else
+ typedef __int16 int16_t;
+@@ -26,2 +29,3 @@
+ typedef unsigned __int64 uint64_t;
++#endif
+
+EOF
+# fix missing sys/mman.h
+mkdir -p sys
+cat > sys/mman.h << EOF
+#ifndef __INCLUDED_MMAN_H
+#define __INCLUDED_MMAN_H
+#include <io.h>
+#include <windows.h>
+#define PROT_READ 0
+#define MAP_SHARED 0
+//#define MAP_FAILED NULL
+void* mmap (void *start, size_t length, int prot, int flags, int fd, off_t offset)
+{
+  HANDLE handle;
+/*
+  if (offset % getpagesize() != 0)
+    return NULL;
+*/
+  if ((handle = CreateFileMapping((HANDLE)_get_osfhandle(fd), NULL, PAGE_WRITECOPY, 0, 0, NULL)) == NULL)
+    return NULL;
+  start = MapViewOfFile(handle, FILE_MAP_COPY, 0, offset, length);
+  CloseHandle(handle);
+  return start;
+}
+int munmap (void *start, size_t length)
+{
+  UnmapViewOfFile(start);
+  return 0;
+}
+#endif
+EOF
+# skip making test
+cat > test/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ ( make || make CXXFLAGS="-fpermissive" ) &&
+ make install-strip &&
+ cp -f mimetic/config_win32.h $INSTALLPREFIX/include/mimetic/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

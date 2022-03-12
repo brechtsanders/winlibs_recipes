@@ -1,0 +1,111 @@
+export NAME="gavl"
+export STATUS=
+export URL=http://gmerlin.sourceforge.net/
+export BASENAME=gavl
+export DESCRIPTION="Gavl is short for Gmerlin Audio Video Library. It is a low level library, upon which multimedia APIs can be built. Gavl handles all the details of audio and video formats like colorspaces, samplerates, multichannel configurations etc. It provides standardized definitions for those formats as well as container structures for carrying audio samples or video images inside an application."
+export CATEGORY=audio,video
+export TYPE=library
+#export VERSION=1.1.0
+#export VERSION=1.1.1
+#export VERSIONDATE=
+#export VERSION=1.1.2
+#export VERSIONDATE=20100225
+####gavl/timer.c:129: error: 'GAVL_ACCEL_MMX' undeclared (first use in this function)
+#####maybe solution involves compiler flag -msse3
+#export VERSION=1.2.0
+#export VERSIONDATE=20110220
+export VERSION=1.4.0
+export VERSIONDATE=20120610
+wl-showstatus --package-version
+export DEPENDANCIES=libpng
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL3
+#export DOWNLOADURL="http://sourceforge.net/projects/gmerlin/files/ gavl-"
+export DOWNLOADURL="http://sourceforge.net/projects/gmerlin/files/gavl/ gavl-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/gmerlin/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix obsolete function png_set_gray_1_2_4_to_8 (since libpng 1.4.0) in src-IL/src/il_icon.c (version <= 1.1.2)
+#mv src/blend_test.c src/blend_test.c.bak
+#sed -e "s/png_set_gray_1_2_4_to_8/png_set_expand_gray_1_2_4_to_8/" src/blend_test.c.bak > src/blend_test.c
+#mv src/scaletest.c src/scaletest.c.bak
+#sed -e "s/png_set_gray_1_2_4_to_8/png_set_expand_gray_1_2_4_to_8/" src/scaletest.c.bak > src/scaletest.c
+#mv src/pngutil.c src/pngutil.c.bak
+#sed -e "s/png_set_gray_1_2_4_to_8/png_set_expand_gray_1_2_4_to_8/" src/pngutil.c.bak > src/pngutil.c
+# fix configure (version 1.1.0)
+#mv configure configure.bak
+#sed -e "s/-fvisibility=hidden//" configure.bak > configure
+## fix undeclared type u_int8_t (version 1.1.0)
+#mv gavl/libgdither/gdither.c gavl/libgdither/gdither.c.bak
+#echo "typedef unsigned char u_int8_t;" > gavl/libgdither/gdither.c
+#cat gavl/libgdither/gdither.c.bak >> gavl/libgdither/gdither.c
+## fix missing times() and sys/times.h (version 1.1.0)
+#cat >> include/gavl/config.h << EOF
+##define times(s) -1
+#EOF
+## fix problem with using select for sleeping (version 1.1.0)
+#patch -ulbf gavl/time.c << EOF
+#--- gavl/time.c Wed Jan  2 16:17:24 2008
+#+++ gavl/time.c Wed Jan 14 15:00:27 2009
+#@@ -31,8 +31,15 @@
+# #include <arith128.h>
+# 
+#+#ifdef __MINGW32__
+#+#include <windows.h>
+#+#endif
+#+
+# /* Sleep for a specified time */
+# 
+# void gavl_time_delay(gavl_time_t * t)
+#   {
+#+#ifdef __MINGW32__
+#+  Sleep(*t / 1000);
+#+#else  
+#   struct timeval tv;
+#   
+#@@ -40,4 +47,5 @@
+#   tv.tv_usec = *t % 1000000;
+#   select(0, NULL, NULL, NULL, &tv);
+#+#endif
+#   }
+#EOF
+## fix gavl/timer.c (version >= 1.1.2)
+#mv gavl/timer.c gavl/timer.c.bak
+#cat > gavl/timer.c << EOF
+##include <gavl.h>
+#EOF
+#cat gavl/timer.c.bak >> gavl/timer.c
+# fix gavl/cputest.c for 64-bit (version >= 1.4.0)
+patch -ulbf gavl/cputest.c << EOF
+--- gavl/cputest.c  2012-06-08 13:49:48 +0200
++++ gavl/cputest.c  2012-06-10 22:13:32 +0200
+@@ -67,3 +67,3 @@
+   {
+-#ifdef ARCH_X86
++#if defined(ARCH_X86) && !defined(ARCH_X86_64)
+      int rval = 0;
+EOF
+## fix missing libtool (version >= 1.1.2)
+#ln -s `which libtool` libtool
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-doxygen &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-doxygen LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-cpuflags=none --without-doxygen LDFLAGS="-Wl,--as-needed -lpng -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-doxygen LDFLAGS="-Wl,--as-needed -lpng -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-doxygen LDFLAGS="-Wl,--as-needed -lpng -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lpng.dll" ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

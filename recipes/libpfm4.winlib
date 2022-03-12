@@ -1,0 +1,58 @@
+export NAME="libpfm4"
+export STATUS=
+export URL=https://github.com/wcohen/libpfm4
+export BASENAME=libpfm4
+export DESCRIPTION="This package provides a library, called libpfm4 which is used to develop monitoring tools exploiting the performance monitoring events such as those provided by the Performance Monitoring Unit (PMU) of modern processors. This is a complete rewrite of libpfm3 and it is NOT backward compatible with it."
+export CATEGORY=development,hardware
+export TYPE=library
+export VERSION=4.8.0
+export VERSIONDATE=20211226
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/wcohen/libpfm4/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/wcohen/libpfm4/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing strsep in lib/pfmlib_common.c
+mv lib/pfmlib_common.c lib/pfmlib_common.c.bak
+cat > lib/pfmlib_common.c << EOF
+#include <stdlib.h> 
+#include <string.h>
+char* strsep (char** s, const char* delim)
+{
+  char* p = *s;
+  char* q = (p ? strpbrk(p, delim) : NULL);
+  if (q == NULL) {
+    *s = NULL;
+  } else {
+    *q = '\0';
+    *s = q + 1;
+  }
+  return p;
+}
+EOF
+cat lib/pfmlib_common.c.bak >> lib/pfmlib_common.c
+# fix missing -lgnurx in examples/Makefile
+sed -i.bak -e "s/-lgnurx/-lpcreposix/" examples/Makefile
+# avoid -fPIC (useless on Windows and not supported by clang) in rules.mk
+sed -i.bak -e "s/-fPIC//" rules.mk
+wl-showstatus build-install &&
+ make install PREFIX=$INSTALLPREFIX CC=gcc CONFIG_PFMLIB_SHARED= &&
+ make install PREFIX=$INSTALLPREFIX CC=gcc CONFIG_PFMLIB_SHARED=y SLDFLAGS="\$(LDFLAGS) -shared -Wl,--out-implib,\$(VLIBPFM)" SLIBPFM=libpfm.dll VLIBPFM=libpfm.dll.a SOLIBEXT=dummy.dll LN="cp -f" LDCONFIG=true &&
+ strip $INSTALLPREFIX/lib/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ rm -f $INSTALLPREFIX/lib/*.dummy.dll &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

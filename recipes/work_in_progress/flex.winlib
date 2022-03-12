@@ -1,0 +1,100 @@
+export NAME="flex"
+export STATUS=
+export URL=http://flex.sourceforge.net/
+export BASENAME=flex
+export DESCRIPTION="Flex is a tool for generating scanners. A scanner, sometimes called a tokenizer, is a program which recognizes lexical patterns in text. The flex program reads user-specified input files, or its standard input if no file names are given, for a description of a scanner to generate. The description is in the form of pairs of regular expressions and C code, called rules. Flex generates a C source file named, \"lex.yy.c\", which defines the function yylex(). The file \"lex.yy.c\" can be compiled and linked to produce an executable. When the executable is run, it analyzes its input for occurrences of text matching the regular expressions for each rule. Whenever it finds a match, it executes the corresponding C code."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=2.5.33
+#export VERSION=2.5.35
+#export VERSIONDATE=
+export VERSION=2.5.39
+export VERSIONDATE=20200311
+####main.c:168: undefined reference to `wait'
+export VERSION=2.6.2
+export VERSIONDATE=20170428
+#export VERSION=2.6.3
+#export VERSIONDATE=20170428
+#export VERSION=2.6.4
+#export VERSIONDATE=20170507
+####src/filter.c:149: undefined reference to `pipe'
+####src/filter.c:152: undefined reference to `fork'
+wl-showstatus --package-version
+#export DEPENDANCIES=sys_wait_h
+export DEPENDANCIES=sys_wait_h,win32-fork
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD-like
+#export DOWNLOADURL="http://sourceforge.net/projects/flex/files/"
+#export DOWNLOADURL="http://sourceforge.net/projects/flex/files/flex/"
+export DOWNLOADURL="https://github.com/westes/flex/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/sourceforge/flex/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/westes/flex/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix main.c (version <= 2.5.35)
+#patch -ulbf main.c << EOF
+#--- main.c  Mon Sep 10 08:16:34 2007
+#+++ main.c  Wed Jul 15 08:13:44 2009
+#@@ -167,2 +167,3 @@
+#         }
+#+#ifndef __MINGW32__
+#         while (wait(&child_status) > 0){
+#@@ -177,2 +178,3 @@
+#         }
+#+#endif
+#         return exit_status - 1;
+#EOF
+## fix winsock2.h in tables.c (version <= 2.5.35)
+#mv tables.c tables.c.bak &&
+#echo "#include <winsock2.h>" > tables.c &&
+#cat tables.c.bak >> tables.c
+# fix winsock2.h in src/tables.c (version >= 2.6.2)
+mv src/tables.c src/tables.c.bak &&
+echo "#include <winsock2.h>" > src/tables.c &&
+cat src/tables.c.bak >> src/tables.c
+# fix winsock2.h in src/main.c (version >= 2.6.2)
+mv src/main.c src/main.c.bak &&
+echo "#include <winsock2.h>" > src/main.c &&
+cat src/main.c.bak >> src/main.c
+## fix missing sys/wait.h in src/flexdef.h (version >= 2.6.2)
+#mv src/flexdef.h src/flexdef.h.bak &&
+#sed -e "s?^#include <sys/wait.h>?//&?" src/flexdef.h.bak > src/flexdef.h
+# avoid already defined CHAR (version >= 2.6.2)
+mv src/parse.h src/parse.h.bak &&
+sed -e "s/\bCHAR\b/CHARACTER/g" src/parse.h.bak > src/parse.h
+mv src/parse.c src/parse.c.bak &&
+sed -e "s/\bCHAR\b\(.*258\)/CHARACTER\1/g" src/parse.c.bak > src/parse.c
+mv src/yylex.c src/yylex.c.bak &&
+sed -e "s/\bCHAR\b/CHARACTER/g" src/yylex.c.bak > src/yylex.c
+mv src/scan.l src/scan.l.bak &&
+sed -e "s/\bCHAR\b/CHARACTER/g" src/scan.l.bak > src/scan.l
+# fix pipe in src/filter.c (version >= 2.6.2)
+mv src/filter.c src/filter.c.bak &&
+echo "#include <fcntl.h>" > src/filter.c &&
+echo "#define pipe(fds) _pipe(fds, 4096, _O_BINARY)" >> src/filter.c &&
+#echo "#define fork() -1" >> src/filter.c &&
+echo "#include <win32fork.h>" >> src/filter.c &&
+cat src/filter.c.bak >> src/filter.c
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-lws2_32 -lpcreposix -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/win32ports/include" LIBS="-Wl,--as-needed -lws2_32 -lpcreposix" LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined -Wl,--enable-auto-import" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/win32ports/include" LIBS="-Wl,--as-needed -lws2_32 -lpcreposix" LDFLAGS="-Wl,--as-needed -lws2_32 -lwin32fork -Wl,-no-undefined -Wl,--enable-auto-import" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+#make -j1 LIBS="-lws2_32 -lintl -lpcreposix"
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+# for pipe/wait errors see also: http://lists.zerezo.com/mingw-users/msg09870.html
+
+
+

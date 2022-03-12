@@ -1,0 +1,54 @@
+export NAME="OpenCPN"
+export STATUS=
+export URL=https://opencpn.org/
+export BASENAME=opencpn
+export DESCRIPTION="Concise and robust Chart Plotter Navigation software"
+export CATEGORY=geo
+export TYPE=application
+#export VERSION=5.0.0
+#export VERSIONDATE=20190610
+#export VERSION=5.2.0
+#export VERSIONDATE=20200716
+export VERSION=5.2.4
+export VERSIONDATE=20201023
+wl-showstatus --package-version
+export DEPENDANCIES=wxwidgets
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING.gplv3
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/OpenCPN/OpenCPN/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/OpenCPN/OpenCPN/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd OpenCPN-$VERSION
+# create dummy wx-config which supports --version and uses UNIX-style paths
+cat > wx-config.sh << EOF
+#!/bin/sh
+if echo " \$* "|grep -q " --version "; then
+ shift
+ wx-config.exe --release \$* | grep -v "wx-config Error:" | sed -e "s/^\\([0-9]*\\.[0-9]*\\)\$/\\1.0/"
+else
+ #wx-config.exe --static=no --unicode=yes --debug=no --universal=no --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+ #wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=gcc_dll/mswu --static=no --unicode=yes --debug=no --universal=no --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+ wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=gcc_dll/mswu \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+ #wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=gcc_lib/mswu \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+fi
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOCPN_FORCE_GTK3:BOOL=ON -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_BUNDLED_LIBS:BOOL=OFF -DwxWidgets_LIBRARIES:PATH=$MINGWPREFIX/wx/lib/gcc_dll -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include/wx -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/gcc_msw/wxrc.exe -DwxWidgets_USE_UNICODE:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_BUNDLED_LIBS:BOOL=OFF -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/gcc_msw/wxrc.exe -DwxWidgets_USE_UNICODE:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_BUNDLED_LIBS:BOOL=OFF -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(which wx-config.exe) -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/gcc_msw/wxrc.exe -DwxWidgets_LIBRARIES:STRING=$MINGWPREFIX/wx/lib/gcc_dll -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_USE_UNICODE:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenCPN-$VERSION
+
+
+

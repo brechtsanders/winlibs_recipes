@@ -1,0 +1,223 @@
+export NAME="iODBC"
+export STATUS=
+export URL=http://www.iodbc.org/
+export BASENAME=iodbc
+export DESCRIPTION="iODBC is the acronym for Independent Open DataBase Connectivity, an Open Source platform independent implementation of both the ODBC and X/Open specifications. It is rapidly emerging as the industry standard for developing solutions that are language, platform and database independent."
+export CATEGORY=database
+export TYPE=library
+#export VERSION=3.52.9
+#export VERSIONDATE=20140616
+#export VERSION=3.52.10
+#export VERSIONDATE=20150213
+#export VERSION=3.52.12
+#export VERSIONDATE=20160712
+#export VERSION=3.52.13
+#export VERSIONDATE=20201006
+#export VERSION=3.52.14
+#export VERSIONDATE=20210217
+export VERSION=3.52.15
+export VERSIONDATE=20210608
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="LGPL/BSD"
+#export DOWNLOADURL="http://www.iodbc.org/dataspace/iodbc/wiki/iODBC/Downloads"
+#export DOWNLOADURL="http://sourceforge.net/projects/iodbc/files/iodbc/"
+export DOWNLOADURL="https://github.com/openlink/iODBC/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/iodbc/iodbc/$VERSION/libiodbc-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/openlink/iODBC/releases/download/v$VERSION/libiodbc-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/openlink/iODBC/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/libiodbc-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd libiodbc-$VERSION
+#cd iODBC-$VERSION
+# fix missing HWND in include/odbcinst.h
+mv include/odbcinst.h include/odbcinst.h.bak
+echo "#include <windows.h>" > include/odbcinst.h
+cat include/odbcinst.h.bak >> include/odbcinst.h
+# fix missing HWND in include/sql.h
+mv include/sql.h include/sql.h.bak
+echo "#include <windows.h>" > include/sql.h
+cat include/sql.h.bak >> include/sql.h
+# fix missing DWORD/LPDWORD in include/iodbcunix.h
+mv include/iodbcunix.h include/iodbcunix.h.bak
+cat > include/iodbcunix.h << EOF
+#ifdef __WIN32
+#include <windows.h>
+#else
+EOF
+cat include/iodbcunix.h.bak >> include/iodbcunix.h
+echo "#endif" >> include/iodbcunix.h
+# fix redefinition of MEM_FREE/CALLBACK in include/iodbc.h
+mv include/iodbc.h include/iodbc.h.bak
+cat > include/iodbc.h << EOF
+#ifndef _IODBC_H
+#include <windows.h>
+#undef MEM_FREE
+#undef CALLBACK
+#endif
+EOF
+cat include/iodbc.h.bak >> include/iodbc.h
+# fix missing files
+mkdir -p winfix
+cat > winfix/pwd.h << EOF
+#ifndef getuid
+#define getuid() 0
+#define getpwuid(uid) NULL
+struct passwd {
+ //int pw_uid;
+ char *pw_name;
+ char *pw_dir;
+};
+#endif
+EOF
+# fix iodbcinst/SQLWriteDSNToIni.c
+patch -ulbf iodbcinst/SQLWriteDSNToIni.c << EOF
+--- iodbcinst/SQLWriteDSNToIni - Copy.c 2014-04-15 13:00:46 +0200
++++ iodbcinst/SQLWriteDSNToIni.c        2014-06-18 11:39:58 +0200
+@@ -88,2 +88,3 @@
+
++#ifndef __MINGW32__
+ extern int GetPrivateProfileString (LPCSTR lpszSection, LPCSTR lpszEntry,
+@@ -91,2 +92,3 @@
+     LPCSTR lpszFilename);
++#endif
+EOF
+# fix iodbcinst/SQLInstallDriver.c
+patch -ulbf iodbcinst/SQLInstallDriver.c << EOF
+--- iodbcinst/SQLInstallDriver.c  2014-04-15 13:00:46 +0200
++++ iodbcinst/SQLInstallDriver.c  2014-06-18 11:33:50 +0200
+@@ -136,5 +136,5 @@
+    *  On Windows, there is only one place to look
+    */
+-  if (GetWindowsDirectory ((LPSTR) buf, cbPathMax) >= cbPathMax)
++  if (GetWindowsDirectory ((LPSTR) lpszPath, cbPathMax) >= cbPathMax)
+     {
+       PUSH_ERROR (ODBC_ERROR_INVALID_BUFF_LEN);
+EOF
+# fix iodbcinst/SQLGetTranslator.c
+patch -ulbf iodbcinst/SQLGetTranslator.c << EOF
+--- iodbcinst/SQLGetTranslator.c  2014-04-15 13:00:46 +0200
++++ iodbcinst/SQLGetTranslator.c  2014-06-24 11:41:48 +0200
+@@ -91,3 +91,3 @@
+
+-#ifndef WIN32
++#if !defined(WIN32) || defined(__MINGW32__)
+ #include <unistd.h>
+@@ -126,3 +126,3 @@
+
+-extern SQLRETURN _iodbcdm_trschoose_dialbox (HWND, LPSTR, DWORD, int *);
++extern SQLRETURN SQL_API _iodbcdm_trschoose_dialbox (HWND, LPSTR, DWORD, int *);
+
+EOF
+# fix redefinition of GetPrivateProfileString in iodbcinst/SQLReadFileDSN.c
+mv iodbcinst/SQLReadFileDSN.c iodbcinst/SQLReadFileDSN.c.bak
+sed -e "s/\(extern.*\)\(GetPrivateProfileString\)/\1My\2/" iodbcinst/SQLReadFileDSN.c.bak > iodbcinst/SQLReadFileDSN.c
+# fix redefinition of WritePrivateProfileString in iodbcinst/SQLWriteFileDSN.c
+mv iodbcinst/SQLWriteFileDSN.c iodbcinst/SQLWriteFileDSN.c.bak
+sed -e "s/\(extern.*\)\(WritePrivateProfileString\)/\1My\2/" iodbcinst/SQLWriteFileDSN.c.bak > iodbcinst/SQLWriteFileDSN.c
+# fix iodbcinst/unicode.c
+patch -ulbf iodbcinst/unicode.c << EOF
+--- iodbcinst/unicode.c  2014-04-15 13:00:46 +0200
++++ iodbcinst/unicode.c  2014-06-24 12:39:58 +0200
+@@ -87,3 +87,3 @@
+
+-#ifdef WIN32
++#if defined(WIN32) && !defined(__MINGW32__)
+ #include <ansiapi.h>
+EOF
+# fix iodbc/hdbc.c
+patch -ulbf iodbc/hdbc.c << EOF
+--- iodbc/hdbc.c  2014-06-24 12:46:28 +0200
++++ iodbc/hdbc.c  2014-04-15 13:00:46 +0200
+@@ -262,3 +262,3 @@
+
+-SQLRETURN
++SQLRETURN SQL_API
+ SQLFreeConnect_Internal (SQLHDBC hdbc, int ver)
+@@ -321,3 +321,3 @@
+
+-SQLRETURN
++SQLRETURN SQL_API
+ _iodbcdm_SetConnectOption (
+EOF
+# fix missing HDLL in iodbc/dlproc.h
+patch -ulbf iodbc/dlproc.h << EOF
+--- iodbc/dlproc.h  2014-04-15 13:00:46 +0200
++++ iodbc/dlproc.h  2014-06-18 11:50:54 +0200
+@@ -97,2 +97,4 @@
+ typedef void *HDLL;
++#else
++typedef void *HDLL;
+ #endif
+EOF
+# fix iodbc/info.c
+patch -ulbf iodbc/info.c << EOF
+--- iodbc/info.c  2014-04-15 13:00:46 +0200
++++ iodbc/info.c  2014-06-24 12:50:28 +0200
+@@ -109,4 +109,5 @@
+
+
++#ifndef __MINGW32__
+ static int
+ stricmp (const char *s1, const char *s2)
+@@ -123,4 +124,5 @@
+   return (*s2) ? -1 : 0;
+ }
++#endif
+
+
+EOF
+# fix iodbcinst/SQLConfigDriver.c
+patch -ulbf iodbcinst/SQLConfigDriver.c << EOF
+--- iodbcinst/SQLConfigDriver.c  2014-04-15 13:00:46 +0200
++++ iodbcinst/SQLConfigDriver.c  2014-06-24 13:17:04 +0200
+@@ -92,3 +92,3 @@
+
+-#ifndef WIN32
++#if !defined(WIN32) || defined(__MINGW32__)
+ #include <unistd.h>
+EOF
+# fix iodbcinst/SQLConfigDataSource.c
+patch -ulbf iodbcinst/SQLConfigDataSource.c << EOF
+--- iodbcinst/SQLConfigDataSource.c  2014-04-15 13:00:46 +0200
++++ iodbcinst/SQLConfigDataSource.c  2014-06-24 13:20:46 +0200
+@@ -90,3 +90,3 @@
+
+-#ifndef WIN32
++#if !defined(WIN32) || defined(__MINGW32__)
+ #include <unistd.h>
+EOF
+# fix already defined CP_UTF16 in iodbcinst/unicode.h (version >= 3.52.14)
+patch -ulbf iodbcinst/unicode.h << EOF
+@@ -106,2 +106,3 @@
+     CP_UTF16   = SQL_DM_CP_UTF16,
++#undef CP_UTF8
+     CP_UTF8    = SQL_DM_CP_UTF8
+EOF
+wl-showstatus configure &&
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #mkdir -p m4 &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DWIN32 -I$(pwd)/winfix -I$MINGWPREFIX/include/libdl-win32" &&
+ wl-showstatus build &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libiodbc-$VERSION
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf iODBC-$VERSION
+
+
+

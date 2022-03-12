@@ -1,0 +1,84 @@
+export NAME="Redland"
+export STATUS=
+export URL=http://librdf.org/
+export BASENAME=librdf
+export DESCRIPTION="Redland is a library that provides a high-level interface for the Resource Description Framework (RDF) allowing the RDF graph to be parsed from XML, stored, queried and manipulated. Redland implements each of the RDF concepts in its own class via an object based API, reflected into the language APIs, currently Perl, PHP, Python and Ruby. Several classes providing functionality such as for parsers, storage are built as modules that can be loaded at compile or run-time as required."
+export CATEGORY=db
+export TYPE=library
+#export VERSION=1.0.11
+#export VERSIONDATE=20100927
+#export VERSION=1.0.12
+#export VERSIONDATE=20101014
+####checking for rasqal... configure: error: Rasqal is not installed - see http://librdf.org/rasqal/ to get a version in range 0.9.22 to 0.9.99
+#export VERSION=1.0.13
+#export VERSIONDATE=20110202
+#export VERSION=1.0.14
+#export VERSIONDATE=20110724
+#export VERSION=1.0.15
+#export VERSIONDATE=20111204
+#export VERSION=1.0.16
+#export VERSIONDATE=20121230
+export VERSION=1.0.17
+export VERSIONDATE=20131229
+wl-showstatus --package-version
+#export DEPENDANCIES=librasqal,mpfr,gmp,libraptor,libcurl,openssl,libgcrypt,libgpg-error,libxml2,libxslt,zlib,pthreads,libiconv,libltdl,bdb,sqlite3,mysql,postgresql
+export DEPENDANCIES=librasqal,mpfr,gmp,libraptor,libcurl,openssl,libgcrypt,libgpg-error,libxml2,libxslt,zlib,pthreads,libiconv,libltdl,bdb,sqlite3,mariadb-client,postgresql
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL/LGPL
+export DOWNLOADURL="http://download.librdf.org/source/ redland-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.librdf.org/source/redland-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/redland-$VERSION.tar.gz
+cd redland-$VERSION
+# fake -lltdl dependancy from src/Makefile
+touch src/-lltdl
+# fix missing file
+touch utils/win32_config.h
+# fix librdf_heuristic_gen_name in src/rasqal_internal.h (version >= 1.0.13)
+patch -ulbf src/rasqal_internal.h << EOF
+--- src/rdf_heuristics.h  2009-04-08 06:31:14 +0200
++++ src/rdf_heuristics.h  2011-06-28 10:54:26 +0200
+@@ -32,3 +32,3 @@
+
+-char* librdf_heuristic_gen_name(const char *name);
++REDLAND_API char* librdf_heuristic_gen_name(const char *name);
+ int librdf_heuristic_is_blank_node(const char *node);
+EOF
+# fix missing config-win.h
+echo "typedef unsigned int uint;" > src/config-win.h
+## fix invalid REDLAND_MODULE_PATH in src/Makefile.in
+#mv src/Makefile.in src/Makefile.in.bak &&
+#sed -e "s?\(-DREDLAND_MODULE_PATH=[\"\\]*\)[^\"\\]*?\1?" src/Makefile.in.bak > src/Makefile.in
+wl-showstatus configure &&
+# remove smiley's (SOH, ASCII 1) from Makefile
+# fix invalid compiler parameters
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl --without-mysql &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --disable-ltdl-install --without-included-ltdl --without-mysql &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl --without-mysql LDFLAGS="-lpthread -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl --without-mysql --with-module-path=$INSTALLPREFIX/redland:./redland LDFLAGS="-lpthread -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl --without-mysql --with-module-path=$INSTALLPREFIX/redland:./redland LDFLAGS="-Wl,--as-needed -lpthread -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl --without-mysql --with-module-path=$INSTALLPREFIX/redland:./redland --without-virtuoso LDFLAGS="-Wl,--as-needed -lpthread -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl --with-mysql --with-module-path=$INSTALLPREFIX/redland:./redland --without-virtuoso LDFLAGS="-Wl,--as-needed -lpthread -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ltdl-install --without-included-ltdl --with-threads --with-module-path=$INSTALLPREFIX/redland:./redland --without-virtuoso LDFLAGS="-Wl,--as-needed -lpthread -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix invalid compiler switches
+ sed -i.bak s/$'\x01'//g'; s?"/MT" "/Zi" "/O2" "/Ob1" "/D" "NDEBUG"?-O2 -DNDEBUG?; s?"/wd4996"??' $(find . -iname Makefile) &&
+ # fix issues with backslashes in defined paths and change to relative paths
+ mv src/Makefile src/Makefile.bak &&
+ sed -e "s?\(-D\)\(PKGDATADIR\|REDLAND_MODULE_PATH\)=[^ ]*?\1\2=\"\\\\\"../lib/redland\\\\\"\"?" src/Makefile.bak > src/Makefile &&
+ ( make install-strip LIBS="-Wl,--as-needed -lws2_32 -lraptor2" || ( make -C src install-strip LIBS="-Wl,--as-needed -lws2_32 -lraptor2" && make -C data install-strip && make install-pkgconfigDATA ) ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf redland-$VERSION
+#TO DO: fix for mysql
+####librdf_storage_mysql_la_LDFLAGS="-module -avoid-version -lmysql"
+
+
+

@@ -1,0 +1,100 @@
+#export NAME="virt-viewer"
+#export STATUS=
+#export URL=https://virt-manager.org/
+#export BASENAME=virt-viewer
+#export DESCRIPTION="virt-viewer is a lightweight UI interface for interacting with the graphical display of virtualized guest OS. It can display VNC or SPICE, and uses libvirt to lookup the graphical connection details."
+#export CATEGORY=communication
+#export TYPE=application
+##export VERSION=6.0
+##export VERSIONDATE=20170912
+##export VERSION=7.0
+##export VERSIONDATE=20180728
+##export VERSION=8.0
+##export VERSIONDATE=20190302
+#####Executable (remote-viewer.exe) crashes
+#export VERSION=9.0
+#export VERSIONDATE=20200502
+#wl-showstatus --package-version
+#export DEPENDANCIES=libxml2,gtk3,libvirt,gtk-vnc,spice-gtk
+##export DEPENDANCIES=libxml2,gtk3,libvirt,libvirt-glib,gtk-vnc,spice-gtk
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="https://releases.pagure.org/virt-viewer/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://virt-manager.org/download/sources/virt-viewer/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+#wl-showstatus configure &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-libvirt --with-gtk-vnc --with-spice-gtk --without-ovirt &&
+##INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libvirt --with-gtk-vnc --with-spice-gtk --with-ovirt --without-vte &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####remote-viewer.exe
+
+
+
+export NAME="virt-viewer"
+export STATUS=
+export URL=https://virt-manager.org/
+export BASENAME=virt-viewer
+export DESCRIPTION="virt-viewer is a lightweight UI interface for interacting with the graphical display of virtualized guest OS. It can display VNC or SPICE, and uses libvirt to lookup the graphical connection details."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=10.0
+#export VERSIONDATE=20210421
+export VERSION=11.0
+export VERSIONDATE=20211123
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2,gtk3,libvirt,libvirt-glib,gtk-vnc,spice-gtk
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://releases.pagure.org/virt-viewer/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://virt-manager.org/download/sources/virt-viewer/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## also allow building shared libraries
+#sed -i.bak -e "s/static_\(library\)/\1/" src/meson.build
+# fix detection of Python
+sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+# disable stack protector
+sed -i.bak2 -e "s/'-fstack-protector[^ ']*',//g" meson.build
+# skip building tests
+sed -i.bak3 -e "s/^subdir('tests')/#&/" meson.build
+# skip updating mime/icon cache/desktop databases on installation
+sed -i.bak4 -e "s/if \(update_mime_database\|update_icon_cache\|update_desktop_database\).found()/if false/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PATH=$PATH:$PERLDIR/bin PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibvirt=enabled -Dvnc=enabled -Dspice=enabled -Dvte=disabled -Dbash_completion=disabled . build_both &&
+ # fix invalid relative paths
+ sed -i.bak -e "s?-I../../include/?-I$(cygpath -m $MINGWPREFIX)/include/?g" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####remote-viewer.exe
+
+
+
+## create standalone package
+#mkdir -p virt-viewer/bin virt-viewer/share/icons/Adwaita virt-viewer/share/glib-2.0/schemas &&
+#copypedeps -r $MINGWPREFIX/bin/remote-viewer.exe virt-viewer/bin/ &&
+#for F in $(cat $C/var/lib/packages/virt-viewer/files); do
+# mkdir -p virt-viewer/$(dirname $F)
+# echo $MINGWPREFIX/$F virt-viewer/$F
+#done &&
+#cp -rf $MINGWPREFIX/share/icons/Adwaita/* virt-viewer/share/icons/Adwaita/
+#cp -f $C/share/glib-2.0/schemas/org.gtk.Settings.*.gschema.xml virt-viewer/share/glib-2.0/schemas/
+#glib-compile-schemas.exe virt-viewer/share/glib-2.0/schemas --targetdir=virt-viewer/share/glib-2.0/schemas

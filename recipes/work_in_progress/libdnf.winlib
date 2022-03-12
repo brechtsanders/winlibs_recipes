@@ -1,0 +1,115 @@
+export NAME="libdnf"
+export STATUS=
+export URL=https://github.com/rpm-software-management/libdnf
+export BASENAME=libdnf
+export DESCRIPTION="This library provides a high level package-manager. It's core library of dnf, PackageKit and rpm-ostree. It's replacement for deprecated hawkey library which it contains inside and uses librepo under the hood."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.47.0
+#export VERSIONDATE=20200407
+#export VERSION=0.48.0
+#export VERSIONDATE=20200602
+####CMake Error at cmake/modules/FindGpgme.cmake:165 (macro_bool_to_01): Unknown CMake command "macro_bool_to_01".
+#export VERSION=0.54.2
+#export VERSIONDATE=20201006
+#export VERSION=0.55.0
+#export VERSIONDATE=20201109
+#export VERSION=0.55.2
+#export VERSIONDATE=20201203
+#export VERSION=0.58.0
+#export VERSIONDATE=20210129
+#export VERSION=0.60.0
+#export VERSIONDATE=20210203
+#export VERSION=0.60.1
+#export VERSIONDATE=20210413
+#export VERSION=0.61.1
+#export VERSIONDATE=20210413
+#export VERSION=0.62.0
+#export VERSIONDATE=20210413
+#export VERSION=0.63.0
+#export VERSIONDATE=20210519
+#export VERSION=0.63.1
+#export VERSIONDATE=20210615
+#export VERSION=0.64.0
+#export VERSIONDATE=20210917
+#export VERSION=0.65.0
+#export VERSIONDATE=20211021
+export VERSION=0.66.0
+export VERSIONDATE=20220308
+####Could not find a package configuration file provided by "LibSolv"
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,json,libsolv,libmodulemd,sqlite3,librepo
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/rpm-software-management/libdnf/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rpm-software-management/libdnf/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing macro_bool_to_01 in cmake/modules/FindGpgme.cmake (version >= 0.54.2)
+mv cmake/modules/FindGpgme.cmake cmake/modules/FindGpgme.cmake.bak
+cat > cmake/modules/FindGpgme.cmake << EOF
+MACRO(macro_bool_to_01 FOUND_VAR)
+   FOREACH (_current_VAR \${ARGN})
+      IF(\${FOUND_VAR})
+         SET(\${_current_VAR} 1)
+      ELSE(\${FOUND_VAR})
+         SET(\${_current_VAR} 0)
+      ENDIF(\${FOUND_VAR})
+   ENDFOREACH(_current_VAR)
+ENDMACRO(MACRO_BOOL_TO_01)
+EOF
+cat cmake/modules/FindGpgme.cmake.bak >> cmake/modules/FindGpgme.cmake
+# make sure FindLibSolv.cmake can be found in CMAKE_MODULE_PATH and gio-unix is not used
+sed -i.bak -e "s?set(CMAKE_MODULE_PATH [^)]*?&;$(cygpath -m $MINGWPREFIX/share/cmake/modules)?; s?gio-unix?gio-windows?" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_ZCHUNK:BOOL=ON -DENABLE_RHSM_SUPPORT:BOOL=OFF -DENABLE_SOLV_URPMREORDER:BOOL=OFF -DWITH_MAN:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDANCIES=cmake
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# #wl-showstatus build &&
+# #make -Cbuild_static &&
+# #wl-showstatus build &&
+# #make -Cbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+#    echo OK
+
+#export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

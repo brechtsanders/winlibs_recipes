@@ -1,0 +1,78 @@
+export NAME="libnova"
+export STATUS=
+export URL=http://libnova.sourceforge.net/
+export BASENAME=libnova
+export DESCRIPTION="Celestial Mechanics, Astrometry and Astrodynamics Library"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=0.15.0
+export VERSIONDATE=20141209
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/libnova/files/libnova/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/libnova/libnova/v%20$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix math.h issues in src/heliocentric_time.c
+mv src/heliocentric_time.c src/heliocentric_time.c.bak
+echo "#include <math.h>" > src/heliocentric_time.c
+cat src/heliocentric_time.c.bak >> src/heliocentric_time.c
+## fix missing _ftime_s/gmtime_s/strtok_s in src/utility.c
+#mv src/utility.c src/utility.c.bak
+#cat > src/utility.c << EOF
+##define strtok_s(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))
+##define gmtime_s(tp, tm) gmtime((tp))
+##define _ftime_s(timeptr) _ftime(timeptr)
+#EOF
+#cat src/utility.c.bak >> src/utility.c
+# fix missing gmtime_s in src/utility.c
+patch -ulbf src/utility.c << EOF
+--- src/utility.c  2012-04-28 11:41:42.000000000 +0200
++++ src/utility.c  2015-02-16 09:44:04.974402100 +0100
+@@ -697,7 +697,12 @@
+ struct tm *gmtime_r (time_t *t, struct tm *gmt)
+ {
+-       gmtime_s (gmt, t);
+-
+-       return gmt;
++  struct tm *p = gmtime(t);
++  if (!p)
++    return NULL;
++  if (gmt) {
++    memcpy (gmt, p, sizeof (struct tm));
++    return gmt;
++  } else
++    return p;
+ }
+
+EOF
+# fix redefinition of struct timeval in src/libnova/ln_types.h
+patch -ulbf src/libnova/ln_types.h << EOF
+--- src/libnova/ln_types.h  2011-07-28 13:02:42.000000000 +0200
++++ src/libnova/ln_types.h  2014-12-09 17:53:36.940148300 +0100
+@@ -338,5 +338,5 @@
+
+ /* Definitions of POSIX structures for Win32. */
+-#ifdef __WIN32__
++#if defined __WIN32__ && !defined __MINGW32__
+
+ #include <time.h>
+EOF
+wl-showstatus configure &&
+autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

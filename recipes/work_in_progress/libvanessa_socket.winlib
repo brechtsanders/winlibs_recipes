@@ -1,0 +1,109 @@
+export NAME="libvanessa_socket"
+export STATUS=
+export URL=http://www.vergenet.net/linux/vanessa/
+export BASENAME=libvanessa_socket
+export DESCRIPTION="Simplifies TCP/IP socket operations. It includes code to open a socket to a server as a client, to listen on socket for clients as a server and to pipe information between sockets."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.0.7
+export VERSION=0.0.8
+#export VERSION=0.0.9
+#export VERSION=0.0.10
+#export VERSION=0.0.11
+#export VERSION=0.0.12
+export VERSIONDATE=
+#export VERSION=0.0.13
+#export VERSIONDATE=20150614
+####libvanessa_socket/vanessa_socket_server.c:28:22: fatal error: sys/poll.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=vanessa_logger
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2.1
+export DOWNLOADURL="http://www.vergenet.net/linux/vanessa/download/vanessa_socket/ vanessa_socket-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.vergenet.net/linux/vanessa/download/vanessa_socket/$VERSION/vanessa_socket-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://www.vergenet.net/linux/vanessa/download/vanessa_socket/$VERSION/vanessa_socket-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/vanessa_socket-$VERSION.tar.gz
+tar xfj $TARBALLDIR/$BASENAME/vanessa_socket-$VERSION.tar.bz2
+cd vanessa_socket-$VERSION
+# fix missing files
+mkdir netinet sys arpa
+touch netdb.h netinet/in.h sys/wait.h arpa/inet.h
+echo "#include <winsock2.h>" > sys/socket.h
+# create dummy syslog.h
+cat > syslog.h << EOF
+#define LOG_DEBUG   7    //debug-level messages
+//#define LOG_DAEMON   (3<<3)    //system daemons
+//#define LOG_PID    0x01    //log the pid with each message
+//#define LOG_CONS   0x02    //log on the console if errors in sending
+#define LOG_ERR 3
+#define LOG_INFO 6
+//static void openlog (const char *ident, int option, int facility) {}
+//static void syslog (int priority, const char *format, ...) {}
+//static void closelog (void) {}
+EOF
+cat > pwd.h << EOF
+#ifndef  DUMMY_PWD_H_INCLUDED
+#define DUMMY_PWD_H_INCLUDED
+typedef int uid_t;
+#define _SC_OPEN_MAX 4
+#endif
+EOF
+cat > grp.h << EOF
+#ifndef  DUMMY_GRP_H_INCLUDED
+#define DUMMY_GRP_H_INCLUDED
+typedef int gid_t;
+#endif
+EOF
+# fix libvanessa_socket/vanessa_socket_client.c (version >= 0.0.9)
+mv libvanessa_socket/vanessa_socket_client.c libvanessa_socket/vanessa_socket_client.c.bak
+cat > libvanessa_socket/vanessa_socket_client.c << EOF
+#include <ws2tcpip.h>
+#define bzero(b,len) memset(b,0,len)
+#define EAI_SYSTEM 11
+EOF
+cat libvanessa_socket/vanessa_socket_client.c.bak >> libvanessa_socket/vanessa_socket_client.c
+# fix use of h_errno in libvanessa_socket/vanessa_socket_client.c (version >= 0.0.9)
+mv libvanessa_socket/vanessa_socket_host.c libvanessa_socket/vanessa_socket_host.c.bak
+grep -e "s/h_errno/h__errno/g" libvanessa_socket/vanessa_socket_host.c.bak > libvanessa_socket/vanessa_socket_host.c
+# fix libvanessa_socket/vanessa_socket_daemon.c (version >= 0.0.9)
+patch -u -l libvanessa_socket/vanessa_socket_daemon.c << EOF
+--- libvanessa_socket/vanessa_socket_daemon.c  Thu Sep  3 12:07:30 2009
++++ libvanessa_socket/vanessa_socket_daemon.c  Mon Sep 28 11:57:42 2009
+@@ -221,2 +221,5 @@
+ {
++#ifdef __MINGW32__
++       return (-1);
++#else
+        uid_t uid;
+@@ -270,2 +273,3 @@
+        return (0);
++#endif
+ }
+EOF
+# fix libvanessa_socket/vanessa_socket_handler.c (version >= 0.0.9)
+mv libvanessa_socket/vanessa_socket_handler.c libvanessa_socket/vanessa_socket_handler.c.bak
+cat > libvanessa_socket/vanessa_socket_handler.c << EOF
+#define WNOHANG BSF_NOHANG
+EOF
+cat libvanessa_socket/vanessa_socket_handler.c.bak >> libvanessa_socket/vanessa_socket_handler.c
+# fix conflicting definitions of vanessa_socket_pipe_read_write_func
+mv libvanessa_socket/vanessa_socket.h libvanessa_socket/vanessa_socket.h.bak
+sed -e "s/^int\( vanessa_socket_pipe_read_write_func\)/ssize_t\1/" libvanessa_socket/vanessa_socket.h.bak > libvanessa_socket/vanessa_socket.h
+####vanessa_socket_client.c:183: error: storage size of 'hints' isn't known
+####vanessa_socket_client.c:188: warning: incompatible implicit declaration of built-in function 'bzero'
+####vanessa_socket_client.c:193: error: 'EAI_SYSTEM' undeclared (first use in this function)
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf vanessa_socket-$VERSION
+
+
+

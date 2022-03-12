@@ -1,0 +1,77 @@
+export NAME="libcfu"
+export STATUS=
+export URL=http://libcfu.sourceforge.net/
+#export URL=https://sourceforge.net/projects/libcfu/
+#export URL=https://github.com/codebrainz/libcfu
+export BASENAME=libcfu
+export DESCRIPTION="Libcfu is a library of useful tools, particularly when developing multithreaded software. It includes a hash table, a linked list, self-extending strings, a config file parser, a simple timer, a thread queue, and command-line parser."
+export CATEGORY=development
+export TYPE=library
+export VERSION=0.03
+export VERSIONDATE=20211113
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://sourceforge.net/projects/libcfu/files/libcfu/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/libcfu/libcfu/libcfu-$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix undefined u_int32_t
+sed -i.bak -e "s/u_int32_t/uint32_t/g" $(grep -lr u_int32_t) &&
+mv include/cfuhash.h include/cfuhash.h.bak2 &&
+echo "#include <stdint.h>" > include/cfuhash.h &&
+cat include/cfuhash.h.bak2 >> include/cfuhash.h
+# fix examples/hash_usage.c (version >= 0.03)
+patch -ulbf examples/hash_usage.c << EOF
+@@ -38,4 +38,4 @@
+        for (i = 0; i < 32; i++) {
+-               sprintf(list[i][0], "test_var%d", i);
+-               sprintf(list[i][1], "value%d", i);
++               sprintf(list[i][0], "test_var%d", (int)i);
++               sprintf(list[i][1], "value%d", (int)i);
+        }
+@@ -60,3 +60,3 @@
+
+-       printf("%d entries, %d buckets used out of %d\\n", cfuhash_num_entries(hash), cfuhash_num_buckets_used(hash), cfuhash_num_buckets(hash));
++       printf("%d entries, %d buckets used out of %d\\n", (int)cfuhash_num_entries(hash), (int)cfuhash_num_buckets_used(hash), (int)cfuhash_num_buckets(hash));
+@@ -71,3 +71,3 @@
+                cfuhash_put(hash, list[i][0], list[i][1]);
+-               printf("%d entries, %d buckets used out of %d (%.2f)\\n", num_entries, used, num_buckets, (float)num_entries/(float)num_buckets);
++               printf("%d entries, %d buckets used out of %d (%.2f)\\n", (int)num_entries, (int)used, (int)num_buckets, (float)num_entries/(float)num_buckets);
+@@ -84,3 +84,3 @@
+
+-               printf("\\n\\nkeys (%u):\\n", key_count);
++               printf("\\n\\nkeys (%u):\\n", (unsigned int)key_count);
+                for (i = 0; i < key_count; i++) {
+@@ -94,3 +94,3 @@
+        cfuhash_clear(hash);
+-       printf("%d entries, %d buckets used out of %d\\n", cfuhash_num_entries(hash), cfuhash_num_buckets_used(hash), cfuhash_num_buckets(hash));
++       printf("%d entries, %d buckets used out of %d\\n", (int)cfuhash_num_entries(hash), (int)cfuhash_num_buckets_used(hash), (int)cfuhash_num_buckets(hash));
+EOF
+# skip making examples
+sed -i.bak -e "s/examples//" Makefile.in
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build &&
+ make -Csrc libcfu-config &&
+ make &&
+ # manually build shared library
+ ( echo "EXPORTS" && nm -f posix --defined-only -p src/libcfu.a | sed -n -e "s/^_*\(cfu[^ ]*\) T .*$/\1/p" ) > libcfu.def &&
+ gcc -shared -s -mwindows -def libcfu.def -o libcfu.dll src/libcfu.a -Wl,--out-implib,libcfu.dll.a &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ # manually install shared library
+ cp -f libcfu.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f libcfu.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

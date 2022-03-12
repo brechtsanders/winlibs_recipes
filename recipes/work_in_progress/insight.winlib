@@ -1,0 +1,105 @@
+export NAME="Insight"
+export STATUS=
+export URL=https://www.sourceware.org/insight/
+export BASENAME=insight
+export DESCRIPTION="Insight is a graphical user interface to GDB, the GNU Debugger written in Tcl/Tk by people working at Red Hat, Inc. and Cygnus Solutions."
+export CATEGORY=development
+export TYPE=application
+export VERSION=6.8-1a
+export VERSIONDATE=20201221
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceware.org/pub/insight/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://sourceware.org/pub/insight/releases/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$(echo $VERSION|sed -e "s/[a-z]*$//")
+# fix redefinition of struct timezone in tk/win/tkWinPort.h (version >= 6.8-1a)
+patch -ulbf tk/win/tkWinPort.h << EOF
+@@ -125,2 +125,3 @@
+
++#ifndef __MINGW32__
+ struct timezone {
+@@ -129,2 +130,3 @@
+ };
++#endif
+
+EOF
+
+## fix redefinition of EXCEPTION_REGISTRATION
+#if grep -w EXCEPTION_REGISTRATION $MINGWDIR/*mingw32/include/winnt.h > /dev/null; then
+# # fix redefinition of EXCEPTION_REGISTRATION in tcl/win/tclWin32Dll.c
+# mv tcl/win/tclWin32Dll.c tcl/win/tclWin32Dll.c.bak
+# echo "#define __MINGW_EXCPT_DEFINE_PSDK 1" > tcl/win/tclWin32Dll.c
+# cat tcl/win/tclWin32Dll.c.bak >> tcl/win/tclWin32Dll.c
+# # fix redefinition of EXCEPTION_REGISTRATION in tcl/win/tclWinChan.c
+# mv tcl/win/tclWinChan.c tcl/win/tclWinChan.c.bak
+# echo "#define __MINGW_EXCPT_DEFINE_PSDK 1" > tcl/win/tclWinChan.c
+# cat tcl/win/tclWinChan.c.bak >> tcl/win/tclWinChan.c
+# # fix redefinition of EXCEPTION_REGISTRATION in tcl/win/tclWinFCmd.c
+# mv tcl/win/tclWinFCmd.c tcl/win/tclWinFCmd.c.bak
+# echo "#define __MINGW_EXCPT_DEFINE_PSDK 1" > tcl/win/tclWinFCmd.c
+# cat tcl/win/tclWinFCmd.c.bak >> tcl/win/tclWinFCmd.c
+#fi
+## include levmar.h instead of lm.h and fix missing USER_INFO_1 in tcl/win/tclWinFile.c
+#echo "#include <levmar.h>" | gcc -c -xc - -o /dev/null &> /dev/null && (
+# sed -i.bak -e "s/#include <lm\.h>.*$/#include <levmar.h>\n#include <lmaccess.h>\n#include <lmapibuf.h>/" tcl/win/tclWinFile.c
+#)
+## fix tcl/generic/tclCmdAH.c
+#mv tcl/generic/tclCmdAH.c tcl/generic/tclCmdAH.c.bak &&
+#echo "#include <sys/stat.h>" > tcl/generic/tclCmdAH.c &&
+#cat tcl/generic/tclCmdAH.c.bak >> tcl/generic/tclCmdAH.c
+
+# skip building bfd/doc
+cat > bfd/doc/Makefile.in << EOF
+clean:
+info:
+all:
+install:
+EOF
+# fix gdb/configure
+patch -ulbf gdb/configure << EOF
+@@ -24480,3 +24480,3 @@
+ echo "\$as_me: error: \\"*** Gdb does not support native target \${host}\\"" >&2;}
+-   { (exit 1); exit 1; }; }
++   }
+   fi
+EOF
+wl-showstatus configure &&
+ # mkdir -p m4 &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-bootstrap --enable-serial-configure CFLAGS="-Wno-implicit-fallthrough -Wno-stringop-truncation -Wno-unused-value -Wno-cast-function-type -Wno-unused-but-set-variable" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ wl-showstatus build &&
+ make &&
+ #cp tcl/win/libtclstub84.a tcl/win/libtcl84.a &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$(echo $VERSION|sed -e "s/[a-z]*$//")
+
+
+

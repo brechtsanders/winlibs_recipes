@@ -1,0 +1,150 @@
+export NAME="Claws Mail"
+export STATUS=
+export URL=http://www.claws-mail.org/
+export BASENAME=claws-mail
+export DESCRIPTION="Claws Mail is a GTK+ based, lightweight, and fast e-mail client and newsreader. Supports POP3, APOP, IMAP, SMTP, SMTP AUTH, NNTP, LDAP, multiple accounts, spell-checking, addressbook, SSL, GPG, filtering, i18n, & more. It is further extended by plugins."
+export CATEGORY=internet
+export TYPE=application
+#export VERSION=2.10.0
+#export VERSION=3.7.5
+#export VERSIONDATE=20100201
+#export VERSION=3.7.6
+####main.c:614: error: 'F_SETFD' undeclared (first use in this function)
+#export VERSION=3.7.7
+#export VERSIONDATE=20101119
+####ldapquery.c:1048: error: aggregate value used where an integer was expected
+####ldapquery.c:1067: error: aggregate value used where an integer was expected
+#export VERSION=3.7.8
+#export VERSIONDATE=20110220
+#export VERSION=3.7.9
+#export VERSIONDATE=20110410
+####etpan-thread-manager.c:374: error: 'ERROR_MEMORY' undeclared (first use in this function)
+####etpan-thread-manager.c:505: error: 'ERROR_INVAL' undeclared (first use in this function)
+####etpan-thread-manager.c:512: error: 'ERROR_MEMORY' undeclared (first use in this function)
+####utils.c:3540: warning: implicit declaration of function 'gmtime_r'
+####utils.c:3540: error: invalid type argument of 'unary *' (have 'int')
+#export VERSION=3.7.10
+#export VERSIONDATE=20110827
+####src/common/utils.c:3540: warning: implicit declaration of function 'gmtime_r'
+####src/common/utils.c:3540: error: invalid type argument of 'unary *' (have 'int')
+#export VERSION=3.8.0
+#export VERSIONDATE=20111217
+#export VERSION=3.8.1
+#export VERSIONDATE=20120627
+#export VERSION=3.9.0
+#export VERSIONDATE=20121115
+#export VERSION=3.9.1
+#export VERSIONDATE=20130507
+####configure: error: libetpan 0.57 not found
+#export VERSION=3.9.2
+#export VERSIONDATE=20130609
+#export VERSION=3.9.3
+#export VERSIONDATE=20131214
+#export VERSION=3.11.1
+#export VERSIONDATE=20150329
+export VERSION=3.12.0
+export VERSIONDATE=20150811
+####src/plugins/clamd/libclamd/clamd-plugin.c:289:21: error: storage size of 'addr_u' isn't known
+wl-showstatus --package-version
+export DEPENDANCIES=boost,libetpan
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://sourceforge.net/projects/sylpheed-claws/files/ claws-mail-"
+#export DOWNLOADURL="http://sourceforge.net/projects/sylpheed-claws/files/Claws%20Mail/ claws-mail-"
+export DOWNLOADURL="http://sourceforge.net/projects/claws-mail/files/Claws%20Mail/ claws-mail-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/sylpheed-claws/Claws%20Mail/$VERSION/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://sourceforge.net/projects/claws-mail/files/Claws%20Mail/$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p sys
+touch sys/wait.h
+# fix missing fcntl stuff in src/main.c
+patch -ulbf src/main.c << EOF
+--- src/main.c  2010-10-18 19:36:12 +0200
++++ src/main.c  2010-11-19 22:52:50 +0100
+@@ -619,4 +619,6 @@
+                exec'ed children */
++#ifndef __MINGW32__
+                fcntl(IceConnectionNumber(connection),F_SETFD,
+                fcntl(IceConnectionNumber(connection),F_GETFD,0) | FD_CLOEXEC);
++#endif
+EOF
+# fix src/common/defs.h (version >= 3.8.0)
+patch -ulbf src/common/defs.h << EOF
+--- src/common/defs.h  2011-12-16 09:09:34 +0100
++++ src/common/defs.h  2011-12-17 20:17:40 +0100
+@@ -28,6 +28,2 @@
+
+-#ifdef G_OS_WIN32
+-#  include <glib/gwin32.h>
+-#endif
+-
+ #if HAVE_PATHS_H
+EOF
+# fix missing gmtime_r in src/common/utils.c (version >= 3.9.1)
+mv src/common/utils.c src/common/utils.c.bak
+cat > src/common/utils.c << EOF
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+inline struct tm* gmtime_r (const time_t* timer, struct tm* result)
+{
+  struct tm* local_result;
+  if ((local_result = gmtime(timer)) == NULL || result == NULL)
+    return NULL;
+  memcpy(result, local_result, sizeof(result));
+  return result;
+}
+#define localtime_r(clock, result) (*(result) = *localtime((clock)), (result))
+#define asctime_r(tm,buf) (strcpy((buf), asctime((tm))), (buf))
+EOF
+cat src/common/utils.c.bak >> src/common/utils.c
+# fix missing ERROR_MEMORY in src/etpan/etpan-thread-manager.c (version >= 3.9.1)
+mv src/etpan/etpan-thread-manager.c src/etpan/etpan-thread-manager.c.bak
+echo "#include \"etpan-errors.h\"" > src/etpan/etpan-thread-manager.c
+cat src/etpan/etpan-thread-manager.c.bak >> src/etpan/etpan-thread-manager.c
+# fix missing ctime_r in src/mbox.c (version >= 3.9.1)
+mv src/mbox.c src/mbox.c.bak
+echo "#define ctime_r(clock,buf) (strcpy((buf), ctime((clock))), (buf))" > src/mbox.c
+cat src/mbox.c.bak >> src/mbox.c
+# fix missing ctime_r in src/exporthtml.c (version >= 3.9.1)
+mv src/exporthtml.c src/exporthtml.c.bak
+echo "#define ctime_r(clock,buf) (strcpy((buf), ctime((clock))), (buf))" > src/exporthtml.c
+cat src/exporthtml.c.bak >> src/exporthtml.c
+# fix missing comma in src/matcher.c (version >= 3.9.2)
+patch -ulbf src/matcher.c << EOF
+--- src/matcher.c  2013-06-08 22:31:04 +0200
++++ src/matcher.c  2013-06-09 10:11:18 +0200
+@@ -1221,3 +1221,3 @@
+                m = matcherprop_new(MATCHCRITERIA_SUBJECT, NULL,
+-                       case_sensitive? MATCHTYPE_MATCH: MATCHTYPE_MATCHCASE
++                       case_sensitive? MATCHTYPE_MATCH: MATCHTYPE_MATCHCASE,
+                        strings[i], 0);
+EOF
+# fix missing files (version >= 3.9.2)
+mkdir -p sys netinet arpa
+echo "#include <winsock2.h>" > sys/socket.h
+touch netinet/in.h sys/un.h arpa/inet.h netdb.h
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-ldap --disable-dbus &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-pthread --disable-ldap --disable-dbus &&
+PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-pthread --disable-ldap --disable-dbus &&
+ # fix error: /include/w32api/winspool.h:255: error: two or more data types in declaration specifiers
+ mv config.h config.h.bak &&
+ echo "#include <windows.h>" > config.h &&
+ cat config.h.bak >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

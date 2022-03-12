@@ -1,0 +1,168 @@
+export NAME="Nix"
+export STATUS=
+export URL=http://nixos.org/nix/about.html
+export BASENAME=nix
+export DESCRIPTION="Nix is a purely functional package manager. This means that it treats packages like values in purely functional programming languages such as Haskell - they are built by functions that don't have side-effects, and they never change after they have been built."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.11.2
+#export VERSIONDATE=20160608
+#export VERSION=1.11.3
+#export VERSIONDATE=20160823
+#export VERSION=1.11.4
+#export VERSIONDATE=20160907
+#export VERSION=1.11.5
+#export VERSIONDATE=20170103
+#export VERSION=1.11.6
+#export VERSIONDATE=20170113
+#export VERSION=1.11.7
+#export VERSIONDATE=20170224
+#export VERSION=1.11.8
+#export VERSIONDATE=20170321
+#export VERSION=1.11.9
+#export VERSIONDATE=20170426
+####I/O error : Attempt to load network entity http://docbook.org/xml/5.0/rng/docbook.rng
+#export VERSION=1.11.10
+#export VERSIONDATE=20170613
+#export VERSION=1.11.11
+#export VERSIONDATE=20170620
+#export VERSION=1.11.12
+#export VERSIONDATE=20170714
+#export VERSION=1.11.13
+#export VERSIONDATE=20170718
+#export VERSION=1.11.14
+#export VERSIONDATE=20170831
+#export VERSION=1.11.15
+#export VERSIONDATE=20170916
+#export VERSION=1.11.16
+#export VERSIONDATE=20171221
+#export VERSION=2.0
+#export VERSIONDATE=20180223
+#export VERSION=2.0.1
+#export VERSIONDATE=20180421
+#export VERSION=2.0.2
+#export VERSIONDATE=20180504
+#export VERSION=2.0.3
+#export VERSIONDATE=20180530
+#export VERSION=2.0.4
+#export VERSIONDATE=20180531
+#export VERSION=2.1
+#export VERSIONDATE=20180903
+#export VERSION=2.1.1
+#export VERSIONDATE=20180906
+#export VERSION=2.1.2
+#export VERSIONDATE=20180920
+#export VERSION=2.1.3
+#export VERSIONDATE=20181002
+#export VERSION=2.2
+#export VERSIONDATE=20190111
+#export VERSION=2.2.1
+#export VERSIONDATE=20190112
+#export VERSION=2.2.2
+#export VERSIONDATE=20190416
+#export VERSION=2.3.1
+#export VERSIONDATE=20191011
+#export VERSION=2.3.2
+#export VERSIONDATE=20200106
+#export VERSION=2.3.3
+#export VERSIONDATE=20200219
+#export VERSION=2.3.4
+#export VERSIONDATE=20200411
+#export VERSION=2.3.5
+#export VERSIONDATE=20200527
+#export VERSION=2.3.6
+#export VERSIONDATE=20200603
+#export VERSION=2.3.7
+#export VERSIONDATE=20200709
+#export VERSION=2.3.8
+#export VERSIONDATE=20201022
+#export VERSION=2.3.9
+#export VERSIONDATE=20201120
+#export VERSION=2.3.10
+#export VERSIONDATE=20201218
+#export VERSION=2.3.11
+#export VERSIONDATE=20210514
+#export VERSION=2.3.12
+#export VERSIONDATE=20210602
+#export VERSION=2.3.13
+#export VERSIONDATE=20210624
+#export VERSION=2.3.14
+#export VERSIONDATE=20210705
+#export VERSION=2.3.15
+#export VERSIONDATE=20210729
+#export VERSION=2.3.16
+#export VERSIONDATE=20211008
+#export VERSION=2.5.1
+#export VERSIONDATE=20220122
+#export VERSION=2.6.0
+#export VERSIONDATE=20220125
+#export VERSION=2.6.1
+#export VERSIONDATE=20220218
+export VERSION=2.7.0
+export VERSIONDATE=20220308
+####src/libstore/download.cc:17:24: error: 'gettimeofday' was not declared in this scope
+wl-showstatus --package-version
+export DEPENDANCIES=sqlite3,openssl,libbz2,liblzmadec,libcurl,libsodium,wineditline,lowdown
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://github.com/NixOS/nix/releases"
+export DOWNLOADURL="https://github.com/NixOS/nix/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/NixOS/nix/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/NixOS/nix/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing sys/wait.h
+for F in $(grep -lr "#include <\(sys/wait\.h\|poll\.h\|sys/socket\.h\)>" *); do
+ mv $F $F.bak &&
+ sed -e "s/#include <sys/wait\.h>/#ifndef _WIN32\n&\n#endif/; s/#include <poll.h>/#ifndef _WIN32\n&\n#endif/; s/#include <sys/socket\.h>/#ifdef _WIN32\n#include <winsock2.h>\n#else\n&\n#endif/" $F.bak > $F
+done
+# fix missing gettimeofday in src/libstore/download.cc
+patch -ulbf src/libstore/download.cc << EOF
+@@ -15,7 +15,11 @@
+ double getTime()
+ {
++#ifdef __MINGW__
++    return ((double)clock()) / CLOCKS_PER_SEC;
++#else
+     struct timeval tv;
+     gettimeofday(&tv, 0);
+     return tv.tv_sec + (tv.tv_usec / 1000000.0);
++#endif
+ }
+
+EOF
+# fix configure.ac
+mv configure.ac configure.ac.bak &&
+echo "m4_pattern_allow([^AC_MSG_ERROR])" > configure.ac &&
+cat configure.ac.bak >> configure.ac
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./bootstrap.sh &&
+ # fix configure issues
+ sed -i.bak -e "s/^char BZ2_bzWriteOpen ()/#include <bzlib.h>/; s/return BZ2_bzWriteOpen ();/void* p = BZ2_bzWriteOpen;/; s/as_fn_error\(.*The Perl module.*missing\)/echo\1/" configure &&
+ ## fix missing libeditline
+ #sed -i.bak2 -e "s/libeditline/libedit/g" configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-perl-bindings &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

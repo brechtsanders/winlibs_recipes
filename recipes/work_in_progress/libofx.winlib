@@ -1,0 +1,71 @@
+export NAME="libofx"
+export STATUS=
+#export URL=http://www.ofx.net/
+export URL=https://github.com/libofx/libofx
+export BASENAME=libofx
+export DESCRIPTION="The libofx OFX banking protocol abstraction library"
+export CATEGORY=finance
+export TYPE=library
+#export VERSION=0.9.12
+#export VERSIONDATE=20180402
+#export VERSION=0.9.13
+#export VERSIONDATE=20180501
+#export VERSION=0.9.14
+#export VERSIONDATE=20190212
+#export VERSION=0.9.15
+#export VERSIONDATE=20191001
+#export VERSION=0.10.0
+#export VERSIONDATE=20210103
+#export VERSION=0.10.2
+#export VERSIONDATE=20210424
+export VERSION=0.10.3
+export VERSIONDATE=20210930
+wl-showstatus --package-version
+export DEPENDANCIES=opensp,glibmm,gengetopt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/libofx/libofx/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/libofx/libofx/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing timegm in lib/ofx_utilities.cpp (version >= 0.10.2)
+mv lib/ofx_utilities.cpp lib/ofx_utilities.cpp.bak
+cat > lib/ofx_utilities.cpp << EOF
+#include <stdlib.h>
+#include <time.h>
+inline time_t timegm (struct tm* tm) {
+  time_t ret;
+  putenv("TZ=");
+  tzset();
+  ret = mktime(tm);
+  //to do: reset time zone to previous value
+  return ret;
+}
+EOF
+cat lib/ofx_utilities.cpp.bak >> lib/ofx_utilities.cpp
+# fix ambiguous byte in lib/ofx_preproc.cpp (version >= 0.10.2)
+mv lib/ofx_preproc.cpp lib/ofx_preproc.cpp.bak &&
+echo "#include <windows.h>" > lib/ofx_preproc.cpp &&
+echo "#undef ERROR" >> lib/ofx_preproc.cpp &&
+echo "#undef DELETE" >> lib/ofx_preproc.cpp &&
+cat lib/ofx_preproc.cpp.bak >> lib/ofx_preproc.cpp
+# fix detection of opensp
+sed -i.bak -e "s?/usr/local/include/OpenSP?$MINGWPREFIX/include/OpenSP?" configure.ac
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-fpermissive" &&
+ wl-showstatus build &&
+ make -j1 &&
+ wl-showstatus build-install &&
+ PATH=$(pwd)/lib/.libs:$PATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

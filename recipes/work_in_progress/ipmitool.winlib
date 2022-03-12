@@ -1,0 +1,69 @@
+export NAME="IPMItool"
+export STATUS=
+export URL=http://ipmitool.sourceforge.net/
+export BASENAME=ipmitool
+export DESCRIPTION="IPMItool is a utility for managing and configuring devices that support the Intelligent Platform Management Interface (IPMI) version 1.5 and version 2.0 specifications. IPMI is an open standard for monitoring, logging, recovery, inventory, and control of hardware that is implemented independent of the main CPU, BIOS, and OS. The service processor (or Baseboard Management Controller, BMC) is the brain behind platform management and its primary purpose is to handle the autonomous sensor monitoring and event logging features."
+export CATEGORY=hardware,communication
+export TYPE=library
+#export VERSION=1.8.9
+#export VERSION=1.8.11
+#export VERSIONDATE=
+#export VERSION=1.8.12
+#export VERSIONDATE=20120810
+#export VERSION=1.8.13
+#export VERSIONDATE=20141205
+#export VERSION=1.8.15
+#export VERSIONDATE=20141124
+#export VERSION=1.8.16
+#export VERSIONDATE=20160220
+#export VERSION=1.8.17
+#export VERSIONDATE=20160507
+export VERSION=1.8.18
+export VERSIONDATE=20161008
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="Sun Open Source"
+#export DOWNLOADURL="http://sourceforge.net/project/showfiles.php?group_id=95200&package_id=101411"
+export DOWNLOADURL="http://sourceforge.net/projects/ipmitool/files/ipmitool/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/ipmitool/ipmitool-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/ipmitool-$VERSION.tar.bz2
+cd ipmitool-$VERSION
+# fixes for winsock
+mv include/ipmitool/ipmi.h include/ipmitool/ipmi.h.bak
+sed -e "s?netinet/in.h?winsock2.h?" include/ipmitool/ipmi.h.bak > include/ipmitool/ipmi.h
+mv include/ipmitool/ipmi_intf.h include/ipmitool/ipmi_intf.h.bak
+sed -e "s?#include <arpa/inet.h>?#include <winsock2.h>?; s?#include <sys/socket.h>?#define socklen_t int?; s?#include <netinet/in.h>??" include/ipmitool/ipmi_intf.h.bak > include/ipmitool/ipmi_intf.h
+# fix for missing files
+mkdir sys
+touch sys/ioctl.h sys/select.h
+cat > syslog.h << EOF
+#define LOG_ERR 3
+#define LOG_WARNING 4
+#define LOG_NOTICE 5
+#define LOG_INFO 6
+#define LOG_DEBUG 7
+static void syslog (int priority, const char *format, ...) {}
+EOF
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-intf-lan --enable-intf-lanplus --disable-intf-free --disable-intf-open --disable-intf-imb --disable-intf-bmc --enable-ipmishell CFLAGS="-I$(pwd)/winfix" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-intf-free --disable-intf-open CFLAGS="-I$(pwd)/winfix" &&
+ make install &&
+    echo OK
+####ipmi_sol.c:39:24: sys/select.h: No such file or directory
+####ipmi_sol.c: In function `leave_raw_mode':
+####ipmi_sol.c:1052: error: `TCSADRAIN' undeclared (first use in this function)
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION
+cd ..
+
+
+

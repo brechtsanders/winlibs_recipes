@@ -1,0 +1,175 @@
+export NAME="libevhtp"
+export STATUS=
+#export URL=http://ellzey.github.io/libevhtp/
+export URL=https://github.com/criticalstack/libevhtp
+export BASENAME=libevhtp
+export DESCRIPTION="libevhtp - A user-friendly framework for high-performance http servers."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.2.10
+#export VERSIONDATE=20160128
+#export VERSION=1.2.11
+#export VERSIONDATE=20160129
+#export VERSION=1.2.11n
+#export VERSIONDATE=20170906
+####cc1.exe: error: CPU you selected does not support x86-64 instruction set
+#export VERSION=1.2.12
+#export VERSIONDATE=20170910
+#export VERSION=1.2.12-1
+#export VERSIONDATE=20170912
+#export VERSION=1.2.13
+#export VERSIONDATE=20171115
+#export VERSION=1.2.14
+#export VERSIONDATE=20171121
+#export VERSION=1.2.15
+#export VERSIONDATE=20171207
+export VERSION=1.2.16
+export VERSIONDATE=20180116
+####set_target_properties called with incorrect number of arguments.
+#export VERSION=1.2.17
+#export VERSIONDATE=20190123
+####evhtp.c:2896:25: error: request for member 'p' in something not a structure or union
+#export VERSION=1.2.18
+#export VERSIONDATE=20190606
+####log.c:8:10: fatal error: arpa/inet.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,oniguruma
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/ellzey/libevhtp/releases"
+export DOWNLOADURL="https://github.com/criticalstack/libevhtp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/ellzey/libevhtp/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/criticalstack/libevhtp/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBEVENT_PTHREADS_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpthreadGC2.a -DEVHTP_BUILD_SHARED:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBEVENT_PTHREADS_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpthreadGC2.a -DEVHTP_BUILD_SHARED:BOOL=ON .. &&
+# cd .. &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# fix missing strndup in evhtp.c
+mv evhtp.c evhtp.c.bak
+cat > evhtp.c << EOF
+#include <stddef.h>
+#define NO_STRNDUP 1
+static char* strndup(const char* s, size_t n);
+EOF
+cat evhtp.c.bak >> evhtp.c
+# fix pthread_self issue in evhtp.c (version <= 1.2.16)
+if gcc --version | grep -q "posix"; then
+patch -ulbf evhtp.c << EOF
+@@ -2607,9 +2607,3 @@
+ {
+-#ifndef WIN32
+-
+     return (unsigned long)pthread_self();
+-#else
+-
+-    return (unsigned long)(pthread_self().p);
+-#endif
+ }
+EOF
+fi
+## fix pthread_self issue in evhtp.c (version >= 1.2.17)
+#if gcc --version | grep -q "posix"; then
+#patch -ulbf evhtp.c << EOF
+#@@ -2891,7 +2892,3 @@
+#
+#-#ifndef WIN32
+#     tid = (unsigned long)pthread_self();
+#-#else
+#-    tid = pthread_self().p;
+#-#endif
+#
+#EOF
+#fi
+# fix missing TAILQ_HEAD in thread.c (version >= 1.2.12)
+patch -ulbf thread.c << EOF
+@@ -12,4 +12,4 @@
+ #include <sys/ioctl.h>
+-#include <sys/queue.h>
+ #endif
++#include <sys/queue.h>
+
+EOF
+# fix missing inet_pton in evhtp.c
+if gcc --version | grep -q "MinGW-W64"; then
+ mv evhtp.c evhtp.c.bak &&
+ echo "#define _WIN32_WINNT 0x0600" > evhtp.c &&
+ cat evhtp.c.bak >> evhtp.c
+else
+ mv evhtp.c evhtp.c.bak &&
+ echo "#define inet_pton(af,src,dst) 0" > evhtp.c &&
+ cat evhtp.c.bak >> evhtp.c
+# fix missing IPV6_V6ONLY in evhtp.c
+patch -ulbf evhtp.c << EOF
+@@ -3819,2 +3819,3 @@
+
++#ifdef IPV6_V6ONLY
+         if (sa->sa_family == AF_INET6)
+@@ -3826,2 +3827,3 @@
+         }
++#endif
+
+EOF
+fi
+# create missing file
+touch compat/sys/queue.h
+# fix missing strndup in sslutils.c (version >= 1.2.16)
+mv sslutils.c sslutils.c.bak
+cat > sslutils.c << EOF
+#include <stdlib.h>
+#include <string.h>
+char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+EOF
+cat sslutils.c.bak >> sslutils.c
+# fix CMakeLists.txt (version >= 1.2.15)
+sed -i.bak -e "s/\(VERSION \"\${PROJECT_VERSION}\" \)0 /\1/" CMakeLists.txt
+# fix architecture flag in CMakeLists.txt
+sed -i.orig -e "s/-march=i486//" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBEVENT_PTHREADS_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpthreadGC2.a -DEVHTP_BUILD_SHARED:BOOL=ON -S. -Bbuild_static &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVHTP_BUILD_SHARED:BOOL=ON -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVHTP_BUILD_SHARED:BOOL=ON -DLIB_WS32:STRING=-lws2_32 -S. -Bbuild_static &&
+ echo "-Wl,--as-needed -lws2_32 -lregex" >> build_static/CMakeFiles/evhtp.dir/linklibs.rsp &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBEVENT_PTHREADS_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libpthreadGC2.a -DEVHTP_BUILD_SHARED:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVHTP_BUILD_SHARED:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEVHTP_BUILD_SHARED:BOOL=OFF -DLIB_WS32:STRING=-lws2_32 -S. -Bbuild_shared &&
+ echo "-Wl,--as-needed -lregex" >> build_shared/CMakeFiles/evhtp.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ # remove unwanted (conflicting) files
+ rm -rf $INSTALLPREFIX/include/sys $INSTALLPREFIX/include/onigposix.h &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,54 @@
+export NAME="plotutils"
+export STATUS=
+export URL=http://www.gnu.org/software/plotutils/
+export BASENAME=plotutils
+export DESCRIPTION=" The GNU plotutils package contains software for both programmers and technical users. Its centerpiece is libplot, a powerful C/C++ function library for exporting 2-D vector graphics in many file formats, both vector and raster. It can also do vector graphics animations. libplot is device-independent in the sense that its API (application programming interface) does not depend on the type of graphics file to be exported."
+export CATEGORY=graphics
+export TYPE=application
+#export VERSION=2.5
+#export VERSION=2.5.1
+export VERSION=2.6
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libpng
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/plotutils/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/plotutils/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/plotutils-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix libplot/z_write.c for newer libpng
+patch -ulbf libplot/z_write.c << EOF
+--- libplot/z_write.c  2008-07-16 02:54:10 +0200
++++ libplot/z_write.c  2013-11-14 13:52:42 +0100
+@@ -166,3 +166,3 @@
+   /* cleanup after libpng errors (error handler does a longjmp) */
+-  if (setjmp (png_ptr->jmpbuf))
++  if (png_jmpbuf(png_ptr))
+     {
+@@ -446,3 +446,3 @@
+
+-  longjmp (png_ptr->jmpbuf, 1);
++  png_longjmp (png_ptr, 1);
+ }
+EOF
+wl-showstatus configure &&
+# build and fix missing signgam
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x LDFLAGS="-no-undefined -Wl,-no-undefined" && 
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x LDFLAGS="-Wl,-no-undefined" && 
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ echo "#define NO_SYSTEM_GAMMA" >> config.h && 
+ wl-showstatus build-install &&
+ ( make -j1 install-strip || make -j1 install-strip LIBS="-lpng.dll" ) && 
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

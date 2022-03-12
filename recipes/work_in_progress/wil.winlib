@@ -1,0 +1,70 @@
+export NAME="Windows Implementation Libraries (WIL)"
+export STATUS=
+export URL=https://github.com/microsoft/wil
+export BASENAME=wil
+export DESCRIPTION="The Windows Implementation Libraries (WIL) is a header-only C++ library created to make life easier for developers on Windows through readable type-safe C++ interfaces for common Windows coding patterns."
+export CATEGORY=development
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20191105
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/microsoft/wil/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/microsoft/wil/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix tests/catch.hpp
+mv tests/catch.hpp tests/catch.hpp.bak &&
+echo "#include <windows.h>" > tests/catch.hpp &&
+cat tests/catch.hpp.bak >> tests/catch.hpp
+# fix invalid compiler flags
+patch -ulbf cmake/common_build_flags.cmake << EOF
+@@ -22,2 +22,5 @@
+
++if (MINGW)
++append_cxx_flag("")
++else(MINGW)
+ # Fixup default compiler settings
+@@ -69 +72,2 @@
+ endif()
++endif(MINGW)
+
+EOF
+# fix missing __pragma include/wil/common.h
+mv include/wil/common.h include/wil/common.h.bak
+cat  > include/wil/common.h << EOF
+#ifdef __MINGW32__
+#define __pragma(p)
+#endif
+EOF
+cat include/wil/common.h.bak >> include/wil/common.h
+# remove -DWINAPI_FAMILY=WINAPI_FAMILY_PC_APP compiler flag
+sed -i.bak -e "s/^add_definitions(-DWINAPI_FAMILY=WINAPI_FAMILY_PC_APP)/#&/" tests/app/CMakeLists.txt
+## skip building tests
+#sed -i.bak -e "s/^add_subdirectory(tests)/#&/" CMakeLists.txt
+#mkdir -p build_test && cd build_test && cmake.exe -G"MSYS Makefiles" .. -LH && echo OK; cd ..; rm -rf build_test
+#rm -rf CMakeCache.txt CMakeFiles; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#export BUILDDEPENDANCIES=cmake
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+wl-showstatus configure &&
+cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-fpermissive -D__nullptr=nullptr -D_WIN32_WINNT=0x0600 " . &&
+#-DFAST_BUILD:BOOL=ON 
+ wl-showstatus build &&
+ make &&
+ #make VERBOSE=1 -j1 CXX="g++ -std=c++14 -fpermissive" &&
+ wl-showstatus build-install &&
+ make install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

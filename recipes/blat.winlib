@@ -1,0 +1,109 @@
+export NAME="Blat"
+export STATUS=
+export URL=http://www.blat.net/
+export BASENAME=blat
+export DESCRIPTION="Blat is a Win32 command line utility that sends eMail using SMTP or post to usenet using NNTP."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=2.6.2
+#export VERSIONDATE=20110729
+#export VERSION=3.0.7
+#export VERSIONDATE=20130129
+#export VERSION=3.1.1
+#export VERSIONDATE=20130507
+####buf.h:37:38: error: '__T' was not declared in this scope
+#export VERSION=3.2.4
+#export VERSIONDATE=20150327
+#export VERSION=3.2.12
+#export VERSIONDATE=20160111
+export VERSION=3.2.22
+export VERSIONDATE=20201124
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="http://sourceforge.net/projects/blat/files/Blat%20Source/ blat .source.zip"
+export DOWNLOADURL="http://sourceforge.net/projects/blat/files/Blat%20Source/ Blat%20v %20%28source%29/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/blat/Blat%20Source/Blat%20v$VERSION%20%28source%29/blat`echo $VERSION|sed -e "s/\.//g"`.source.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+unzip -oq $TARBALLDIR/$BASENAME/blat`echo $VERSION|sed -e "s/\.//g"`.source.zip
+cd blat$(echo $VERSION|sed -e "s/\.//g")/full/source
+# fix missing file
+touch win-mac.h mapiwin.h
+## fix bldhdrs.cpp (version <= 3.1.1)
+#patch -ulbf bldhdrs.cpp << EOF
+#--- bldhdrs.cpp  2006-11-12 18:16:40 +0100
+#+++ bldhdrs.cpp  2011-08-02 14:51:36 +0200
+#@@ -12,2 +12,3 @@
+# #include <string.h>
+#+#include <ctype.h>
+#
+#@@ -623,2 +624,5 @@
+#     GetSystemTimeAsFileTime( &today );
+#+#ifdef __MINGW32__
+#+    cpuTime = rand() + (RAND_MAX + 1) * rand();
+#+#else
+#     __asm {
+#@@ -629,2 +633,3 @@
+#     }
+#+#endif
+#     sprintf(tmpstr, "Message-ID: <%08lx\$Blat.v%s\$%08lx\$%lx%lx@%s>\\r\\n",
+#EOF
+# fix bldhdrs.cpp (version >= 3.2.4)
+patch -ulbf bldhdrs.cpp << EOF
+--- bldhdrs.cpp  2015-02-24 09:31:02.000000000 +0100
++++ bldhdrs.cpp  2015-03-28 09:39:04.638433900 +0100
+@@ -1074,3 +1074,3 @@
+
+-#if defined(_WIN64)
++#if defined(_WIN64) || defined(__MINGW32__)
+     cpuTime = (DWORD)rand();
+EOF
+# fix missing max in gensock.cpp (version >= 3.2.4)
+patch -ulbf gensock.cpp << EOF
+--- gensock.cpp  2014-10-15 01:19:52.000000000 +0200
++++ gensock.cpp  2015-03-28 09:44:05.919542500 +0100
+@@ -1308,3 +1308,7 @@
+ {
+-    char     name[max(MAX_HOSTNAME_LENGTH+1,MAX_COMPUTERNAME_LENGTH+1)];
++#if MAX_HOSTNAME_LENGTH > MAX_COMPUTERNAME_LENGTH
++    char     name[MAX_HOSTNAME_LENGTH+1];
++#else
++    char     name[MAX_COMPUTERNAME_LENGTH+1];
++#endif
+     int      retval;
+EOF
+# fix makeargv.cpp
+mv makeargv.cpp makeargv.cpp.bak &&
+echo "#include <ctype.h>" > makeargv.cpp &&
+cat makeargv.cpp.bak >> makeargv.cpp
+# fix server.cpp
+mv server.cpp server.cpp.bak &&
+echo "#include <ctype.h>" > server.cpp &&
+cat server.cpp.bak >> server.cpp
+# fix options.cpp
+mv options.cpp options.cpp.bak &&
+sed -e "s/static enum/enum/" options.cpp.bak > options.cpp
+# fix missing min in blatcgi.cpp
+mv blatcgi.cpp blatcgi.cpp.bak &&
+echo "#define MY_min(a,b) (((a) < (b)) ? (a) : (b))" > blatcgi.cpp &&
+sed -e "s/\bmin\b/MY_&/g" blatcgi.cpp.bak >> blatcgi.cpp
+# fix tabs in makefile.g32
+#sed -e "s/^       /\t/; s/^\(CPPFLAGS=.*\)/\1 -I./; s/-Wall//; s/^\(OBJS *= *\)/\1unicode.o /; s/-lwsock32/-lws2_32/" makefile.g32 > makefile.mingw
+#sed -e "s/^       /\t/; s/^\(CPPFLAGS=.*\)/\1 -I./; s/-Wall//; s/^\(OBJS *= *\)/\1punycode.o /; s/-lwsock32/-lws2_32/" makefile.g32 > makefile.mingw
+sed -e "s/^       /\t/; s/^\(CPPFLAGS=.*\)/\1 -I./; s/-Wall//; s/^\(OBJS *= *\)/\1punycode.o /; s/-lwsock32/-lws2_32 -Wl,--allow-multiple-definition/" makefile.g32 > makefile.mingw
+wl-showstatus build &&
+make -fmakefile.mingw &&
+ strip blat.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f blat.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../../.. && wl-showstatus cleanup && rm -rf blat$(echo $VERSION|sed -e "s/\.//g")
+
+
+

@@ -1,0 +1,77 @@
+export NAME="Trantor"
+export STATUS=
+export URL=https://github.com/an-tao/trantor
+export BASENAME=trantor
+export DESCRIPTION="A non-blocking I/O tcp network lib based on C++14/17"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.0.0-rc8
+#export VERSIONDATE=20200127
+#export VERSION=1.0.0
+#export VERSIONDATE=20200927
+#export VERSION=1.1.0
+#export VERSIONDATE=20201024
+#export VERSION=1.1.1
+#export VERSIONDATE=20201212
+#export VERSION=1.2.0
+#export VERSIONDATE=20210116
+#export VERSION=1.3.0
+#export VERSIONDATE=20210306
+#export VERSION=1.4.0
+#export VERSIONDATE=20210409
+#export VERSION=1.4.1
+#export VERSIONDATE=20210515
+#export VERSION=1.5.0
+#export VERSIONDATE=20210618
+#export VERSION=1.5.1
+#export VERSIONDATE=20210808
+#export VERSION=1.5.2
+#export VERSIONDATE=20211017
+#export VERSION=1.5.3
+#export VERSIONDATE=20211128
+#export VERSION=1.5.4
+#export VERSIONDATE=20211210
+export VERSION=1.5.5
+export VERSIONDATE=20220220
+wl-showstatus --package-version
+export DEPENDANCIES=c-ares,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=License
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/an-tao/trantor/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/an-tao/trantor/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing inet_pton/inet_ntop in trantor/net/InetAddress.cc
+mv trantor/net/InetAddress.cc trantor/net/InetAddress.cc.bak
+cat > trantor/net/InetAddress.cc << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat trantor/net/InetAddress.cc.bak >> trantor/net/InetAddress.cc
+# don't compile with -Wall -Wextra -Werror (version >= 1.4.1)
+sed -i.bak -e "s/-Wall -Wextra -Werror//" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TRANTOR_SHARED:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TRANTOR_SHARED:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

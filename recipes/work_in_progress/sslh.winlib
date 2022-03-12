@@ -1,0 +1,80 @@
+export NAME="SSLH"
+export STATUS=
+export URL=https://www.rutschle.net/tech/sslh/README.html
+#export URL=https://github.com/yrutschle/sslh
+export BASENAME=sslh
+export DESCRIPTION="Applicative Protocol Multiplexer (e.g. share SSH and HTTPS on the same port)"
+export CATEGORY=communication,security
+export TYPE=application
+#export VERSION=1.20
+#export VERSIONDATE=20190111
+#export VERSION=1.21
+#export VERSIONDATE=20200712
+#export VERSION=1.21b
+#export VERSIONDATE=20200720
+#export VERSION=1.21c
+#export VERSIONDATE=20200731
+#export VERSION=1.22
+#export VERSIONDATE=20210818
+#export VERSION=1.22b
+#export VERSIONDATE=20210825
+export VERSION=1.22c
+export VERSIONDATE=20210906
+wl-showstatus --package-version
+export DEPENDANCIES=sys_wait_h,pcre,libconfig,tcpwrappers
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/yrutschle/sslh/releases"
+export DOWNLOADURL="https://github.com/yrutschle/sslh/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/yrutschle/sslh/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/yrutschle/sslh/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h winfix/netdb.h
+cat > winfix/syslog.h << EOF
+//#ifndef __DUMMY_SYSLOG_H_INCLUDED
+//#define __DUMMY_SYSLOG_H_INCLUDED
+//#define LOG_ERR 3
+//#define LOG_WARNING 4
+//#define LOG_NOTICE 5
+//#define LOG_INFO 6
+//#define LOG_DEBUG 7
+//#define LOG_PRIMASK 0x07
+//#define LOG_DAEMON (3<<3)
+//#define LOG_AUTHPRIV (10<<3)
+//#define LOG_PID 0x01
+//#define SEVERITY 1
+//static void openlog (const char *ident, int option, ...) {}
+//static void syslog (int priority, const char *format, ...) {}
+//static void closelog (void) {}
+//#endif
+EOF
+cat > winfix/pwd.h << EOF
+//struct passwd {
+// int pw_uid;
+//};
+//#define setuid(uid) 0
+EOF
+cat > winfix/grp.h << EOF
+//struct group {
+// int gr_gid;
+//};
+//#define setgid(gid) -1
+EOF
+wl-showstatus build &&
+ make PREFIX=$INSTALLPREFIX CC="gcc -I$MINGWPREFIX/win32ports/include -I$(pwd)/winfix" ENABLE_REGEX=1 USELIBCONFIG=1 USELIBPCRE=1 USELIBWRAP= USELIBCAP=1 USESYSTEMD= COV_TEST= &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

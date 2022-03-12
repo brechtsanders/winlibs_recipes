@@ -1,0 +1,66 @@
+export NAME="G729"
+export STATUS=
+export URL=https://github.com/DoubangoTelecom/g729
+export BASENAME=g729
+export DESCRIPTION="experimental version of G.729 codec for ARM devices"
+export CATEGORY=audio,codec
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20170710
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=README.md
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/DoubangoTelecom/g729/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/DoubangoTelecom/g729/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix type definitions in typedef.h
+patch -ulbf typedef.h << EOF
+@@ -15,3 +15,8 @@
+
+-#if defined(__BORLANDC__) || defined (__WATCOMC__) || defined(_MSC_VER) || defined(__ZTC__) || defined(__HIGHC__)
++#if defined(__MINGW32__)
++#include <stdint.h>
++typedef int32_t Word32;
++typedef int16_t Word16;
++typedef short int Flag;
++#elif defined(__BORLANDC__) || defined (__WATCOMC__) || defined(_MSC_VER) || defined(__ZTC__) || defined(__HIGHC__)
+ typedef  long  int   Word32   ;
+EOF
+# fix conflicting roung basic_op.h
+mv basic_op.h basic_op.h.bak &&
+echo "#define round G729_round" > basic_op.h &&
+cat basic_op.h.bak >> basic_op.h
+# fix shared variable in ld8a.h
+cat >> ld8a.h << EOF
+#if defined(_WIN32) 
+# if defined(DLL_EXPORT) && defined(BUILDING_G729)
+__declspec(dllexport)
+# else
+__declspec(dllimport)
+# endif
+Word16 bad_lsf;
+#endif
+EOF
+wl-showstatus configure &&
+touch NEWS README AUTHORS ChangeLog &&
+mkdir -p m4 &&
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DBUILDING_G729" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-fcommon -DBUILDING_G729" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

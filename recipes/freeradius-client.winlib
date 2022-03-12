@@ -1,0 +1,189 @@
+export NAME="FreeRADIUS Client"
+export STATUS=
+export URL=http://freeradius.org/freeradius-client/
+export BASENAME=freeradius-client
+export DESCRIPTION="FreeRADIUS Client is a framework and library for writing RADIUS Clients which additionally includes radlogin, a flexible RADIUS aware login replacement, a command line program to send RADIUS accounting records and a utility to query the status of a RADIUS server. All of these programs are based on a library that lets you develop a RADIUS-aware application in less than 50 lines of C code. It is highly portable and runs on Linux, many BSD variants and Solaris."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.1.6
+#export VERSIONDATE=
+export VERSION=1.1.7
+export VERSIONDATE=20150120
+####lib/sendserver.c:18:18: fatal error: poll.h: No such file or directory
+wl-showstatus --package-version
+#export DEPENDANCIES=libcrypt,gettext,plibc
+export DEPENDANCIES=libcrypt,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE="BSD license"
+#export DOWNLOADURL="http://wiki.freeradius.org/Radiusclient"
+#export DOWNLOADURL="http://ftp.ticklers.org/ftp.freeradius.org/ freeradius-client-"
+#export DOWNLOADURL="http://ftp.plig.net/pub/freeradius/ freeradius-client-"
+export DOWNLOADURL="ftp://ftp.freeradius.org/pub/freeradius/ freeradius-client-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.freeradius.org/pub/freeradius/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp.ticklers.org/ftp.freeradius.org/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp.plig.net/pub/freeradius/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=ftp://ftp.freeradius.org/pub/freeradius/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fixes
+cat >> include/includes.h << EOF
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#ifndef EWOULDBLOCK
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#endif
+#ifndef EADDRNOTAVAIL
+#define EADDRNOTAVAIL WSAEADDRNOTAVAIL
+#endif
+//#define socklen_t int
+#define _MSC_VER
+#include <syslog.h>
+//#define WINDOWS
+//#include <plibc.h>
+EOF
+# fix src/radlogin.c
+mv src/radlogin.c src/radlogin.c.bak
+echo "#define SECURITY_DISABLED" > src/radlogin.c
+sed -e "s?\(signal(\)?//\1?" src/radlogin.c.bak >> src/radlogin.c
+# fix src/local.c
+mv src/local.c src/local.c.bak
+cat > src/local.c << EOF
+#define getpwnam(n) NULL
+struct passwd {
+ char* pw_passwd;
+};
+EOF
+cat src/local.c.bak >> src/local.c
+# create dummy syslog.h
+cat > syslog.h << EOF
+#ifndef __DUMMY_SYSLOG_H_INCLUDED
+#define __DUMMY_SYSLOG_H_INCLUDED
+#define LOG_CRIT 2
+#define LOG_ERR 3
+#define LOG_WARNING 4
+#define LOG_NOTICE 5
+static void syslog (int priority, const char *format, ...) {}
+#endif
+EOF
+mv lib/buildreq.c lib/buildreq.c.bak
+echo "#include <syslog.h>" > lib/buildreq.c
+cat lib/buildreq.c.bak >> lib/buildreq.c
+#mv src/include/autoconf.h src/include/autoconf.h.bak
+#sed -e "s?^\(#include <plibc.h>\)?//\1?; s?^\(#define socklen_t int\)?//\1?" src/include/autoconf.h.bak > src/include/autoconf.h
+#mv src/freeradius-devel/autoconf.h src/freeradius-devel/autoconf.h.bak
+#sed -e "s?^\(#include <plibc.h>\)?//\1?; s?^\(#define socklen_t int\)?//\1?" src/freeradius-devel/autoconf.h.bak > src/freeradius-devel/autoconf.h
+#mv freeradius-devel/autoconf.h freeradius-devel/autoconf.h.bak
+#echo "#include <ws2tcpip.h>" > freeradius-devel/autoconf.h
+#sed -e "s?^\(#include <plibc.h>\)?//\1?" freeradius-devel/autoconf.h.bak >> freeradius-devel/autoconf.h
+# fix missing strtok_r in lib/config.c
+mv lib/config.c lib/config.c.bak
+echo "#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))" > lib/config.c
+cat lib/config.c.bak >> lib/config.c
+## fix missing getppid in lib/sendserver.c (version <= 1.1.6)
+#mv lib/sendserver.c lib/sendserver.c.bak
+#echo "#define getppid() 0" > lib/sendserver.c
+#cat lib/sendserver.c.bak >> lib/sendserver.c
+# fix missing poll.h in lib/sendserver.c (version >= 1.1.7)
+patch -ulbf lib/sendserver.c << EOF
+@@ -16,3 +16,8 @@
+
++#ifdef _WIN32
++#define _WIN32_WINNT 0x0600
++#include <winsock2.h>
++#else
+ #include <poll.h>
++#endif
+
+@@ -236,3 +241,7 @@
+        VALUE_PAIR      *vp;
++#ifdef _WIN32
++       WSAPOLLFD       pfd;
++#else
+        struct pollfd   pfd;
++#endif
+        double          start_time, timeout;
+@@ -356,3 +365,7 @@
+                    timeout -= rc_getctime() - start_time) {
++#ifdef _WIN32
++                       result = WSAPoll(&pfd, 1, timeout * 1000);
++#else
+                        result = poll(&pfd, 1, timeout * 1000);
++#endif
+                        if (result != -1 || errno != EINTR)
+EOF
+# fix missing inet_pton/inet_ntop in lib/avpair.c (version >= 1.1.7)
+mv lib/avpair.c lib/avpair.c.bak
+cat > lib/avpair.c << EOF
+#define _WIN32_WINNT 0x0600
+#include <winsock2.h>
+EOF
+cat lib/avpair.c.bak >> lib/avpair.c
+# fix missing _lock_file/_unlock_file in lib/lock.c
+#mv lib/lock.c lib/lock.c.bak
+#cat > lib/lock.c << EOF
+##include <stdint.h>
+##include <winsock2.h>
+##define WINDOWS
+##include <plibc.h>
+##define HAVE_FLOCK 1
+#EOF
+#cat lib/lock.c.bak >> lib/lock.c
+patch -ulbf lib/lock.c << EOF
+--- lib/lock.c  2007-07-11 18:37:36 +0200
++++ lib/lock.c  2011-11-15 15:24:04 +0100
+@@ -26,2 +26,28 @@
+
++#elif defined(__MINGW32__)
++
++int do_lock_exclusive(FILE * fd)
++{
++  DWORD filesizelo;
++  DWORD filesizehi;
++  OVERLAPPED ovlp;
++  HANDLE h = (HANDLE)_get_osfhandle(fd);
++  filesizelo = GetFileSize(h, &filesizehi);
++  memset(&ovlp, 0, sizeof(ovlp));
++  if (!LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, &filesizelo, &filesizehi, &ovlp))
++    return -1;
++  return 0;
++}
++
++int do_unlock(FILE * fd)
++{
++  DWORD filesizelo;
++  DWORD filesizehi;
++  HANDLE h = (HANDLE)_get_osfhandle(fd);
++  filesizelo = GetFileSize(h, &filesizehi);
++  if (!UnlockFile(h, 0, 0, filesizelo, filesizehi))
++    return -1;
++  return 0;
++}
++
+ #elif defined(WIN32)
+EOF
+# fix building DLLs
+autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-lws2_32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lplibc -lws2_32 -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lplibc -lws2_32 -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make -C lib install-strip &&
+ make -C include install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####64-bit: e:\prog\mingw64\mingw64\bin\../lib/gcc/x86_64-w64-mingw32/4.6.2/../../../../x86_64-w64-mingw32/include/unistd.h:31:5: error: conflicting types for 'truncate'
+####64-bit: E:\Prog\MinGW64\msys\custombuilt64\include/plibc.h:349:5: note: previous declaration of 'truncate' was here
+
+
+

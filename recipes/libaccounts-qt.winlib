@@ -1,0 +1,52 @@
+export NAME="libaccounts-qt"
+export STATUS=
+export URL=https://gitlab.com/accounts-sso/libaccounts-qt
+export BASENAME=libaccounts-qt
+export DESCRIPTION="Qt-based client library for the accounts database"
+export CATEGORY=
+export TYPE=library
+export VERSION=1.16
+export VERSIONDATE=20210915
+wl-showstatus --package-version
+export DEPENDANCIES=qt
+#export DEPENDANCIES=qt,libsignon-glib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://gitlab.com/accounts-sso/libaccounts-qt/-/tags?sort=updated_desc"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.com/accounts-sso/libaccounts-qt/-/archive/VERSION_$VERSION/libaccounts-qt-VERSION_$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/libaccounts-qt-VERSION_$VERSION.tar.bz2
+cd libaccounts-qt-VERSION_$VERSION
+# don't build tests
+sed -i.bak -e "s/ tests//" accounts-qt.pro
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ $MINGWPREFIX/qt/bin/qmake -makefile ../accounts-qt.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ PREFIX=$INSTALLPREFIX CONFIG+=staticlib &&
+ #$MINGWPREFIX/qt/bin/qmake -set INSTALL_PREFIX $INSTALLPREFIX -set INSTALL_LIBDIR $INSTALLPREFIX/lib &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ $MINGWPREFIX/qt/bin/qmake -makefile ../accounts-qt.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ PREFIX=$INSTALLPREFIX &&
+ #$MINGWPREFIX/qt/bin/qmake -set INSTALL_PREFIX $INSTALLPREFIX -set INSTALL_LIBDIR $INSTALLPREFIX/lib &&
+ cd .. &&
+ wl-showstatus build-install &&
+ CPLUS_INCLUDE_PATH=$MINGWPREFIX/include/gio-win32-2.0:$CPLUS_INCLUDE_PATH mingw32-make -Cbuild_static install &&
+ wl-showstatus build-install &&
+ CPLUS_INCLUDE_PATH=$MINGWPREFIX/include/gio-win32-2.0:$CPLUS_INCLUDE_PATH mingw32-make -Cbuild_shared install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f build_static/Accounts/release/libaccounts-qt5.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/Accounts/release/libaccounts-qt5*.a $INSTALLPREFIX/lib/libaccounts-qt5.dll.a &&
+ # fix detection of library via cmake
+ sed -i -e "s?[^ ]*lib/libaccounts-qt5\.so?-laccounts-qt5?; s?$(cygpath -m $INSTALLPREFIX)?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $INSTALLPREFIX/lib/cmake/AccountsQt5/AccountsQt5Config.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libaccounts-qt-VERSION_$VERSION
+
+
+

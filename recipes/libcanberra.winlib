@@ -1,0 +1,102 @@
+export NAME="libcanberra"
+export STATUS=
+export URL=http://0pointer.de/lennart/projects/libcanberra/
+export BASENAME=libcanberra
+export DESCRIPTION="libcanberra is an implementation of the XDG Sound Theme and Name Specifications, for generating event sounds on free desktops, such as GNOME. It comes with several backends (ALSA, PulseAudio, OSS, GStreamer, null) and is designed to be portable."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=0.12
+#export VERSION=0.24
+#export VERSIONDATE=20100420
+#export VERSION=0.28
+#export VERSIONDATE=20110315
+#export VERSION=0.29
+#export VERSIONDATE=20120515
+#export DEPENDANCIES=pthreads,libogg,libvorbis,libltdl,gtk2
+export VERSION=0.30
+export VERSIONDATE=20120925
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libogg,libvorbis,libltdl,gtk3,libx11
+export OPTIONALDEPENDANCIES=tdb,gtk3
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LGPL
+export LICENSETYPE=LGPL2.1
+export DOWNLOADURL="http://0pointer.de/lennart/projects/libcanberra/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://0pointer.de/lennart/projects/libcanberra/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://0pointer.de/lennart/projects/libcanberra/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing LC_MESSAGES in src/sound-theme-spec.c
+mv src/sound-theme-spec.c src/sound-theme-spec.c.bak
+echo "#include <libintl.h>" > src/sound-theme-spec.c
+cat src/sound-theme-spec.c.bak >> src/sound-theme-spec.c
+# fix missing sleep
+mv src/test-canberra.c src/test-canberra.c.bak
+echo "#define sleep(t) _sleep((t) * 1000)" > src/test-canberra.c
+cat src/test-canberra.c.bak >> src/test-canberra.c
+# fix missing gdk/gdkx.h
+mkdir -p gdk
+cat > gdk/gdkx.h << EOF
+////fix error: /include/w32api/winspool.h:255: error: two or more data types in declaration specifiers
+//#undef Status
+#include <windows.h>
+#include <gdk/gdkwin32.h>
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#define GDK_WINDOW_XID(dw) (int)GDK_WINDOW_HWND(dw)
+//#define gdk_x11_get_xatom_by_name_for_display(d,n) GDK_ROOT_WINDOW()
+#define gdk_x11_get_xatom_by_name_for_display(d,n) ((guint32) HWND_DESKTOP)
+#define GDK_DISPLAY_XDISPLAY(d) gdk_display_get_default_screen(d)
+EOF
+# fix .so extension instead of .dll (version >= 0.28)
+mv src/Makefile.in src/Makefile.in.bak
+sed -e "s/\.so/\.dll/g" src/Makefile.in.bak > src/Makefile.in
+mv src/Makefile.am src/Makefile.am.bak
+sed -e "s/\.so/\.dll/g" src/Makefile.am.bak > src/Makefile.am
+wl-showstatus configure
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # fix configure.ac for possibly missing AM_PROG_AR
+ patch -ulbf configure.ac << EOF
+--- configure.ac  2012-09-25 02:21:08 +0200
++++ configure.ac  2014-10-29 07:46:30 +0100
+@@ -56,3 +56,3 @@
+ AC_PROG_LN_S
+-AM_PROG_AR
++m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
+
+EOF
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtk LDFLAGS="-lpthread -lintl -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-gtk LDFLAGS="-lpthread -lintl -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM  --enable-static --enable-shared --enable-gtk --enable-gtk3 LDFLAGS="-lpthread -lintl -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM  --enable-static --enable-shared --enable-gtk --disable-gtk3 LDFLAGS="-lpthread -lintl -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM  --enable-static --enable-shared --enable-gtk --enable-gtk3 LDFLAGS="-lpthread -lintl -Wl,-no-undefined" &&
+#PKG_CONFIG=$(which pkg-config.exe) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM  --enable-static --enable-shared --enable-gtk --enable-gtk3 LDFLAGS="-lpthread -lintl -Wl,-no-undefined" &&
+PKG_CONFIG=$(which pkg-config.exe) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM  --enable-static --enable-shared --enable-gtk --enable-gtk3 --disable-udev LDFLAGS="-lpthread -lintl -Wl,-no-undefined" &&
+ # fix building DLLs on 64-bit
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build-install &&
+ ##( make -j1 all install-strip || make -j1 all install-strip LIBS="-Wl,--as-needed -lX11" || (
+ #( make -j1 all install-strip || make -j1 all install-strip LIBS="-Wl,--as-needed -lgmodule-2.0" || (
+ # cp -f src/.libs/libcanberra-gtk3-module.dll $INSTALLPREFIX/lib/gtk-3.0/modules/ &&
+ # make -j1 all install-strip
+ #)) &&
+ wl-showstatus build &&
+ ( make || make LIBS="-Wl,--as-needed -lgmodule-2.0" || (
+  cp -f src/.libs/libcanberra-gtk3-module.dll $INSTALLPREFIX/lib/gtk-3.0/modules/ &&
+  make
+ )) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

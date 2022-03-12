@@ -1,0 +1,104 @@
+export NAME="GNOME-DB"
+export STATUS=
+export URL=http://www.gnome-db.org/
+export BASENAME=libgnomedb
+export DESCRIPTION="Libgnomedb is a database widget library with data bound widgets and more. It depends on GTK+."
+export CATEGORY=db
+export TYPE=library
+export VERSION=3.1.2
+#export VERSION=3.99.7
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=libgda,gtk2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/libgnomedb/"
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/libgnomedb/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/libgnomedb-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/libgnomedb-$VERSION.tar.bz2
+cd libgnomedb-$VERSION
+# patches to exclude gda proxy filter stuff
+patch -u -l libgnomedb/gnome-db-data-widget-filter.c << EOF
+--- libgnomedb/gnome-db-data-widget-filter.c  Tue Feb 12 13:26:23 2008
++++ libgnomedb/gnome-db-data-widget-filter.c  Tue Feb 12 13:29:11 2008
+@@ -153,7 +153,7 @@
+        while (g_main_context_pending (NULL))
+            g_main_context_iteration (NULL, FALSE);
+ 
+-       if (!gda_data_proxy_set_filter_expr (filter->priv->proxy, expr, &error)) {
++       if (TRUE/*!gda_data_proxy_set_filter_expr (filter->priv->proxy, expr, &error)*/) {
+            if (error && error->message)
+                err = g_strdup (error->message);
+            else
+@@ -275,7 +275,7 @@
+    const gchar *expr;
+
+    g_assert (proxy == filter->priv->proxy);
+-   expr = gda_data_proxy_get_filter_expr (proxy);
++   expr = NULL/*gda_data_proxy_get_filter_expr (proxy)*/;
+    gtk_entry_set_text (GTK_ENTRY (filter->priv->filter_entry), expr ? expr : "");
+ }
+EOF
+patch -u -l libgnomedb/gnome-db-data-widget-info.c << EOF
+--- libgnomedb/gnome-db-data-widget-info.c  Tue Feb 12 13:23:09 2008
++++ libgnomedb/gnome-db-data-widget-info.c  Tue Feb 12 13:24:43 2008
+@@ -503,10 +503,10 @@
+
+    model_iter = gnome_db_data_widget_get_current_data (info->priv->data_widget);
+    if (info->priv->proxy) {
+-       filtered_proxy = gda_data_proxy_get_filter_expr (info->priv->proxy) ? TRUE : FALSE;
++       filtered_proxy = /*gda_data_proxy_get_filter_expr (info->priv->proxy) ? TRUE :*/ FALSE;
+        proxy_rows = gda_data_model_get_n_rows (GDA_DATA_MODEL (info->priv->proxy));
+        if (filtered_proxy) {
+-           proxied_rows = gda_data_proxy_get_filtered_n_rows (info->priv->proxy);
++           //proxied_rows = gda_data_proxy_get_filtered_n_rows (info->priv->proxy);
+            all_rows = proxied_rows;
+        }
+        else {
+EOF
+patch -u -l libgnomedb/gnome-db-raw-grid.c << EOF
+--- libgnomedb/gnome-db-raw-grid.c  Tue Feb 12 13:30:20 2008
++++ libgnomedb/gnome-db-raw-grid.c  Tue Feb 12 13:30:25 2008
+@@ -1880,7 +1880,7 @@
+ static void
+ menu_unset_filter_cb (GtkWidget *widget, GnomeDbRawGrid *grid)
+ {
+-   gda_data_proxy_set_filter_expr (grid->priv->proxy, NULL, NULL);
++   //gda_data_proxy_set_filter_expr (grid->priv->proxy, NULL, NULL);
+ }
+EOF
+# skip making demos
+cat > extra/demos/Makefile.in << EOF
+all:
+install:
+EOF
+# fix configure to support libgda version 4
+patch -ulbf configure << EOF
+--- configure  2007-10-24 21:44:08 +0200
++++ configure  2010-11-18 17:36:14 +0100
+@@ -23031,3 +23031,3 @@
+ GTK_MODULES="gtk+-2.0 >= 2.6.0 gthread-2.0"
+-LIBGDA_MODULES="libgda-3.0 >= 3.0.0"
++LIBGDA_MODULES="libgda-4.0 >= 4.0.0"
+ LIBGNOMEDB_REQUIRES="\$GTK_MODULES \$LIBGDA_MODULES"
+EOF
+wl-showstatus configure &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/gtk-2.0 -I$MINGWPREFIX/lib/gtk-2.0/include -I$MINGWPREFIX/include/pango-1.0 -I$MINGWPREFIX/include/cairo -I$MINGWPREFIX/include/atk-1.0 -I$MINGWPREFIX/include/gconf/2 -I$MINGWPREFIX/include/libglade-2.0 -I$MINGWPREFIX/include/libgnomecanvas-2.0" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --build=$BUILDPLATFORM --host=$RUNPLATFORM --prefix=$INSTALLPREFIX &&
+ #echo "#define GdaParameterList GdaSet" >> config.h &&
+ #echo "#define GdaParameterListSource GdaSetSource" >> config.h &&
+ ##echo "#define GdaParameter GdaHolder" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf libgnomedb-$VERSION
+#### GNOME-DB is now part of libgda (since version 4.2)
+
+
+

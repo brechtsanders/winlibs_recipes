@@ -1,0 +1,132 @@
+export NAME="XDMF"
+export STATUS=
+export URL=http://www.xdmf.org/
+export BASENAME=xdmf
+export DESCRIPTION="The need for a standardized method to exchange scientific data between High Performance Computing codes and tools lead to the development of the eXtensible Data Model and Format (XDMF)."
+export CATEGORY=database
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20170529
+####XdmfMap.cpp:110:19: error: definition of static data member 'XdmfMap::ItemTag' of dllimport'd class
+wl-showstatus --package-version
+export DEPENDANCIES=hdf5,boost,libxml2,libtiff
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=Copyright.txt
+export LICENSETYPE=
+#export DOWNLOADURL="https://gitlab.kitware.com/xdmf/xdmf/"
+export DOWNLOADURL="https://gitlab.kitware.com/xdmf/xdmf/branches"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://gitlab.kitware.com/xdmf/xdmf/repository/archive.tar.gz
+export DOWNLOADSOURCEURL=https://gitlab.kitware.com/xdmf/xdmf/-/archive/master/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/archive.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION*
+# fix redefinition of PATH_MAX in core/XdmfCore.hpp
+patch -ulbf core/XdmfCore.hpp << EOF
+@@ -51,3 +51,5 @@
+ /* Used in XdmfSystemUtils */
++#ifndef PATH_MAX
+ #define PATH_MAX _MAX_PATH
++#endif
+ #define realpath(x,y) _fullpath((char *) y,x, _MAX_PATH)
+EOF
+# fix conflict between long long and __int64 in core/XdmfArray.cpp
+patch -ulbf core/XdmfArray.cpp << EOF
+@@ -1197,11 +1197,11 @@
+ XdmfArray::setArrayType<long long>()
+ {
+   mArrayType = XdmfArrayType::Int64();
+ }
+
+-#ifdef WIN32
++#if defined(WIN32) && !defined(__MINGW32__)
+ template <>
+ XDMFCORE_EXPORT
+ void
+ XdmfArray::setArrayType<__int64>()
+ {
+EOF
+# fix CMakeLists.txt for building static and shared libraries
+patch -ulbf CMakeLists.txt << EOF
+@@ -32,3 +32,3 @@
+
+-if (WIN32)
++if (FALSE)
+   set(XDMF_STATIC_AND_SHARED OFF)
+@@ -208,3 +208,3 @@
+
+-    if(WIN32)
++    if(FALSE)
+       if(NOT MSVC10)
+@@ -273,3 +273,3 @@
+
+-    if(WIN32)
++    if(FALSE)
+          if(NOT MSVC10)
+@@ -387,3 +387,3 @@
+   else()
+-    if (WIN32)
++    if (FALSE)
+       if (XDMF_BUILD_DSM)
+@@ -403,3 +403,3 @@
+   if(XDMF_BUILD_DSM)
+-    if (NOT WIN32)
++    if (NOT FALSE)
+       target_link_libraries(\${XDMF_LIBNAME} XdmfCore XdmfDSM)
+@@ -412,3 +412,3 @@
+   else(XDMF_BUILD_DSM)
+-    if (NOT WIN32)
++    if (NOT FALSE)
+       target_link_libraries(\${XDMF_LIBNAME} XdmfCore)
+@@ -425,3 +425,3 @@
+
+-  if(WIN32)
++  if(FALSE)
+     if (BUILD_SHARED_LIBS)
+@@ -482,3 +482,7 @@
+   if(WIN32)
+-    set(XDMF_LIBRARY \${CMAKE_INSTALL_PREFIX}/lib/\${XDMF_LIBNAME}.lib)
++    if (BUILD_SHARED_LIBS)
++      set(XDMF_LIBRARY \${CMAKE_INSTALL_LIBDIR}/lib\${XDMF_LIBNAME}.dll)
++    else (BUILD_SHARED_LIBS)
++      set(XDMF_LIBRARY \${CMAKE_INSTALL_LIBDIR}/lib\${XDMF_LIBNAME}.a)
++    endif (BUILD_SHARED_LIBS)
+   endif()
+@@ -517,3 +521,3 @@
+
+-if(WIN32 AND NOT CYGWIN)
++if(FALSE)
+   set(DEF_INSTALL_CMAKE_DIR CMake)
+EOF
+patch -ulbf utils/CMakeLists.txt << EOF
+@@ -121,3 +121,3 @@
+ target_link_libraries(XdmfUtils \${XdmfUtilsLinkLibraries})
+-if (BUILD_SHARED_LIBS)
++if (XDMF_STATIC_AND_SHARED AND BUILD_SHARED_LIBS)
+   target_link_libraries(XdmfUtils_Static \${XdmfUtilsLinkLibraries})
+@@ -185,3 +185,3 @@
+     ARCHIVE DESTINATION lib)
+-if (BUILD_SHARED_LIBS)
++if (XDMF_STATIC_AND_SHARED AND BUILD_SHARED_LIBS)
+ install(TARGETS XdmfUtils_Static
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DXDMF_STATIC_AND_SHARED:BOOL=OFF -DXDMF_BUILD_UTILS:BOOL=ON -DHDF5_DIR:PATH=$MINGWPREFIX/cmake -DHDF5_INCLUDE_DIRS:PATH=$MINGWPREFIX/include -DHDF5_LIB:FILEPATH=$MINGWPREFIX/lib/libhdf5.a -DXDMF_BUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DXDMF_STATIC_AND_SHARED:BOOL=OFF -DXDMF_BUILD_UTILS:BOOL=ON -DHDF5_DIR:PATH=$MINGWPREFIX/cmake -DHDF5_INCLUDE_DIRS:PATH=$MINGWPREFIX/include -DHDF5_LIB:FILEPATH=$MINGWPREFIX/lib/libhdf5.dll.a -DXDMF_BUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION*
+
+
+

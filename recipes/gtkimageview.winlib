@@ -1,0 +1,64 @@
+export NAME="GtkImageView"
+export STATUS=
+#export URL=http://trac.bjourne.webfactional.com/
+export URL=https://projects.gnome.org/gtkimageview/
+#export URL=https://github.com/GNOME/gtkimageview
+export BASENAME=gtkimageview
+export DESCRIPTION="GtkImageView is a simple image viewer widget for GTK. Similar to the image viewer panes in gThumb or Eye of Gnome. It makes writing image viewing and editing applications easy."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=0.12.0
+#export VERSIONDATE=20170906
+export VERSION=1.6.4
+export VERSIONDATE=20110829
+wl-showstatus --package-version
+export DEPENDANCIES=gtk2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://trac.bjourne.webfactional.com/chrome/common/releases/"
+export DOWNLOADURL="https://github.com/GNOME/gtkimageview/releases"
+#export DOWNLOADURL="http://hackage.haskell.org/package/gtkimageview"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://trac.bjourne.webfactional.com/chrome/common/releases/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://hackage.haskell.org/package/gtkimageview-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing braces in src/gtkimagenav.c (version >= 1.6.4)
+####src/gtkimagenav.c:74:5: error: this 'if' clause does not guard... [-Werror=misleading-indentation]
+patch -ulbf src/gtkimagenav.c << EOF
+@@ -73,4 +73,5 @@
+        GdkPixbuf *pixbuf = gtk_image_view_get_pixbuf (nav->view);
+-    if (!pixbuf)
++    if (!pixbuf) {
+         return (Size){GTK_IMAGE_NAV_MAX_WIDTH, GTK_IMAGE_NAV_MAX_HEIGHT};
++       }
+        int img_width = gdk_pixbuf_get_width (pixbuf);
+EOF
+## fix deprecated g_get_current_time() in src/gtkanimview.c (version >= 1.6.4)
+#patch -ulbf src/gtkanimview.c << EOF
+#@@ -286 +286 @@
+#-    g_get_current_time (&aview->time);
+#+    aview->time = g_get_real_time ();
+#EOF
+# skip making tests
+cat > tests/Makefile << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-Wno-error=deprecated-declarations" &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ PATH=$PYDIR:$PATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

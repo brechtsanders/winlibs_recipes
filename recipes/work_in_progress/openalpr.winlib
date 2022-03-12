@@ -1,0 +1,97 @@
+export NAME="OpenALPR"
+export STATUS=
+export URL=http://www.openalpr.com/
+export BASENAME=openalpr
+export DESCRIPTION="Automatic License Plate Recognition library"
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=2.2.0
+#export VERSIONDATE=20151217
+export VERSION=2.3.0
+export VERSIONDATE=20160718
+wl-showstatus --package-version
+export DEPENDANCIES=tesseract-ocr,opencv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE="Affero General Public License"
+export DOWNLOADURL="https://github.com/openalpr/openalpr/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/openalpr/openalpr/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus configure &&
+# fix redefinition of mode_t in src/openalpr/support/filesystem.h
+patch -ulbf src/openalpr/support/filesystem.h << EOF
+--- src/openalpr/support/filesystem.h  2015-10-20 04:38:25.000000000 +0200
++++ src/openalpr/support/filesystem.h  2015-12-21 23:35:43.974587300 +0100
+@@ -9,3 +9,5 @@
+ #include "windows/unistd_partial.h"
++#ifndef __MINGW32__
+ typedef int mode_t;
++#endif
+ #else
+EOF
+# fix redefinition of round in src/openalpr/support/windows/utils.h
+patch -ulbf src/openalpr/support/windows/utils.h << EOF
+--- src/openalpr/support/windows/utils.h  2015-10-20 04:38:25.000000000 +0200
++++ src/openalpr/support/windows/utils.h  2015-12-21 23:36:53.287946900 +0100
+@@ -1 +1,2 @@
++#ifndef __MINGW32__
+
+@@ -7 +8,2 @@
+ }
++#endif
+EOF
+# fix redefinition of struct timespec in src/openalpr/support/timing.h
+patch -ulbf src/openalpr/support/timing.h << EOF
+--- src/openalpr/support/timing.h  2015-10-20 04:38:25.000000000 +0200
++++ src/openalpr/support/timing.h  2015-12-21 23:41:29.171183700 +0100
+@@ -12,3 +12,3 @@
+        #include <windows.h>
+-       #if _MSC_VER < 1900
++       #if _MSC_VER < 1900 && !defined(__MINGW64_VERSION_MAJOR)
+        struct timespec
+EOF
+# fix redefinition of clock_gettime in src/openalpr/support/timing.cpp
+sed -i.bak -e "s/\(clock_gettime\)/my_\1/" src/openalpr/support/timing.cpp
+## fix missing CV_MOP_CLOSE in newer OpenCV in src/openalpr/detection/detectormorph.cpp (version >= 2.3.0)
+#mv src/openalpr/detection/detectormorph.cpp src/openalpr/detection/detectormorph.cpp.bak &&
+#echo "#include <opencv2/imgproc/types_c.h>" > src/openalpr/detection/detectormorph.cpp &&
+#cat src/openalpr/detection/detectormorph.cpp.bak >> src/openalpr/detection/detectormorph.cpp
+## fix src/openalpr/detection/detector.cpp (version >= 2.3.0)
+#mv src/openalpr/detection/detector.cpp src/openalpr/detection/detector.cpp.bak &&
+#echo "#include <opencv2/imgproc/types_c.h>" > src/openalpr/detection/detector.cpp &&
+#cat src/openalpr/detection/detector.cpp.bak >> src/openalpr/detection/detector.cpp
+## fix src/openalpr/alpr_impl.cpp (version >= 2.3.0)
+#mv src/openalpr/alpr_impl.cpp src/openalpr/alpr_impl.cpp.bak &&
+#echo "#include <opencv2/imgproc/types_c.h>" > src/openalpr/alpr_impl.cpp &&
+#cat src/openalpr/alpr_impl.cpp.bak >> src/openalpr/alpr_impl.cpp
+## fix deprecated constants in newer OpenCV (version >= 2.3.0)
+#sed -i.bak -e "s/CV_BGR2GRAY/cv::COLOR_BGRA2GRAY/g; s/CV_LOAD_IMAGE_COLOR/cv::IMREAD_COLOR/g; s/CV_\(THRESH_OTSU\|THRESH_BINARY\)/cv::\1/g; s/CV_MOP_OPEN/cv::MORPH_OPEN/g; s/CV_HAAR_DO_CANNY_PRUNING/cv::CASCADE_DO_CANNY_PRUNING/g; s/CV_GRAY2BGR/cv::COLOR_GRAY2BGRA/g; s/CV_FONT_HERSHEY_PLAIN/cv::FONT_HERSHEY_PLAIN/g; s/CV_FILLED/cv::FILLED/g" $(grep -l "CV_BGR2GRAY\|CV_LOAD_IMAGE_COLOR\|CV_THRESH_OTSU\|THRESH_BINARY\|CV_MOP_OPEN\|CV_HAAR_DO_CANNY_PRUNING\|CV_GRAY2BGR\|CV_FONT_HERSHEY_PLAIN\|CV_FILLED" $(find -name '*.cpp'))
+mkdir -p build_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_OPENCV_GCC_TARGET_MACHINE:STRING=32 -DWITH_TESTS:BOOL=FALSE -DOpenCV_CONFIG_PATH:PATH=$MINGWPREFIX -DOpenCV_SHARED:BOOL=TRUE -DTesseract_INCLUDE_BASEAPI_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCSTRUCT_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCMAIN_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCUTIL_DIR:PATH=$MINGWPREFIX/include -S./src -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_OPENCV_GCC_TARGET_MACHINE:STRING=32 -DWITH_TESTS:BOOL=FALSE -DOpenCV_CONFIG_PATH:PATH=$MINGWPREFIX -DOpenCV_SHARED:BOOL=TRUE -DOpenCV_LIB_PATH:PATH=$MINGWPREFIX/$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x64; else echo x86; fi)/mingw/lib -DTesseract_INCLUDE_BASEAPI_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCSTRUCT_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCMAIN_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCUTIL_DIR:PATH=$MINGWPREFIX/include -S./src -Bbuild_win &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_OPENCV_GCC_TARGET_MACHINE:STRING=32 -DWITH_TESTS:BOOL=FALSE -DOpenCV_CONFIG_PATH:PATH=$MINGWPREFIX -DOpenCV_SHARED:BOOL=TRUE -DOpenCV_DIR:PATH=$MINGWPREFIX/$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x64; else echo x86; fi)/mingw/lib -DTesseract_INCLUDE_BASEAPI_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCSTRUCT_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCMAIN_DIR:PATH=$MINGWPREFIX/include -DTesseract_INCLUDE_CCUTIL_DIR:PATH=$MINGWPREFIX/include -S./src -Bbuild_win &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ pushd $INSTALLPREFIX &&
+ MYINSTPATH=$(pwd -W) &&
+ popd &&
+ pushd $MINGWPREFIX &&
+ MYDISTPATH=$(pwd -W) &&
+ popd &&
+ mkdir -p $INSTALLPREFIX/etc/openalpr &&
+ sed -e "s?$MYINSTPATH?$MYDISTPATH?g" build_win/config/openalpr.conf > $INSTALLPREFIX/etc/openalpr/openalpr.conf &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####PATH=$PATH:$MINGWPREFIX/x86/mingw/bin OPENALPR_CONFIG_FILE=$MINGWPREFIX/etc/openalpr/openalpr.conf alpr --help
+####To do: fix redefinitions of S_IS*
+
+
+

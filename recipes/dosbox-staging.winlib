@@ -1,0 +1,110 @@
+#export NAME="DOSBox Staging"
+#export STATUS=
+#export URL=https://github.com/dosbox-staging/dosbox-staging
+#export BASENAME=dosbox-staging
+#export DESCRIPTION="DOS/x86 emulator focusing on ease of use"
+#export CATEGORY=
+#export TYPE=library
+##export VERSION=master
+##export VERSIONDATE=20210302
+#export VERSION=0.76.0
+#export VERSIONDATE=20210302
+#wl-showstatus --package-version
+#export DEPENDANCIES=pthreads,ncurses,sdl2,libpng,opusfile,fluidsynth,mman-win32
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/dosbox-staging/dosbox-staging/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=https://github.com/dosbox-staging/dosbox-staging/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/dosbox-staging/dosbox-staging/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix missing _mkdir() in src/misc/cross.cpp
+#mv src/misc/cross.cpp src/misc/cross.cpp.bak &&
+#echo "#include <direct.h>" > src/misc/cross.cpp &&
+#cat src/misc/cross.cpp.bak >> src/misc/cross.cpp
+## fix missing S_IFMT in src/misc/fs_utils_win32.cpp
+#mv src/misc/fs_utils_win32.cpp src/misc/fs_utils_win32.cpp.bak &&
+#echo "#include <sys/stat.h>" > src/misc/fs_utils_win32.cpp &&
+#cat src/misc/fs_utils_win32.cpp.bak >> src/misc/fs_utils_win32.cpp
+## fix missing strerror_r() in src/misc/support.cpp
+#mv src/misc/support.cpp src/misc/support.cpp.bak &&
+#echo "#define strerror_r(a,b,c) strerror_s((b),(c),(a))" > src/misc/support.cpp &&
+#cat src/misc/support.cpp.bak >> src/misc/support.cpp
+## fix missing WinMain() in src/gui/sdlmain.cpp
+#echo "int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) { return main(__argc, __argv); }" >> src/gui/sdlmain.cpp
+#wl-showstatus configure &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sdltest --disable-tests CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="DOSBox Staging"
+export STATUS=
+export URL=https://github.com/dosbox-staging/dosbox-staging
+export BASENAME=dosbox-staging
+export DESCRIPTION="DOS/x86 emulator focusing on ease of use"
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.77.0
+#export VERSIONDATE=20210703
+#export VERSION=0.77.1
+#export VERSIONDATE=20210829
+#export VERSION=0.78.0
+#export VERSIONDATE=20211226
+export VERSION=0.78.1
+export VERSIONDATE=20220108
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,ncurses,sdl2,sdl2net,libpng,opusfile,fluidsynth,libpcap,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/dosbox-staging/dosbox-staging/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/dosbox-staging/dosbox-staging/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix location of Perl
+sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+# fix detection of Python
+sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+# fix missing gio-unix
+#sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Duse_sdl2_net=true -Duse_opengl=true -Duse_fluidsynth=true -Duse_opusfile=true -Duse_png=true -Duse_alsa=false -Duse_mt32emu=true -Denable_debugger=none -Dunit_tests=disabled . build_both &&
+ #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX/share/dosbox-staging --backend ninja --buildtype release --strip --default-library both -Duse_sdl2_net=true -Duse_opengl=true -Duse_fluidsynth=true -Duse_png=true -Duse_alsa=false -Duse_mt32emu=true -Duse_pcap=true -Denable_debugger=none -Dunit_tests=disabled . build_both &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX/share/dosbox-staging --backend ninja --buildtype release --strip --default-library both -Duse_sdl2_net=true -Duse_opengl=true -Duse_fluidsynth=true -Duse_png=true -Duse_alsa=false -Duse_mt32emu=true -Denable_debugger=none -Dunit_tests=disabled . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ strip build_both/subprojects/munt-libmt32emu_*/*.dll &&
+ cp -u build_both/subprojects/munt-libmt32emu_*/*.dll $INSTALLPREFIX/share/dosbox-staging/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: Conflicts with dosbox => moved to separate folder
+
+
+

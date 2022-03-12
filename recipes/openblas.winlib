@@ -1,0 +1,171 @@
+export NAME="OpenBLAS"
+export STATUS=
+export URL=http://www.openblas.net/
+export BASENAME=openblas
+export DESCRIPTION="OpenBLAS is an optimized BLAS library based on GotoBLAS2 1.13 BSD version."
+export CATEGORY=math
+export TYPE=library
+#export VERSION=0.2.8
+#export VERSIONDATE=20131104
+#export VERSION=0.2.13
+#export VERSIONDATE=20150322
+####make[2]: gfortran: Command not found
+#export VERSION=0.2.14
+#export VERSIONDATE=20150329
+#export VERSION=0.2.15
+#export VERSIONDATE=20151101
+#export VERSION=0.2.17
+#export VERSIONDATE=20160405
+#export VERSION=0.2.18
+#export VERSIONDATE=20160413
+#export VERSION=0.2.19
+#export VERSIONDATE=20160901
+#export VERSION=0.2.20
+#export VERSIONDATE=20170724
+#export VERSION=0.3.0
+#export VERSIONDATE=20180523
+#export VERSION=0.3.1
+#export VERSIONDATE=20180701
+#export VERSION=0.3.2
+#export VERSIONDATE=20180730
+#export VERSION=0.3.3
+#export VERSIONDATE=20180831
+#export VERSION=0.3.4
+#export VERSIONDATE=20181203
+#export VERSION=0.3.5
+#export VERSIONDATE=20190101
+#export VERSION=0.3.6
+#export VERSIONDATE=20190430
+#export VERSION=0.3.7
+#export VERSIONDATE=20190812
+#export VERSION=0.3.8
+#export VERSIONDATE=20200210
+#export VERSION=0.3.9
+#export VERSIONDATE=20200302
+#export VERSION=0.3.10
+#export VERSIONDATE=20200615
+#export VERSION=0.3.11
+#export VERSIONDATE=20201018
+#export VERSION=0.3.12
+#export VERSIONDATE=20201024
+#export VERSION=0.3.13
+#export VERSIONDATE=20201213
+#export VERSION=0.3.14
+#export VERSIONDATE=20210318
+#export VERSION=0.3.15
+#export VERSIONDATE=20210503
+#export VERSION=0.3.16
+#export VERSIONDATE=20210712
+#export VERSION=0.3.17
+#export VERSIONDATE=20210715
+#export VERSION=0.3.18
+#export VERSIONDATE=20211003
+#export VERSION=0.3.19
+#export VERSIONDATE=20211220
+export VERSION=0.3.20
+export VERSIONDATE=20220221
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="http://www.openblas.net/"
+export DOWNLOADURL="https://github.com/xianyi/OpenBLAS/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://codeload.github.com/xianyi/OpenBLAS/legacy.tar.gz/v$VERSION
+export DOWNLOADSOURCEURL=https://github.com/xianyi/OpenBLAS/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/xianyi-OpenBLAS-v$VERSION*.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#mv $TARBALLDIR/$BASENAME/v$VERSION $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz || mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz -C$BASENAME-$VERSION
+#cd $BASENAME-$VERSION/xianyi-OpenBLAS*
+cd $BASENAME-$VERSION/*OpenBLAS*
+# fix redefinition of CR/DOUBLE in driver/level3/gemm.c
+mv driver/level3/gemm.c driver/level3/gemm.c.bak
+cat > driver/level3/gemm.c << EOF
+#if defined(CR) || defined(DOUBLE)
+#ifdef CR
+#undef CR
+#define CR win_CR
+#endif
+#ifdef DOUBLE
+#undef DOUBLE
+#define DOUBLE win_DOUBLE
+#endif
+#include <windows.h>
+#ifdef win_CR
+#undef CR
+#define CR win_CR
+#endif
+#ifdef win_DOUBLE
+#undef DOUBLE
+#define DOUBLE win_DOUBLE
+#endif
+#endif
+EOF
+cat driver/level3/gemm.c.bak >> driver/level3/gemm.c
+# fix redefinition of CR/DOUBLE in driver/level3/gemm3m.c
+mv driver/level3/gemm3m.c driver/level3/gemm3m.c.bak
+cat > driver/level3/gemm3m.c << EOF
+#if defined(CR) || defined(DOUBLE)
+#ifdef CR
+#undef CR
+#define CR win_CR
+#endif
+#ifdef DOUBLE
+#undef DOUBLE
+#define DOUBLE win_DOUBLE
+#endif
+#include <windows.h>
+#ifdef win_CR
+#undef CR
+#define CR win_CR
+#endif
+#ifdef win_DOUBLE
+#undef DOUBLE
+#define DOUBLE win_DOUBLE
+#endif
+#endif
+EOF
+cat driver/level3/gemm3m.c.bak >> driver/level3/gemm3m.c
+# fix redefinition of DOUBLE in driver/level3/syrk_k.c
+mv driver/level3/syrk_k.c driver/level3/syrk_k.c.bak
+cat > driver/level3/syrk_k.c << EOF
+#ifdef DOUBLE
+#undef DOUBLE
+#define DOUBLE win_DOUBLE
+#include <windows.h>
+#undef DOUBLE
+#define DOUBLE win_DOUBLE
+#endif
+EOF
+cat driver/level3/syrk_k.c.bak >> driver/level3/syrk_k.c
+# don't build with -Wall
+mv Makefile.generic Makefile.generic.bak
+sed -e "s/-Wall//" Makefile.generic.bak > Makefile.generic
+mv Makefile.system Makefile.system.bak
+sed -e "s/-Wall//" Makefile.system.bak > Makefile.system
+wl-showstatus build &&
+ #make BINARY=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo 32; else echo 64; fi) CC=gcc FC=gfortran &&
+ #make BINARY=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo 32; else echo 64; fi) CC=gcc FC=gfortran SMP=1 &&
+ #make BINARY=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo 32; else echo 64; fi) CC=gcc FC="gfortran -fno-asynchronous-unwind-tables" SMP=1 &&
+ MAKEFLAGS= make BINARY=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo 32; else echo 64; fi) HOSTCC=gcc CC=gcc FC="gfortran -fno-asynchronous-unwind-tables" SMP=1 DYNAMIC_ARCH=1 BINARY=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "64"; else echo "32"; fi) USE_OPENMP=1 BUILD_LAPACK_DEPRECATED=1 &&
+ wl-showstatus build-install &&
+ make install PREFIX=$INSTALLPREFIX &&
+ # place .dll in the right folder (version <= 0.2.8)
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ ##cp -f libopenblas.a $INSTALLPREFIX/lib/libopenblas.dll.a &&
+ #dlltool -d exports/libopenblas.def -D $INSTALLPREFIX/bin/libopenblas.dll -l $INSTALLPREFIX/lib/libopenblas.dll.a &&
+ # fix absolute link in .cmake file(s)
+ sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $INSTALLPREFIX/lib/cmake/openblas/OpenBLASConfig.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TARGET=P2
+
+
+

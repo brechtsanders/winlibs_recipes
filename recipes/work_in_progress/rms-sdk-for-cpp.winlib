@@ -1,0 +1,92 @@
+export NAME="RMS SDK for C++"
+export STATUS=
+export URL=https://github.com/AzureAD/rms-sdk-for-cpp
+export BASENAME=rms-sdk-for-cpp
+export DESCRIPTION="The Rights Management Service (RMS) portable SDK is an open-source, cross-platform, simplified SDK that enables a lightweight development experience in upgrading your device apps with information protection via Azure Rights Management Services. Developers can build apps that leverage Active Directory Rights Management Services (AD RMS) or Azure Rights Management to provide information protection and can easily protect or consume information, while transparently handling complex security practices such as key management, encryption and decryption, policy and permissions creation, secure caching, and communication with AD RMS and Azure RMS services."
+export CATEGORY=security
+export TYPE=library
+export VERSION=0.3.0
+export VERSIONDATE=20220301
+####Project ERROR: Unknown module(s) in QT: webkitwidgets
+wl-showstatus --package-version
+export DEPENDANCIES=qt,openssl,libsecret
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/AzureAD/rms-sdk-for-cpp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/AzureAD/rms-sdk-for-cpp/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing round() in sdk/rms_sdk/Json/JsonSerializer.cpp
+mv sdk/rms_sdk/Json/JsonSerializer.cpp sdk/rms_sdk/Json/JsonSerializer.cpp.bak &&
+echo "#include <math.h>" > sdk/rms_sdk/Json/JsonSerializer.cpp &&
+cat sdk/rms_sdk/Json/JsonSerializer.cpp.bak >> sdk/rms_sdk/Json/JsonSerializer.cpp
+# support newer OpenSSL in sdk/rmscrypto_sdk/Platform/Crypto/AESCryptoKey.cpp
+patch -ulbf sdk/rmscrypto_sdk/Platform/Crypto/AESCryptoKey.cpp << EOF
+@@ -71,4 +71,4 @@
+   int totalOut = static_cast<int>(cbOut);
+-  EVP_CIPHER_CTX ctx;
+-  EVP_CIPHER_CTX_init(&ctx);
++  EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
++  EVP_CIPHER_CTX_reset(ctx);
+   const EVP_CIPHER *cipher = nullptr;
+@@ -125,11 +125,11 @@
+
+-  EVP_CipherInit_ex(&ctx, cipher, NULL, m_key.data(), pbIv, encrypt ? 1 : 0);
++  EVP_CipherInit_ex(ctx, cipher, NULL, m_key.data(), pbIv, encrypt ? 1 : 0);
+
+   if (m_algorithm == api::CRYPTO_ALGORITHM_AES_CBC_PKCS7) {
+-    EVP_CIPHER_CTX_set_padding(&ctx, 1);
++    EVP_CIPHER_CTX_set_padding(ctx, 1);
+   } else {
+-    EVP_CIPHER_CTX_set_padding(&ctx, 0);
++    EVP_CIPHER_CTX_set_padding(ctx, 0);
+   }
+
+-  if (!EVP_CipherUpdate(&ctx, pbOut, &totalOut, pbIn, static_cast<int>(cbIn))) {
++  if (!EVP_CipherUpdate(ctx, pbOut, &totalOut, pbIn, static_cast<int>(cbIn))) {
+     throw exceptions::RMSCryptoIOException(
+@@ -150,3 +150,3 @@
+
+-    if (!EVP_CipherFinal_ex(&ctx, pbOut, &remain)) {
++    if (!EVP_CipherFinal_ex(ctx, pbOut, &remain)) {
+       throw exceptions::RMSCryptoIOException(
+@@ -158,3 +158,3 @@
+
+-  EVP_CIPHER_CTX_cleanup(&ctx);
++  EVP_CIPHER_CTX_cleanup(ctx);
+
+EOF
+# fix missing -lssleay32MDd/-llibeay32MDd
+sed -i.bak -e "s/-lssleay32MDd/-lssleay32/; s/-llibeay32MDd/-leay32/" $(grep "-lssleay32MDd\|-llibeay32MDd" $(find -name '*.pro'))
+wl-showstatus configure &&
+ $MINGWPREFIX/qt/bin/qmake -makefile sdk/sdk.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
+ wl-showstatus build &&
+ mingw32-make &&
+    echo OK
+
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# $MINGWPREFIX/qt/bin/qmake -makefile ../sdk/sdk.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ CONFIG+=staticlib &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# $MINGWPREFIX/qt/bin/qmake -makefile ../sdk/sdk.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
+# cd .. &&
+# wl-showstatus build &&
+# mingw32-make -Cbuild_static &&
+# wl-showstatus build &&
+# mingw32-make -Cbuild_shared &&
+#    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

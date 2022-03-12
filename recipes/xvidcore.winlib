@@ -1,0 +1,97 @@
+export NAME="xvidcore"
+export STATUS=
+export URL=http://www.xvid.org/
+export BASENAME=xvidcore
+export DESCRIPTION="Xvid is an open-source research project focusing on video compression and is a collaborative development effort."
+export CATEGORY=video,codec
+export TYPE=library
+#export VERSION=1.1.3
+#export VERSION=1.2.0
+#export VERSION=1.2.1
+#export VERSION=1.2.2
+#export VERSION=1.3.0
+#export VERSIONDATE=20110224
+#export VERSION=1.3.1
+#export VERSIONDATE=20110325
+#export VERSION=1.3.2
+#export VERSIONDATE=20110531
+#export VERSION=1.3.3
+#export VERSIONDATE=20140625
+#export VERSION=1.3.4
+#export VERSIONDATE=20150622
+####64-bit: /home/ruben/mingw-w64/src/mingw-w64/mingw-w64-crt/crt/crt0_c.c:18: undefined reference to `WinMain'
+#export VERSION=1.3.5
+#export VERSIONDATE=20171212
+#export VERSION=1.3.6
+#export VERSIONDATE=20191204
+export VERSION=1.3.7
+export VERSIONDATE=20191228
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=yasm
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://www.xvid.org/Xvid-Codec.2.0.html"
+#export DOWNLOADURL="http://www.xvid.org/Downloads.43.0.html"
+export DOWNLOADURL="https://labs.xvid.com/source/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.xvid.org/downloads/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://downloads.xvid.com/downloads/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/xvidcore-$VERSION.tar.gz -C $BASENAME-$VERSION
+cd $BASENAME-$VERSION/xvidcore
+## fix build/generic/configure for 64-bit (version >= 1.3.2 <= 1.3.3)
+#patch -ulbf build/generic/configure << EOF
+#--- build/generic/configure  2012-04-03 22:02:20 +0200
+#+++ build/generic/configure  2012-04-03 22:03:16 +0200
+#@@ -3573,3 +3573,3 @@
+#                 ;;
+#-          x86_64)
+#+          x86_64*)
+#                 { \$as_echo "\$as_me:\${as_lineno-\$LINENO}: result: x86_64" >&5
+#EOF
+## fix invalid -mno-cygwin on 64-bit (version <= 1.3.4)
+#mv build/generic/configure build/generic/configure.bak
+#sed -e "s/-mno-cygwin//" build/generic/configure.bak > build/generic/configure
+## fix missing WinMain on 64-bit (version <= 1.3.4)
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) { return 0; }" >> src/xvid.c
+#fi
+# fix build/generic/configure for Windows (version >= 1.3.5)
+sed -i.bak -e "s/\(target_os=\)\$\*/\1mingw32/" build/generic/configure
+wl-showstatus configure &&
+if ( echo $RUNPLATFORM | grep -vq x86_64 ); then
+ build/generic/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM
+ #build/generic/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=i686 --disable-assembly
+else
+ build/generic/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=x86_64 --disable-assembly
+ #build/generic/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=x86_64 --disable-assembly CFLAGS="-D_MSC_VER"
+ #build/generic/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=x86_64 --disable-assembly LDFLAGS="-Wl,--as-needed -lkernel32 -lgdi32 -lshell32"
+ #build/generic/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=x86_64 --disable-assembly LDFLAGS="-Wl,--as-needed -lmingw32"
+fi &&
+ cp -f platform.inc build/generic/ &&
+ wl-showstatus build &&
+ #cp -f platform.inc build/generic/ &&
+ make -C build/generic STATIC_LIB=libxvidcore.a SHARED_LIB=xvidcore.dll PRE_SHARED_LIB=xvidcore.dll &&
+ #make -C build/generic &&
+ wl-showstatus build-install &&
+ make -C build/generic install prefix=$INSTALLPREFIX STATIC_LIB=libxvidcore.a SHARED_LIB=xvidcore.dll PRE_SHARED_LIB=xvidcore.dll &&
+ #make -C build/generic install prefix=$INSTALLPREFIX &&
+ if [ -f $INSTALLPREFIX/lib/xvidcore.dll.a ]; then
+  mv $INSTALLPREFIX/lib/xvidcore.dll.a $INSTALLPREFIX/lib/libxvidcore.dll.a
+ fi &&
+ #if [ ! -f $INSTALLPREFIX/lib/libxvidcore.dll.a ]; then
+ # #cp -f build/generic/=build/xvidcore.dll.a $INSTALLPREFIX/lib/libxvidcore.dll.a ||
+ # dlltool -d build/generic/=build/libxvidcore.def -D build/generic/=build/xvidcore.dll -l $INSTALLPREFIX/lib/libxvidcore.dll.a
+ #fi &&
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #( mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ || cp -f build/generic/=build/*.dll $INSTALLPREFIX/bin/) &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

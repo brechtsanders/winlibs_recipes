@@ -1,0 +1,75 @@
+export NAME="pesign"
+export STATUS=
+export URL=https://github.com/rhboot/pesign
+export BASENAME=pesign
+export DESCRIPTION="Signing tool for PE-COFF binaries, hopefully at least vaguely compliant with the PE and Authenticode specifications."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=0.112
+#export VERSIONDATE=20190213
+#export VERSION=113
+#export VERSIONDATE=20190511
+#export VERSION=114
+#export VERSIONDATE=20220202
+export VERSION=115
+export VERSIONDATE=20220309
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/rhboot/pesign/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rhboot/pesign/releases/download/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing loff_t in include/libdpe/libdpe.h
+sed -i.bak -e "s/loff_t/off64_t/g" include/libdpe/libdpe.h
+# fix libdpe/pe_update.c
+patch -ulbf libdpe/pe_update.c << EOF
+@@ -64,2 +64,3 @@
+
++#ifndef _WIN32
+        if (size != -1 && (st.st_mode & (S_ISUID | S_ISGID)) &&
+@@ -69,2 +70,3 @@
+        }
++#endif
+
+@@ -76,3 +78,3 @@
+
+-loff_t
++off64_t
+ pe_update(Pe *pe, Pe_Cmd cmd)
+EOF
+# fix libdpe/endian.h
+patch -ulbf libdpe/endian.h << EOF
+@@ -21,3 +21,8 @@
+
++#ifdef _WIN32
++#define __LITTLE_ENDIAN 1234
++#define __BYTE_ORDER __LITTLE_ENDIAN
++#else
+ #include <endian.h>
++#endif
+ #include <stdint.h>
+@@ -57,3 +62,7 @@
+ {
++#ifdef _WIN32
++       return __builtin_bswap32(x);
++#else
+        return __bswap_32(x);
++#endif
+ }
+EOF
+wl-showstatus build &&
+ make CC="gcc -I$MINGWPREFIX/include/mman-win32" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

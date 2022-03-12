@@ -1,0 +1,52 @@
+export NAME="FLIF"
+export STATUS=
+export URL=http://flif.info/
+export BASENAME=flif
+export DESCRIPTION="FLIF is a novel lossless image format which outperforms PNG, lossless WebP, lossless BPG, lossless JPEG2000, and lossless JPEG XR in terms of compression ratio."
+export CATEGORY=graphics,fileformat
+export TYPE=library
+#export VERSION=0.2.2
+#export VERSIONDATE=20170206
+#export VERSION=0.3
+#export VERSIONDATE=20170429
+export VERSION=0.4
+export VERSIONDATE=20211122
+wl-showstatus --package-version
+export DEPENDANCIES=sdl2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="LGPL,Apache"
+export DOWNLOADURL="https://github.com/FLIF-hub/FLIF/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/FLIF-hub/FLIF/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd FLIF-$VERSION
+# fix src/Makefile
+mv src/Makefile src/Makefile.bak &&
+sed -e "s/-o viewflif$/-lSDL2main -lSDL2 &.exe/; s/\(-Wl,\$(SONAME),\)\([^ ]*\)\(\$(LIBEXTV)\)/\1\2\3 -Wl,--out-implib,\2.dll.a/" src/Makefile.bak > src/Makefile
+cat >> src/Makefile << EOF
+libflif.a: \$(FILES_H) \$(FILES_CPP) library/*.h library/*.hpp library/*.cpp
+`printf "\\t"`ar cru libflif.a \$(FILES_CPP) library/flif-interface.cpp
+EOF
+#wl-showstatus configure &&
+#$PYDIR/python.exe configure.py --help
+wl-showstatus build-install &&
+ # fix missing .exe extention in strip commands (version >= 0.3)
+ mv src/Makefile src/Makefile.bak &&
+ sed -e "s/strip .*flif$/&.exe/" src/Makefile.bak > src/Makefile &&
+ make install CC="gcc -mavx -I$MINGWPREFIX/include/SDL2" CXX="g++ -mavx -I$MINGWPREFIX/include/SDL2" LIBEXT=._dll LIBEXTV=.dll PREFIX=$INSTALLPREFIX &&
+ make -Csrc libflif.a &&
+ rm -f $INSTALLPREFIX/lib/*._dll &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f src/*.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FLIF-$VERSION
+
+
+

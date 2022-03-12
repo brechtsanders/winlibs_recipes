@@ -1,0 +1,103 @@
+export NAME="PcapPlusPlus"
+export STATUS=
+export URL=seladb.github.io/PcapPlusPlus-Doc/
+#export URL=https://github.com/seladb/PcapPlusPlus
+export BASENAME=pcapplusplus
+export DESCRIPTION="PcapPlusPlus is a multiplatform C++ network sniffing and packet parsing and manipulation framework. It's meant to be lightweight, efficient and easy to use."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=17.02
+#export VERSIONDATE=20170330
+#export VERSION=17.11
+#export VERSIONDATE=20171106
+#export VERSION=18.08
+#export VERSIONDATE=20180807
+#export VERSION=19.04
+#export VERSIONDATE=20190402
+#export VERSION=19.12
+#export VERSIONDATE=20191204
+#export VERSION=20.08
+#export VERSIONDATE=20200825
+#export VERSION=21.05
+#export VERSIONDATE=20210519
+export VERSION=21.11
+export VERSIONDATE=20211109
+wl-showstatus --package-version
+export DEPENDANCIES=winpcap
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/seladb/PcapPlusPlus/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/seladb/PcapPlusPlus/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd PcapPlusPlus-$VERSION
+# fix 3rdParty/debug-new/debug_new.cpp
+patch -ulbf 3rdParty/debug-new/debug_new.cpp << EOF
+@@ -40,3 +40,3 @@
+ #ifndef DEBUG_NEW_HASH
+-#define DEBUG_NEW_HASH(p) (((unsigned long)(p) >> 8) % DEBUG_NEW_HASHTABLESIZE)
++#define DEBUG_NEW_HASH(p) (((uintptr_t)(p) >> 8) % DEBUG_NEW_HASHTABLESIZE)
+ #endif
+EOF
+# fix 3rdParty/MemPlumber/MemPlumber/memplumber.cpp (version >= 19.12)
+patch -ulbf 3rdParty/MemPlumber/MemPlumber/memplumber.cpp << EOF
+@@ -17 +17 @@
+-#define MEMPLUMBER_HASH(p) (((unsigned long)(p) >> 8) % MEMPLUMBER_HASHTABLE_SIZE)
++#define MEMPLUMBER_HASH(p) (((uintptr_t)(p) >> 8) % MEMPLUMBER_HASHTABLE_SIZE)
+EOF
+## fix already defined inet_ntop/inet_pton in Common++/header/IpUtils.h (version >= 21.11)
+#patch -ulbf Common++/header/IpUtils.h << EOF
+#@@ -23,3 +23,3 @@
+#
+#-#if defined(WIN32) && !defined(_MSC_VER)
+#+#if defined(WIN32) && !defined(_MSC_VER) && !defined(__MINGW32__)
+# /**
+#EOF
+## fix already defined inet_ntop/inet_pton in Common++/src/IpUtils.cpp (version >= 21.11)
+#patch -ulbf Common++/src/IpUtils.cpp << EOF
+#@@ -64,3 +64,3 @@
+#
+#-#if defined(WIN32) && !defined(_MSC_VER)
+#+#if defined(WIN32) && !defined(_MSC_VER) && !defined(__MINGW32__)
+# /* const char *
+#EOF
+# determine Windows paths
+pushd /
+MSYSDIR=$(pwd -W|tr '/' '\\')
+popd
+pushd $MINGWDIR
+MINGWDIR=$(pwd -W|tr '/' '\\')
+popd
+pushd $MINGWPREFIX/share/winpcap
+WINPCAPDIR=$(pwd -W|tr '/' '\\')
+popd
+wl-showstatus configure &&
+ sed -e "s?{{INSTALL_DIR}}?$INSTALLPREFIX?" mk/install.sh.template > mk/install.sh &&
+ #./configure-linux.sh &&
+ #$COMSPEC /C "configure-windows-mingw.bat $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo mingw-w64; else echo mingw32; fi) -m $MINGWDIR -s $MSYSDIR -w $WINPCAPDIR" &&
+ echo "configure-windows-mingw.bat $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo mingw-w64; else echo mingw32; fi) -m $MINGWDIR -s $MSYSDIR -w $WINPCAPDIR" | $COMSPEC &&
+ # fix missing -lPacket
+ sed -i.bak -e "s/-lPacket/-lpacket.dll/; s/-lpacket.dll++/-lpacket++/" mk/PcapPlusPlus.mk &&
+ # fix for Windows
+ sed -i.bak -e "s/^\(LIB_PREFIX := *\).*$/\1lib/; s/^\(LIB_EXT := *\).*$/\1.a/" mk/platform.mk &&
+ wl-showstatus build &&
+ #make PCAPPP_INCLUDES="-I$MINGWPREFIX/include -I$MINGWPREFIX/share/winpcap/include/pcap" &&
+ make CXX="g++ -fpermissive -I$MINGWPREFIX/include -I$MINGWPREFIX/share/winpcap/include/pcap" &&
+ wl-showstatus install &&
+ cd Dist &&
+ ../mk/install.sh &&
+ cd .. &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf PcapPlusPlus-$VERSION
+####TO DO: build DLLs
+
+
+

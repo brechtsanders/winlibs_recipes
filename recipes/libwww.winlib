@@ -1,0 +1,86 @@
+export NAME="libwww"
+export STATUS=
+export URL=http://www.w3.org/Library/
+export BASENAME=libwww
+export DESCRIPTION="Libwww is a highly modular, general-purpose client side Web API written in C for Unix and Windows (Win32). It's well suited for both small and large applications, like browser/editors, robots, batch tools, etc. Pluggable modules provided with libwww include complete HTTP/1.1 (with caching, pipelining, PUT, POST, Digest Authentication, deflate, etc), MySQL logging, FTP, HTML/4, XML (expat), RDF (SiRPAC), WebDAV, and much more. The purpose of libwww is to serve as a testbed for protocol experiments."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=5.4.0
+export VERSIONDATE=
+#export VERSION=5.4.1
+#export VERSIONDATE=20170106
+#export VERSION=5.4.2
+#export VERSIONDATE=20170625
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYRIGH
+export LICENSETYPE="W3C's Intellectual Property License"
+export DOWNLOADURL="http://www.w3.org/Library/Distribution/ w3c-libwww- .tgz"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.w3.org/Library/Distribution/old/w3c-libwww-$VERSION.tgz
+#export DOWNLOADSOURCEURL=http://www.w3.org/Library/Distribution/w3c-libwww-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/w3c-libwww-$VERSION.tgz
+cd w3c-libwww-$VERSION
+# fix LineMode/src/HTBrowse.c (error: lvalue required as left operand of assignment)
+patch -ulbf LineMode/src/HTBrowse.c << EOF
+--- LineMode/src/HTBrowse.c  2000-07-28 12:09:48 +0200
++++ LineMode/src/HTBrowse.c  2011-08-24 22:34:12 +0200
+@@ -1234,4 +1234,6 @@
+        } else if (CHECK_INPUT("VERBOSE", token)) {  /* Switch verbose mode  */
++#ifndef __MINGW32__
+            WWWTRACE = WWWTRACE ? 0 : lm->trace;
+            OutputData(lm->pView, "\\n  Verbose mode %s.\\n", WWWTRACE ? "ON":"OFF");
++#endif
+        } else if (CHECK_INPUT("VERSION", token)) {               /* Version */
+EOF
+# fix missing _PC_NAME_MAX in Library/src/HTFile.c (version >= 5.4.2)
+mv Library/src/HTFile.c Library/src/HTFile.c.bak &&
+echo "#define NAME_MAX 255" > Library/src/HTFile.c &&
+cat Library/src/HTFile.c.bak >> Library/src/HTFile.c
+## fix missing ../../../libwww (version >= 5.4.1)
+#mv ./modules/md5/.deps/md5.Plo ./modules/md5/.deps/md5.Plo.bak &&
+#sed -e "s?../../../libwww/?$(pwd)/?g" ./modules/md5/.deps/md5.Plo.bak > ./modules/md5/.deps/md5.Plo
+## fix duplicate installation of HTBind.h (version = 5.4.1)
+#patch -ulbf Library/src/Makefile.in << EOF
+#@@ -916,3 +916,2 @@
+#        HTBind.h \\
+#-       HTBind.h \\
+#        HTBound.h \\
+#EOF
+# don't strip when installing to fix issue with installation of the libwww-config script
+sed -i.bak -e "s/AM_INSTALL_PROGRAM_FLAGS=-s//" $(grep -l "AM_INSTALL_PROGRAM_FLAGS=-s" $(find -name Makefile.in))
+wl-showstatus configure &&
+ ## fix building DLLs
+ #autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+ ####aclocal: macro `_LT_DECL_SED' required but not defined
+ ####aclocal: macro `_LT_FUNC_STRIPNAME_CNF' required but not defined
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ ##sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pei?-i386|pei?-x86-64/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\).*\(\"\)/\1pass_all\2\nhardcode_into_libs=yes/" libtool &&
+ #wl-showstatus build &&
+ #make -j1 &&
+ #make -j1 top_srcdir="$(pwd)" &&
+ make top_srcdir="$(pwd)" &&
+ wl-showstatus build-install &&
+ #( make install || make -i install-strip ) &&
+ make install &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ # fix absolute path in libwww-config
+ sed -i -e "s?^\(prefix=\)$\1INSTALLPREFIX?\$(realpath \$(dirname \$0)/..)?" $INSTALLPREFIX/bin/libwww-config &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf w3c-libwww-$VERSION
+####To do: build DLLs
+####head modules/expat/xmltok/.libs/libxmltok-0.dll-def
+
+
+

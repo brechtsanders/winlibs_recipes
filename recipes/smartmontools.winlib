@@ -1,0 +1,158 @@
+export NAME="smartmontools"
+export STATUS=
+export URL=http://smartmontools.sourceforge.net/
+export BASENAME=smartmontools
+export DESCRIPTION="The smartmontools package contains two utility programs (smartctl and smartd) to control and monitor storage systems using the Self-Monitoring, Analysis and Reporting Technology System (SMART) built into most modern ATA and SCSI harddisks. In many cases, these utilities will provide advanced warning of disk degradation and failure."
+export CATEGORY=hardware
+export TYPE=application
+#export VERSION=5.39
+#export VERSIONDATE=20091210
+#export VERSION=5.39.1
+#export VERSIONDATE=20100129
+#export VERSION=5.40
+#export VERSIONDATE=20101017
+#export VERSION=5.41
+#export VERSIONDATE=20110610
+####D:/Prog/MinGW-mSys.newer/home/win32/smartmontools-5.40/smartmontools-5.40.win32/'in/drivedb.h(1984): Syntax error, invalid char '
+#export VERSION=5.42
+#export VERSIONDATE=20111021
+#export VERSION=5.43
+#export VERSIONDATE=20120630
+#export VERSION=6.0
+#export VERSIONDATE=20121010
+#export VERSION=6.1
+#export VERSIONDATE=20130316
+####':/Prog/MinGW-mSys/mingw32/bin/drivedb.h(2652): Syntax error, invalid char '
+#export VERSION=6.2
+#export VERSIONDATE=20130727
+#export VERSION=6.3
+#export VERSIONDATE=20140726
+#export VERSION=6.4
+#export VERSIONDATE=20150605
+#export VERSION=6.5
+#export VERSIONDATE=20160507
+#export VERSION=6.6
+#export VERSIONDATE=20171106
+#export VERSION=7.0
+#export VERSIONDATE=20181230
+#export VERSION=7.1
+#export VERSIONDATE=20191230
+#export VERSION=7.2
+#export VERSIONDATE=20201231
+export VERSION=7.3
+export VERSIONDATE=20220301
+####os_win32/daemon_win32.cpp:1014:7: error: 'SERVICE_DELAYED_AUTO_START_INFO' was not declared in this scope
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=zip
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+export DOWNLOADURL="http://sourceforge.net/projects/smartmontools/files/smartmontools/ smartmontools-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://dl.sourceforge.net/sourceforge/smartmontools/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/smartmontools/smartmontools/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix syslog problem (version <= 5.38)
+#mv smartd.cpp smartd.cpp.bak
+#sed -e "s?^#include <syslog.h>?#include <os_win32/syslog.h>?" smartd.cpp.bak > smartd.cpp
+# fix regex problems
+mkdir posix/bak
+mv posix/regex* posix/bak/
+touch posix/regcomp.c posix/regex.c posix/regex_internal.c posix/regexec.c
+#cp $MINGWPREFIX/include/regex.h posix/
+cp $MINGWPREFIX/include/pcreposix.h posix/regex.h
+# fix os_win32.cpp for 64-bit
+patch -ulbf os_win32.cpp << EOF
+--- os_win32.cpp  2009-12-09 21:57:14 +0100
++++ os_win32.cpp  2012-01-26 23:01:08 +0100
+@@ -3079,3 +3079,3 @@
+         pout("WaitForSingleObject(%lx) = 0x%lx,%ld, Error=%ld\n",
+-          (unsigned long)event, rc, rc, GetLastError());
++          (unsigned long)(intptr_t)event, rc, rc, GetLastError());
+       }
+EOF
+# fix missing WTS_CONNECTSTATE_CLASS/WTS_INFO_CLASS (version >= 6.0)
+mv os_win32/wtssendmsg.cpp os_win32/wtssendmsg.cpp.bak
+sed -e "s/^\(#define WINVER \)0x0500/\10x0501/" os_win32/wtssendmsg.cpp.bak > os_win32/wtssendmsg.cpp
+## fix missing SERVICE_DELAYED_AUTO_START_INFO in os_win32/daemon_win32.cpp (version >= 6.1)
+#patch -ulbf os_win32/daemon_win32.cpp << EOF
+#--- os_win32/daemon_win32.cpp  2013-01-30 19:43:40 +0100
+#+++ os_win32/daemon_win32.cpp  2013-03-16 20:55:18 +0100
+#@@ -39,2 +39,5 @@
+# #define SERVICE_CONFIG_DELAYED_AUTO_START_INFO 3
+#+typedef struct _SERVICE_DELAYED_AUTO_START_INFO {
+#+  BOOL fDelayedAutostart;
+#+} SERVICE_DELAYED_AUTO_START_INFO, *LPSERVICE_DELAYED_AUTO_START_INFO;
+# #endif
+#EOF
+# fix missing WTSActive/WTSConnected in os_win32/wtssendmsg.c (version >= 6.1)
+mv os_win32/wtssendmsg.c os_win32/wtssendmsg.c.bak
+sed -e "s/0x0500/0x0501/" os_win32/wtssendmsg.c.bak > os_win32/wtssendmsg.c
+# fix redefinition of READ_THRESHOLDS in atacmds.h (version >= 6.4)
+mv atacmds.h atacmds.h.bak
+cat > atacmds.h << EOF
+#include <windows.h>
+#include <winioctl.h>
+#define READ_THRESHOLDS SMRT_READ_THRESHOLDS
+EOF
+cat atacmds.h.bak >> atacmds.h
+# disable stack protector (version >= 7.2)
+#sed -i.bak -e 's/ "-fstack-protector-strong"//' configure
+sed -i.bak -e 's/ "-fstack-protector-strong" "-fstack-protector"//' configure
+ wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libgcc" LIBS="-lpcreposix" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" LIBS="-lpcreposix" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" LIBS="-Wl,--as-needed -lpcreposix -lssp" &&
+ (
+patch -ulbf Makefile << EOF
+--- Makefile  Thu Dec 10 14:27:10 2009
++++ Makefile  Thu Dec 10 14:39:16 2009
+@@ -1694,14 +1694,3 @@
+-# The script below changes the word at offset 220 (Subsystem) from 3
+-# (Console) to 2 (GUI) in a copy of smartctl.exe.
+-# This will be changed when a tool (like 'editbin') is available in
+-# the Cygwin distribution
+-smartctl-nc.exe: smartctl.exe
+-       @rm -f \$@
+-       cp -p smartctl.exe \$@.tmp
+-       @if test \`od -A n -j 220 -N 2 -d \$@.tmp\` -eq 3; then :; \\
+-         else echo "invalid EXE header"; exit 1; fi
+-       @echo "editbin /subsystem:windows \$@.tmp"
+-       @echo -ne '\\002' | dd bs=1 seek=220 count=1 conv=notrunc of=\$@.tmp 2>/dev/null
+-       @if test \`od -A n -j 220 -N 2 -d \$@.tmp\` -eq 2; then :; \\
+-         else echo "EXE patch failed"; exit 1; fi
+-       mv -f \$@.tmp \$@
++smartctl-nc\$(EXEEXT): \$(smartctl_OBJECTS) \$(smartctl_DEPENDENCIES) 
++`printf "\\t"`@rm -f smartctl\$(EXEEXT)
++`printf "\\t"`\$(CXXLINK) -mwindows \$(smartctl_OBJECTS) \$(smartctl_LDADD) \$(LIBS)
+EOF
+ ) &&
+ # avoid sha1sum and sha256sum
+ mv Makefile Makefile.bak &&
+ sed -e "s/sha1sum\|sha256sum/echo UNAVAILABLE/g" Makefile.bak > Makefile &&
+ # fix groff hanging on input
+ mv Makefile Makefile.bak2 &&
+ sed -e "s/\(MAN2[A-Z]* *= *\)\(groff.*\)/\1\2 </" Makefile.bak2 > Makefile &&
+ # fix missing folder (version = 5.41)
+ #mkdir -p smartmontools-5.41.win32/doc &&
+ #make install-strip &&
+ #( make -j1 dist-win32 || make -j1 dist-win32 UNIX2DOS="unix2dos -ascii" || make -j1 dist-win32 UNIX2DOS="cat" ) &&
+ ( make -j1 dist-win32 MAN2HTML=true || make -j1 dist-win32 UNIX2DOS="unix2dos -ascii" MAN2HTML=true || make -j1 dist-win32 UNIX2DOS="cat" MAN2HTML=true || make -j1 MAN2PDF= ) &&
+ ( smartmontools-$VERSION.win*/bin/smartctl.exe -i -lscttempsts sda -d ata || true ) &&
+ mkdir -p $INSTALLPREFIX/ &&
+ rm -rf smartmontools-$VERSION.win*/doc &&
+ cp -rfp smartmontools-$VERSION.win*/* $INSTALLPREFIX/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####os_win32/wtssendmsg.cpp:57:34: error: '_WTSSendMessageA' was not declared in this scope -> in include/wtsapi32.h make sure WINAPI is specified in: BOOL WINAPI WTSSendMessageA
+#mv $MINGWDIR/include/wtsapi32.h $MINGWDIR/include/wtsapi32.h.bak
+#sed -e "s/^\(BOOL\) \(WTSSendMessage\)/\1 WINAPI \2/" $MINGWDIR/include/wtsapi32.h.bak > $MINGWDIR/include/wtsapi32.h
+#smartctl --scan
+#smartctl -a /dev/sda
+
+
+

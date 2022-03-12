@@ -1,0 +1,129 @@
+export NAME="PortableXDR"
+export STATUS=
+#export URL=http://et.redhat.com/~rjones/portablexdr/
+export URL=http://people.redhat.com/~rjones/portablexdr/
+export BASENAME=portablexdr
+export DESCRIPTION="PortableXDR - external data representation (XDR) library. Portable XDR is an XDR (RFC 4506) library for Windows and Mac OS X."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=4.0.7
+#export VERSION=4.0.8
+#export VERSION=4.0.10
+#export VERSION=4.0.11
+export VERSION=4.9.1
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LIB
+export LICENSETYPE="BSD-like (portions LGPLv2+)"
+#export DOWNLOADURL="http://et.redhat.com/~rjones/portablexdr/files/"
+export DOWNLOADURL="http://people.redhat.com/~rjones/portablexdr/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://et.redhat.com/~rjones/portablexdr/files/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://people.redhat.com/~rjones/portablexdr/files/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# remove config.h from rpc/rpc.h
+mv rpc/rpc.h rpc/rpc.h.bak
+grep -v "^#include \"config.h\"$" rpc/rpc.h.bak > rpc/rpc.h
+# fix for 64-bit
+patch -ulbf xdr_mem.c << EOF
+--- xdr_mem.c  2009-01-12 16:55:24 +0100
++++ xdr_mem.c  2011-09-14 08:27:30 +0200
+@@ -54,2 +54,5 @@
+ #include <rpc/xdr.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#endif
+
+@@ -171,3 +174,3 @@
+
+-       if ((long)newaddr > (long)lastaddr)
++       if ((intptr_t)newaddr > (intptr_t)lastaddr)
+                return (FALSE);
+EOF
+patch -ulbf xdr_rec.c << EOF
+--- xdr_rec.c  2009-01-12 16:55:24 +0100
++++ xdr_rec.c  2011-09-14 08:30:18 +0200
+@@ -62,2 +62,5 @@
+ #include <rpc/xdr.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#endif
+
+@@ -175,3 +178,3 @@
+        for (rstrm->out_base = rstrm->the_buffer;
+-            (long) rstrm->out_base % BYTES_PER_XDR_UNIT != 0;
++            (intptr_t) rstrm->out_base % BYTES_PER_XDR_UNIT != 0;
+                rstrm->out_base++);
+@@ -474,4 +477,4 @@
+        if (sendnow || rstrm->frag_sent ||
+-               ((u_long)rstrm->out_finger + sizeof(u_long) >=
+-               (u_long)rstrm->out_boundry)) {
++               ((intptr_t)rstrm->out_finger + sizeof(u_long) >=
++               (intptr_t)rstrm->out_boundry)) {
+                rstrm->frag_sent = FALSE;
+@@ -479,3 +482,3 @@
+        }
+-       len = (u_long)(rstrm->out_finger) - (u_long)(rstrm->frag_header) -
++       len = (intptr_t)(rstrm->out_finger) - (intptr_t)(rstrm->frag_header) -
+           sizeof(u_long);
+@@ -497,7 +500,7 @@
+        register u_long eormask = (eor == TRUE) ? LAST_FRAG : 0;
+-       register u_long len = (u_long)(rstrm->out_finger) -
+-               (u_long)(rstrm->frag_header) - sizeof(u_long);
++       register u_long len = (intptr_t)(rstrm->out_finger) -
++               (intptr_t)(rstrm->frag_header) - sizeof(u_long);
+
+        *(rstrm->frag_header) = htonl(len | eormask);
+-       len = (u_long)(rstrm->out_finger) - (u_long)(rstrm->out_base);
++       len = (intptr_t)(rstrm->out_finger) - (intptr_t)(rstrm->out_base);
+        if ((*(rstrm->writeit))(rstrm->tcp_handle, rstrm->out_base, (int)len)
+@@ -519,3 +522,3 @@
+        where = rstrm->in_base;
+-       i = (long) rstrm->in_boundry % BYTES_PER_XDR_UNIT;
++       i = (intptr_t) rstrm->in_boundry % BYTES_PER_XDR_UNIT;
+        where += i;
+EOF
+patch -ulbf xdr_stdio.c << EOF
+--- xdr_stdio.c  2009-01-12 16:55:24 +0100
++++ xdr_stdio.c 2011-09-14 20:25:58 +0200
+@@ -53,2 +53,5 @@
+ #include <rpc/xdr.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#endif
+EOF
+#mkdir $INSTALLPREFIX/include/
+#cp -rfp rpc $INSTALLPREFIX/include/
+# fix NULL output_filename when writing to stdout in rpcgen_main.c (version >= 4.9.1)
+patch -ulbf rpcgen_main.c << EOF
+@@ -186,3 +186,3 @@
+   if (out && strcmp (out, "-") == 0) {
+-    output_filename = NULL;
++    output_filename = "stdout";
+     unlink_output_filename = 0;
+EOF
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -lwsock32" && make install
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -lws2_32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lws2_32" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" &&
+ echo "#define HAVE_NTOHL" >> config.h &&
+ echo "#define HAVE_NTOHS" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ cp $INSTALLPREFIX/lib/libportablexdr.la $INSTALLPREFIX/lib/libxdr.la &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

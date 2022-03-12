@@ -1,0 +1,125 @@
+export NAME="GDB"
+export STATUS=
+export URL=https://www.gnu.org/software/gdb/
+export BASENAME=gdb
+export DESCRIPTION="GDB, the GNU Project debugger, allows you to see what is going on 'inside' another program while it executes -- or what another program was doing at the moment it crashed."
+export CATEGORY=debugging
+export TYPE=application
+#export VERSION=8.2.1
+#export VERSIONDATE=20190324
+#export VERSION=8.3
+#export VERSIONDATE=20190512
+#export VERSION=8.3.1
+#export VERSIONDATE=20190922
+#export VERSION=9.1
+#export VERSIONDATE=20200209
+#export VERSION=9.2
+#export VERSIONDATE=20200524
+#export VERSION=10.1
+#export VERSIONDATE=20201024
+#export VERSION=10.2
+#export VERSIONDATE=20210425
+#export VERSION=11.1
+#export VERSIONDATE=20210913
+export VERSION=11.2
+export VERSIONDATE=20220116
+wl-showstatus --package-version
+#export DEPENDANCIES=zlib,xz,expat,libiconv,mpfr,pthreads,termcap
+#export DEPENDANCIES=zlib,xz,expat,libiconv,mpfr,pthreads,ncurses
+#export DEPENDANCIES=zlib,xz,expat,libiconv,mpfr,pthreads,ncurses,src-highlite
+#export DEPENDANCIES=zlib,xz,mman-win32,expat,libiconv,mpfr,pthreads,ncurses,src-highlite
+#export DEPENDANCIES=zlib,xz,mman-win32,expat,libiconv,mpfr,mpc,isl,pthreads,ncurses,src-highlite,xxhash
+export DEPENDANCIES=zlib,xz,mman-win32,expat,libiconv,mpfr,mpc,isl,pthreads,ncurses,src-highlite,xxhash,cpython-mingw
+#export DEPENDANCIES=zlib,xz,mman-win32,expat,libiconv,mpfr,mpc,isl,pthreads,ncurses,src-highlite,xxhash,cpython-mingw,tcl,tk
+export OPTIONALDEPENDANCIES=babeltrace
+#export OPTIONALDEPENDANCIES=babeltrace,libipt
+export BUILDDEPENDANCIES=texinfo
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://ftp.gnu.org/gnu/gdb/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/gdb/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## fix missing log2 in gdb/dwarf-index-write.c (version >= 8.3)
+#sed -i.bak -e "s/std::\(log2\)/\1/" gdb/dwarf-index-write.c
+# fix backspace issue in readline/readline/terminal.c (version >= 9.2)
+####See also: http://sourceware-org.1504.n7.nabble.com/readline-mingw-backspace-key-and-TUI-size-td37213.html
+patch -ulbf readline/readline/terminal.c << EOF
+@@ -655,3 +655,3 @@
+
+-#ifndef __MSDOS__
++#if !defined (__MSDOS__) && !defined (__MINGW32__)
+   if (_rl_term_backspace)
+EOF
+# manually create initialization script (version >= 11.1)
+cat > gdbinit << EOF
+python
+import sys
+import os
+sys.path.insert(0, os.path.join(sys.prefix, "share", "gcc-$(PATH=$MINGWPREFIX/share/gcc/bin:$PATH gcc --version|sed -n -e "s/^gcc.* \([0-9]*\.[0-9]*\.[0-9]*\)[ 0-9]*$/\1/p")", "python"))
+from libstdcxx.v6.printers import register_libstdcxx_printers
+register_libstdcxx_printers(None)
+end
+EOF
+# fix error when --with-pkgversion value contains a comma
+sed -i.bak -e 's/\(-e "s\),\([^,]*\),\([^,]*\),/\1?\2?\3?/' bfd/Makefile.in
+# fix missing install-strip target
+grep -q "install-strip:" readline/Makefile.in || echo "install-strip: install" >> readline/Makefile.in
+grep -q "install-strip:" sim/Makefile.in || echo "install-strip: install" >> sim/Makefile.in
+# fix missing libraries (version >= 10.2)
+sed -i.bak -e "s/^LIBXXHASH = /&-Wl,--as-needed -lbcrypt -lmman /" gdb/Makefile.in
+# fix detection of Tk (version >= 11.1)
+sed -i.bak2 "s/as_fn_error\(.*could not find Tk private headers\)/echo\1/" gdb/configure
+## avoid -fPIC (useless on Windows and not supported by clang)
+#sed -i.bak3 -e "s/-fPIC//" $(grep -l "\-fPIC" $(find -name configure))
+mkdir -p build &&
+ wl-showstatus configure &&
+ cd build &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,tui,gdbtk} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma} --with-system-zlib --without-{python,guile,tcl,tk,x} CFLAGS="-D__USE_MINGW_ANSI_STDIO=1" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,tui,gdbtk} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma} --with-system-zlib --without-{python,guile,tcl,tk,x} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-zlib CFLAGS="-D__USE_MINGW_ANSI_STDIO=1" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui} --enable-{64-bit-bfd,curses} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma} --with-system-zlib --without-{python,guile,tcl,tk,x} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-zlib CFLAGS="-D__USE_MINGW_ANSI_STDIO=1" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui} --enable-{64-bit-bfd,curses} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma} --with-system-zlib --without-{python,guile,tcl,tk,x} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-zlib --disable-source-highlight CFLAGS="-D__USE_MINGW_ANSI_STDIO=1" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests} --enable-{64-bit-bfd,curses,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses} --with-system-zlib --without-{python,guile,tcl,tk,x} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-{zlib,readline} --with-included-regex --disable-source-highlight CFLAGS="-D__USE_MINGW_ANSI_STDIO=1 -D_FORTIFY_SOURCE=0" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests} --enable-{64-bit-bfd,curses,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses} --with-system-zlib --without-{python,guile,tcl,tk,x} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-{zlib,readline} --with-included-regex --enable-source-highlight --without-intel-pt CFLAGS="-D__USE_MINGW_ANSI_STDIO=1 -D_FORTIFY_SOURCE=0" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests} --enable-{64-bit-bfd,curses,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses} --with-system-zlib --without-{python,guile,tcl,tk,x} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-{zlib,readline} --with-included-regex --enable-source-highlight --without-intel-pt --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests} --enable-{64-bit-bfd,curses,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,tcl,tk} --with-system-zlib --without-{guile,x,python} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-{zlib,readline} --with-included-regex --enable-source-highlight --without-intel-pt --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests} --enable-{64-bit-bfd,curses,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,tcl,tk} --with-system-zlib --without-{guile,x,python} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-system-{zlib,readline} --with-included-regex --enable-source-highlight --without-intel-pt --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/ncurses -I$MINGWPREFIX/include/ncursesw" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests} --enable-{64-bit-bfd,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,tcl,tk,xxhash} --with-system-{zlib,readline} --without-{guile,x,python} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-included-regex --enable-source-highlight --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests} --enable-{64-bit-bfd,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,tcl,tk,xxhash} --with-system-zlib --without-system-readline --without-{guile,x,python} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-included-regex --enable-source-highlight --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,tui,unit-tests,isl-version-check} --enable-{64-bit-bfd,gdbserver} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,tcl,tk,xxhash} --with-system-zlib --without-system-readline --without-{guile,x,python} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-included-regex --enable-source-highlight --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,gtk,unit-tests} --enable-{64-bit-bfd,gdbserver,tui} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,xxhash} --with-{tcl,tk}=$MINGWPREFIX/bin --with-system-zlib --without-system-readline --without-{guile,x,python} --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-included-regex --enable-source-highlight --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lmman" &&
+ #../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,gtk,unit-tests} --enable-{64-bit-bfd,gdbserver,tui} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,xxhash} --with-{tcl,tk}=$MINGWPREFIX/bin --with-system-zlib --without-system-readline --without-{guile,x} --with-python=$MINGWPREFIX/share/python/bin/python3.exe --with-python-libdir=$MINGWPREFIX/share/python/lib --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-included-regex --enable-source-highlight --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined -L$MINGWPREFIX/share/python/lib" LIBS="-Wl,--as-needed -lmman" &&
+ ../configure --prefix=$INSTALLPREFIX/share/gdb --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pkgversion="GDB for MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi), built by Brecht Sanders" --enable-serial-configure --disable-bootstrap --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --disable-{nls,win32-registry,rpath,gdbtk,gtk,unit-tests} --enable-{64-bit-bfd,gdbserver,tui} --enable-64-bit-bfd --with-{expat,libiconv,zlib,lzma,curses,xxhash} --with-{tcl,tk}=$MINGWPREFIX/bin --with-system-gdbinit="$INSTALLPREFIX/share/gdb/share/gdb/gdbinit" --with-system-zlib --without-system-readline --without-{guile,x} --with-python=$MINGWPREFIX/share/python/bin/python3.exe --with-python-libdir=$MINGWPREFIX/share/python/lib --enable-compressed-debug-sections=all --enable-host-shared --with-lzma --with-included-regex --enable-source-highlight --with-mmap CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined -L$MINGWPREFIX/share/python/lib" LIBS="-Wl,--as-needed -lmman" &&
+ #$(if which libipt.dll &> /dev/null; then echo "--with-intel-pt"; fi) 
+ #--enable-{gtk,gdbtk} 
+ ####WARNING: --with-python causes gdb.exe to depend on python*.dll
+ cd .. &&
+ #make -Cbuild configure-host configure-target &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" build/*/libtool &&
+ wl-showstatus build &&
+ #( make -Cbuild || make -Cbuild MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) &&
+ #( make -Cbuild || make -Cbuild LOADLIBES="-Wl,--as-needed -lssp" GDBSERVER_LIBS="-Wl,--as-needed -lssp" || (( make -Cbuild -Cgdb LOADLIBES="-Wl,--as-needed -lssp" GDBSERVER_LIBS="-Wl,--as-needed -lssp" || make -Cbuild -Cgdb/gdbserver GDBSERVER_LIBS="-Wl,--as-needed -lssp" ) && make -Cbuild ) || make -Cbuild MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) &&
+ #( make -Cbuild || make -Cbuild LOADLIBES="-Wl,--as-needed -lssp -lmman" GDBSERVER_LIBS="-Wl,--as-needed -lssp -lmman" || (( make -Cbuild -Cgdb LOADLIBES="-Wl,--as-needed -lssp -lmman" GDBSERVER_LIBS="-Wl,--as-needed -lssp -lmman" || make -Cbuild -Cgdb/gdbserver GDBSERVER_LIBS="-Wl,--as-needed -lssp" ) && make -Cbuild ) || make -Cbuild MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) &&
+ ( make -Cbuild || make -Cbuild LOADLIBES="-Wl,--as-needed -lssp -lmman -ldl" GDBSERVER_LIBS="-Wl,--as-needed -lssp -lmman -ldl" || (( make -Cbuild -Cgdb LOADLIBES="-Wl,--as-needed -lssp -lmman -ldl" GDBSERVER_LIBS="-Wl,--as-needed -lssp -lmman -ldl" || make -Cbuild -Cgdb/gdbserver GDBSERVER_LIBS="-Wl,--as-needed -lssp -ldl" ) && make -Cbuild ) || make -Cbuild MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) &&
+ #( make -Cbuild TK_INCLUDE_SPEC="-I$MINGWPREFIX/include" || make -Cbuild TK_INCLUDE_SPEC="-I$MINGWPREFIX/include" LOADLIBES="-Wl,--as-needed -lssp -lmman -ldl" GDBSERVER_LIBS="-Wl,--as-needed -lssp -lmman -ldl" || (( make -Cbuild -Cgdb LOADLIBES="-Wl,--as-needed -lssp -lmman -ldl" GDBSERVER_LIBS="-Wl,--as-needed -lssp -lmman -ldl" || make -Cbuild -Cgdb/gdbserver GDBSERVER_LIBS="-Wl,--as-needed -lssp -ldl" ) && make -Cbuild ) || make -Cbuild MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) &&
+ wl-showstatus build-install &&
+ ( make -Cbuild install-strip || (( make -Cbuild install || make -Cbuild install MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) && make -Cbuild -Cgdb install-strip )) &&
+ rm -rf $MINGWPREFIX/share/gdb/auto-load &&
+ # manually copy initialization script (version >= 11.1)
+ cp -f gdbinit $INSTALLPREFIX/share/gdb/share/gdb/ &&
+ # remove .la files
+ rm -f $(find $INSTALLPREFIX -name '*.la') &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####make -Cgdb LOADLIBES="-Wl,--as-needed -lssp" && echo OK
+####make -Cgdb/gdbserver GDBSERVER_LIBS="-Wl,--as-needed -lssp" && echo OK
+####gdb --configuration
+####TO DO: fix https://github.com/brechtsanders/winlibs_mingw/issues/32 by looking at USERPROFILE if HOME environment variable is not set
+
+
+

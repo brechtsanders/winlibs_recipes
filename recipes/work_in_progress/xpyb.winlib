@@ -1,0 +1,52 @@
+export NAME="xpyb"
+export STATUS=
+export URL=http://cgit.freedesktop.org/xcb/xpyb/
+export BASENAME=xpyb
+export DESCRIPTION="X Python Binding, based on the X C Binding (XCB) library"
+export CATEGORY=x
+export TYPE=library
+export VERSION=1.3.1
+export VERSIONDATE=20131113
+wl-showstatus --package-version
+export DEPENDANCIES=xcbproto,xcb
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="public domain"
+export DOWNLOADURL="http://xcb.freedesktop.org/dist/"
+#export DOWNLOADURL="https://gitlab.freedesktop.org/xorg/lib/xpyb/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://xcb.freedesktop.org/dist/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://gitlab.freedesktop.org/xorg/lib/xpyb/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix src/py_client.py for 64-bit
+patch -ulbf src/py_client.py << EOF
+--- src/py_client.py  2012-03-23 22:24:40 +0100
++++ src/py_client.py  2013-11-13 11:55:06 +0100
+@@ -21,2 +21,3 @@
+                    'INT32':  'i', 'int32_t': 'i',
++                   'INT64':  'i', 'int64_t': 'i',
+                    'BYTE': 'B',
+EOF
+## workaround for linking with python*.dll
+#mkdir -p winfix
+#for F in $PYDIR/python[0-9]*.dll; do
+#  dlltool -D $F -d $PYDIR/Libs/$(basename $F|sed -e "s/dll$/def/") -l winfix/lib$(basename $F).a
+#  dlltool -D $F -d $PYDIR/Libs/$(basename $F|sed -e "s/dll$/def/") -l winfix/lib$(basename $F|sed -e "s/dll$/a/")
+#done
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared PYTHON=$PYDIR/python.exe CFLAGS="-I$PYDIR/include$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo -n " -DMS_WIN64"; fi)" LDFLAGS="-Wl,--as-needed -L$(pwd)/winfix -L$PYDIR/libs -l`basename $PYDIR/libs/libpython[0-9.]*.a|sed -e "s/^lib\(.*\)\.a$/\1/"`" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared PYTHON=$PYDIR/python.exe CFLAGS="-I$PYDIR/include$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo -n " -DMS_WIN64"; fi)" LDFLAGS="-Wl,--as-needed -L$PYDIR/libs -l`basename $PYDIR/libs/libpython[0-9.]*.a|sed -e "s/^lib\(.*\)\.a$/\1/"`" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared PYTHON=$PY2DIR/python.exe CFLAGS="-I$PY2DIR/include$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo -n " -DMS_WIN64"; fi)" LDFLAGS="-Wl,--as-needed -L$PY2DIR/libs -l$(basename $(ls -1 $PY2DIR/libs/libpython[0-9.]*.a|tail -n1)|sed -e "s/^lib\(.*\)\(\.dll\)*\.a$/\1/")" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ PATH=$PY2DIR:$PATH PYTHONPATH=$MINGWPREFIX/python/lib/site-packages:$PYTHONPATH make install-strip XCBPROTO_XCBPYTHONDIR=$MINGWPREFIX/python/lib/site-packages pyexecdir=$INSTALLPREFIX/python/Lib/site-packages pythondir=$INSTALLPREFIX/python/Lib/site-packages &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

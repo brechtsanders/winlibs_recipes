@@ -1,0 +1,86 @@
+export NAME="lxml"
+export STATUS=
+export URL=https://lxml.de/
+export BASENAME=lxml
+export DESCRIPTION="The lxml XML toolkit for Python"
+export CATEGORY=
+export TYPE=library
+#export VERSION=4.6.3
+#export VERSIONDATE=20210929
+#export VERSION=4.7.0
+#export VERSIONDATE=20211213
+#export VERSION=4.7.1
+#export VERSIONDATE=20211213
+export VERSION=4.8.0
+export VERSIONDATE=20220217
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2,libxslt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://lxml.de/"
+#export DOWNLOADURL="https://lxml.de/files/"
+export DOWNLOADURL="https://github.com/lxml/lxml/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/lxml/lxml/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://lxml.de/files/$BASENAME-$VERSION.tgz
+export DOWNLOADSOURCEURL=https://github.com/lxml/lxml/releases/download/lxml-$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd lxml-lxml-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+mkdir -p $INSTALLPREFIX/python/Lib/site-packages
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+patch -ulbf winfix/distutils/ccompiler.py << EOF
+@@ -931,3 +931,3 @@
+     ('posix', 'unix'),
+-    ('nt', 'msvc'),
++    ('nt', 'mingw32'),
+
+EOF
+cp -rf $PYDIR/Lib/site-packages/setuptools winfix/
+patch -ulbf winfix/setuptools/monkey.py << EOF
+@@ -136,2 +136,3 @@
+     """
++    return
+     # import late to avoid circular imports on Python < 3.5
+EOF
+# fix issue with pointer size in src/lxml/etree.c (version >= 4.6.3)
+patch -ulbf src/lxml/etree.c << EOF
+@@ -292,5 +292,2 @@
+   #undef MASK
+-  #ifdef SIZEOF_VOID_P
+-    enum { __pyx_check_sizeof_voidp = 1 / (int)(SIZEOF_VOID_P == sizeof(void*)) };
+-  #endif
+ #endif
+EOF
+# fix setup.py (version >= 4.6.3)
+####TypeError: 'NoneType' object is not iterable
+patch -ulbf setup.py << EOF
+@@ -153,3 +153,3 @@
+                     STATIC_CFLAGS, STATIC_BINARIES)
+-    extra_opts['ext_modules'] = ext_modules
++#    extra_opts['ext_modules'] = ext_modules
+
+EOF
+wl-showstatus build-install &&
+ PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe PYTHONPATH=$(pwd)/winfix:$PYTHONPATH:$MINGWPREFIX/python/Lib/site-packages:$INSTALLPREFIX/python:$PYDIR/Lib/site-packages:$INSTALLPREFIX/python/Lib/site-packages $PYDIR/python.exe setup.py --without-cython install --prefix=$(cygpath -w $INSTALLPREFIX/python) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

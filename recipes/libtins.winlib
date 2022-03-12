@@ -1,0 +1,92 @@
+export NAME="libtins"
+export STATUS=
+export URL=https://libtins.github.io/
+export BASENAME=libtins
+export DESCRIPTION="libtins is a high-level, multiplatform C++ network packet sniffing and crafting library. Its main purpose is to provide the C++ developer an easy, efficient, platform and endianess-independent way to create tools which need to send, receive and manipulate network packets."
+export CATEGORY=network,communication
+export TYPE=library
+#export VERSION=3.3
+#export VERSIONDATE=20160220
+#export VERSION=3.4
+#export VERSIONDATE=20160404
+####/include/pcap/bpf.h:68:9: error: 'u_int' does not name a type
+#export VERSION=3.5
+#export VERSIONDATE=20170402
+#export VERSION=4.0
+#export VERSIONDATE=20171104
+#export VERSION=4.1
+#export VERSIONDATE=20181211
+#export VERSION=4.2
+#export VERSIONDATE=20190308
+#export VERSION=4.3
+#export VERSIONDATE=20200918
+export VERSION=4.4
+export VERSIONDATE=20220218
+wl-showstatus --package-version
+#export DEPENDANCIES=openssl,winpcap
+export DEPENDANCIES=openssl,libpcap
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/mfontanini/libtins/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mfontanini/libtins/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing InetPtonA in src/ip_address.cpp
+mv src/ip_address.cpp src/ip_address.cpp.bak
+echo "#define _WIN32_WINNT 0x0600" > src/ip_address.cpp
+cat src/ip_address.cpp.bak >> src/ip_address.cpp
+# fix missing OnLinkPrefixLength in src/network_interface.cpp
+mv src/network_interface.cpp src/network_interface.cpp.bak
+echo "#define _WIN32_WINNT 0x0600" > src/network_interface.cpp
+cat src/network_interface.cpp.bak >> src/network_interface.cpp
+# fix snprintf issue in src/ppi.cpp
+patch -ulbf src/ppi.cpp << EOF
+--- src/ppi.cpp  2016-02-03 07:43:28.000000000 +0100
++++ src/ppi.cpp  2016-02-20 18:46:18.205598300 +0100
+@@ -31,3 +31,2 @@
+ #include <cstring>
+-#include <pcap.h>
+ #include "dot11/dot11_base.h"
+@@ -42,2 +41,4 @@
+ #include "memory_helpers.h"
++#define _MSC_VER 1500
++#include <pcap.h>
+
+EOF
+mkdir -p build_static build_shared &&
+ #wl-showstatus configure &&
+ #cd build_static &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -SLIBTINS_BUILD_SHARED:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/pcap" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap" .. &&
+ #cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -SLIBTINS_BUILD_SHARED:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/pcap" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/pcap" .. &&
+ cd .. &&
+ wl-showstatus build-install &&
+ #( make -Cbuild_static install/strip || (
+ # echo "-lntoskrnl" >> build_static/src/CMakeFiles/tins.dir/linklibs.rsp &&
+ # make -Cbuild_static install/strip
+ #)) &&
+ wl-showstatus build-install &&
+ ( make -Cbuild_shared install/strip || (
+  echo "-lntoskrnl" >> build_shared/src/CMakeFiles/tins.dir/linklibs.rsp &&
+  make -Cbuild_shared install/strip
+ )) &&
+ ( ls -1 $INSTALLPREFIX/bin/libtins.dll &> /dev/null || (
+  mkdir -p $INSTALLPREFIX/bin &&
+  cp -f build_shared/src/libtins.dll $INSTALLPREFIX/bin/
+ )) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: build static library
+
+
+

@@ -1,0 +1,67 @@
+export NAME="libstreamanalyzer"
+export STATUS=
+export URL=https://github.com/KDE/libstreamanalyzer
+export BASENAME=libstreamanalyzer
+export DESCRIPTION="Strigi libstreamanalyzer"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=0.7.8
+export VERSIONDATE=20200416
+wl-showstatus --package-version
+export DEPENDANCIES=libstreams,clucene,exiv2,ffmpeg3
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/KDE/libstreamanalyzer/releases"
+export DOWNLOADURL="https://github.com/KDE/libstreamanalyzer/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/KDE/libstreamanalyzer/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/KDE/libstreamanalyzer/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing realpath in lib/lineanalyzers/m3ustreamanalyzer.cpp
+mv lib/lineanalyzers/m3ustreamanalyzer.cpp lib/lineanalyzers/m3ustreamanalyzer.cpp.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > lib/lineanalyzers/m3ustreamanalyzer.cpp &&
+cat lib/lineanalyzers/m3ustreamanalyzer.cpp.bak >> lib/lineanalyzers/m3ustreamanalyzer.cpp
+# fix lib/endanalyzers/id3endanalyzer.cpp
+patch -ulbf lib/endanalyzers/id3endanalyzer.cpp << EOF
+@@ -573,3 +573,3 @@
+                    if(p) {
+-                       indexable.addValue(factory->genreField, genres[ p ]);
++                       indexable.addValue(factory->genreField, genres[ (long)p ]);
+                        found_genre = true;
+EOF
+# fix missing struct timeval in plugins/indexers/cluceneindexer/cluceneindexmanager.h (version >= 0.7.8)
+patch -ulbf plugins/indexers/cluceneindexer/cluceneindexmanager.h << EOF
+@@ -27,2 +27,3 @@
+ #include <map>
++#include <time.h>
+
+EOF
+# fix version detection issue for recent GCC versions
+mv cmake/MacroEnsureVersion.cmake cmake/MacroEnsureVersion.cmake.bak
+cat > cmake/MacroEnsureVersion.cmake << EOF
+MACRO(MACRO_ENSURE_VERSION requested_version found_version var_too_old)
+SET(\${var_too_old} TRUE)
+ENDMACRO(MACRO_ENSURE_VERSION)
+MACRO(MACRO_ENSURE_VERSION2 requested_version found_version var_too_old)
+SET(\${var_too_old} TRUE)
+ENDMACRO(MACRO_ENSURE_VERSION2)
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg3/include:$C_INCLUDE_PATH CPLUS_INCLUDE_PATH=$MINGWPREFIX/ffmpeg3/include:$CPLUS_INCLUDE_PATH cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #make -Cbuild_win &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

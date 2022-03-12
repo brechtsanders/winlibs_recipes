@@ -1,0 +1,61 @@
+export NAME="ntru-crypto"
+export STATUS=
+export URL=https://www.securityinnovation.com/products/ntru-crypto
+#export URL=https://github.com/NTRUOpenSourceProject/ntru-crypto
+export BASENAME=ntru-crypto
+export DESCRIPTION="Open Source NTRU Public Key Cryptography and Reference Code"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20160601
+####configure.ac:1: error: Autoconf version 2.69 or higher is required
+export VERSION=c89
+export VERSIONDATE=20180204
+wl-showstatus --package-version
+export DEPENDANCIES=
+#export DEPENDANCIES=fftw
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/NTRUOpenSourceProject/ntru-crypto/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/NTRUOpenSourceProject/ntru-crypto/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing WIN32
+mv reference-code/C/Encrypt/include/ntru_crypto_platform.h reference-code/C/Encrypt/include/ntru_crypto_platform.h.bak
+cat > reference-code/C/Encrypt/include/ntru_crypto_platform.h << EOF
+#if !defined(WIN32) && defined(_WIN32)
+#define WIN32
+#endif
+EOF
+cat reference-code/C/Encrypt/include/ntru_crypto_platform.h.bak >> reference-code/C/Encrypt/include/ntru_crypto_platform.h
+# fix reference-code/C/Sign/PASS/src/Makefile
+mv reference-code/C/Sign/PASS/src/Makefile reference-code/C/Sign/PASS/src/Makefile.bak &&
+sed -e "s/\(\$(LDFLAGS)\) \(\$(OBJECTS)\)/\2 \1/" reference-code/C/Sign/PASS/src/Makefile.bak > reference-code/C/Sign/PASS/src/Makefile
+wl-showstatus configure &&
+ cd reference-code/C/Encrypt &&
+ #cd reference-code/NTRUEncrypt &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DNTRUCRYPTO_EXPORTS" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ cd ../../.. &&
+ wl-showstatus build-install &&
+ make -Creference-code/C/Encrypt install-strip &&
+ #make -Creference-code/C/Sign/PASS CC=gcc &&
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #cp -f reference-code/C/Sign/PASS/bin/* $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

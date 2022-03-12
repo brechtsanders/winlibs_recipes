@@ -1,0 +1,71 @@
+export NAME="lasem"
+export STATUS=
+export URL=http://blogs.gnome.org/emmanuel/category/lasem/
+export BASENAME=lasem
+export DESCRIPTION="Lasem is a library for SVG and MathML rendering, implementing a DOM like API. It's based on GObject, and uses Pango and Cairo for the graphic output."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.2.1
+#export VERSIONDATE=20110506
+#export VERSION=0.3.0
+#export VERSIONDATE=20101008
+#export VERSION=0.3.1
+#export VERSIONDATE=20111013
+#export VERSION=0.3.2
+#export VERSIONDATE=20120614
+#export VERSION=0.3.3
+#export VERSIONDATE=20121018
+#export VERSION=0.3.4
+#export VERSIONDATE=20121027
+#export VERSION=0.4.1
+#export VERSIONDATE=20121204
+#export VERSION=0.4.3
+#export VERSIONDATE=20150216
+#export VERSION=0.4.4
+#export VERSIONDATE=20190525
+#export VERSION=0.5.0
+#export VERSIONDATE=20150211
+export VERSION=0.5.1
+export VERSIONDATE=20190525
+wl-showstatus --package-version
+export DEPENDANCIES=pango,cairo,gdk-pixbuf,libxml2,glib2,gtk2,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/lasem/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix invalid include in src/lsmmathmlentitydictionary.c
+mv src/lsmmathmlentitydictionary.c src/lsmmathmlentitydictionary.c.bak
+sed -e "s?#include <glib/ghash.h>?#include <glib.h>?" src/lsmmathmlentitydictionary.c.bak > src/lsmmathmlentitydictionary.c
+wl-showstatus configure
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi &&
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ #( make install-strip || make -j1 install-strip ) &&
+ ( PATH=$PYDIR:$PATH make install-strip || PATH=$PYDIR:$PATH make -j1 install-strip ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

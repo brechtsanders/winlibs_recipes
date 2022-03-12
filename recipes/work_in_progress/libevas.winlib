@@ -1,0 +1,111 @@
+export NAME="Evas"
+export STATUS=
+export URL=http://trac.enlightenment.org/e/wiki/Evas
+export BASENAME=libevas
+export DESCRIPTION="Evas is a clean display canvas API that implements a scene graph, not an immediate-mode rendering target, is cross-platform, for several target display systems that can draw anti-aliased text, smooth super and sub-sampled scaled images, alpha-blend objects and much more."
+export CATEGORY=
+export TYPE=library
+#export VERSION=1.7.0
+#export VERSIONDATE=20121020
+####configure: error: Cannot find fnmatch()
+#export VERSION=1.7.1
+#export VERSIONDATE=20121022
+#export VERSION=1.7.2
+#export VERSIONDATE=20121123
+#export VERSION=1.7.3
+#export VERSIONDATE=20121208
+#export VERSION=1.7.4
+#export VERSIONDATE=20121221
+#export VERSION=1.7.5
+#export VERSIONDATE=20130104
+#export VERSION=1.7.6
+#export VERSIONDATE=20130405
+#export VERSION=1.7.6.1
+#export VERSIONDATE=20130405
+#export VERSION=1.7.7
+#export VERSIONDATE=20130514
+#export VERSION=1.7.8
+#export VERSIONDATE=20130730
+#export VERSION=1.7.9
+#export VERSIONDATE=20131105
+export VERSION=1.7.10
+export VERSIONDATE=20140107
+####config.status: WARNING:  'evas.pc.in' seems to ignore the --datarootdir setting
+wl-showstatus --package-version
+export DEPENDANCIES=libevil,libeina
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.enlightenment.org/p.php?p=download evas-"
+#export DOWNLOADURL="http://download.enlightenment.org/releases/ evas-"
+export DOWNLOADURL="https://download.enlightenment.org/att/releases/ evas-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.enlightenment.org/releases/evas-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://download.enlightenment.org/att/releases/evas-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/evas-$VERSION.tar.bz2
+cd evas-$VERSION
+# fix undefined EINA_UNUSED in src/lib/canvas/evas_render.c (version >= 1.7.2)
+mv src/lib/canvas/evas_render.c src/lib/canvas/evas_render.c.bak
+echo "#define EINA_UNUSED" > src/lib/canvas/evas_render.c
+cat src/lib/canvas/evas_render.c.bak >> src/lib/canvas/evas_render.c
+# fix issues on 64-bit (version >= 1.7.2)
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# fix missing min/max in src/modules/engines/direct3d/evas_direct3d_object_image.cpp on 64-bit (version >= 1.7.2)
+mv src/modules/engines/direct3d/evas_direct3d_object_image.cpp src/modules/engines/direct3d/evas_direct3d_object_image.cpp.bak
+cat > src/modules/engines/direct3d/evas_direct3d_object_image.cpp << EOF
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+EOF
+cat src/modules/engines/direct3d/evas_direct3d_object_image.cpp.bak >> src/modules/engines/direct3d/evas_direct3d_object_image.cpp
+# fix missing min/max in src/modules/engines/direct3d/evas_direct3d_main.cpp on 64-bit (version >= 1.7.2)
+mv src/modules/engines/direct3d/evas_direct3d_main.cpp src/modules/engines/direct3d/evas_direct3d_main.cpp.bak
+cat > src/modules/engines/direct3d/evas_direct3d_main.cpp << EOF
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+EOF
+cat src/modules/engines/direct3d/evas_direct3d_main.cpp.bak >> src/modules/engines/direct3d/evas_direct3d_main.cpp
+# fix missing Evas_Image_Load_Opts in src/modules/engines/direct3d/evas_engine.h on 64-bit (version >= 1.7.2)
+mv src/modules/engines/direct3d/evas_engine.h src/modules/engines/direct3d/evas_engine.h.bak
+echo '#include "evas_private.h"' > src/modules/engines/direct3d/evas_engine.h
+cat src/modules/engines/direct3d/evas_engine.h.bak >> src/modules/engines/direct3d/evas_engine.h
+fi
+# fix detection of fnmatch in configure
+patch -ulbf configure << EOF
+--- configure  2012-10-20 16:14:42 +0200
++++ configure  2012-10-22 15:45:00 +0200
+@@ -19824,4 +19824,2 @@
+
+-else
+-  as_fn_error \$? "Cannot find fnmatch()" "\$LINENO" 5
+ fi
+EOF
+# fix extra parameter to EGifCloseFile in giflib >= 1.7.10
+if grep -q "GifCloseFile.*ErrorCode" $MINGWPREFIX/include/gif_lib.h; then
+ mv src/modules/loaders/gif/evas_image_load_gif.c src/modules/loaders/gif/evas_image_load_gif.c.bak &&
+ sed -e "s/\(GifCloseFile(gif\))/\1, NULL)/" src/modules/loaders/gif/evas_image_load_gif.c.bak > src/modules/loaders/gif/evas_image_load_gif.c
+fi
+# fix empty _XOPEN_SOURCE in src/modules/loaders/psd/evas_image_load_psd.c (version >= 1.7.10)
+mv src/modules/loaders/psd/evas_image_load_psd.c src/modules/loaders/psd/evas_image_load_psd.c.bak
+sed -e "s/^\(#define _XOPEN_SOURCE\)$/\1 1/" src/modules/loaders/psd/evas_image_load_psd.c.bak > src/modules/loaders/psd/evas_image_load_psd.c
+# fix empty _XOPEN_SOURCE in src/bin/loaders/psd/evas_image_load_psd.c (version >= 1.7.10)
+mv src/bin/loaders/psd/evas_image_load_psd.c src/bin/loaders/psd/evas_image_load_psd.c.bak
+sed -e "s/^\(#define _XOPEN_SOURCE\)$/\1 1/" src/bin/loaders/psd/evas_image_load_psd.c.bak > src/bin/loaders/psd/evas_image_load_psd.c
+# fix invalid -pthread in configure
+mv configure configure.bak
+sed -e "s/-pthread/-lpthread/g" configure.bak > configure
+wl-showstatus configure &&
+#PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-pthreads --disable-image-loader-generic --enable-direct3d &&
+#PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-pthreads --disable-image-loader-generic --disable-direct3d &&
+PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-pthreads --disable-image-loader-generic --disable-direct3d FREETYPE_CFLAGS="-I$MINGWPREFIX/include/freetype2 -I$MINGWPREFIX/include/freetype2/freetype" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf evas-$VERSION
+####Now part of EFL (efl)
+
+
+

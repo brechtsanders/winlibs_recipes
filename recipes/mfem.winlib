@@ -1,0 +1,106 @@
+export NAME="MFEM"
+export STATUS=
+export URL=http://mfem.org/
+export BASENAME=mfem
+export DESCRIPTION="MFEM is a free, lightweight, scalable C++ library for finite element methods."
+export CATEGORY=math,dataprocessing
+export TYPE=library
+#export VERSION=3.4
+#export VERSIONDATE=20180622
+#export VERSION=4.0
+#export VERSIONDATE=20190525
+####/mesh/mesh_readers.cpp:1399:18: error: 'nc_open' was not declared in this scope
+#export VERSION=4.0.0xsdk
+#export VERSIONDATE=20191018
+#export VERSION=4.1
+#export VERSIONDATE=20200311
+export VERSION=4.2
+export VERSIONDATE=20201031
+#export VERSION=4.3
+#export VERSIONDATE=20210730
+wl-showstatus --package-version
+export DEPENDANCIES=gnutls,mpfr,netcdf
+#lapack
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+#export LICENSEFILE=COPYRIGHT
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/mfem/mfem/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mfem/mfem/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of ssize_t in general/isockstream.cpp
+patch -ulbf general/isockstream.cpp << EOF
+@@ -24,5 +24,9 @@
+ #else
+-#include <winsock.h>
++#include <winsock2.h>
++#ifdef __MINGW32__
++#include <ws2tcpip.h>
++#else
+ typedef int ssize_t;
+ typedef int socklen_t;
++#endif
+ #define close closesocket
+EOF
+# fix redefinition of ssize_t in general/socketstream.cpp
+patch -ulbf general/socketstream.cpp << EOF
+@@ -30,3 +30,5 @@
+ #include <winsock.h>
++#ifndef __MINGW32__
+ typedef int ssize_t;
++#endif
+ // Link with ws2_32.lib
+EOF
+## fix CMakeLists.txt (version >= 4.3)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -498,9 +498,14 @@
+# # message(STATUS "TPL_LIBRARIES = \${TPL_LIBRARIES}")
+#-if (CMAKE_VERSION VERSION_GREATER 2.8.11)
+#-  target_link_libraries(mfem PUBLIC \${TPL_LIBRARIES})
+#-else()
+#-  target_link_libraries(mfem \${TPL_LIBRARIES})
+#-endif()
+# if (MINGW)
+#-  target_link_libraries(mfem ws2_32)
+#+  if (CMAKE_VERSION VERSION_GREATER 2.8.11)
+#+    target_link_libraries(mfem PUBLIC \${TPL_LIBRARIES} ws2_32)
+#+  else()
+#+    target_link_libraries(mfem \${TPL_LIBRARIES} ws2_32)
+#+  endif()
+#+else()
+#+  if (CMAKE_VERSION VERSION_GREATER 2.8.11)
+#+    target_link_libraries(mfem PUBLIC \${TPL_LIBRARIES})
+#+  else()
+#+    target_link_libraries(mfem \${TPL_LIBRARIES})
+#+  endif()
+# endif()
+#EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -LH -S. -Bbuild_static && echo OK
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMFEM_THREAD_SAFE:BOOL=ON -DMFEM_USE_EXCEPTIONS:BOOL=OFF -DMFEM_USE_GNUTLS:BOOL=ON -DGNUTLS_DIR:PATH=$MINGWPREFIX -DMFEM_USE_MPFR:BOOL=ON -DMPFR_DIR:PATH=$MINGWPREFIX -DMFEM_USE_NETCDF:BOOL=ON -DNETCDF_DIR:PATH=$MINGWPREFIX -DMFEM_ENABLE_MINIAPPS:BOOL=OFF -DMFEM_ENABLE_EXAMPLES:BOOL=OFF -DMFEM_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMFEM_THREAD_SAFE:BOOL=ON -DMFEM_USE_EXCEPTIONS:BOOL=OFF -DMFEM_USE_GNUTLS:BOOL=ON -DGNUTLS_DIR:PATH=$MINGWPREFIX -DMFEM_USE_MPFR:BOOL=ON -DMPFR_DIR:PATH=$MINGWPREFIX -DMFEM_USE_NETCDF:BOOL=ON -DNETCDF_DIR:PATH=$MINGWPREFIX -DMFEM_ENABLE_MINIAPPS:BOOL=OFF -DHDF5_C_LIBRARY_hdf5_hl="-lhdf5_hl" -DMFEM_ENABLE_EXAMPLES:BOOL=OFF -DMFEM_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DMFEM_USE_LAPACK:BOOL=ON -DLAPACK_INCLUDE_DIRS:STRING=$MINGWPREFIX/include -DLAPACK_LIBRARIES:STRING=$MINGWPREFIX/lib 
+ #-DBLAS_INCLUDE_DIRS:STRING=$MINGWPREFIX/include -DBLAS_LIBRARIES:STRING=$MINGWPREFIX/lib 
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMFEM_THREAD_SAFE:BOOL=ON -DMFEM_USE_EXCEPTIONS:BOOL=OFF -DMFEM_USE_GNUTLS:BOOL=ON -DGNUTLS_DIR:PATH=$MINGWPREFIX -DMFEM_USE_MPFR:BOOL=ON -DMPFR_DIR:PATH=$MINGWPREFIX -DMFEM_USE_NETCDF:BOOL=ON -DNETCDF_DIR:PATH=$MINGWPREFIX -DMFEM_ENABLE_MINIAPPS:BOOL=OFF -DMFEM_ENABLE_EXAMPLES:BOOL=OFF -DMFEM_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMFEM_THREAD_SAFE:BOOL=ON -DMFEM_USE_EXCEPTIONS:BOOL=OFF -DMFEM_USE_GNUTLS:BOOL=ON -DGNUTLS_DIR:PATH=$MINGWPREFIX -DMFEM_USE_MPFR:BOOL=ON -DMPFR_DIR:PATH=$MINGWPREFIX -DMFEM_USE_NETCDF:BOOL=ON -DNETCDF_DIR:PATH=$MINGWPREFIX -DMFEM_ENABLE_MINIAPPS:BOOL=OFF -DHDF5_C_LIBRARY_hdf5_hl="-lhdf5_hl" -DMFEM_ENABLE_EXAMPLES:BOOL=OFF -DMFEM_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ sed -i.bak -e "s?/lib/\(libmfem.dll\"\)?/bin/\1?" $INSTALLPREFIX/lib/cmake/mfem/MFEMTargets-release.cmake &&
+ rm -f $INSTALLPREFIX/lib/cmake/mfem/MFEMTargets-release.cmake.bak &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: check the many build parameters
+
+
+

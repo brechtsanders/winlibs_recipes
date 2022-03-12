@@ -1,0 +1,212 @@
+export NAME="JACK"
+export STATUS=
+#export URL=http://jackaudio.org/
+export URL=http://jackit.sf.net/
+export BASENAME=jack
+export DESCRIPTION="JACK is system for handling real-time, low latency audio (and MIDI)."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=1.9.4
+#export VERSIONDATE=20091120
+#export VERSION=1.9.5
+#export VERSIONDATE=20100215
+#export VERSION=1.9.6
+#export VERSIONDATE=20101018
+#export VERSION=1.9.7
+#export VERSIONDATE=20110404
+#export VERSION=1.9.8
+#export VERSIONDATE=20111219
+#export VERSION=1.9.9.5
+#export VERSIONDATE=20121210
+#export VERSION=1.9.10
+#export VERSIONDATE=20160106
+#export VERSION=1.9.12
+#export VERSIONDATE=20171214
+####ImportError: No module named msvc
+#export VERSION=1.9.13
+#export VERSIONDATE=20191007
+#export VERSION=1.9.14
+#export VERSIONDATE=20191120
+####common/JackTools.cpp:242:36: error: 'ADDON_DIR' was not declared in this scope
+#export VERSION=1.9.15
+#export VERSIONDATE=20201016
+####source not found: '..\\build\\libjacknet64.def' in bld(target='', idx=6, install_task=
+#export VERSION=1.9.16
+#export VERSIONDATE=20201017
+####windows\portaudio\JackPortAudioDevices.h:27:10: fatal error: pa_asio.h: No such file or directory
+#export VERSION=1.9.17
+#export VERSIONDATE=20210116
+#export VERSION=1.9.18
+#export VERSIONDATE=20210415
+#export VERSION=1.9.19
+#export VERSIONDATE=20210715
+export VERSION=1.9.20
+export VERSIONDATE=20220116
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,pcre,libsndfile,libsamplerate,readline,portaudio,celt,libopus
+export OPTIONALDEPENDANCIES=eigen,gtkiostream,bdb
+export BUILDDEPENDANCIES=waf
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="http://jackaudio.org/download"
+export DOWNLOADURL="https://github.com/jackaudio/jack2/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.grame.fr/~letz/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://www.grame.fr/~letz/$BASENAME-$VERSION.tgz
+#export DOWNLOADSOURCEURL=https://dl.dropbox.com/u/28869550/jack-1.9.9.5.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/jackaudio/jack2/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+cd jack2-$VERSION
+# fix windows/JackSystemDeps_os.h
+patch -ulbf windows/JackSystemDeps_os.h << EOF
+@@ -29,3 +30,5 @@
+
++#ifndef UINT32_MAX
+ #define UINT32_MAX 4294967295U
++#endif
+
+EOF
+## fix example-clients/transport.c (version <= 1.9.10)
+#patch -ulbf example-clients/transport.c << EOF
+#@@ -23,3 +23,5 @@
+# #include <unistd.h>
+#+#ifndef _WIN32
+# #include <signal.h>
+#+#endif
+# #include <stdlib.h>
+#@@ -124,2 +126,3 @@
+#
+#+#ifndef _WIN32
+# static void signal_handler(int sig)
+#@@ -130,2 +133,3 @@
+# }
+#+#endif
+#
+#@@ -461,2 +465,3 @@
+#
+#+#ifndef _WIN32
+#        signal(SIGQUIT, signal_handler);
+#@@ -465,2 +470,3 @@
+#        signal(SIGINT, signal_handler);
+#+#endif
+#
+#EOF
+# fix example-clients/transport.c (version >= 1.9.12)
+patch -ulbf example-clients/transport.c << EOF
+@@ -23,3 +23,5 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <signal.h>
++#endif
+ #include <stdlib.h>
+@@ -127,2 +129,3 @@
+
++#ifndef _WIN32
+ static void signal_handler(int sig)
+@@ -133,2 +136,3 @@
+ }
++#endif
+
+@@ -464,2 +468,3 @@
+ #if HAVE_READLINE
++#ifndef _WIN32
+                free(line);             /* realine() called malloc() */
+@@ -488,8 +493,15 @@
+
+-#if !WIN32
++#ifdef SIGQUIT
+        signal(SIGQUIT, signal_handler);
++#endif
++#ifdef SIGHUP
+        signal(SIGHUP, signal_handler);
+ #endif
++#ifdef SIGTERM
+        signal(SIGTERM, signal_handler);
++#endif
++#ifdef SIGINT
+        signal(SIGINT, signal_handler);
++#endif
++#endif
+
+EOF
+# fix example-clients/wscript to use -lreadline
+patch -ulbf example-clients/wscript << EOF
+@@ -109,2 +109,4 @@
+             prog.use += ['READLINE']
++        if bld.env['IS_WINDOWS']:
++            prog.use += ['READLINE']
+         prog.target = 'jack_transport'
+EOF
+# fix including windows.h before winsock2.h
+for F in $(grep -l "#include <windows\.h>" windows/*.h) common/JackTools.h common/jack/systemdeps.h; do
+ mv $F $F.bak &&
+ sed -e "s/#include <windows\.h>/#include <winsock2.h>\n&/" $F.bak > $F
+done
+## fix missing strcasecmp in common/JackDriverLoader.cpp
+#mv common/JackDriverLoader.cpp common/JackDriverLoader.cpp.bak &&
+#sed -e "s/strcasecmp/stricmp/g" common/JackDriverLoader.cpp.bak > common/JackDriverLoader.cpp
+## fix type conversion in common/JackTools.cpp
+#mv common/JackTools.cpp common/JackTools.cpp.bak &&
+#sed -e "s/return \"\";/return (char*)\"\";/" common/JackTools.cpp.bak > common/JackTools.cpp
+# fix mkdir in common/JackMetadata.cpp (version >= 1.9.13)
+sed -i.bak -e "s/\(mkdir\s*([^,]*\),[^)]*)/\1)/" common/JackMetadata.cpp
+# fix detection of MinGW compilers (version >= 1.9.12)
+sed -i.bak -e "s/'msvc',//" waflib/Tools/compiler_c.py
+sed -i.bak -e "s/'msvc',//" waflib/Tools/compiler_cxx.py
+wl-showstatus configure &&
+ #$PYDIR/python.exe ./waf configure --prefix=$INSTALLPREFIX --dist-target mingw --winmme --jobs=$NUMBER_OF_PROCESSORS &&
+ #$PYDIR/python.exe ./waf configure --prefix=$INSTALLPREFIX -j$NUMBER_OF_PROCESSORS --platform=win32 --autostart=none --doxygen=no &&
+ #$PY2DIR/python.exe ./waf configure --prefix=$INSTALLPREFIX -j$NUMBER_OF_PROCESSORS --platform=win32 --autostart=none --doxygen=no &&
+ CC=$(which gcc.exe) CXX=$(which g++.exe) $PYDIR/python.exe ./waf configure --prefix=$INSTALLPREFIX -j$NUMBER_OF_PROCESSORS --platform=win32 --autostart=none --iio=no --doxygen=no &&
+ wl-showstatus build &&
+ ## manually generate svnversion.h (version <= 1.9.19)
+ #./svnversion_regenerate.sh svnversion.h &&
+ #$PY2DIR/python.exe ./waf build -j$NUMBER_OF_PROCESSORS &&
+ $PYDIR/python.exe ./waf build -j$NUMBER_OF_PROCESSORS &&
+ wl-showstatus build-install &&
+ #$PY2DIR/python.exe ./waf install &&
+ $PYDIR/python.exe ./waf install &&
+ # fix jack.pc
+ sed -i -e "s?$(cygpath.exe -w $INSTALLPREFIX|sed -e "s?\\\\?\\\\\\\\?g")\\\\?$INSTALLPREFIX/?g; s?$(cygpath.exe -w $INSTALLPREFIX|sed -e "s?\\\\?\\\\\\\\?g")?$INSTALLPREFIX?g" $INSTALLPREFIX/lib/pkgconfig/jack.pc &&
+ ## move .a files to the lib folder (version <= 1.9.12)
+ #mv -f $INSTALLPREFIX/bin/*.a $INSTALLPREFIX/lib/ &&
+ # move .dll files to the bin folder (version >= 1.9.17)
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ ( ls -1 $INSTALLPREFIX/lib/libjack.dll.a &> /dev/null || cp -u $INSTALLPREFIX/lib/libjack64.dll.a $INSTALLPREFIX/lib/libjack.dll.a ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####TO DO: build static libraries
+
+
+
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# CC=$(which gcc.exe) CXX=$(which g++.exe) $PYDIR/python.exe ./waf configure --prefix=$INSTALLPREFIX --static -j$NUMBER_OF_PROCESSORS --platform=win32 --autostart=none --iio=no --doxygen=no --out=build_static &&
+# wl-showstatus configure &&
+# CC=$(which gcc.exe) CXX=$(which g++.exe) $PYDIR/python.exe ./waf configure --prefix=$INSTALLPREFIX -j$NUMBER_OF_PROCESSORS --platform=win32 --autostart=none --iio=no --doxygen=no --out=build_shared &&
+# wl-showstatus build &&
+# $PYDIR/python.exe waf build --out=build_static -j$NUMBER_OF_PROCESSORS &&
+# wl-showstatus build &&
+# $PYDIR/python.exe ./waf build --out=build_shared -j$NUMBER_OF_PROCESSORS &&
+# wl-showstatus build-install &&
+# $PYDIR/python.exe ./waf install --out=build_static &&
+# wl-showstatus build-install &&
+# $PYDIR/python.exe ./waf install --out=build_shared &&
+# # fix jack.pc
+# sed -i -e "s?$(cygpath.exe -w $INSTALLPREFIX|sed -e "s?\\\\?\\\\\\\\?g")\\\\?$INSTALLPREFIX/?g; s?$(cygpath.exe -w $INSTALLPREFIX|sed -e "s?\\\\?\\\\\\\\?g")?$INSTALLPREFIX?g" $INSTALLPREFIX/lib/pkgconfig/jack.pc &&
+# ## move .a files to the lib folder (version <= 1.9.12)
+# #mv -f $INSTALLPREFIX/bin/*.a $INSTALLPREFIX/lib/ &&
+# # move .dll files to the bin folder (version >= 1.9.17)
+# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# ( ls -1 $INSTALLPREFIX/lib/libjack.dll.a &> /dev/null || cp -u $INSTALLPREFIX/lib/libjack64.dll.a $INSTALLPREFIX/lib/libjack.dll.a ) &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

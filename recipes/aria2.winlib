@@ -1,0 +1,58 @@
+export NAME="aria2"
+export STATUS=
+export URL=http://aria2.sourceforge.net/
+export BASENAME=aria2
+export DESCRIPTION="aria2 is a lightweight multi-protocol & multi-source command-line download utility. It supports HTTP/HTTPS, FTP, BitTorrent and Metalink. aria2 can be manipulated via built-in JSON-RPC and XML-RPC interfaces."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.18.9
+#export VERSIONDATE=20150201
+#export VERSION=1.18.10
+#export VERSIONDATE=20150224
+#export DEPENDANCIES=zlib,sqlite3,libxml2,c-ares,gmp,libiconv,gettext
+export VERSION=1.19.0
+export VERSIONDATE=20150524
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,sqlite3,libxml2,c-ares,gmp,libiconv,gettext,gnutls,libnettle,libssh2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sourceforge.net/projects/aria2/files/stable/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/aria2/stable/aria2-$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix redefinition of asctime_r in src/asctime_r.h and src/asctime_r.c on MinGW-w64 (version >= 1.19.0)
+if gcc --version|grep -q "MinGW-W64"; then
+ mv src/asctime_r.c src/asctime_r.c.bak &&
+ touch src/asctime_r.c &&
+ mv src/asctime_r.h src/asctime_r.h.bak &&
+ touch src/asctime_r.h &&
+ mv src/localtime_r.c src/localtime_r.c.bak &&
+ touch src/localtime_r.c &&
+ mv src/localtime_r.h src/localtime_r.h.bak &&
+ touch src/localtime_r.h
+fi
+# fix for GCC 11 in src/LibnettleMessageDigestImpl.cc (version >= 1.19.0)
+mv src/LibnettleMessageDigestImpl.cc src/LibnettleMessageDigestImpl.cc.bak &&
+echo "#include <limits>" > src/LibnettleMessageDigestImpl.cc &&
+cat src/LibnettleMessageDigestImpl.cc.bak >> src/LibnettleMessageDigestImpl.cc
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-libaria2 --without-wintls --with-gnutls &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-libaria2 --without-wintls --with-gnutls LDFLAGS="-Wl,--as-needed -lintl" &&
+ #PKG_CONFIG=$(which pkg-config.exe) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-libaria2 --without-wintls --with-gnutls LDFLAGS="-Wl,--as-needed -lintl" &&
+ PKG_CONFIG=$(which pkg-config.exe) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-libaria2 --without-wintls --with-gnutls CXXFLAGS="-std=c++11 -D_POSIX_THREAD_SAFE_FUNCTIONS" LDFLAGS="-Wl,--as-needed -lintl" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

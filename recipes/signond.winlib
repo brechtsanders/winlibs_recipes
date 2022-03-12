@@ -1,0 +1,72 @@
+export NAME="signond"
+export STATUS=
+export URL=https://gitlab.com/accounts-sso/signond
+export BASENAME=signond
+export DESCRIPTION="SignOn Daemon (Qt)"
+export CATEGORY=
+export TYPE=library
+#export VERSION=8.60
+#export VERSIONDATE=20210915
+export VERSION=8.61
+export VERSIONDATE=20220310
+wl-showstatus --package-version
+export DEPENDANCIES=qt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://gitlab.com/accounts-sso/signond/-/tags?sort=updated_desc"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.com/accounts-sso/signond/-/archive/VERSION_$VERSION/signond-VERSION_$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/signond-VERSION_$VERSION.tar.bz2
+cd signond-VERSION_$VERSION
+# fix missing chiwn in lib/signond/SignOn/misc.cpp (version >= 8.60)
+patch -ulbf lib/signond/SignOn/misc.cpp << EOF
+@@ -47,2 +47,6 @@
+     const char *filePathStr = filePathArray.constData();
++#ifdef _WIN32
++    BLAME() << "chown of" << filePathStr << "failed, not supported on Windows";
++    return false;
++#else
+     if (chown(filePathStr, fileInfo.st_uid , fileInfo.st_gid) != 0) {
+@@ -51,2 +55,3 @@
+     }
++#endif
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ $MINGWPREFIX/qt/bin/qmake -makefile ../signon.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ CONFIG+=staticlib PREFIX=$INSTALLPREFIX QMAKE_CXXFLAGS+="-fpermissive" &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ $MINGWPREFIX/qt/bin/qmake -makefile ../signon.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ PREFIX=$INSTALLPREFIX QMAKE_CXXFLAGS+="-fpermissive" &&
+ cd .. &&
+ wl-showstatus build &&
+ ( mingw32-make -Cbuild_static || mingw32-make -Cbuild_static sub-lib-release sub-server-release ) &&
+ #mingw32-make -Cbuild_static &&
+ wl-showstatus build &&
+ ( mingw32-make -Cbuild_shared || mingw32-make -Cbuild_shared sub-lib-release sub-server-release ) &&
+ #mingw32-make -Cbuild_shared &&
+ wl-showstatus install &&
+ mingw32-make -Cbuild_shared sub-lib-install_subtargets sub-server-install_subtargets &&
+ #mingw32-make -Cbuild_shared install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ for F in $INSTALLPREFIX/lib/*.a; do
+  mv $F $(echo $F|sed -e "s/\.a/.dll&/")
+ done &&
+ wl-showstatus install &&
+ mingw32-make -Cbuild_static sub-lib-install_subtargets sub-server-install_subtargets &&
+ #mingw32-make -Cbuild_static install &&
+ # fix detection of library via cmake
+ sed -i -e "s?\(set(SIGNONQT_LIBRARIES[^ ]* \)[^ ]*lib/liblibsignon-qt5\(\.so\|.a\)?\1-lsignon-qt5?; s?$(cygpath -m $INSTALLPREFIX)?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $INSTALLPREFIX/lib/cmake/SignOnQt5/SignOnQt5Config.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf signond-VERSION_$VERSION
+
+
+

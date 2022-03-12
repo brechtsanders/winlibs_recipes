@@ -1,0 +1,344 @@
+#export NAME="libnpupnp"
+#export STATUS=
+##export URL=https://www.lesbonscomptes.com/upmpdcli/libnpupnp.html
+#export URL=https://www.lesbonscomptes.com/upmpdcli/npupnp-doc/libnpupnp.html
+#export BASENAME=libnpupnp
+#export DESCRIPTION="replacement for libupnp library"
+#export CATEGORY=communication
+#export TYPE=library
+##export VERSION=2.0.1
+##export VERSIONDATE=20200207
+##export VERSION=2.1.1
+##export VERSIONDATE=20200225
+##export VERSION=2.2.1
+##export VERSIONDATE=20200408
+##export VERSION=4.0.1
+##export VERSIONDATE=20200508
+##export VERSION=4.0.2
+##export VERSIONDATE=20200510
+##export VERSION=4.0.3
+##export VERSIONDATE=20200513
+##export VERSION=4.0.4
+##export VERSIONDATE=20200514
+##export VERSION=4.0.5
+##export VERSIONDATE=20200522
+##export VERSION=4.0.6
+##export VERSIONDATE=20200611
+##export VERSION=4.0.7
+##export VERSIONDATE=20200627
+##export VERSION=4.0.8
+##export VERSIONDATE=20200714
+##export VERSION=4.0.9
+##export VERSIONDATE=20200714
+##export VERSION=4.0.10
+##export VERSIONDATE=20200720
+#####src/soap/soap_ctrlpt.cpp:58:10: fatal error: utf8iter.h: No such file or directory
+##export VERSION=4.0.11
+##export VERSIONDATE=20200903
+##export VERSION=4.0.12
+##export VERSIONDATE=20201005
+##export VERSION=4.0.13
+##export VERSIONDATE=20201102
+#export VERSION=4.0.14
+#export VERSIONDATE=20201115
+#wl-showstatus --package-version
+#export DEPENDANCIES=pthreads,libcurl,expat,libmicrohttpd
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+#export DOWNLOADURL="https://www.lesbonscomptes.com/upmpdcli/downloads.html"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://www.lesbonscomptes.com/upmpdcli/downloads/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+### fix missing posix_strerror_r/inet_ntop/inet_pton in src/inc/uri.h
+##patch -ulbf src/inc/uri.h << EOF
+##@@ -48,3 +48,12 @@
+##
+##+#ifdef _WIN32
+##+#if _WIN32_WINNT < 0x0600
+##+#undef _WIN32_WINNT
+##+#define _WIN32_WINNT >= 0x0600
+##+#endif
+##+#include <winsock2.h>
+##+#include <ws2tcpip.h>
+##+#else
+## #include <netdb.h>
+##+#endif
+##
+##EOF
+### fix redefinition of inet_ntop/inet_pton (version >= 2.2.1 <= 4.0.4)
+##mv src/utils/inet_pton.c src/utils/inet_pton.c.bak &&
+##mv src/inc/inet_pton.h src/inc/inet_pton.h.bak &&
+##touch src/utils/inet_pton.c src/inc/inet_pton.h
+### fix src/dispatcher/miniserver.cpp (version >= 2.2.1)
+##patch -ulbf src/dispatcher/miniserver.cpp << EOF
+##@@ -570,3 +570,3 @@
+##                                out->miniServerSock4, SOL_SOCKET, SO_REUSEADDR,
+##-                               &on, sizeof(int)) == SOCKET_ERROR) {
+##+                               (char*)&on, sizeof(int)) == SOCKET_ERROR) {
+##                        ret = UPNP_E_SOCKET_BIND;
+##@@ -579,3 +579,3 @@
+##                                out->miniServerSock6, SOL_SOCKET, SO_REUSEADDR,
+##-                               &on, sizeof(int)) == SOCKET_ERROR) {
+##+                               (char*)&on, sizeof(int)) == SOCKET_ERROR) {
+##                        ret = UPNP_E_SOCKET_BIND;
+##EOF
+### fix src/inc/smallut.h (version >= 2.2.1 <= 4.0.4)
+##patch -ulbf src/inc/smallut.h << EOF
+##@@ -33,4 +33,5 @@
+##
+##-#include <string>
+## #include <string.h>
+##+#ifdef __cplusplus
+##+#include <string>
+##
+##@@ -46,3 +47,8 @@
+##
+##+extern "C" {
+##+#endif
+## extern size_t upnp_strlcpy(char *dst, const char *src, size_t dsize);
+##+#ifdef __cplusplus
+##+}
+##+
+## inline size_t upnp_strlcpy(char *dst, const std::string& src, size_t dsize) {
+##@@ -55,2 +61,3 @@
+## int dom_cmp_name(const std::string& domname, const std::string& ref);
+##+#endif
+##
+##EOF
+### fix missing files
+##mkdir -p winfix
+##cat > winfix/netdb.h << EOF
+###ifdef _WIN32
+###if _WIN32_WINNT < 0x0600
+###undef _WIN32_WINNT
+###define _WIN32_WINNT >= 0x0600
+###endif
+###include <winsock2.h>
+###include <ws2tcpip.h>
+###endif
+##EOF
+## fix use of WIN32 instead of _WIN32
+#sed -i.bak -e "s/\bWIN32\b/_&/g" $(grep -lw WIN32 $(find -name '*.cpp' -or -name '*.h'))
+### fix missing strlen in src/utils/smallut.cpp
+##mv src/utils/smallut.cpp src/utils/smallut.cpp.bak2 &&
+##echo "#include <string.h>" > src/utils/smallut.cpp &&
+##cat src/utils/smallut.cpp.bak2 >> src/utils/smallut.cpp
+### fix src/inc/netif.h (version >= 4.0.1)
+##patch -ulbf src/inc/netif.h << EOF
+##@@ -39,3 +39,7 @@
+## #include <vector>
+##+#ifdef _WIN32
+##+#include <winsock2.h>
+##+#else
+## #include <netinet/in.h>
+##+#endif
+##
+##EOF
+### fix src/ssdp/ssdp_device.cpp (version >= 4.0.1)
+##patch -ulbf src/ssdp/ssdp_device.cpp << EOF
+##@@ -162,3 +162,3 @@
+## // for setting the LOCATION header
+##-static int createMulticastSocket4(
+##+static SOCKET createMulticastSocket4(
+##        const struct sockaddr_in *srcaddr, std::string& lochost)
+##@@ -166,3 +166,7 @@
+##        char ttl = 2;
+##+#ifdef _WIN32
+##+       BOOL bcast = TRUE;
+##+#else
+##        int bcast = 1;
+##+#endif
+##        const NetIF::IPAddr
+##@@ -182,3 +186,3 @@
+##        }
+##-       if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &bcast, sizeof(bcast)) < 0) {
+##+       if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<char *>(&bcast), sizeof(bcast)) < 0) {
+##                goto error;
+##@@ -191,3 +195,7 @@
+## error:
+##+#ifdef _WIN32
+##+       closesocket(sock);
+##+#else
+##        close(sock);
+##+#endif
+##        return -1;
+##@@ -195,3 +203,3 @@
+##
+##-static int createReplySocket4(
+##+static SOCKET createReplySocket4(
+##        struct sockaddr_in *destaddr, std::string& lochost)
+##@@ -221,3 +229,3 @@
+## }
+##-static int createMulticastSocket6(int index, std::string& lochost)
+##+static SOCKET createMulticastSocket6(int index, std::string& lochost)
+## {
+##@@ -252,3 +260,7 @@
+## error:
+##+#ifdef _WIN32
+##+       closesocket(sock);
+##+#else
+##        close(sock);
+##+#endif
+##        return INVALID_SOCKET;
+##@@ -256,3 +268,3 @@
+##
+##-static int createReplySocket6(
+##+static SOCKET createReplySocket6(
+##        struct sockaddr_in6 *destaddr, std::string& lochost)
+##@@ -812,3 +824,7 @@
+##                                }
+##+#ifdef _WIN32
+##+                               closesocket(sock);
+##+#else
+##                                close(sock);
+##+#endif
+##                                sock = -1;
+##@@ -840,3 +856,7 @@
+##                                        DeviceUDN, ServiceType, Exp, loc.c_str());
+##+#ifdef _WIN32
+##+                               closesocket(sock);
+##+#else
+##                                close(sock);
+##+#endif
+##                                sock = -1;
+##EOF
+### fix src/ssdp/ssdp_server.cpp (version >= 4.0.1)
+##patch -ulbf src/ssdp/ssdp_server.cpp << EOF
+##@@ -510,3 +510,7 @@
+## {
+##+#ifdef _WIN32
+##+       DWORD hops = 1;
+##+#else
+##        int hops = 1;
+##+#endif
+##        int index = apiFirstIPV6Index();
+##@@ -530,3 +534,3 @@
+##        if (setsockopt(
+##-                       sock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops, sizeof(hops)) < 0) {
+##+                       sock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, reinterpret_cast<char *>(&hops), sizeof(hops)) < 0) {
+##                errorcause = "setsockopt(IPV6_MULTICAST_HOPS)";
+##EOF
+### fix src/dispatcher/miniserver.cpp (version >= 4.0.1)
+##patch -ulbf src/dispatcher/miniserver.cpp << EOF
+##@@ -494,3 +494,3 @@
+##        for (int i = 0; i < 20; i++) {
+##-               saddr.sin_port = htons(static_cast<in_port_t>(port));
+##+               saddr.sin_port = htons(static_cast<uint16_t>(port));
+##                if (bind(fd, reinterpret_cast<struct sockaddr*>(&saddr),
+##@@ -512,3 +512,7 @@
+##        if (fd >=0) {
+##+#ifdef _WIN32
+##+               closesocket(fd);
+##+#else
+##                close(fd);
+##+#endif
+##        }
+##EOF
+### fix src/utils/netif.cpp (version >= 4.0.1)
+##patch -ulbf src/utils/netif.cpp << EOF
+##@@ -501,3 +501,3 @@
+##                char tmpnm[256];
+##-               wcstombs(tmpIfName, adapts_item->FriendlyName, sizeof(tmpnm));
+##+               wcstombs(tmpnm, adapts_item->FriendlyName, sizeof(tmpnm));
+##                ifit->m->friendlyname = tmpnm;
+##EOF
+## fix missing localtime_r in src/utils/smallut.cpp (version >= 4.0.14)
+#mv src/utils/smallut.cpp src/utils/smallut.cpp.bak &&
+#echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > src/utils/smallut.cpp &&
+#cat src/utils/smallut.cpp.bak >> src/utils/smallut.cpp
+#wl-showstatus configure &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CXXFLAGS="-fpermissive -I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi" &&
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# ## fix missing posix_strerror_r
+# #echo "#ifndef posix_strerror_r" >> src/inc/config.h &&
+# #echo "#define posix_strerror_r(errno, buf, buflen) FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, (errno), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (buf), (buflen), NULL)" >> src/inc/config.h &&
+# #echo "#endif" >> src/inc/config.h &&
+# # fix missing inet_ntop/inet_pton
+# echo "#if _WIN32_WINNT < 0x0600" >> src/inc/config.h &&
+# echo "#undef _WIN32_WINNT" >> src/inc/config.h &&
+# echo "#define _WIN32_WINNT 0x0600" >> src/inc/config.h &&
+# echo "#endif" >> src/inc/config.h &&
+# #echo "#include <winsock2.h>" >> src/inc/config.h &&
+# # use existing inet_pton (version >= 4.0.1)
+# echo '#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600' >> autoconfig.h &&
+# echo "#undef _WIN32_WINNT" >> autoconfig.h &&
+# echo "#define _WIN32_WINNT 0x0600" >> autoconfig.h &&
+# echo "#include <ws2tcpip.h>" >> autoconfig.h &&
+# echo "#define HAVE_INET_PTON 1" >> autoconfig.h &&
+# echo "#define HAVE_INET_NTOP 1" >> autoconfig.h &&
+# echo "#endif" >> autoconfig.h &&
+# wl-showstatus build-install &&
+# make libnpupnp.la CXXFLAGS="-fpermissive -DLIBUPNP_EXPORTS -O3" &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="libnpupnp"
+export STATUS=
+export URL=https://www.lesbonscomptes.com/upmpdcli/npupnp-doc/libnpupnp.html
+#export URL=https://framagit.org/medoc92/npupnp
+export BASENAME=libnpupnp
+export DESCRIPTION="A C++ base UPnP library, derived from Portable UPnP, a.k.a libupnp"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=4.1.4
+#export VERSIONDATE=20210806
+#export VERSION=4.1.5
+#export VERSIONDATE=20211101
+export VERSION=4.2.1
+export VERSIONDATE=20220107
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libcurl,expat,libmicrohttpd,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="https://www.lesbonscomptes.com/upmpdcli/downloads.html"
+export DOWNLOADURL="https://framagit.org/medoc92/npupnp/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://framagit.org/medoc92/npupnp/-/archive/libnpupnp-v$VERSION/npupnp-libnpupnp-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/npupnp-libnpupnp-v$VERSION.tar.bz2
+cd npupnp-libnpupnp-v$VERSION
+# fix missing WC_ERR_INVALID_CHARS in src/utils/netif.cpp (version >= 4.1.5)
+patch -ulbf src/utils/netif.cpp << EOF
+@@ -598,3 +598,3 @@
+     }
+-    int flags = WC_ERR_INVALID_CHARS;
++    int flags = MB_ERR_INVALID_CHARS;
+     int bytes = ::WideCharToMultiByte(CP_UTF8, flags, in, wlen, nullptr, 0, nullptr, nullptr);
+EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-expat --disable-ipv6 --disable-testprogs CXXFLAGS="-DLIBUPNP_EXPORTS" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-expat --enable-ipv6 --enable-reuseaddr --disable-testprogs CXXFLAGS="-DLIBUPNP_EXPORTS -DHAVE_INET_PTON" LDFLAGS="-Wl,--as-needed -liphlpapi" &&
+ # fix missing inet_pton
+ echo "#if _WIN32_WINNT < 0x0600" >> src/inc/config.h &&
+ echo "#undef _WIN32_WINNT" >> src/inc/config.h &&
+ echo "#define _WIN32_WINNT 0x0600" >> src/inc/config.h &&
+ echo "#endif" >> src/inc/config.h &&
+ #echo "#ifndef HAVE_INET_PTON" >> src/inc/config.h &&
+ #echo "#define HAVE_INET_PTON" >> src/inc/config.h &&
+ #echo "#endif" >> src/inc/config.h &&
+ ## fix issues in Makefile
+ #sed -i.bak -e "s?\`test -f 'src/api/[^']*\.cpp' || echo '\$(srcdir)/'\`??" Makefile &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf npupnp-libnpupnp-v$VERSION
+
+
+

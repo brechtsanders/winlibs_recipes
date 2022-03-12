@@ -1,0 +1,205 @@
+export NAME="Lasso"
+export STATUS=
+export URL=http://lasso.entrouvert.org/
+export BASENAME=lasso
+export DESCRIPTION="Lasso is a free software C library aiming to implement the Liberty Alliance standards; it defines processes for federated identities, single sign-on and related protocols. Lasso is built on top of libxml2, XMLSec and OpenSSL and is licensed under the GNU General Public License (with an OpenSSL exception)."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=2.3.6
+#export VERSIONDATE=20130111
+#export VERSION=2.5.0
+#export VERSIONDATE=20160105
+#export VERSION=2.5.1
+#export VERSIONDATE=20160220
+#export VERSION=2.6.0
+#export VERSIONDATE=20180613
+#export VERSION=2.6.1
+#export VERSIONDATE=20200423
+export VERSION=2.7.0
+export VERSIONDATE=20210601
+####Cannot export lasso_data_service_add_modification: symbol not defined
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,xmlsec1,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=swig
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://lasso.entrouvert.org/download/"
+export DOWNLOADURL="https://dev.entrouvert.org/releases/lasso/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://dev.entrouvert.org/lasso/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://dev.entrouvert.org/releases/lasso/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing strptime and dereferencing pointer to incomplete type in lasso/xml/tools.c
+#patch -ulbf lasso/xml/tools.c << EOF
+#--- lasso/xml/tools.c  2011-11-29 10:19:50 +0100
+#+++ lasso/xml/tools.c  2013-01-14 12:41:42 +0100
+#@@ -64,2 +64,5 @@
+# #include <ctype.h>
+#+#ifdef __MINGW32__
+#+#include <plibc.h>
+#+#endif
+#
+#@@ -1065,3 +1068,3 @@
+#        xmlOutputBufferFlush(buf);
+#-       buffer = buf->conv ? buf->conv->content : buf->buffer->content;
+#+       buffer = buf->conv ? xmlBufContent(buf->conv) : xmlBufContent(buf->buffer);
+#
+#@@ -2158,3 +2161,3 @@
+#        xmlOutputBufferFlush(buf);
+#-       buffer = buf->conv ? buf->conv->content : buf->buffer->content;
+#+       buffer = buf->conv ? xmlBufContent(buf->conv) : xmlBufContent(buf->buffer);
+#        /* do not mix XML and GLib strings, so we must copy */
+#EOF
+## fix dereferencing pointer to incomplete type in lasso/id-ff/lecp.c
+#patch -ulbf lasso/id-ff/lecp.c << EOF
+#--- lasso/id-ff/lecp.c  2011-11-29 10:19:50 +0100
+#+++ lasso/id-ff/lecp.c  2013-01-14 12:46:36 +0100
+#@@ -98,3 +98,3 @@
+#        lasso_assign_string(profile->msg_body,
+#-                       (char*)(buf->conv ? buf->conv->content : buf->buffer->content));
+#+                       (char*)(buf->conv ? xmlBufContent(buf->conv) : xmlBufContent(buf->buffer)));
+#        xmlOutputBufferClose(buf);
+#@@ -344,3 +344,3 @@
+#        LASSO_PROFILE(lecp)->msg_body = g_strdup( (char*)(
+#-                       buf->conv ? buf->conv->content : buf->buffer->content));
+#+                       buf->conv ? xmlBufContent(buf->conv) : xmlBufContent(buf->buffer)));
+#        xmlOutputBufferClose(buf);
+#EOF
+## fix dereferencing pointer to incomplete type in lasso/id-ff/session.c
+#patch -ulbf lasso/id-ff/session.c << EOF
+#--- lasso/id-ff/session.c  2011-11-29 10:19:50 +0100
+#+++ lasso/id-ff/session.c  2013-01-14 12:48:48 +0100
+#@@ -452,3 +452,3 @@
+#        xmlOutputBufferFlush(buf);
+#-       buffer = buf->conv ? buf->conv->content : buf->buffer->content;
+#+       buffer = buf->conv ? xmlBufContent(buf->conv) : xmlBufContent(buf->buffer);
+#
+#EOF
+## fix dereferencing pointer to incomplete type in lasso/saml-2.0/ecp.c
+#patch -ulbf lasso/saml-2.0/ecp.c << EOF
+#--- lasso/saml-2.0/ecp.c  2011-11-29 10:19:50 +0100
+#+++ lasso/saml-2.0/ecp.c  2013-01-14 12:51:20 +0100
+#@@ -177,3 +177,3 @@
+#        LASSO_PROFILE(ecp)->msg_body = g_strdup(
+#-                       (char*)(buf->conv ? buf->conv->content : buf->buffer->content));
+#+                       (char*)(buf->conv ? xmlBufContent(buf->conv) : xmlBufContent(buf->buffer)));
+#        xmlOutputBufferClose(buf);
+#@@ -278,3 +278,3 @@
+#        LASSO_PROFILE(ecp)->msg_body = g_strdup(
+#-                       (char*)(buf->conv ? buf->conv->content : buf->buffer->content));
+#+                       (char*)(buf->conv ? xmlBufContent(buf->conv) : xmlBufContent(buf->buffer)));
+#        xmlOutputBufferClose(buf);
+#EOF
+## fix invalid glib include in lasso/xml/xml.h
+#mv lasso/xml/xml.h lasso/xml/xml.h.bak
+#sed -e "s?\(#include <\)glib/.*>?\1glib.h>?" lasso/xml/xml.h.bak > lasso/xml/xml.h
+## fix invalid glib include in lasso/errors.c.in
+#mv lasso/errors.c.in lasso/errors.c.in.bak
+#sed -e "s?\(#include <\)glib/.*>?\1glib.h>?" lasso/errors.c.in.bak > lasso/errors.c.in
+## fix missing strtok_r in lasso/saml-2.0/provider.c
+#mv lasso/saml-2.0/provider.c lasso/saml-2.0/provider.c.bak
+#echo "#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))" > lasso/saml-2.0/provider.c
+#cat lasso/saml-2.0/provider.c.bak >> lasso/saml-2.0/provider.c
+## fix missing timegm/strtok_r in lasso/lasso.c
+#mv lasso/lasso.c lasso/lasso.c.bak
+#cat > lasso/lasso.c << EOF
+##include <stdlib.h>
+##include <time.h>
+#inline time_t timegm (struct tm* tm) {
+#  time_t ret;
+#  putenv("TZ=");
+#  tzset();
+#  ret = mktime(tm);
+#  //to do: reset time zone to previous value
+#  return ret;
+#}
+##define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))
+#EOF
+#cat lasso/lasso.c.bak >> lasso/lasso.c
+## fix missing strndup in lasso/xml/xml.c
+#mv lasso/xml/xml.c lasso/xml/xml.c.bak
+#cat > lasso/xml/xml.c << EOF
+##include <string.h>
+##include <malloc.h>
+##ifndef __MINGW32__
+#inline int strnlen (const char *str, size_t maxlen)
+#{
+#  int l = 0;
+#  if (str)
+#    while (l < maxlen && str[l])
+#      l++;
+#  return l;
+#}
+##endif
+#inline char* strndup (const char *str, size_t maxlen)
+#{
+#  int l = strnlen(str, maxlen);
+#  char* s = (char*)malloc(l + 1);
+#  memcpy(s, str, l);
+#  s[l] = 0;
+#  return s;
+#}
+#EOF
+#cat lasso/xml/xml.c.bak >> lasso/xml/xml.c
+## fix export issues lasso/lasso.h
+#mv lasso/lasso.h lasso/lasso.h.bak
+#sed -e "s/defined MINGW32/defined __MINGW32__/" lasso/lasso.h.bak > lasso/lasso.h
+## fix export issues lasso/export.h
+#mv lasso/export.h lasso/export.h.bak
+#sed -e "s/defined MINGW32/defined __MINGW32__/" lasso/export.h.bak > lasso/export.h
+# fix missing strptime/timegm in lasso/xml/tools.c (version >= 2.5.0)
+mv lasso/xml/tools.c lasso/xml/tools.c.bak
+cat > lasso/xml/tools.c << EOF
+#include <stdlib.h>
+#include <time.h>
+#define strptime(s,dmt,tm) NULL
+static inline time_t timegm (struct tm* tm) {
+  time_t ret;
+  putenv("TZ=");
+  tzset();
+  ret = mktime(tm);
+  //to do: reset time zone to previous value
+  return ret;
+}
+EOF
+cat lasso/xml/tools.c.bak >> lasso/xml/tools.c
+## fix problems building DLL using __declspec(dllexport) and .def file at the same time
+#patch -ulbf lasso/export.h << EOF
+#@@ -40,3 +40,3 @@
+# #      if !defined(LASSO_STATIC)
+#-#        define LASSO_EXPORT __declspec(dllexport)
+#+#        define LASSO_EXPORT //__declspec(dllexport)
+# #      else
+#EOF
+## fix building DLLs
+#sed -i.bak -e "s/ MINGW32/ __MINGW32__/g" lasso/export.h
+wl-showstatus configure &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --enable-static-linking --disable-tests --disable-perl --with-zlib LDFLAGS="-Wl,--as-needed -lplibc -Wl,--enable-auto-import" &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --disable-perl --disable-tests --with-zlib LDFLAGS="-Wl,--as-needed -lplibc -Wl,--enable-auto-import" &&
+PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --disable-perl --disable-tests --with-zlib --disable-python &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-perl --disable-tests --with-zlib --disable-python CFLAGS="-DIN_LASSO -DWIN32 -DMINGW32" &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-wsf --disable-perl --disable-tests --with-zlib --disable-python CFLAGS="-DIN_LASSO -DWIN32 -DMINGW32" LDFLAGS="-Wl,--as-needed -ldl -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # don't use .def files and __declspec(dllexport) at the same time
+ sed -i.bak2 -e "s/\(CC -shared\) [^ ]*\.def/\1/" libtool &&
+ ## fix invalid glib include in lasso/errors.c
+ #mv lasso/errors.c lasso/errors.c.bak &&
+ #sed -e "s?\(#include <\)glib/.*>?\1glib.h>?" lasso/errors.c.bak > lasso/errors.c &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ #PYTHON=$PYDIR/python.exe make install-strip CFLAGS="-DIN_LASSO -DWIN32" &&
+ #C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include make install-strip CFLAGS="-DIN_LASSO -DWIN32 -DMINGW32" &&
+ make install-strip CFLAGS="-DIN_LASSO -DWIN32 -DMINGW32" &&
+ #PATH=$PYDIR:$PATH make install-strip CFLAGS="-DIN_LASSO -DWIN32 -DMINGW32" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####To do: build DLL
+
+
+

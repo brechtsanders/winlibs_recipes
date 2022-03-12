@@ -1,0 +1,231 @@
+#export NAME="zziplib"
+#export STATUS=
+##export URL=http://zziplib.sourceforge.net/
+#export URL=https://github.com/gdraheim/zziplib
+#export BASENAME=zziplib
+#export DESCRIPTION="The zziplib library is intentionally lightweight, it offers the ability to easily extract data from files archived in a single zip file. Applications can bundle files into a single zip archive and access them. The implementation is based only on the (free) subset of compression with the zlib algorithm which is actually used by the zip/unzip tools."
+#export CATEGORY=compression
+#export TYPE=library
+##export VERSION=0.10.82
+##export VERSION=0.13.56
+##export VERSION=0.13.57
+##export VERSION=0.13.58
+##export VERSION=0.13.59
+##export VERSIONDATE=20100330
+##export VERSION=0.13.60
+##export VERSIONDATE=20111214
+##export VERSION=0.13.61
+##export VERSIONDATE=20120311
+##export VERSION=0.13.62
+##export VERSIONDATE=20120312
+##export VERSION=0.13.66
+##export VERSIONDATE=20170523
+#####zzip/mmapped.c:324:17: error: 'EBADMSG' undeclared (first use in this function)
+##export VERSION=0.13.68
+##export VERSIONDATE=20180206
+#####bins/unzzipcat-zip.c:160:20: error: 'FNM_PATHNAME' undeclared (first use in this function)
+#export VERSION=0.13.71
+#export VERSIONDATE=20200423
+#wl-showstatus --package-version
+#export DEPENDANCIES=zlib
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+##export LICENSEFILE=docs/COPYING.ZZIP
+#export LICENSEFILE=docs/COPYING.LIB
+##export LICENSETYPE="LGPL with restrictions"
+#export LICENSETYPE=MPL/LGPL
+##export DOWNLOADURL="http://sourceforge.net/projects/zziplib/files/ zziplib"
+#export DOWNLOADURL="https://github.com/gdraheim/zziplib/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/zziplib/$BASENAME-$VERSION.tar.bz2
+##export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/zziplib/zziplib13/$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/gdraheim/zziplib/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+##tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+##tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+### fix missing sleep and invalid assignment to typecast (version <= 0.10.82)
+##mv zziplib/zziptest.c zziplib/zziptest.c.bak
+##echo "#define sleep(t) _sleep((t) * 1000)" > zziplib/zziptest.c
+##cat zziplib/zziptest.c.bak >> zziplib/zziptest.c
+### fix missing sleep and invalid assignment to typecast (version <= 0.13.56)
+##mv bins/zziptest.c bins/zziptest.c.bak
+##echo "#define sleep(t) _sleep((t) * 1000)" > bins/zziptest.c
+##sed -e "s/(char \*)hdr += hdr->d_reclen;/hdr = (char*)hdr + hdr->d_reclen;/" bins/zziptest.c.bak >> bins/zziptest.c
+### fix missing redefinition of sleep in bins/zziptest.c (version <= 0.13.66)
+##mv bins/zziptest.c bins/zziptest.c.bak &&
+##sed -e "s?^#define sleep?//&?" bins/zziptest.c.bak >> bins/zziptest.c
+### fix error: lvalue required as unary '&' operand (version >= 10.13.56 <= 0.13.57)
+##patch -ulbf zzip/mmapped.c << EOF
+##--- zzip/mmapped.c  Sat Jun 27 20:42:48 2009
+##+++ zzip/mmapped.c  Wed Jul  8 13:04:14 2009
+##@@ -109,3 +109,4 @@
+##         return 0;
+##-    disk->buffer = _zzip_mmap(&disk->mapped, fd, 0, st.st_size);
+##+    long* p = &disk->mapped;
+##+    disk->buffer = _zzip_mmap(p, fd, 0, st.st_size);
+##     if (disk->buffer == MAP_FAILED)
+##EOF
+### don't stop on warnings (version = 0.13.56)
+##mv zzip/Makefile zzip/Makefile.bak
+##sed -e "s/-Wall -Wstrict-prototypes//" zzip/Makefile.bak > zzip/Makefile
+### fix missing ftello (version = 10.13.56)
+##mv zzip/fseeko.c zzip/fseeko.c.bak
+##sed -e "s/^\(#define ftello \)ftello/\1ftell/" zzip/fseeko.c.bak > zzip/fseeko.c
+### fix missing install directory (version = 10.13.56)
+##mkdir -p $INSTALLPREFIX/include/zzip
+##wl-showstatus build-install &&
+##make install || ( touch $INSTALLPREFIX/include/zzip/wrap.h && make install )
+##make -C test test
+### fix missing strcasecmp
+##cat >> config.h.in << EOF
+###ifndef HAVE_STRCASECMP
+###include <string.h>
+##inline int strcasecmp (const char* s, const char* t) { return stricmp((s), (t))
+###define HAVE_STRCASECMP 1
+###endif
+##EOF
+### fix missing strcasecmp in zzip/stat.c
+##mv zzip/stat.c zzip/stat.c.bak &&
+##sed -e "s/\bstrcasecmp/stricmp/g" zzip/stat.c.bak > zzip/stat.c
+### fix missing strcasecmp in zzip/mmapped.c
+##mv zzip/mmapped.c zzip/mmapped.c.bak &&
+##sed -e "s/\bstrcasecmp/stricmp/g" zzip/mmapped.c.bak > zzip/mmapped.c
+## fix missing EBADMSG in zzip/mmapped.c (version >= 0.13.66)
+#for F in $(grep -l EBADMSG zzip/*.c); do
+# mv $F $F.bak &&
+# #echo "#define EBADMSG 84" > $F &&
+# echo "#define EBADMSG 9905" > $F &&
+# cat $F.bak >> $F
+#done
+## fix missing strndup in bins/unzzipcat-zip.c (version >= 0.13.66)
+#for F in $(grep -l strndup */*.c); do
+#mv $F $F.bak
+#cat > $F << EOF
+##include <malloc.h>
+##include <string.h>
+#static inline char* strndup (const char* s, size_t n)
+#{
+#  char* result;
+#  size_t len = strlen(s);
+#  if (len > n)
+#    len = n;
+#  result = (char*)malloc(len + 1);
+#  if (!result)
+#    return 0;
+#  result[len] = 0;
+#  return (char*)memcpy(result, s, len);
+#}
+#EOF
+#cat $F.bak >> $F
+#done
+## fix invalid -Wl,-mconsole in configure (version >= 0.13.61)
+#sed -i.bak -e "s/\${wl}-mconsole//" configure
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-builddir &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-builddir LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-builddir --with-zlib=$MINGWPREFIX LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-builddir --with-zlib=$MINGWPREFIX LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-sdl --disable-debug --disable-mmap --with-zlib=$MINGWPREFIX LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# ## fix missing FNM_NOESCAPE/FNM_PATHNAME/FNM_PERIOD (version >= 0.13.68)
+# #echo "#define FNM_NOESCAPE" >> config.h &&
+# #echo "#define FNM_PATHNAME" >> config.h &&
+# #echo "#define FNM_PERIOD 1" >> config.h &&
+# wl-showstatus build-install &&
+# make -C zzip install-strip &&
+# make -C zzipwrap install-strip &&
+# make -C SDL install-strip &&
+# make -C bins install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####To do: fix prefix in /lib/pkgconfig/zzipfseeko.pc and /lib/pkgconfig/zzipmmapped.pc
+
+
+
+export NAME="zziplib"
+export STATUS=
+#export URL=http://zziplib.sourceforge.net/
+export URL=https://github.com/gdraheim/zziplib
+export BASENAME=zziplib
+export DESCRIPTION="The zziplib library is intentionally lightweight, it offers the ability to easily extract data from files archived in a single zip file. Applications can bundle files into a single zip archive and access them. The implementation is based only on the (free) subset of compression with the zlib algorithm which is actually used by the zip/unzip tools."
+export CATEGORY=compression
+export TYPE=library
+export VERSION=0.13.72
+export VERSIONDATE=20210105
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja,xmlto,zip
+#export LICENSEFILE=docs/COPYING.ZZIP
+export LICENSEFILE=docs/COPYING.LIB
+#export LICENSETYPE="LGPL with restrictions"
+export LICENSETYPE=MPL/LGPL
+#export DOWNLOADURL="https://github.com/gdraheim/zziplib/releases"
+export DOWNLOADURL="https://github.com/gdraheim/zziplib/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/gdraheim/zziplib/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/gdraheim/zziplib/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix zzip/write.h (version >= 0.13.72)
+patch -ulbf zzip/write.h << EOF
+@@ -12,7 +12,12 @@
+
++_zzip_export
+ ZZIP_DIR*    zzip_dir_creat_ext_io(zzip_char_t* name, int o_mode,
+                                    zzip_strings_t* ext, zzip_plugin_io_t io);
++_zzip_export
+ ZZIP_DIR*    zzip_dir_creat(zzip_char_t* name, int o_mode);
++_zzip_export
+ int          zzip_file_mkdir(ZZIP_DIR* dir, zzip_char_t* name, int o_mode);
++_zzip_export
+ ZZIP_FILE*   zzip_file_creat(ZZIP_DIR* dir, zzip_char_t* name, int o_mode);
++_zzip_export
+ zzip_ssize_t zzip_file_write(ZZIP_FILE* file,
+@@ -20,4 +25,7 @@
+
++_zzip_export
+ ZZIP_DIR*    zzip_createdir(zzip_char_t* name, int o_mode);
++_zzip_export
+ zzip_ssize_t zzip_write(ZZIP_FILE* file, const void* ptr, zzip_size_t len);
++_zzip_export
+ zzip_size_t  zzip_fwrite(const void* ptr, zzip_size_t len,
+EOF
+# fix SDL/SDL_rwops_zzip.c (version >= 0.13.72)
+patch -ulbf SDL/SDL_rwops_zzip.c << EOF
+@@ -22,2 +22,3 @@
+
++#undef _zzip_read
+ static int _zzip_read(SDL_RWops *context, void *ptr, int size, int maxnum)
+@@ -27,2 +28,3 @@
+
++#undef _zzip_write
+ static int _zzip_write(SDL_RWops *context, const void *ptr, int size, int num)
+EOF
+# don't add release postfix to library names
+sed -i.bak -e "s/SET_TARGET_PROPERTIES.*RELEASE_POSTFIX/#&/i" zzip/CMakeLists.txt zzipwrap/CMakeLists.txt
+#set_target_properties(libzzip PROPERTIES OUTPUT_NAME "zzip" RELEASE_POSTFIX "-${RELNUM}")
+sed -i.bak -e "s/\(SET_TARGET_PROPERTIES.*\) RELEASE_POSTFIX [^ )]*/\1/i" zzip/CMakeLists.txt zzipwrap/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_STATIC_LIBS:BOOL=ON -DZZIP_PKGCONFIG:BOOL=ON -DZZIP_INSTALL_ACLOCAL:BOOL=ON -DZZIP_LIBTOOL:BOOL=OFF -DZZIP_COMPAT:BOOL=ON -DMSVC_STATIC_RUNTIME:BOOL=OFF -DZZIP_MANPAGES:BOOL=ON -DZZIP_TESTCVE:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC_LIBS:BOOL=OFF -DZZIP_PKGCONFIG:BOOL=ON -DZZIP_INSTALL_ACLOCAL:BOOL=ON -DZZIP_LIBTOOL:BOOL=OFF -DZZIP_COMPAT:BOOL=ON -DMSVC_STATIC_RUNTIME:BOOL=OFF -DZZIP_MANPAGES:BOOL=ON -DZZIP_TESTCVE:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ # fix .pc files (version >= 0.13.72)
+ sed -i -e "s?^\(prefix=\).*?\1$(cygpath -m $INSTALLPREFIX)?" $INSTALLPREFIX/lib/pkgconfig/zzipfseeko.pc $INSTALLPREFIX/lib/pkgconfig/zzipmmapped.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

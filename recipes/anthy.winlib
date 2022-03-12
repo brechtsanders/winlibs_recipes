@@ -1,0 +1,113 @@
+export NAME="Anthy"
+export STATUS=
+#export URL=http://anthy.osdn.jp/
+export URL=https://osdn.net/projects/anthy/
+export BASENAME=anthy
+export DESCRIPTION="Anthy is a system for Japanese input method. It converts Hiragana text to Kana Kanji mixed text."
+export CATEGORY=internationalization
+export TYPE=library
+export VERSION=3200d
+export VERSIONDATE=20201226
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://osdn.net/projects/anthy/releases/ anthy- .tar.gz/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL="https://osdn.net/frs/redir.php?m=acc&f=anthy%2F1248%2Fanthy-$VERSION.tar.gz"
+export DOWNLOADSOURCEURL=https://acc.dl.osdn.jp/anthy/1248/anthy-3200d.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/netinet
+echo "#include <winsock2.h>" > winfix/netinet/in.h
+# fix src-diclib/conf.c (version >= 3200d)
+patch -ulbf src-diclib/conf.c << EOF
+@@ -6,3 +6,8 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <pwd.h>
++#else
++struct passwd {};
++#include <winsock2.h>
++#endif
+ #include <time.h>
+@@ -143,4 +148,8 @@
+     }
++#ifdef _WIN32
++    add_val("HOME", getenv("APPDATA"));
++#else
+     pw = getpwuid(getuid());
+     add_val("HOME", pw->pw_dir);
++#endif
+     alloc_session_id();
+EOF
+# fix src-diclib/record.c (version >= 3200d)
+patch -ulbf src-diclib/record.c << EOF
+@@ -1282,3 +1282,7 @@
+     /*fprintf(stderr, "Anthy: Failed to open anthy directory(%s).\\n", dn);*/
++#ifdef _WIN32
++    r = mkdir(dn);
++#else
+     r = mkdir(dn, S_IRWXU);
++#endif
+     if (r == -1){
+@@ -1650,2 +1654,3 @@
+   }
++#ifndef _WIN32
+   if (!lockf(rs->fd_lock, F_LOCK, 0)) {
+@@ -1654,2 +1659,3 @@
+   }
++#endif
+ }
+EOF
+# fix src-util/agent.c (version >= 3200d)
+patch -ulbf src-util/agent.c << EOF
+@@ -22,2 +22,5 @@
+ #include <assert.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#endif
+
+EOF
+# fix redefinition of log2 in src-splitter/wordlist.c (version >= 3200d)
+patch -ulbf src-splitter/wordlist.c << EOF
+@@ -71,3 +71,7 @@
+ static int calc_score_by_len(int x);
++#ifdef __MINGW32__
++#include <math.h>
++#else
+ static int log2(int );
++#endif
+ static void wordseq_rule_dtor(void *);
+@@ -137,2 +141,3 @@
+
++#ifndef __MINGW32__
+ static int
+@@ -157,2 +162,3 @@
+ }
++#endif
+
+EOF
+wl-showstatus configure &&
+ # fix shared library support
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build &&
+ ( make || ( make -Csrc-main LIBS="-Wl,--as-needed -L$(pwd)/src-diclib/.libs -lanthydic" && make -Csrc-util LIBS="-Wl,--as-needed -L$(pwd)/src-main/.libs -lanthy" && make ) || make -j1) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

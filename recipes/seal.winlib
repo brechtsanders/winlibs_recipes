@@ -1,0 +1,121 @@
+export NAME="Microsoft SEAL"
+export STATUS=
+export URL=https://www.microsoft.com/en-us/research/project/microsoft-seal/
+#export URL=https://github.com/microsoft/SEAL
+export BASENAME=seal
+export DESCRIPTION="Microsoft SEAL - powered by open-source homomorphic encryption technology - provides a set of encryption libraries that allow computations to be performed directly on encrypted data. This enables software engineers to build end-to-end encrypted data storage and computation services where the customer never needs to share their key with the service."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=3.6.1
+#export VERSIONDATE=20201221
+#export VERSION=3.6.2
+#export VERSIONDATE=20210213
+#export VERSION=3.6.3
+#export VERSIONDATE=20210407
+#export VERSION=3.6.4
+#export VERSIONDATE=20210414
+#export VERSION=3.6.5
+#export VERSIONDATE=20210519
+#export VERSION=3.6.6
+#export VERSIONDATE=20210615
+#export VERSION=3.7.0
+#export VERSIONDATE=20210915
+#export VERSION=3.7.1
+#export VERSIONDATE=20210923
+export VERSION=3.7.2
+export VERSIONDATE=20211113
+####SEAL_C requires 64-bit platform
+wl-showstatus --package-version
+export DEPENDANCIES=msgsl,zlib,zstd
+export OPTIONALDEPENDANCIES=
+#export OPTIONALDEPENDANCIES=hexl
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/microsoft/SEAL/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/microsoft/SEAL/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd SEAL-$VERSION
+# fix invalid __always_inline in native/src/seal/util/gcc.h (version >= 3.6.2)
+patch -ulbf native/src/seal/util/gcc.h << EOF
+@@ -19,3 +19,5 @@
+
++#ifndef __MINGW32__
+ #define SEAL_FORCE_INLINE __always_inline
++#endif
+
+EOF
+# fix detection of zstd and building shared library on Windows
+patch -ulbf CMakeLists.txt << EOF
+@@ -170,22 +170,5 @@
+     else()
+-        find_package(zstd CONFIG)
+-        if(NOT zstd_FOUND)
+-            message(FATAL_ERROR "Zstandard: not found")
+-        else()
+-            if(TARGET zstd::libzstd_static)
+-                set(zstd_static "zstd::libzstd_static")
+-            elseif(TARGET libzstd)
+-                get_target_property(libzstd_type libzstd TYPE)
+-                if(libzstd_type STREQUAL "STATIC_LIBRARY")
+-                    set(zstd_static "libzstd")
+-                    message(STATUS "Zstandard: found")
+-                else()
+-                    message(FATAL_ERROR "Zstandard: must be static")
+-                endif()
+-            elseif(TARGET zstd::libzstd_shared)
+-                message(FATAL_ERROR "Zstandard: must be static")
+-            else()
+-                message(FATAL_ERROR "Zstandard: not found")
+-            endif()
+-        endif()
++        find_package(PkgConfig)
++        pkg_check_modules(ZSTD libzstd IMPORTED_TARGET GLOBAL)
++        set(zstd_static "PkgConfig::ZSTD")
+     endif()
+@@ -201,3 +184,3 @@
+ option(BUILD_SHARED_LIBS \${BUILD_SHARED_LIBS_STR} OFF)
+-if(WIN32 AND BUILD_SHARED_LIBS)
++if(MSVC AND BUILD_SHARED_LIBS)
+     message(FATAL_ERROR "On Windows only static build is supported; set \`BUILD_SHARED_LIBS=OFF\`")
+@@ -420,9 +403,2 @@
+
+-    if(BUILD_SHARED_LIBS)
+-        message(FATAL_ERROR "SEAL_C requires \`BUILD_SHARED_LIBS=OFF\`")
+-    endif()
+-
+-    if(NOT SEAL_BUILD_DEPS)
+-        message(FATAL_ERROR "SEAL_C requires \`SEAL_BUILD_DEPS=ON\`")
+-    endif()
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSEAL_BUILD_SEAL_C:BOOL=OFF -DSEAL_BUILD_DEPS:BOOL=OFF -DSEAL_USE_ZSTD:BOOL=ON -DSEAL_BUILD_EXAMPLES:BOOL=OFF -DSEAL_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSEAL_BUILD_STATIC_SEAL_C:BOOL=ON -DSEAL_BUILD_SEAL_C:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DSEAL_BUILD_DEPS:BOOL=OFF -DSEAL_USE_ZSTD:BOOL=ON -DSEAL_BUILD_EXAMPLES:BOOL=OFF -DSEAL_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSEAL_BUILD_STATIC_SEAL_C:BOOL=ON -DSEAL_BUILD_SEAL_C:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DSEAL_BUILD_DEPS:BOOL=ON -DSEAL_USE_ZSTD:BOOL=ON -DSEAL_USE_INTEL_HEXL:BOOL=OFF -DSEAL_BUILD_EXAMPLES:BOOL=OFF -DSEAL_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Daligned_alloc=_aligned_malloc" -S. -Bbuild_static &&
+ sed -i.bak -e "s?[^ ]*\\llvm-ar\.exe?$(cygpath -m $(which ar.exe))?g; s?\*\.o\b?&bj?g" build_static/build.ninja &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSEAL_BUILD_SEAL_C:BOOL=OFF -DSEAL_BUILD_DEPS:BOOL=OFF -DSEAL_USE_ZSTD:BOOL=ON -DSEAL_BUILD_EXAMPLES:BOOL=OFF -DSEAL_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSEAL_BUILD_STATIC_SEAL_C:BOOL=OFF -DSEAL_BUILD_SEAL_C:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DSEAL_BUILD_DEPS:BOOL=OFF -DSEAL_USE_ZSTD:BOOL=ON -DSEAL_BUILD_EXAMPLES:BOOL=OFF -DSEAL_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSEAL_BUILD_STATIC_SEAL_C:BOOL=OFF -DSEAL_BUILD_SEAL_C:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DSEAL_BUILD_DEPS:BOOL=ON -DSEAL_USE_ZSTD:BOOL=ON -DSEAL_USE_INTEL_HEXL:BOOL=OFF -DSEAL_BUILD_EXAMPLES:BOOL=OFF -DSEAL_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Daligned_alloc=_aligned_malloc" -S. -Bbuild_shared &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lbcrypt/; s?-lseal?lib/libseal.dll.a?" build_shared/build.ninja &&
+ sed -i.bak2 -e "s?[^ ]*\\llvm-ar\.exe?$(cygpath -m $(which ar.exe))?g; s?\*\.o\b?&bj?g" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ cp -u $INSTALLPREFIX/lib/libseal-*.a $INSTALLPREFIX/lib/libseal.a &&
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  cp -u $INSTALLPREFIX/lib/libsealc-*.a $INSTALLPREFIX/lib/libsealc.a
+ fi &&
+ wl-showstatus build-install &&
+ ( ninja -Cbuild_shared install/strip || ( ninja -Cbuild_shared libseal.dll && ninja -Cbuild_shared install/strip )) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf SEAL-$VERSION
+####TO DO: -DSEAL_BUILD_SEAL_C:BOOL=ON on 32-bit Windows (probably not possible)
+
+
+

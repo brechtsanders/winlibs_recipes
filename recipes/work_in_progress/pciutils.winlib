@@ -1,0 +1,437 @@
+export NAME="PCI Utilities"
+export STATUS=
+export URL=http://mj.ucw.cz/sw/pciutils/
+export BASENAME=pciutils
+export DESCRIPTION="The PCI Utilities are a collection of programs for inspecting and manipulating configuration of PCI devices, all based on a common portable library libpci which offers access to the PCI configuration space on a variety of operating systems."
+export CATEGORY=system
+export TYPE=library,application
+#export VERSION=3.2.1
+#export VERSIONDATE=20140731
+#export VERSION=3.3.0
+#export VERSIONDATE=20141110
+#export VERSION=3.3.1
+#export VERSIONDATE=20150411
+#export VERSION=3.4.0
+#export VERSIONDATE=20150915
+#export VERSION=3.4.1
+#export VERSIONDATE=20160405
+#export VERSION=3.5.0
+#export VERSIONDATE=20160520
+#export VERSION=3.5.1
+#export VERSIONDATE=20160522
+#export VERSION=3.5.2
+#export VERSIONDATE=20161004
+#export VERSION=3.5.3
+#export VERSIONDATE=20170215
+#export VERSION=3.5.4
+#export VERSIONDATE=20170226
+####lspci.o:lspci.c:(.text.startup+0x3d): undefined reference to `pci_filter_init'
+####lspci.o:lspci.c:(.text+0x37c): undefined reference to `pci_filter_match'
+#export VERSION=3.5.5
+#export VERSIONDATE=20170706
+#export VERSION=3.5.6
+#export VERSIONDATE=20171117
+#export VERSION=3.6.0
+#export VERSIONDATE=20180701
+#export VERSION=3.6.1
+#export VERSIONDATE=20180712
+#export VERSION=3.6.2
+#export VERSIONDATE=20180812
+#export VERSION=3.6.4
+#export VERSIONDATE=20200407
+export VERSION=3.7.0
+export VERSIONDATE=20200531
+####lib/i386-ports.c:(.text+0x86): undefined reference to `_outpd'
+####lspci: Cannot find any working access method.
+wl-showstatus --package-version
+export DEPENDANCIES=winio
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="ftp://atrey.karlin.mff.cuni.cz/pub/linux/pci/"
+export DOWNLOADURL="http://mj.ucw.cz/download/linux/pci/"
+#export DOWNLOADURL="https://github.com/pciutils/pciutils/releases/"
+#export DOWNLOADURL="https://github.com/pciutils/pciutils/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://atrey.karlin.mff.cuni.cz/pub/linux/pci/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://mj.ucw.cz/download/linux/pci/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/pciutils/pciutils/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+patch -ulbf lib/types.h << EOF
+@@ -13,2 +13,8 @@
+ #ifdef PCI_OS_WINDOWS
++#ifdef __MINGW32__
++#include <stdint.h>
++typedef uint8_t u8;
++typedef uint16_t u16;
++typedef uint32_t u32;
++#else
+ /* On Windows compilers, use <windef.h> */
+@@ -18,2 +24,3 @@
+ typedef DWORD u32;
++#endif
+ typedef unsigned __int64 u64;
+EOF
+## fix missing symver in lib/internal.h (version <= 3.2.1)
+#patch -ulbf lib/internal.h << EOF
+#--- lib/internal.h  2013-04-01 15:36:18 +0200
+#+++ lib/internal.h  2014-07-31 13:45:46 +0200
+#@@ -14,4 +14,8 @@
+# #define DEFINE_ALIAS(_decl, _for) extern _decl __attribute__((alias(#_for)))
+#+#ifndef __MINGW32__
+# #define SYMBOL_VERSION(_int, _ext) asm(".symver " #_int "," #_ext)
+# #else
+#+#define SYMBOL_VERSION(_int, _ext)
+#+#endif
+#+#else
+# #define STATIC_ALIAS(_decl, _for) _decl { return _for; }
+#EOF
+# fix missing symver in lib/internal.h (version >= 3.3.0)
+patch -ulbf lib/internal.h << EOF
+--- lib/internal.h  2014-11-02 12:07:24 +0100
++++ lib/internal.h  2014-11-10 21:14:26 +0100
+@@ -23,3 +23,7 @@
+ #define DEFINE_ALIAS(_decl, _for) extern _decl __attribute__((alias(#_for)))
++#ifndef __MINGW32__
+ #define SYMBOL_VERSION(_int, _ext) asm(".symver " #_int "," #_ext)
++#else
++#define SYMBOL_VERSION(_int, _ext)
++#endif
+ #endif
+EOF
+## fix missing pci_fill_info in lib/access.c
+#echo "int pci_fill_info(struct pci_dev *d, int flags) { return pci_fill_info_v32(d, flags); }" >> lib/access.c
+# fix pciutils.h
+sed -i.bak -e 's/^\(#define PCIUTILS_VERSION \).*$/\1"'$VERSION'"/' pciutils.h
+# manually create config.h and config.mk
+cp -f win32/config.mk .
+cp -f win32/config.h .
+echo "#define PCI_OS_MSYS_NT" >> config.h
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ echo "#undef PCI_ARCH_I386" >> config.h &&
+ echo "#define PCI_ARCH_X86_64" >> config.h
+fi
+# manually create lib/config.h and lib/config.mk
+echo "#include \"../config.h\"" > lib/config.h
+echo "WITH_LIBS=" > lib/config.mk
+#echo "WITH_LIBS=-Wl,--as-needed -lkernel32" > lib/config.mk
+## fix OS detection problem in lib/config.h
+#mv lib/config.h lib/config.h.bak &&
+#grep -v "^#define PCI_OS_[0-9]" lib/config.h.bak > lib/config.h &&
+#echo "#define PCI_OS_WINDOWS" >> lib/config.h
+
+sed -e "s/PCI_ARCH_I386/$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo PCI_ARCH_X86_64; else echo PCI_ARCH_I386; fi)/" win32/config.mk > lib/config.mk
+sed -e "s/PCI_ARCH_I386/$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo PCI_ARCH_X86_64; else echo PCI_ARCH_I386; fi)/" win32/config.h > lib/config.h
+
+wl-showstatus build-install &&
+ make all install SHARED=no ZLIB=yes DNS=no LIBKMOD=no PREFIX=$INSTALLPREFIX PCI_HAVE_PM_INTEL_CONF=1 PCILIB=libpci.a PCI_IDS=pci.ids CFLAGS="-DPCI_OS_WINDOWS -DPCI_CONFIG_H -O2 -Wall -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes" &&
+ #rm $INSTALLPREFIX/lib/libpci..[0-9]* &&
+ $INSTALLPREFIX/sbin/lspci.exe &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: on 64-bit fix missing _outp/_outpw/_outpd/_inp/_inpw/_inpd
+
+
+
+patch -ulbf lib/configure << EOF
+--- lib/configure  2013-04-01 21:47:38 +0200
++++ lib/configure  2014-07-31 13:40:06 +0200
+@@ -42,2 +42,3 @@
+        fi
++       uname -s | grep -q MINGW32 && sys=mingw
+        HOST=${3:-$cpu-$sys}
+@@ -117,3 +118,3 @@
+                ;;
+-       gnu)
++       gnu|mingw)
+                echo_n " i386-ports"
+EOF
+
+
+
+  ./configure --help
+  head COPYING* LICENSE*
+  ls -l COPYING* LICENSE*
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ sed -i.orig "s/^\(#define PCI_OS_[0-9]*\)\.\([0-9]*\)/\1\2/" lib/config.h &&
+ wl-showstatus build &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm -f CMakeCache.txt
+#wl-showstatus configure
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####See also: http://eternallybored.org/misc/pciutils/
+####To do: build lib/
+
+
+
+## 3.1.9 see also http://eternallybored.org/misc/pciutils/
+#patch -ulbf Makefile << EOF
+#--- Makefile  2012-01-14 15:07:55.000000000 +0100
+#+++ Makefile  22012-02-19 15:06:57.152001592 +0100
+#@@ -24,6 +24,12 @@
+# # ABI version suffix in the name of the shared library
+# ABI_VERSION=.3
+# 
+#+ifdef HOST
+#+ifndef CROSS_COMPILE
+#+CROSS_COMPILE=\$(HOST)-
+#+endif
+#+endif
+#+
+# # Installation directories
+# PREFIX=/usr/local
+# SBINDIR=\$(PREFIX)/sbin
+#@@ -39,6 +45,7 @@
+# DIRINSTALL=install -d
+# STRIP=-s
+# CC=\$(CROSS_COMPILE)gcc
+#+LD=\$(CROSS_COMPILE)ld
+# AR=\$(CROSS_COMPILE)ar
+# RANLIB=\$(CROSS_COMPILE)ranlib
+# 
+#@@ -52,7 +59,7 @@
+# 
+# export
+# 
+#-all: lib/\$(PCILIB) lspci setpci example lspci.8 setpci.8 pcilib.7 update-pciids update-pciids.8 \$(PCI_IDS)
+#+all: lib/\$(PCILIB) lspci\$(EXEEXT) setpci\$(EXEEXT) example\$(EXEEXT) lspci.8 setpci.8 pcilib.7 update-pciids update-pciids.8 \$(PCI_IDS)
+# 
+# lib/\$(PCILIB): \$(PCIINC) force
+#         \$(MAKE) -C lib all
+#@@ -62,8 +69,10 @@
+# lib/config.h lib/config.mk:
+#         cd lib && ./configure
+# 
+#-lspci: lspci.o ls-vpd.o ls-caps.o ls-ecaps.o ls-kernel.o ls-tree.o ls-map.o common.o lib/\$(PCILIB)
+#-setpci: setpci.o common.o lib/\$(PCILIB)
+#+lspci\$(EXEEXT): lspci.o ls-vpd.o ls-caps.o ls-ecaps.o ls-kernel.o ls-tree.o ls-map.o common.o lib/\$(PCILIB)
+#+`printf "\\t"`\$(CC) \$(LDFLAGS) -o \$@ \$+ \$(LDLIBS)
+#+setpci\$(EXEEXT): setpci.o common.o lib/\$(PCILIB)
+#+`printf "\\t"`\$(CC) \$(LDFLAGS) -o \$@ \$+ \$(LDLIBS)
+# 
+# LSPCIINC=lspci.h pciutils.h \$(PCIINC)
+# lspci.o: lspci.c \$(LSPCIINC)
+#@@ -82,7 +91,8 @@
+#         chmod +x \$@
+# 
+# # The example of use of libpci
+#-example: example.o lib/\$(PCILIB)
+#+example\$(EXEEXT): example.o lib/\$(PCILIB)
+#+`printf "\\t"`\$(CC) \$(LDFLAGS) -o \$@ \$+ \$(LDLIBS)
+# example.o: example.c \$(PCIINC)
+# 
+# %: %.o
+#@@ -93,7 +103,7 @@
+# 
+# clean:
+#         rm -f \`find . -name "*~" -o -name "*.[oa]" -o -name "\\#*\\#" -o -name TAGS -o -name core -o -name "*.orig"\`
+#-        rm -f update-pciids lspci setpci example lib/config.* *.[78] pci.ids.* lib/*.pc lib/*.so lib/*.so.*
+#+`printf "\\t"`rm -f update-pciids lspci\$(EXEEXT) setpci\$(EXEEXT) example\$(EXEEXT) lib/config.* *.[78] pci.ids.* lib/*.pc lib/*.so lib/*.so.*
+#         rm -rf maint/dist
+# 
+# distclean: clean
+#@@ -101,7 +111,7 @@
+# install: all
+# # -c is ignored on Linux, but required on FreeBSD
+#         \$(DIRINSTALL) -m 755 \$(DESTDIR)\$(SBINDIR) \$(DESTDIR)\$(IDSDIR) \$(DESTDIR)\$(MANDIR)/man8 \$(DESTDIR)\$(MANDIR)/man7
+#-        \$(INSTALL) -c -m 755 \$(STRIP) lspci setpci \$(DESTDIR)\$(SBINDIR)
+#+`printf "\\t"`\$(INSTALL) -c -m 755 \$(STRIP) lspci\$(EXEEXT) setpci\$(EXEEXT) \$(DESTDIR)\$(SBINDIR)
+#         \$(INSTALL) -c -m 755 update-pciids \$(DESTDIR)\$(SBINDIR)
+#         \$(INSTALL) -c -m 644 \$(PCI_IDS) \$(DESTDIR)\$(IDSDIR)
+#         \$(INSTALL) -c -m 644 lspci.8 setpci.8 update-pciids.8 \$(DESTDIR)\$(MANDIR)/man8
+#@@ -122,7 +132,7 @@
+# endif
+# 
+# uninstall: all
+#-        rm -f \$(DESTDIR)\$(SBINDIR)/lspci \$(DESTDIR)\$(SBINDIR)/setpci \$(DESTDIR)\$(SBINDIR)/update-pciids
+#+`printf "\\t"`rm -f \$(DESTDIR)\$(SBINDIR)/lspci\$(EXEEXT) \$(DESTDIR)\$(SBINDIR)/setpci\$(EXEEXT) \$(DESTDIR)\$(SBINDIR)/update-pciids
+#         rm -f \$(DESTDIR)\$(IDSDIR)/\$(PCI_IDS)
+#         rm -f \$(DESTDIR)\$(MANDIR)/man8/lspci.8 \$(DESTDIR)\$(MANDIR)/man8/setpci.8 \$(DESTDIR)\$(MANDIR)/man8/update-pciids.8
+#         rm -f \$(DESTDIR)\$(MANDIR)/man7/pcilib.7
+#EOF
+#patch -ulbf lib/configure << EOF
+#--- lib/configure        2011-01-07 22:04:28.000000000 +0100
+#+++ lib/configure        2012-02-19 15:05:07.790639456 +0100
+#@@ -36,10 +36,14 @@
+#         then
+#                 sys=freebsd
+#         fi
+#-        if [ "\$sys" = "CYGWIN_NT-5.1" -o "\$sys" = "CYGWIN_NT-6.0" ]
+#-        then
+#-                sys=cygwin
+#-        fi
+#+        case \$sys in
+#+                *CYGWIN*)
+#+                        sys=cygwin
+#+                        ;;
+#+                *MINGW*)
+#+                        sys=mingw
+#+                        ;;
+#+        esac
+#         HOST=\${3:-\$cpu-\$sys}
+# fi
+# [ -n "\$RELEASE" ] && rel="\${RELEASE}"
+#@@ -47,13 +51,24 @@
+# host=\`echo \$HOST | sed -e 's/^\\([^-]*\\)-\\([^-]*\\)-\\([^-]*\\)-\\([^-]*\\)\$/\\1-\\3/' -e 's/^\\([^-]*\\)-\\([^-]*\\)\$/\\1--\\2/' | tr '[A-Z]' '[a-z]'\`
+# cpu=\`echo \$host | sed 's/^\\([^-]*\\)-\\([^-]*\\)-\\(.*\\)\$/\\1/'\`
+# sys=\`echo \$host | sed 's/^\\([^-]*\\)-\\([^-]*\\)-\\(.*\\)\$/\\3/'\`
+#+
+#+#fix up cpu when cross-compiling
+#+cpu=\`echo \$cpu | sed 's:^i[3456]86\$:i386:'\`
+#+
+# echo " \$host \$rel \$cpu \$sys"
+# 
+# c=config.h
+# m=config.mk
+# echo >\$c '#define PCI_CONFIG_H'
+# echo >>\$c "#define PCI_ARCH_\`echo \$cpu | tr '[a-z]' '[A-Z]'\`"
+#-echo >>\$c "#define PCI_OS_\`echo \$sys | tr '[a-z]' '[A-Z]'\`"
+#+case \$sys in
+#+        mingw*)
+#+                echo >>\$c "#define PCI_OS_WINDOWS"
+#+                ;;
+#+        *)
+#+                echo >>\$c "#define PCI_OS_\`echo \$sys | tr '[a-z]' '[A-Z]'\`"
+#+                ;;
+#+esac
+# echo >\$m 'WITH_LIBS='
+# 
+# echo_n "Looking for access methods..."
+#@@ -123,6 +138,13 @@
+#                 echo_n " i386-ports"
+#                 echo >>\$c '#define PCI_HAVE_PM_INTEL_CONF'
+#                 echo >>\$m 'WITH_LIBS+=-lioperm'
+#+                echo >>\$m 'EXEEXT=.exe'
+#+                ;;
+#+        mingw*)
+#+                echo_n " i386-ports"
+#+                echo >>\$c '#define PCI_HAVE_PM_INTEL_CONF'
+#+                echo >>\$m 'EXEEXT=.exe'
+#+                DNS=no
+#                 ;;
+#         beos|haiku)
+#                 case \$cpu in
+#@@ -160,7 +182,15 @@
+# else
+#         echo >>\$c '#define PCI_IDS "pci.ids"'
+# fi
+#-echo >>\$c "#define PCI_PATH_IDS_DIR \\"\$IDSDIR\\""
+#+
+#+case \$sys in
+#+        mingw*)
+#+                echo >>\$c "#define PCI_PATH_IDS_DIR \\".\\""
+#+                ;;
+#+        *)
+#+                echo >>\$c "#define PCI_PATH_IDS_DIR \\"\$IDSDIR\\""
+#+                ;;
+#+esac
+# 
+# echo_n "Checking for DNS support... "
+# if [ "\$DNS" = yes -o "\$DNS" = no ] ; then
+#EOF
+
+
+
+export NAME="PCI Utilities"
+export STATUS=
+export URL=https://github.com/gitGNU/pciutils/tree/windows
+export BASENAME=pciutils
+export DESCRIPTION="The PCI Utilities package contains a library for portable access to PCI bus configuration registers and several utilities based on this library."
+export CATEGORY=hardware
+export TYPE=library
+export VERSION=3.6.2
+export VERSIONDATE=20220126
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/gitGNU/pciutils/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/gitGNU/pciutils/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix pciutils.h
+sed -i.bak -e 's/^\(#define PCIUTILS_VERSION \).*$/\1"'$VERSION'"/' pciutils.h
+# manually copy configuration files
+cp -f win32/config.{h,mk} lib/
+wl-showstatus build-intakk &&
+ make install PREFIX=$INSTALLPREFIX PCI_IDS=pci.ids &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: on 64-bit fix missing _outp/_outpw/_outpd/_inp/_inpw/_inpd
+####See also: https://eternallybored.org/misc/pciutils/src/
+
+
+
+#export NAME="PCI Utilities"
+#export STATUS=
+#export URL=http://mj.ucw.cz/sw/pciutils/
+#export BASENAME=pciutils
+#export DESCRIPTION="The PCI Utilities are a collection of programs for inspecting and manipulating configuration of PCI devices, all based on a common portable library libpci which offers access to the PCI configuration space on a variety of operating systems."
+#export CATEGORY=system
+#export TYPE=library,application
+#export VERSION=3.5.5
+#export VERSIONDATE=20220210
+#wl-showstatus --package-version
+#export DEPENDANCIES=directio
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="https://eternallybored.org/misc/pciutils/src/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://eternallybored.org/misc/pciutils/src/pciutils-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/pciutils-$VERSION.tar.gz
+#cd pciutils-$VERSION
+## remove missing alloca.h from lspci.h
+#sed -i.bak -e "s?^#include <alloca\.h>?#include <malloc.h>?" lspci.h
+#cp win32/config.h lib/config.h
+#wl-showstatus build &&
+# make PCILIB=libpci.a PCI_OS_WINDOWS=yes PCI_ARCH_I386=yes PCI_HAVE_PM_INTEL_CONF=yes PCILIB=libpciutils.a PCILIBPC=libpciutils.pc CC=gcc LD=ld AR=ar RANLIB=ranlib &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pciutils-$VERSION
+
+
+

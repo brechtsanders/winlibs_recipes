@@ -1,0 +1,99 @@
+export NAME="EET"
+export STATUS=
+#export URL=http://docs.enlightenment.org/auto/eet/
+export URL=http://trac.enlightenment.org/e/wiki/Eet
+export BASENAME=libeet
+export DESCRIPTION="EET is a tiny library designed to write an arbitary set of chunks of data to a file and optionally compress each chunk (very much like a zip file) and allow fast random-access reading of the file later on. EET files are perfect for storing data that is written once (or rarely) and read many times, especially when the program does not want to have to read all the data in at once. Use this library when you need to pack C structure and you want to retrieve it quickly with as few as possible memory use. You can also use it to serialize data quickly and exchange them between two program over ipc or network link."
+export CATEGORY=compression,dataprocessing
+export TYPE=library
+#export VERSION=1.3.2
+#export VERSIONDATE=20101116
+#export VERSION=1.4.0
+#export VERSIONDATE=20110202
+#export VERSION=1.4.1
+#export VERSIONDATE=20110525
+#export VERSION=1.5.0
+#export VERSIONDATE=20111202
+#export VERSION=1.5.1
+#export VERSIONDATE=20120607
+#export VERSION=1.6.0
+#export VERSIONDATE=20120426
+#export VERSION=1.6.1
+#export VERSIONDATE=20120607
+#export VERSION=1.7.0
+#export VERSIONDATE=20120830
+#export VERSION=1.7.1
+#export VERSIONDATE=20121020
+#export VERSION=1.7.2
+#export VERSIONDATE=20121123
+#export VERSION=1.7.3
+#export VERSIONDATE=20121208
+#export VERSION=1.7.4
+#export VERSIONDATE=20121222
+#export VERSION=1.7.5
+#export VERSIONDATE=20130104
+#export VERSION=1.7.6
+#export VERSIONDATE=20130405
+#export VERSION=1.7.7
+#export VERSIONDATE=20130514
+#export VERSION=1.7.8
+#export VERSIONDATE=20130730
+#export VERSION=1.7.9
+#export VERSIONDATE=20131105
+export VERSION=1.7.10
+export VERSIONDATE=20140107
+wl-showstatus --package-version
+export DEPENDANCIES=libevil,libeina,libgcrypt,gnutls,pthreads,zlib,libjpeg
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.enlightenment.org/p.php?p=download eet-"
+#export DOWNLOADURL="http://download.enlightenment.org/releases/ eet-"
+export DOWNLOADURL="https://download.enlightenment.org/att/releases/ eet-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.enlightenment.org/releases/eet-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://download.enlightenment.org/att/releases/eet-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/eet-$VERSION.tar.bz2
+cd eet-$VERSION
+# fix missing pthread_mutex_t in src/lib/eet_lib.c
+mv src/lib/eet_lib.c src/lib/eet_lib.c.bak
+echo "#include <pthread.h>" > src/lib/eet_lib.c
+cat src/lib/eet_lib.c.bak >> src/lib/eet_lib.c
+wl-showstatus configure &&
+# fix deprecated gnutls_x509_crt_verify_data in src/lib/eet_cipher.c
+####src/lib/eet_cipher.c:801: undefined reference to `gnutls_x509_crt_verify_data'
+patch -ulbf src/lib/eet_cipher.c << EOF
+--- src/lib/eet_cipher.c  2013-07-29 16:22:39.000000000 +0200
++++ src/lib/eet_cipher.c  2016-01-07 14:52:57.619947100 +0100
+@@ -800,3 +800,4 @@
+
+-   if (!gnutls_x509_crt_verify_data(cert, 0, &datum, &signature))
++   gnutls_pubkey_t pubkey;
++   if (gnutls_pubkey_init(&pubkey) < 0 || !gnutls_pubkey_verify_data2(pubkey, GNUTLS_SIGN_RSA_SHA1, 0, &datum, &signature))
+      return NULL;
+EOF
+# workaround for issue with relative path
+mkdir -p enlightenment/lib enlightenment/lib/.libs
+cp -f $MINGWPREFIX/enlightenment/lib/libevil.la enlightenment/lib/
+cp -f $MINGWPREFIX/enlightenment/lib/libdl.la enlightenment/lib/
+cp -f $MINGWPREFIX/enlightenment/lib/libevil.dll.a enlightenment/lib/.libs/
+#cp -f $MINGWPREFIX/enlightenment/lib/libdl.dll.a enlightenment/lib/.libs/
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+PKG_CONFIG_PATH=$MINGWPREFIX/enlightenment/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX/enlightenment --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lpthread" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf eet-$VERSION
+#### See also: http://trac.enlightenment.org/e/wiki/EFLWindowsXP#BuildofEvil
+####Now part of EFL (efl)
+
+
+

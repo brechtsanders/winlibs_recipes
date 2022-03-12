@@ -1,0 +1,71 @@
+export NAME="rabit"
+export STATUS=
+export URL=https://github.com/dmlc/rabit
+export BASENAME=rabit
+export DESCRIPTION="Reliable Allreduce and Broadcast Interface for distributed machine learning"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=0.1
+export VERSIONDATE=20200221
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/dmlc/rabit/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/dmlc/rabit/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/socket.h (version >= 0.1)
+patch -ulbf src/socket.h << EOF
+@@ -9,2 +9,6 @@
+ #if defined(_WIN32)
++#if _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
+ #include <winsock2.h>
+@@ -30,3 +34,7 @@
+ #if defined(_WIN32)
++#if defined(__MINGW32__)
++#define sleep(s) Sleep((s) * 1000)
++#else
+ typedef int ssize_t;
++#endif
+ typedef int sock_size_t;
+EOF
+sed -e "s/\.so/.dll/g; s/-shared /-s &-Wl,--out-implib,\$@.a /" Makefile > Makefile.mingw
+# avoid -fPIC (useless on Windows and not supported by clang) in Makefile.mingw
+sed -i.bak -e "s/-fPIC//i" Makefile.mingw
+wl-showstatus build &&
+ make -fMakefile.mingw LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/rabit $INSTALLPREFIX/include/ &&
+ cp -f lib/*.a $INSTALLPREFIX/lib/ &&
+ cp -f lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: what about include/dmlc, also install?
+
+
+
+#mkdir -p build &&
+# wl-showstatus configure &&
+# cd build &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DRABIT_BUILD_TESTS:BOOL=OFF .. &&
+# cd .. &&
+# #wl-showstatus build &&
+# #make &&
+# wl-showstatus build-install &&
+# make -Cbuild install/strip &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

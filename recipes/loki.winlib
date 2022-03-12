@@ -1,0 +1,48 @@
+export NAME="Loki"
+export STATUS=
+export URL=http://loki-lib.sourceforge.net/
+export BASENAME=loki
+export DESCRIPTION="Loki is a C++ library of designs, containing flexible implementations of common design patterns and idioms."
+export CATEGORY=development
+export TYPE=library
+export VERSION=0.1.7
+export VERSIONDATE=20160410
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://sourceforge.net/projects/loki-lib/files/Loki/ Loki%20"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/loki-lib/Loki/Loki%20$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix src/LevelMutex.cpp
+mv src/LevelMutex.cpp src/LevelMutex.cpp.bak &&
+echo "#include <windows.h>" > src/LevelMutex.cpp &&
+sed -e "s/\(#if \)\(defined( _MSC_VER )\)$/\1defined(__MINGW32__) || \2/" src/LevelMutex.cpp.bak >> src/LevelMutex.cpp
+# fix use of _MSC_VER
+for F in $(grep -lr "#if defined( _MSC_VER )$" .); do
+  sed -i.bak -e "s/\(#if \)\(defined( _MSC_VER )\)$/\1defined(__MINGW32__) || \2/; s/\(#if \)\(( _MSC_VER >=\)/\1defined(__MINGW32__) || \2/" $F
+done
+# fix missing clock in test/CachedFactory/CachedFactoryTest.cpp
+mv test/CachedFactory/CachedFactoryTest.cpp test/CachedFactory/CachedFactoryTest.cpp.bak &&
+echo "#include <time.h>" > test/CachedFactory/CachedFactoryTest.cpp &&
+cat test/CachedFactory/CachedFactoryTest.cpp.bak >> test/CachedFactory/CachedFactoryTest.cpp
+# skip building test and installing on Windows
+sed -i.bak -e "s/^\(all:.*\)check/\1/; s/^\(ifneq.*Windows\)/&NOT/" Makefile
+sed -i.bak -e "s/^\(ifneq.*Windows\)/&NOT/; s/override LDFLAGS += --shared$/& -s -Wl,--out-implib,libloki.dll.a/; s/ln -s/echo &/" src/Makefile
+wl-showstatus build-install &&
+ make OS=Windows CXX="g++ -std=c++98 -fpermissive" install prefix=$INSTALLPREFIX &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin &&
+ cp -f src/*.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

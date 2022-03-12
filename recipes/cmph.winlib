@@ -1,0 +1,96 @@
+export NAME="CMPH"
+export STATUS=
+export URL=http://cmph.sourceforge.net/
+export BASENAME=cmph
+export DESCRIPTION="C Minimal Perfect Hashing Library is a portable LGPL library to create and to work with minimal perfect hashing functions. The library encapsulates the newest and more efficient algorithms available in the literature in an easy-to-use, production-quality, fast API. The library is designed to work with big entries that cannot fit in the main memory. It has been used successfully for constructing minimal perfect hashing functions for sets with billions of keys."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=2.0
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="LGPL/MPL"
+export DOWNLOADURL="http://sourceforge.net/projects/cmph/files/cmph/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/cmph/cmph/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p sys
+cat > sys/resource.h << EOF
+#ifndef __INCLUDED_RESOURCE_H__
+#define __INCLUDED_RESOURCE_H__
+#include <winsock2.h>
+struct rusage {
+ struct timeval ru_utime;
+ struct timeval ru_stime;
+};
+#define RUSAGE_SELF 0
+#define getrusage(t,rs) -1
+#endif //__INCLUDED_RESOURCE_H__
+EOF
+# fix missing struct timeval in src/cmph_time.h
+mv src/cmph_time.h src/cmph_time.h.bak
+echo "#include <winsock2.h>" > src/cmph_time.h
+cat src/cmph_time.h.bak >> src/cmph_time.h
+# fix missing random in src/bm_numbers.c
+mv src/bm_numbers.c src/bm_numbers.c.bak
+echo "#define random rand" > src/bm_numbers.c
+cat src/bm_numbers.c.bak >> src/bm_numbers.c
+# fix missing random in cxxmph/mph_index.h
+mv cxxmph/mph_index.h cxxmph/mph_index.h.bak
+sed -e "s/\(random(\)/rand(/" cxxmph/mph_index.h.bak > cxxmph/mph_index.h
+# fix missing random in cxxmph/bm_common.cc
+mv cxxmph/bm_common.cc cxxmph/bm_common.cc.bak
+echo "#include <stdlib.h>" > cxxmph/bm_common.cc
+sed -e "s/\(random(\)/rand(/" cxxmph/bm_common.cc.bak >> cxxmph/bm_common.cc
+# fix missing srandom in cxxmph/bm_map.cc
+mv cxxmph/bm_map.cc cxxmph/bm_map.cc.bak
+sed -e "s/\(srandom(\)/srand(/" cxxmph/bm_map.cc.bak >> cxxmph/bm_map.cc
+# fix missing exit/uint32_t in cxxmph/benchmark.cc
+mv cxxmph/benchmark.cc cxxmph/benchmark.cc.bak
+echo "#include <stdlib.h>" > cxxmph/benchmark.cc
+echo "#include <stdint.h>" >> cxxmph/benchmark.cc
+cat cxxmph/benchmark.cc.bak >> cxxmph/benchmark.cc
+## fix math issues
+#####error: '_hypot' was not declared in this scope
+#mv cxxmph/mph_bits.cc cxxmph/mph_bits.cc.bak &&
+#echo "#undef __STRICT_ANSI__" > cxxmph/mph_bits.cc &&
+#cat cxxmph/mph_bits.cc.bak >> cxxmph/mph_bits.cc
+#mv cxxmph/mph_index.cc cxxmph/mph_index.cc.bak &&
+#echo "#undef __STRICT_ANSI__" > cxxmph/mph_index.cc &&
+#cat cxxmph/mph_index.cc.bak >> cxxmph/mph_index.cc
+#mv cxxmph/cxxmph.cc cxxmph/cxxmph.cc.bak &&
+#echo "#undef __STRICT_ANSI__" > cxxmph/cxxmph.cc &&
+#cat cxxmph/cxxmph.cc.bak >> cxxmph/cxxmph.cc
+#mv cxxmph/bm_common.cc cxxmph/bm_common.cc.bak &&
+#echo "#undef __STRICT_ANSI__" > cxxmph/bm_common.cc &&
+#cat cxxmph/bm_common.cc.bak >> cxxmph/bm_common.cc
+#mv cxxmph/bm_map.cc cxxmph/bm_map.cc.bak &&
+#echo "#undef __STRICT_ANSI__" > cxxmph/bm_map.cc &&
+#cat cxxmph/bm_map.cc.bak >> cxxmph/bm_map.cc
+# skip building tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-cxxmph LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #make install-strip CXXFLAGS="-fpermissive" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,129 @@
+export NAME="GNU Source-highlight"
+export STATUS=
+export URL=https://www.gnu.org/software/src-highlite/
+export BASENAME=src-highlite
+export DESCRIPTION="This program, given a source file, produces a document with syntax highlighting. It also provides a C++ highlight library."
+export CATEGORY=dataprocessing
+export TYPE=application,library
+#export VERSION=3.1.8
+#export VERSIONDATE=20190513
+export VERSION=3.1.9
+export VERSIONDATE=20200508
+wl-showstatus --package-version
+export DEPENDANCIES=boost
+export OPTIONALDEPENDANCIES=ctags
+export BUILDDEPENDANCIES=help2man,texinfo
+#export BUILDDEPENDANCIES=doxygen
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://ftp.gnu.org/gnu/src-highlite/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/src-highlite/source-highlight-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/source-highlight-$VERSION.tar.gz
+cd source-highlight-$VERSION
+# fix building DLL
+for F in $(find lib/srchilite -name '*.h' -or -name '*.hpp'); do
+ mv $F $F.bak &&
+ echo "#include \"dllexp.h\"" > $F &&
+ sed -e "s/^class /&DLL_EXPORT_SRCHIGHLITE /; s/^.* operator/DLL_EXPORT_SRCHIGHLITE &/" $F.bak >> $F
+done
+cat > lib/srchilite/dllexp.h << EOF
+#if !defined(DLL_EXPORT_SRCHIGHLITE)
+# if defined(_WIN32) && defined(BUILD_SRCHIGHLITE_DLL)
+#  define DLL_EXPORT_SRCHIGHLITE __declspec(dllexport)
+# elif defined(_WIN32) && !defined(STATIC) && !defined(BUILD_SRCHIGHLITE_STATIC) && !defined(BUILD_SRCHIGHLITE)
+#  define DLL_EXPORT_SRCHIGHLITE __declspec(dllimport)
+# else
+#  define DLL_EXPORT_SRCHIGHLITE
+# endif
+#endif
+EOF
+# fix static variable in lib/srchilite/verbosity.h
+patch -ulbf lib/srchilite/verbosity.h << EOF
+@@ -22,4 +22,4 @@
+  */
++extern DLL_EXPORT_SRCHIGHLITE bool verbosity;
+ class DLL_EXPORT_SRCHIGHLITE Verbosity {
+-    static bool verbosity;
+ public:
+EOF
+# fix static variable in lib/srchilite/verbosity.cpp
+patch -ulbf lib/srchilite/verbosity.cpp << EOF
+@@ -17 +17 @@
+-bool Verbosity::verbosity = false;
++DLL_EXPORT_SRCHIGHLITE bool verbosity = false;
+EOF
+# fix exports in lib/srchilite/fileutil.h
+patch -ulbf lib/srchilite/fileutil.h << EOF
+@@ -21,3 +21,3 @@
+
+-extern std::string start_path;
++extern DLL_EXPORT_SRCHIGHLITE std::string start_path;
+
+@@ -30,3 +30,3 @@
+  */
+-string readFile(const string &fileName) throw (IOException);
++DLL_EXPORT_SRCHIGHLITE string readFile(const string &fileName) throw (IOException);
+
+@@ -42,3 +42,3 @@
+  */
+-string createOutputFileName(const string &inputFileName,
++DLL_EXPORT_SRCHIGHLITE string createOutputFileName(const string &inputFileName,
+         const string &outputDir, const string &ext);
+@@ -49,3 +49,3 @@
+  */
+-unsigned int get_line_count(istream &input);
++DLL_EXPORT_SRCHIGHLITE unsigned int get_line_count(istream &input);
+
+@@ -55,16 +55,16 @@
+  */
+-string get_file_extension(const string &filename);
++DLL_EXPORT_SRCHIGHLITE string get_file_extension(const string &filename);
+
+-FILE * open_file_stream(const string &input_file_name);
+-istream * open_file_istream(const string &filename);
+-istream * open_file_istream_or_error(const string &filename);
+-istream * open_data_file_istream(const string &path, const string &filename,
++DLL_EXPORT_SRCHIGHLITE FILE * open_file_stream(const string &input_file_name);
++DLL_EXPORT_SRCHIGHLITE istream * open_file_istream(const string &filename);
++DLL_EXPORT_SRCHIGHLITE istream * open_file_istream_or_error(const string &filename);
++DLL_EXPORT_SRCHIGHLITE istream * open_data_file_istream(const string &path, const string &filename,
+         const string &start = start_path);
+-FILE * open_data_file_stream(const string &path, const string &filename,
++DLL_EXPORT_SRCHIGHLITE FILE * open_data_file_stream(const string &path, const string &filename,
+         const string &start = start_path);
+-bool read_line(istream *in, string &line);
+-string get_file_path(const string &s);
+-bool contains_path(const string &);
+-string strip_file_path(const string &);
+-string get_input_file_name(const string &file_name);
++DLL_EXPORT_SRCHIGHLITE bool read_line(istream *in, string &line);
++DLL_EXPORT_SRCHIGHLITE string get_file_path(const string &s);
++DLL_EXPORT_SRCHIGHLITE bool contains_path(const string &);
++DLL_EXPORT_SRCHIGHLITE string strip_file_path(const string &);
++DLL_EXPORT_SRCHIGHLITE string get_input_file_name(const string &file_name);
+
+EOF
+# fix building DLL
+sed -i.bak -e "s/\$(CXX) /&-DBUILD_SRCHIGHLITE_DLL /" lib/srchilite/Makefile.in
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM $(if ! [ -f $MINGWPREFIX/lib/libboost_regex-mt.dll.a ]; then echo "--without-boost"; else echo "--with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt"; fi) &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || ( make clean; make install-strip CXX="g++ -std=c++14" )) &&
+ cp -f lib/srchilite/dllexp.h $INSTALLPREFIX/include/srchilite &&
+ # fix wrong -L flag
+ sed -i -e "s? -L$MINGWPREFIX ? ?" $INSTALLPREFIX/lib/libsource-highlight.la $INSTALLPREFIX/lib/pkgconfig/source-highlight.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf source-highlight-$VERSION
+####https://savannah.gnu.org/bugs/index.php?57744
+
+
+

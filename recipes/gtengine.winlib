@@ -1,0 +1,256 @@
+export NAME="Geometric Tools Engine"
+export STATUS=
+export URL=https://www.geometrictools.com/
+export BASENAME=gtengine
+export DESCRIPTION="A library of source code for computing in the fields of mathematics, graphics, image analysis and physics. The engine is written in C++ 11 and, as such, has portable access to standard constructs for multithreading programming on cores. The engine also supports high-performance computing using general purpose GPU programming (GPGPU). SIMD code is also available using Intel Streaming SIMD Extensions (SSE)."
+export CATEGORY=math,science
+export TYPE=library
+#export VERSION=3.18
+#export VERSIONDATE=20181115
+#export VERSION=3.19
+#export VERSIONDATE=20181201
+#export VERSION=3.20
+#export VERSIONDATE=20190110
+#export VERSION=3.21
+#export VERSIONDATE=20190122
+#export VERSION=3.22
+#export VERSIONDATE=20190305
+#export VERSION=3.24
+#export VERSIONDATE=20190413
+#export VERSION=3.25
+#export VERSIONDATE=20190430
+#export VERSION=3.26
+#export VERSIONDATE=20190802
+#export VERSION=3.27
+#export VERSIONDATE=20190815
+#export VERSION=3.28
+#export VERSIONDATE=20190830
+#export VERSION=3.29
+#export VERSIONDATE=20191206
+#export VERSION=3.30
+#export VERSIONDATE=20191230
+#export VERSION=4.0
+#export VERSIONDATE=20190815
+#export VERSION=4.1
+#export VERSIONDATE=20190830
+#export VERSION=4.2
+#export VERSIONDATE=20191206
+#export VERSION=4.3
+#export VERSIONDATE=20191230
+#export VERSION=4.4
+#export VERSIONDATE=20200105
+#export VERSION=4.5
+#export VERSIONDATE=20200113
+export VERSION=4.6
+export VERSIONDATE=20200415
+#export VERSION=4.7
+#export VERSIONDATE=20200626
+#export VERSION=4.8
+#export VERSIONDATE=20200813
+#export VERSION=4.9
+#export VERSIONDATE=20200906
+#export VERSION=5.0
+#export VERSIONDATE=20200916
+#export VERSION=5.1
+#export VERSIONDATE=20201001
+#export VERSION=5.2
+#export VERSIONDATE=20201012
+#export VERSION=5.3
+#export VERSIONDATE=20201106
+#export VERSION=5.4
+#export VERSIONDATE=20201119
+#export VERSION=6.0
+#export VERSIONDATE=20220107
+####Applications/GLX/WindowSystem.cpp:14:10: fatal error: GL/glx.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=Gte4p6InstallationRelease.pdf
+export LICENSETYPE=Boost
+export DOWNLOADURL="https://www.geometrictools.com/Downloads/Downloads.html GeometricToolsEngine"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.geometrictools.com/Downloads/GeometricToolsEngine$(echo $VERSION|sed -e "s/\./p/").zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/GeometricToolsEngine$(echo $VERSION|sed -e "s/\./p/").zip -d$BASENAME-$VERSION
+#cd $BASENAME-$VERSION/GeometricTools/GTEngine
+cd $BASENAME-$VERSION/GeometricTools/GTE
+## fix missing GL/glx.h
+#for F in $(grep -l "GL/glx\.h" $(find -name '*.h' -or -name '*.cpp')); do
+# mv $F $F.bak &&
+# echo "#include <stdint.h>" > $F
+# echo "#include <GL/glxew.h>" >> $F
+# sed -e "s?#include <GL/glx\.h>?//&?" $F.bak >> $F
+#done
+# fix Graphics/GL45/GL45.h (version >= 4.6)
+patch -ulbf Graphics/GL45/GL45.h << EOF
+@@ -9,2 +9,3 @@
+
++#ifndef __MINGW32__
+ #if defined(__gl_h_) || defined(__GL_H__)
+@@ -15,2 +16,3 @@
+ #endif
++#endif
+ #define __gl_h_
+@@ -29,4 +31,8 @@
+ // from being defined in glcorearb.h.
++#ifndef GL_VERSION_1_0
+ #define GL_VERSION_1_0
++#endif
++#ifndef GL_VERSION_1_1
+ #define GL_VERSION_1_1
++#endif
+ extern "C"
+EOF
+# fix missing getenv_s() in Applications/Environment.cpp (version >= 4.6)
+patch -ulbf Applications/Environment.cpp << EOF
+@@ -16,3 +16,3 @@
+ {
+-#if defined(GTE_USE_MSWINDOWS)
++#if defined(GTE_USE_MSWINDOWS) && !defined(__MINGW32__)
+     size_t size;
+EOF
+# fix Applications/MSW/WICFileIO.cpp (version >= 4.6)
+patch -ulbf Applications/MSW/WICFileIO.cpp << EOF
+@@ -470,3 +470,3 @@
+         varValue.vt = VT_UI1;
+-#if defined(MINGW)
++#if defined(__MINGW32__)
+         // The wincodec.h of MinGW 7.2.0 does not define the
+@@ -592,6 +592,12 @@
+ {
++#ifdef __MINGW32__
++    { DF_R10G10B10A2_UNORM, &GUID_WICPixelFormat32bppRGBA, nullptr },
++#else
+     { DF_R10G10B10A2_UNORM, &GUID_WICPixelFormat32bppRGBA1010102, nullptr },
+     { DF_R10G10B10_XR_BIAS_A2_UNORM, &GUID_WICPixelFormat32bppRGBA1010102XR, nullptr },
++#endif
+     { DF_R32_FLOAT, &GUID_WICPixelFormat32bppGrayFloat, nullptr },
++#ifndef __MINGW32__
+     { DF_R16G16B16A16_UNORM, &GUID_WICPixelFormat64bppBGRA, &GUID_WICPixelFormat64bppRGBA },
++#endif
+     { DF_B5G6R5_UNORM, &GUID_WICPixelFormat16bppBGR565, nullptr },
+@@ -615,4 +621,8 @@
+     // The wincodec.h of MinGW 7.2.0 does not support these formats.
++#ifdef __MINGW32__
++    { DF_R10G10B10A2_UNORM, &GUID_WICPixelFormat32bppRGBA },
++#else
+     { DF_R10G10B10A2_UNORM, &GUID_WICPixelFormat32bppRGBA1010102 },
+     { DF_R10G10B10_XR_BIAS_A2_UNORM, &GUID_WICPixelFormat32bppRGBA1010102XR },
++#endif
+     { DF_R32_FLOAT, &GUID_WICPixelFormat32bppGrayFloat },
+EOF
+## fix Applications/MSW/WICFileIO.cpp (version >= 4.7)
+#patch -ulbf Applications/MSW/WICFileIO.cpp << EOF
+#@@ -86,5 +86,5 @@
+#         return WICFileIONative::R8G8B8A8;
+#+    default:
+#+        return DF_UNKNOWN;
+#     }
+#-
+#-    LogError("Invalid DFType");
+# }
+#EOF
+## fix Applications/MSW/WICFileIONative.cpp (version >= 4.8)
+#patch -ulbf Applications/MSW/WICFileIONative.cpp << EOF
+#@@ -593,6 +593,13 @@
+# { {
+#+#ifdef __MINGW32__
+#+    { R10G10B10A2, &GUID_WICPixelFormat32bppRGBA, nullptr },
+#+    { R10G10B10_XR_BIAS_A2, &GUID_WICPixelFormat32bppRGBA, nullptr },
+#+#else
+#     { R10G10B10A2, &GUID_WICPixelFormat32bppRGBA1010102, nullptr },
+#     { R10G10B10_XR_BIAS_A2, &GUID_WICPixelFormat32bppRGBA1010102XR, nullptr },
+#+#endif
+#     { R32_FLOAT, &GUID_WICPixelFormat32bppGrayFloat, nullptr },
+#+#ifndef __MINGW32__
+#     { R16G16B16A16, &GUID_WICPixelFormat64bppBGRA, &GUID_WICPixelFormat64bppRGBA },
+#+#endif
+#     { B5G6R5, &GUID_WICPixelFormat16bppBGR565, nullptr },
+#@@ -615,4 +622,9 @@
+# { {
+#+#ifdef __MINGW32__
+#+    { R10G10B10A2, &GUID_WICPixelFormat32bppRGBA },
+#+    { R10G10B10_XR_BIAS_A2, &GUID_WICPixelFormat32bppRGBA },
+#+#else
+#     { R10G10B10A2, &GUID_WICPixelFormat32bppRGBA1010102 },
+#     { R10G10B10_XR_BIAS_A2, &GUID_WICPixelFormat32bppRGBA1010102XR },
+#+#endif
+#     { R32_FLOAT, &GUID_WICPixelFormat32bppGrayFloat },
+#EOF
+# fix include of wrong Console.h (version >= 4.6)
+sed -i.bak -e "s?^\(#include <Applications/\)GLX\(/Console.h>.*\)\$?#if defined(GTE_USE_MSWINDOWS)\n\1MSW\2\n#else\n&\n#endif?" Applications/GLX/Console.cpp Applications/GLX/ConsoleSystem.cpp
+# fix error if MSVC is not detected (version >= 4.6)
+sed -i.bak -e "s/\(#if \)\(_MSC_VER < [0-9]*\|\!defined(_MSC_VER)\)/\1\!defined(__MINGW32__) \&\& \2/" $(grep -l "#if _MSC_VER < [0-9]*\|#if \!defined(_MSC_VER)" $(find -name '*.cpp'))
+## fix missing LogError in Applications/MSW/WICFileIO.cpp
+#mv Applications/MSW/WICFileIO.cpp Applications/MSW/WICFileIO.cpp.bak2 &&
+#echo "#include \"../../Mathematics/Logger.h\"" > Applications/MSW/WICFileIO.cpp &&
+#cat Applications/MSW/WICFileIO.cpp.bak2 >> Applications/MSW/WICFileIO.cpp
+# fix building for Windows (version >= 4.6)
+sed -i.bak -e "s/-DGTE_USE_LINUX/-DGTE_USE_MSWINDOWS -DMINGW -municode/" $(grep -l "DGTE_USE_LINUX" $(find -name '*.gte'))
+sed -i.bak2 -e "s/-lGL/-lopengl32/g" $(grep -l "lGL" $(find -name '*.gte'))
+sed -i.bak3 -e "s?-Wl,-soname,lib\([^ ]*\)\.so\.\$(SOVER)?-s -Wl,--out-implib,lib/ReleaseDynamic/lib\1.dll.a -Wl,--output-def=lib/ReleaseDynamic/lib\1.def?g; s/\.so\.\$(RELVER)/.dll/; s/\$(AR) \$(ARFLAGS).*\*\.o/& \$(EXTRALDFLAGS)/; s/ln -s/echo SKIPPING: &/" $(grep -l "Wl,-soname" $(find -name '*.gte'))
+sed -i.bak4 -e "s/GLX/WGL/g" makegraphics.gte
+sed -i.bak4 -e "s/GLX/MSW/g" makeapplications.gte
+sed -i.bak4 -e "s/-lX11 -lXext/-Wl,--as-needed -lgdi32/; s/-lGL -lEGL/-lopengl32/; s/\(\$(APP)\.\)\$(CFG)/\1exe/" Samples/makesample.gte
+wl-showstatus build &&
+ #make -fmakegraphics.gte CFG=Release CC=g++ AR=ar &&
+ ( make -fmakegraphics.gte CFG=Release CC=g++ AR=ar || make -fmakegraphics.gte CFG=Release CC="g++ -Wno-error=switch -Wno-error=return-type" AR=ar ) &&
+ make -fmakegraphics.gte CFG=ReleaseDynamic CC=g++ EXTRALDFLAGS="-Wl,--as-needed -lopengl32 -lgdi32" &&
+ rm -f obj/Release/*.o obj/ReleaseDynamic/*.o &&
+ make -fmakemathematicsgpu.gte CFG=Release CC=g++ AR=ar &&
+ make -fmakemathematicsgpu.gte CFG=ReleaseDynamic CC=g++ EXTRALDFLAGS="-Wl,--as-needed -Llib/ReleaseDynamic -lgtgraphics" &&
+ rm -f obj/Release/*.o obj/ReleaseDynamic/*.o &&
+ #make -fmakeapplications.gte CFG=Release CC=g++ AR=ar &&
+ ( make -fmakeapplications.gte CFG=Release CC=g++ AR=ar || make -fmakeapplications.gte CFG=Release CC="g++ -Wno-error=switch -Wno-error=return-type -Wno-error=sign-compare" AR=ar ) &&
+ make -fmakeapplications.gte CFG=ReleaseDynamic CC=g++ EXTRALDFLAGS="-Wl,--as-needed -Llib/ReleaseDynamic -lgtgraphics -lgdi32 -lwindowscodecs -lole32 -loleaut32" &&
+ #rm -f obj/Release/*.o obj/ReleaseDynamic/*.o &&
+ ##make -CSamples -fmakeallsamples.gte CFG=Release CC=g++ AR=ar &&
+ #make -CSamples -fmakeallsamples.gte CFG=ReleaseDynamic CC=g++ &&
+ #find Samples -name '*.exe'
+ #ls -1 lib/Release*/*
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/GTE/{Graphics,Graphics/DX11,Graphics/GL45,Mathematics,Mathematics/GPU,Applications,Applications/MSW} $INSTALLPREFIX/lib  $INSTALLPREFIX/bin &&
+ cp -f Graphics/*.h $INSTALLPREFIX/include/GTE/Graphics/ &&
+ cp -f Graphics/DX11/*.h $INSTALLPREFIX/include/GTE/Graphics/DX11/ &&
+ cp -f Graphics/GL45/*.h $INSTALLPREFIX/include/GTE/Graphics/GL45/ &&
+ cp -f Mathematics/*.h $INSTALLPREFIX/include/GTE/Mathematics/ &&
+ cp -f Mathematics/GPU/*.h $INSTALLPREFIX/include/GTE/Mathematics/GPU/ &&
+ cp -f Applications/*.h $INSTALLPREFIX/include/GTE/Applications/ &&
+ cp -f Applications/MSW/*.h $INSTALLPREFIX/include/GTE/Applications/MSW &&
+ cp -f lib/Release/*.a lib/ReleaseDynamic/*.a lib/ReleaseDynamic/*.def $INSTALLPREFIX/lib/ &&
+ cp -f lib/ReleaseDynamic/*.dll $INSTALLPREFIX/bin &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export BUILDDEPENDANCIES=cmake,ninja
+## fix ../gte/mathematics/math.h (version >= 6.0)
+#patch -ulbf ../gte/mathematics/math.h << EOF
+#@@ -24,2 +24,4 @@
+# #include <type_traits>
+#+#include <cstdint>
+#+#include <stdint.h>
+#
+#EOF
+## replace GTE_USE_LINUX with GTE_USE_MSWINDOWS
+#sed -i.bak -e "s/GTE_USE_LINUX/GTE_USE_MSWINDOWS/g" $(grep -l GTE_USE_LINUX $(find -name CMakeLists.txt ))
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_SHARED_LIB:BOOL=OFF -DBUILD_RELEASE_LIB:BOOL=ON -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_SHARED_LIB:BOOL=ON -DBUILD_RELEASE_LIB:BOOL=ON -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# wl-showstatus build &&
+# ninja -Cbuild_static &&
+# wl-showstatus build &&
+# ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK

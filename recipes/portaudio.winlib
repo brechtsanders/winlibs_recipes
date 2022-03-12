@@ -1,0 +1,128 @@
+export NAME="PortAudio"
+export STATUS=
+export URL=http://www.portaudio.com/
+export BASENAME=portaudio
+export DESCRIPTION='PortAudio is a portable API for audio I/O. It allows people writing audio programs to easily access the audio devices.'
+export CATEGORY=audio,hardware
+export TYPE=library
+#export VERSION=19_061121
+#export VERSION=19_20111121
+#export VERSIONDATE=20120116
+#export VERSION=19_20140130
+#export VERSIONDATE=20140131
+#export VERSION=190600_20161030
+#export VERSIONDATE=20161031
+export VERSION=190700_20210406
+export VERSIONDATE=20210520
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=rtaudio
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.portaudio.com/archives/ pa_stable_v"
+#export DOWNLOADURL="http://www.portaudio.com/download.html pa_stable_v"
+#export DOWNLOADURL="http://files.portaudio.com/download.html pa_stable_v"
+export DOWNLOADURL="http://files.portaudio.com/archives/ pa_stable_v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.portaudio.com/archives/pa_stable_v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://www.portaudio.com/archives/pa_stable_v$VERSION.tgz
+export DOWNLOADSOURCEURL=http://files.portaudio.com/archives/pa_stable_v$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/pa_stable_v$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/pa_stable_v$VERSION.tgz
+#mv portaudio pa_stable_v$VERSION
+#cd pa_stable_v$VERSION
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/pa_stable_v$VERSION.tgz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/portaudio
+# fix for errors on empty $(SUBDIRS) in for
+mv Makefile.in Makefile.in.bak
+sed -e 's/^\(.*$(SUBDIRS).*\)$/#\1/' Makefile.in.bak > Makefile.in
+## fix missing swprintf and vswprintf
+#mv include/portaudio.h include/portaudio.h.bak
+#echo "#include <stdio.h>" > include/portaudio.h
+#cat include/portaudio.h.bak >> include/portaudio.h
+#mv bindings/cpp/include/portaudiocpp/Device.hxx bindings/cpp/include/portaudiocpp/Device.hxx.bak
+#echo "#include <stdio.h>" > bindings/cpp/include/portaudiocpp/Device.hxx
+#cat bindings/cpp/include/portaudiocpp/Device.hxx.bak >> bindings/cpp/include/portaudiocpp/Device.hxx
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv bindings/cpp/libtool bindings/cpp/libtool.bak
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" bindings/cpp/libtool.bak > bindings/cpp/libtool
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme --enable-cxx=yes &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme --enable-cxx=yes LDFLAGS="-static-libstdc++" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme,wdmks,directx,asio --enable-cxx=yes --with-asiodir=$MINGWPREFIX/share/rtaudio/asiosdk LDFLAGS="-static-libstdc++" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme,wdmks,directx$(if [ -f $MINGWPREFIX/share/rtaudio/asiosdk/common/asiosys.h ]; then echo ",asio"; fi) --enable-cxx=yes --with-asiodir=$MINGWPREFIX/share/rtaudio/asiosdk LDFLAGS="-static-libstdc++" &&
+ #--with-winapi=wasapi
+ # manually build static library
+ sed -i.bak -e "s/\$(C[CX]*) \$(PA_LDFLAGS).*$/& \&\& ar cr libportaudio.a \$(LTOBJS)/" Makefile &&
+ wl-showstatus build-install &&
+ make install &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ # fix errors: ::swprintf/::vswprintf has not been declared, see also: http://sourceforge.net/tracker/index.php?func=detail&aid=2373234&group_id=2435&atid=102435
+ sed -i.bak -e "s/-ansi -pedantic//" bindings/cpp/Makefile &&
+ sed -i.bak -e "s/-ansi -pedantic//" bindings/cpp/lib/Makefile &&
+ sed -i.bak -e "s/-ansi -pedantic/-DWIN32/" bindings/cpp/bin/Makefile &&
+ # workaround for error: undefined reference to `portaudio::AsioDeviceAdapter::granularity() const'
+ mv bindings/cpp/example/devs.cxx bindings/cpp/example/devs.cxx.bak &&
+ echo "#undef WIN32" > bindings/cpp/example/devs.cxx &&
+ cat bindings/cpp/example/devs.cxx.bak >> bindings/cpp/example/devs.cxx &&
+ make -C bindings/cpp install-strip &&
+ cp -f src/common/pa_*.h $INSTALLPREFIX/include/ &&
+ cp -f include/pa_asio.h $INSTALLPREFIX/include/ &&
+ # manually install static library
+ cp -f libportaudio.a $INSTALLPREFIX/lib/ &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pa_stable_v$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export NAME="PortAudio"
+#export STATUS=
+#export URL=http://www.portaudio.com/
+#export BASENAME=portaudio
+#export DESCRIPTION='PortAudio is a portable API for audio I/O. It allows people writing audio programs to easily access the audio devices.'
+#export CATEGORY=audio,hardware
+#export TYPE=library
+#export VERSION=190600_20161030
+#export VERSIONDATE=20161031
+##export VERSION=190700_20210406
+##export VERSIONDATE=20210520
+#wl-showstatus --package-version
+#export DEPENDANCIES=asio
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=LICENSE.txt
+#export LICENSETYPE=
+#export DOWNLOADURL="http://www.portaudio.com/archives/ pa_stable_v"
+##export DOWNLOADURL="http://www.portaudio.com/download.html pa_stable_v"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://www.portaudio.com/archives/pa_stable_v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://www.portaudio.com/archives/pa_stable_v$VERSION.tgz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/pa_stable_v$VERSION.tgz -C$BASENAME-$VERSION
+#cd $BASENAME-$VERSION/portaudio
+### fix missing common/asio.cpp
+##sed -i.bak -e "s/^.*PA_ASIOSDK_SOURCES/#&/" CMakeLists.txt
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPA_UNICODE_BUILD:BOOL=ON -DPA_USE_ASIO:BOOL=ON -DPA_USE_DS:BOOL=OFF -DPA_USE_WDMKS:BOOL=ON -DPA_USE_WMME:BOOL=ON -DASIOSDK_ROOT_DIR:PATH=$MINGWPREFIX/share/rtaudio/asiosdk -DASIOSDK_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DPA_BUILD_EXAMPLES:BOOL=OFF -DPA_BUILD_TESTS:BOOL=OFF -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# cp -f build_win/libportaudio_static.a $INSTALLPREFIX/lib/libportaudio_static.a &&
+# cp -f build_win/libportaudio_static.a $INSTALLPREFIX/lib/libportaudio.a &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: libportaudiocpp
+#####TO DO: -DPA_USE_DS:BOOL=ON
+
+
+

@@ -1,0 +1,87 @@
+export NAME="Apple CoreFoundation"
+export STATUS=
+#export URL=https://github.com/opensource-apple/CF/
+export URL=https://opensource.apple.com/source/CF/
+export BASENAME=apple-cf
+export DESCRIPTION="Apple's core foundation source code"
+export CATEGORY=development
+export TYPE=library
+#export VERSION=1151.16
+#export VERSIONDATE=20200407
+export VERSION=1153.18
+export VERSIONDATE=20200408
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=APPLE_LICENSE
+export LICENSETYPE="Apple public source license"
+export DOWNLOADURL="https://opensource.apple.com/tarballs/CF/ CF-"
+#export DOWNLOADURL="https://opensource.apple.com/source/CF/ CF-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://opensource.apple.com/tarballs/CF/CF-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/CF-$VERSION.tar.gz
+cd CF-$VERSION
+# fix CoreFoundation_Prefix.h (version >= 1151.16)
+patch -ulbf CoreFoundation_Prefix.h << EOF
+@@ -36,2 +36,5 @@
+ #include <string.h>
++#ifdef __MINGW32__
++#include <sys/stat.h>
++#endif
+
+@@ -58,3 +61,5 @@
+ #else
++#ifndef __MINGW32__
+ typedef signed char    BOOL;
++#endif
+ typedef char * id;
+@@ -235,3 +240,3 @@
+ CF_EXPORT int _NS_rename(const char *oldName, const char *newName);
+-CF_EXPORT int _NS_open(const char *name, int oflag, int pmode = 0);
++CF_EXPORT int _NS_open(const char *name, int oflag, int pmode /*= 0*/);
+ CF_EXPORT int _NS_chdir(const char *name);
+@@ -283,3 +288,5 @@
+
++#ifndef __MINGW32__
+ #define scalbn(A, B) _scalb(A, B)
++#endif
+
+@@ -315,2 +322,3 @@
+
++#ifndef __MINGW32__
+ CF_INLINE long long llabs(long long v) {
+@@ -319,2 +327,3 @@
+ }
++#endif
+
+@@ -324,3 +333,5 @@
+ #define strtoll_l(a,b,c,locale) _strtoi64(a,b,c)
++#ifndef strncasecmp
+ #define strncasecmp(a, b, c) _strnicmp(a, b, c)
++#endif
+ #define strncasecmp_l(a, b, c, d) _strnicmp(a, b, c)
+EOF
+# force building for Windows
+sed -i.bak -e "s/\(TARGET_OS_WIN32\s*\)0/\11/; s/\(TARGET_OS_LINUX\s*\)1/\10/" TargetConditionals.h CF-Objects/normal/CoreFoundation/TargetConditionals.h
+# fix missing files
+touch Availability.h AvailabilityMacros.h
+#touch pthread/qos.h
+#mkdir -p pthread
+mkdir -p dispatch
+echo "#include_next <dispatch.h>" > dispatch/dispatch.h
+wl-showstatus build &&
+ make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1" &&
+ #make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe" CFLAGS="-c -x c -std=gnu99 -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1 -DCF_BUILDING_CF=1 -DU_SHOW_DRAFT_API=1 -DU_SHOW_CPLUSPLUS_API=0 -DHAVE_STRUCT_TIMESPEC=1 -I\$(OBJBASE) -DVERSION=\$(VERSION) -include CoreFoundation_Prefix.h" &&
+ make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe" CFLAGS="-c -x c++ -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1 -DCF_BUILDING_CF=1 -DU_SHOW_DRAFT_API=1 -DU_SHOW_CPLUSPLUS_API=0 -DHAVE_STRUCT_TIMESPEC=1 -I\$(OBJBASE) -DVERSION=\$(VERSION) -include CoreFoundation_Prefix.h" &&
+ make -fMakefileLinux -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe" CFLAGS="-c -x c -std=gnu99 -Wno-trigraphs -fexceptions -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1 -DCF_BUILDING_CF=1 -DU_SHOW_DRAFT_API=1 -DU_SHOW_CPLUSPLUS_API=0 -DHAVE_STRUCT_TIMESPEC=1 -I\$(OBJBASE) -DVERSION=\$(VERSION) -include CoreFoundation_Prefix.h" LFLAGS="-shared -s -Wl,--out-implib,libCoreFoundation.dll.a -init=___CFInitialize" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf CF-$VERSION
+
+
+
+####See also: https://www.cocotron.org/Using/Getting_Source/

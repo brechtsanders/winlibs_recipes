@@ -1,0 +1,83 @@
+export NAME="videoInput"
+export STATUS=
+export URL=http://muonics.net/school/spring05/videoInput/
+#export URL=https://github.com/ofTheo/videoInput
+export BASENAME=videoinput
+export DESCRIPTION="a free windows video capture library"
+export CATEGORY=video,hardware
+export TYPE=library
+#export VERSION=0.1995
+#export VERSIONDATE=20091123
+export VERSION=2014
+export VERSIONDATE=20190503
+wl-showstatus --package-version
+export DEPENDANCIES=glfw
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="http://muonics.net/school/spring05/videoInput/ videoInput .zip"
+export DOWNLOADURL="https://github.com/ofTheo/videoInput/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://muonics.net/school/spring05/videoInput/files/videoInput$VERSION.zip
+export DOWNLOADSOURCEURL=https://github.com/ofTheo/videoInput/archive/$VERSION-Stable.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+##wl-showstatus build-install &&
+#wl-showstatus install &&
+#mkdir $INSTALLPREFIX
+#unzip -oq -d $INSTALLPREFIX/include -j $TARBALLDIR/$BASENAME/videoInput$VERSION.zip "videoInput$VERSION/compiledLib/compiledByDevCpp/include/*.h"
+#unzip -oq -d $INSTALLPREFIX/lib -j $TARBALLDIR/$BASENAME/videoInput$VERSION.zip "videoInput$VERSION/compiledLib/compiledByDevCpp/*.a"
+#mv $INSTALLPREFIX/lib/videoInputLib.a $INSTALLPREFIX/lib/libvideoInput.a &&
+tar xfzv $TARBALLDIR/$BASENAME/$VERSION-Stable.tar.gz
+cd videoInput-$VERSION-Stable
+# fix videoInputSrcAndDemos/libs/videoInput/videoInput.h
+patch -ulbf videoInputSrcAndDemos/libs/videoInput/videoInput.h << EOF
+@@ -2,2 +2,15 @@
+ #define _VIDEOINPUT
++#ifndef DLL_EXPORT_LIBVIDEOINPUT
++#ifdef _WIN32
++#if defined(BUILD_VIDEOINPUT_DLL)
++#define DLL_EXPORT_LIBVIDEOINPUT __declspec(dllexport)
++#elif !defined(STATIC) && !defined(BUILD_VIDEOINPUT_STATIC)
++#define DLL_EXPORT_LIBVIDEOINPUT __declspec(dllimport)
++#else
++#define DLL_EXPORT_LIBVIDEOINPUT
++#endif
++#else
++#define DLL_EXPORT_LIBVIDEOINPUT
++#endif
++#endif
+
+@@ -192,3 +205,3 @@
+
+-class videoDevice{
++class DLL_EXPORT_LIBVIDEOINPUT videoDevice{
+
+@@ -255,3 +268,3 @@
+
+-class videoInput{
++class DLL_EXPORT_LIBVIDEOINPUT videoInput{
+
+EOF
+# fix missing HEADER in videoInputSrcAndDemos/libs/videoInput/videoInput.cpp
+mv videoInputSrcAndDemos/libs/videoInput/videoInput.cpp videoInputSrcAndDemos/libs/videoInput/videoInput.cpp.bak &&
+grep "#define HEADER" videoInputSrcAndDemos/libs/DShow/Include/Amvideo.h > videoInputSrcAndDemos/libs/videoInput/videoInput.cpp &&
+cat videoInputSrcAndDemos/libs/videoInput/videoInput.cpp.bak >> videoInputSrcAndDemos/libs/videoInput/videoInput.cpp
+wl-showstatus build &&
+ g++ -c -O2 -o videoInput.o videoInputSrcAndDemos/libs/videoInput/videoInput.cpp -DBUILD_VIDEOINPUT_DLL &&
+ ar cru libvideoinput.a videoInput.o &&
+ g++ -shared -s -mwindows -o videoInput.dll videoInput.o -Wl,--add-stdcall-alias -Wl,--out-implib,libvideoinput.dll.a -Wl,--output-def,videoInput.def -Wl,--as-needed -lole32 -loleaut32 -lstrmiids -luuid &&
+ ( g++ -s -o videoInputBasicDemo.exe videoInputSrcAndDemos/VS-videoInputDemoWithSrc/src/videoInputBasicDemo.cpp videoInputSrcAndDemos/VS-videoInputDemoWithSrc/src/triangleApp.cpp videoInputSrcAndDemos/VS-videoInputDemoWithSrc/src/simpleApp.cpp videoInputSrcAndDemos/VS-videoInputDemoWithSrc/src/imageTexture.cpp libvideoinput.dll.a -IvideoInputSrcAndDemos/libs/videoInput -Wl,--as-needed -lglfw -lgdi32 -lopengl32 -lglu32 || true ) &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f videoInputSrcAndDemos/libs/videoInput/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ ( cp -f *.exe $INSTALLPREFIX/bin/ || true ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf videoInput-$VERSION-Stable
+
+
+

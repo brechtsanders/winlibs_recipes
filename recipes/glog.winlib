@@ -1,0 +1,120 @@
+export NAME="google-glog"
+export STATUS=
+#export URL=https://code.google.com/p/google-glog/
+export URL=https://github.com/google/glog
+export BASENAME=glog
+#export DESCRIPTION="The glog library implements application-level logging. This library provides logging APIs based on C++-style streams and various helper macros."
+export DESCRIPTION="C++ implementation of the Google logging module"
+export CATEGORY=development
+export TYPE=library
+#export VERSION=0.3.4
+#export VERSIONDATE=20160101
+#export VERSION=0.3.5
+#export VERSIONDATE=20170509
+#export VERSION=0.4.0
+#export VERSIONDATE=20190322
+export VERSION=0.5.0
+export VERSIONDATE=20210508
+####src/logging_unittest.cc:367: undefined reference to `fLB::FLAGS_logtostderr'
+####src/signalhandler_unittest.cc:52:58: error: invalid cast from type 'pthread_t {aka ptw32_handle_t}' to type 'long int'
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libiconv,gflags
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/google/glog/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/google/glog/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd glog-$VERSION
+## fix pthreads issues in src/windows/port.h
+#patch -ulbf src/windows/port.h << EOF
+#--- src/windows/port.h  2015-03-11 05:02:27.000000000 +0100
+#+++ src/windows/port.h  2016-01-01 22:45:30.501705100 +0100
+#@@ -133,4 +133,5 @@
+#
+# // ----------------------------------- THREADS
+#+#ifndef __MINGW32__
+# typedef DWORD pthread_t;
+# typedef DWORD pthread_key_t;
+#@@ -139,9 +140,14 @@
+# #define pthread_self  GetCurrentThreadId
+# #define pthread_equal(pthread_t_1, pthread_t_2)  ((pthread_t_1)==(pthread_t_2))
+#+#else
+#+#include <pthread.h>
+#+#endif
+#
+#+#ifndef __MINGW64_VERSION_MAJOR
+# inline struct tm* localtime_r(const time_t* timep, struct tm* result) {
+#   localtime_s(result, timep);
+#   return result;
+# }
+#+#endif
+#
+# inline char* strerror_r(int errnum, char* buf, size_t buflen) {
+#EOF
+### fix redefinition of localtime_r in src/windows/port.h
+##mv src/windows/port.h src/windows/port.h.bak &&
+##sed -e "s/\blocaltime_r\b/MY&/" src/windows/port.h.bak > src/windows/port.h
+## fix building DLLs
+#for F in $(grep -rl 'defined(_WIN32) && !defined(__CYGWIN__)' src); do
+# mv $F $F.bak
+# sed -e "s/\(defined(_WIN32)\) \&\& \!defined(__CYGWIN__)/\1/" $F.bak > $F
+#done
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# # fix missing openlog/syslog
+# echo "#undef HAVE_SYSLOG_H" >> src/config.h &&
+# wl-showstatus build &&
+# #make CXX="g++ -fpermissive" &&
+# #make CC="gcc -DGOOGLE_GLOG_DLL_DECL=__declspec(dllexport)" &&
+# #make CC="gcc -DGOOGLE_GLOG_DLL_DECL=__declspec(dllimport)" &&
+# make CXX="g++ -fpermissive -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=__declspec\(dllimport\)" &&
+# wl-showstatus build-install &&
+# make install-strip &&
+#    echo OK
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_GFLAGS:BOOL=ON -DWITH_THREADS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+# echo "#undef HAVE_SYSLOG_H" >> build_static/config.h &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_GFLAGS:BOOL=ON -DWITH_THREADS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+# echo "#undef HAVE_SYSLOG_H" >> build_shared/config.h &&
+# echo "-Wl,--as-needed -ldbghelp" >> build_shared/CMakeFiles/glog.dir/linklibs.rsp &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# # manually install libglog.pc
+# mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+# sed -e "s?@prefix@\|@exec_prefix@?$INSTALLPREFIX?g; s?@\([a-z]*\)dir@?\${prefix}/\1?g; s?@VERSION@?$VERSION?g" libglog.pc.in > $INSTALLPREFIX/lib/pkgconfig/libglog.pc &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf glog-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_GFLAGS:BOOL=ON -DWITH_THREADS:BOOL=ON -DWITH_UNWIND:BOOL=OFF -DWITH_GTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ echo "#undef HAVE_SYSLOG_H" >> build_static/config.h &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_GFLAGS:BOOL=ON -DWITH_THREADS:BOOL=ON -DWITH_UNWIND:BOOL=OFF -DWITH_GTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ echo "#undef HAVE_SYSLOG_H" >> build_shared/config.h &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -ldbghelp/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ # manually install libglog.pc
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ sed -e "s?@prefix@\|@exec_prefix@?$INSTALLPREFIX?g; s?@\([a-z]*\)dir@?\${prefix}/\1?g; s?@VERSION@?$VERSION?g" libglog.pc.in > $INSTALLPREFIX/lib/pkgconfig/libglog.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf glog-$VERSION
+
+
+

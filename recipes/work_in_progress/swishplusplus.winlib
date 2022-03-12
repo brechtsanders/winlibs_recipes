@@ -1,0 +1,133 @@
+export NAME="SWISH++"
+export STATUS=
+export URL=http://swishplusplus.sourceforge.net/
+export BASENAME=swishplusplus
+export DESCRIPTION="SWISH++ is a Unix-based file indexing and searching engine (typically used to index and search files on web sites). It was based on SWISH-E although SWISH++ is a complete rewrite. SWISH++ was developed to circumvent my difficulties with using the SWISH-E package. SWISH++ has been ported to compile and run under Microsoft Windows by Robert J. Lebowitz and Christoph Conrad."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=6.1.5
+export VERSIONDATE=20170315
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://sourceforge.net/projects/swishplusplus/files/swishplusplus/ swish%2B%2B-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/swishplusplus/swishplusplus/$VERSION/swish%2B%2B-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/swish++-$VERSION.tar.gz
+cd swish++-$VERSION
+# fix platform.h
+patch -ulbf platform.h << EOF
+--- platform.h  2017-03-15 17:26:12.186285900 +0100
++++ platform.h  2017-03-15 17:26:31.482215300 +0100
+@@ -57,7 +57 @@
+ #endif /* platform_H */
+-
+-#endif /* platform_H */
+-
+-#endif /* platform_H */
+-
+-#endif /* platform_H */
+
+EOF
+mkdir -p sys
+cat > sys/resource.h << EOF
+static int getrlimit (int resource, void* rlim) { return -1; }
+EOF
+# fix config.h
+patch -ulbf config.h << EOF
+--- config.h  2004-12-31 03:35:55.000000000 +0100
++++ config.h  2017-03-15 17:16:40.890162000 +0100
+@@ -198,3 +198,3 @@
+
+-#ifdef  __CYGWIN__
++#ifdef  _WIN32
+ char const  TempDirectory_Default[]     = "/temp";
+@@ -237,6 +237,3 @@
+
+-#error      You have not set WordThreshold_Default for your system.
+-#error      Comment out these lines after you have set it.
+-
+-int const   WordThreshold_Default       = 250000;
++int const   WordThreshold_Default       = 1000000;
+ //          The word count past which partial indicies are generated and merged
+EOF
+# fix config/config.mk
+patch -ulbf config/config.mk << EOF
+--- config/config.mk  2005-08-28 18:02:58.000000000 +0200
++++ config/config.mk  2017-03-15 17:19:48.337904900 +0100
+@@ -37,6 +37,6 @@
+ #FREE_BSD:=1
+-LINUX:=1
++#LINUX:=1
+ #MAC_OS_X:=1
+ #SOLARIS:=1
+-#WIN32:=1
++WIN32:=1
+
+@@ -256,3 +256,3 @@
+
+-I_ROOT:=       /usr/local
++I_ROOT:=       $INSTALLPREFIX
+ #              The top-level directory of where SWISH++ will be installed.
+EOF
+# don't use setrlimit in util.h
+patch -ulbf util.h << EOF
+--- util.h  2006-05-09 02:22:53.000000000 +0200
++++ util.h  2017-03-17 14:21:38.924928400 +0100
+@@ -147,2 +147,3 @@
+ {
++#ifndef _WIN32
+        struct rlimit r;
+@@ -156,2 +157,3 @@
+        ::setrlimit( resource, &r );
++#endif
+ }
+EOF
+wl-showstatus make &&
+CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$MINGWPREFIX/include/mman-win32 make &&
+   echo OK
+
+
+wl-showstatus configure &&
+#./autogen.sh &&
+#    echo OK
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM&&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#mkdir -p build_test; cd build_test; cmake.exe -G"MSYS Makefiles" . -LH && echo OK; cd ..; rm -rf build_test
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#export BUILDDEPENDANCIES=cmake
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf swish++-$VERSION
+
+
+

@@ -1,0 +1,160 @@
+export NAME="UpTools C++ library"
+export STATUS=
+export URL=http://www.palermo.edu/ingenieria/investigacion-desarrollo/up-tools-eng.html
+export BASENAME=uptools
+export DESCRIPTION="The UpTools C++ Library, from the Universidad De Palermo (ie, University of Palermo), is an open source C++ library with facilities for load distribution and parallel processing, multi-threading, timers, memory management (with smart pointers for objects in multithreaded environments), regular expressions, common interfaces for different databases, database access in a multithreaded environment, networking support (DNS, SSL, TLS, sockets, etc), and so on."
+export CATEGORY=framework
+export TYPE=library
+#export VERSION=8.6.3
+#export VERSIONDATE=20170413
+export VERSION=8.6.12
+export VERSIONDATE=20200522
+####include/UpTools/UpArch.h:42:27: fatal error: bits/wordsize.h: No such file or directory
+wl-showstatus --package-version
+#export DEPENDANCIES=openssl,mysql,postgresql
+export DEPENDANCIES=openssl,mariadb-client,postgresql
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="http://www.palermo.edu/ingenieria/investigacion-desarrollo/up-tools-eng.html UpTools-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.palermo.edu/ingenieria/UpTools-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://www.palermo.edu/ingenieria/UpTools-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/UpTools-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/UpTools-$VERSION.tgz
+cd UpTools-$VERSION
+# fix include/UpTools/UpInet.h
+patch -ulbf include/UpTools/UpInet.h << EOF
+--- include/UpTools/UpInet.h  2013-07-02 15:40:10.000000000 +0200
++++ include/UpTools/UpInet.h  2017-04-13 15:09:12.640415900 +0200
+@@ -41,8 +41,12 @@
+
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
+ #include <sys/un.h>
++#endif
+
+ #include <vector>
+EOF
+# avoid missing bits/wordsize.h in include/UpTools/UpArch.h
+mv include/UpTools/UpArch.h include/UpTools/UpArch.h.bak &&
+sed -e "s?.*bits/wordsize\.h?//&?" include/UpTools/UpArch.h.bak > include/UpTools/UpArch.h
+# avoid missing syslog.h in include/UpTools/UpLog.h
+mv include/UpTools/UpLog.h include/UpTools/UpLog.h.bak &&
+sed -e "s?.*syslog\.h?//&?" include/UpTools/UpLog.h.bak > include/UpTools/UpLog.h
+# create stub UpLog.cc
+patch -ulbf UpLog.cc << EOF
+--- UpLog.cc  2013-07-02 15:40:11.000000000 +0200
++++ UpLog.cc  2017-04-14 14:25:48.149337600 +0200
+@@ -55,4 +55,5 @@
+ /* internal functions and data */
+
++#ifndef _WIN32
+ int upLogPid     = 0;
+ int upLogThid    = 0;
+@@ -62,4 +63,5 @@
+ const char* upLogIdent = "";
+ char upLogIdentBuf[64];
++#endif
+
+
+@@ -80,4 +82,5 @@
+ void upLogInternalSetOptions(const char *ident, int options,int logLevel)
+ {
++#ifndef _WIN32
+        upLogPid         = (options&LOG_PID)?1:0;
+        upLogThid        = (options&LOG_THID)?1:0;
+@@ -90,4 +93,5 @@
+                upLogIdent = upLogIdentBuf;
+        }
++#endif
+ }
+
+@@ -98,8 +102,10 @@
+                                                          int logLevel)
+ {
++#ifndef _WIN32
+        upLogInternalSetOptions(ident,options,logLevel);
+        openlog(ident,options,facility);
+        if( upLogThid ) UPLOG(LOG_WARNING,"upOpenLog(...) warning: to log thread id "
+                                                                 "(LOG_THID) replace upOpenLog with upOpenLogFile");
++#endif
+ }
+
+@@ -110,4 +116,5 @@
+                                                                        int (*upLogHdrFunc)(char*) )
+ {
++#ifndef _WIN32
+        upLogInternalSetOptions(ident,options,logLevel);
+        if( strcasecmp("stdout",filename)==0 ) {
+@@ -134,10 +141,13 @@
+                }
+        }
++#endif
+ }
+
+ /* close log file */
+ void upCloseLog() {
++#ifndef _WIN32
+        if(upLogFd>2) close(upLogFd);
+        if(upLogFd<0) closelog();
++#endif
+ }
+
+EOF
+# create stub include/UpTools/UpLog.inl
+patch -ulbf include/UpTools/UpLog.inl << EOF
+--- include/UpTools/UpLog.inl  2013-07-02 15:40:10.000000000 +0200
++++ include/UpTools/UpLog.inl  2017-04-14 14:25:37.565279300 +0200
+@@ -48,2 +48,5 @@
+
++#ifdef _WIN32
++# define __QQFUNC__
++#else
+ # if defined __cplusplus ? __GNUC_PREREQ (2, 6) : __GNUC_PREREQ (2, 4)
+@@ -57,2 +60,3 @@
+ # endif
++#endif
+
+EOF
+wl-showstatus configure &&
+#./autogen.sh &&
+#    echo OK
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+#PYTHON=$PYDIR/python.exe 
+#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl --without-mysql --with-postgresql &&
+####--with-mysql
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+wl-showstatus build &&
+ make -fmakefile &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf UpTools-$VERSION
+
+
+

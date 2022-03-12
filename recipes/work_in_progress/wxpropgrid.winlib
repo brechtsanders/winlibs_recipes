@@ -1,0 +1,80 @@
+export NAME="wxPropertyGrid"
+export STATUS=
+export URL=http://wxpropgrid.sourceforge.net/
+export BASENAME=wxpropgrid
+export DESCRIPTION="A property sheet control for wxWidgets "
+export CATEGORY=gui,portability
+export TYPE=library
+#export VERSION=1.4.14
+#export VERSIONDATE=20130118
+export VERSION=1.4.15
+export VERSIONDATE=20130119
+wl-showstatus --package-version
+export DEPENDANCIES=wxwidgets
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE="wxWidgets license"
+#export DOWNLOADURL="http://wxpropgrid.sourceforge.net/cgi-bin/index?page=download"
+export DOWNLOADURL="http://sourceforge.net/projects/wxpropgrid/files/wxPropertyGrid/ wxpropgrid- -src.tar.gz"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/wxpropgrid/wxPropertyGrid/$VERSION/$BASENAME-$VERSION-src.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-src.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/propgrid
+# create dummy wx-config which supports --version and uses UNIX-style paths
+cat > wx-config.sh << EOF
+#!/bin/sh
+if echo " \$* "|grep -q " --version "; then
+ shift
+ wx-config.exe --release \$* | grep -v "wx-config Error:" | sed -e "s/^\\([0-9]*\\.[0-9]*\\)\$/\\1.0/"
+else
+ wx-config.exe --static=\$WX_STATIC --unicode=\$WX_UNICODE --debug=\$WX_DEBUG --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?/\\1/?g; s?\\\\\\\\?/?g"
+fi
+EOF
+# iterate through all possible wxWidgets builds
+for WX_DEBUG in no yes ; do
+ for WX_STATIC in no yes ; do
+  for WX_UNICODE in no yes ; do
+   echo "*** BUILDING FOR OPTIONS: --static=$WX_STATIC --unicode=$WX_UNICODE --debug=$WX_DEBUG ***"
+   wl-showstatus configure &&
+   ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --$(if [ "$WX_STATIC" == "no" ]; then echo -n enable; else echo -n disable; fi)-shared --with$(if [ "$WX_STATIC" == "yes" ]; then echo -n out; fi)-wxshared --$(if [ "$WX_UNICODE" == "no" ]; then echo -n disable; else echo -n enable; fi)-unicode --$(if [ "$WX_DEBUG" == "no" ]; then echo -n disable; else echo -n enable; fi)-debug --with-wx-config="./wx-config.sh" --with-toolkit=msw &&
+   wl-showstatus build-install &&
+   make install$(if [ "$WX_STATIC" == "no" -a "$WX_DEBUG" == "no" ]; then echo -n -strip; fi) CXX="g++ -fpermissive" &&
+   make clean
+  done
+ done
+done &&
+## iterate through all possible wxWidgets builds
+#for WX_DEBUG in no yes ; do
+# for WX_STATIC in no yes ; do
+#  for WX_UNICODE in no yes ; do
+#   wl-showstatus configure &&
+#   echo "*** CONFIGURING FOR OPTIONS: --static=$WX_STATIC --unicode=$WX_UNICODE --debug=$WX_DEBUG ***" &&
+#   mkdir -p debug$WX_DEBUG\_static$WX_STATIC\unicode$WX_UNICODE &&
+#   cd debug$WX_DEBUG\_static$WX_STATIC\unicode$WX_UNICODE &&
+#   ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --$(if [ "$WX_STATIC" == "no" ]; then echo -n enable; else echo -n disable; fi)-shared --with$(if [ "$WX_STATIC" == "yes" ]; then echo -n out; fi)-wxshared --$(if [ "$WX_UNICODE" == "no" ]; then echo -n disable; else echo -n enable; fi)-unicode --$(if [ "$WX_DEBUG" == "no" ]; then echo -n disable; else echo -n enable; fi)-debug --with-wx-config="./wx-config.sh" --with-toolkit=msw CXXFLAGS="-I$MINGWPREFIX/wx/include" &&
+#   cd ..
+#  done
+# done
+#done &&
+#for WX_DEBUG in no yes ; do
+# for WX_STATIC in no yes ; do
+#  for WX_UNICODE in no yes ; do
+#   wl-showstatus build-install &&
+#   echo "*** BUILDING FOR OPTIONS: --static=$WX_STATIC --unicode=$WX_UNICODE --debug=$WX_DEBUG ***" &&
+#   make -Cdebug$WX_DEBUG\_static$WX_STATIC\unicode$WX_UNICODE install$(if [ "$WX_STATIC" == "no" -a "$WX_DEBUG" == "no" ]; then echo -n -strip; fi) CXX="g++ -fpermissive -I$MINGWPREFIX/wx/include -I$MINGWPREFIX/wx/lib/gcc_$(if [ "$WX_STATIC" == "yes" ]; then echo lib; else echo dll; fi)/msw$(if [ "$WX_UNICODE" == "yes" ]; then echo u; fi)$(if [ "$WX_DEBUG" == "yes" ]; then echo d; fi)"
+#  done
+# done
+#done &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+    echo OK
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: already included in recent wxWidgets versions?
+
+
+

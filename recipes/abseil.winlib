@@ -1,0 +1,173 @@
+export NAME="Abseil - C++ Common Libraries"
+export STATUS=
+export URL=https://abseil.io/
+#export URL=https://github.com/abseil/abseil-cpp
+export BASENAME=abseil
+export DESCRIPTION="Abseil is an open-source collection of C++ code (compliant to C++11) designed to augment the C++ standard library."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=20190808
+#export VERSIONDATE=2020020
+#export VERSION=20200225
+#export VERSIONDATE=20200227
+#export VERSION=20200225.1
+#export VERSIONDATE=20200305
+#export VERSION=20200225.2
+#export VERSIONDATE=20200423
+#export VERSION=20200923
+#export VERSIONDATE=20200925
+####absl/flags/internal/flag.cc:(.rdata$_ZTVN4absl14lts_2020_09_2314flags_internal8FlagImplE[_ZTVN4absl14lts_2020_09_2314flags_internal8FlagImplE]+0x28): undefined reference to `absl::lts_2020_09_23::CommandLineFlag::IsRetired() const'
+#export VERSION=20200923.1
+#export VERSIONDATE=20201010
+####absl/status/statusor.cc:(.text+0x41): undefined reference to `absl::lts_2020_09_23::Status::UnrefNonInlined(unsigned long long)'
+#export VERSION=20200923.2
+#export VERSIONDATE=20201022
+#export VERSION=20200923.3
+#export VERSIONDATE=20210120
+#export VERSION=20210324.0
+#export VERSIONDATE=20210330
+#export VERSION=20210324.1
+#export VERSIONDATE=20210421
+#export VERSION=20210324.2
+#export VERSIONDATE=20210602
+export VERSION=20211102.0
+export VERSIONDATE=20211111
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/abseil/abseil-cpp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/abseil/abseil-cpp/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd abseil-cpp-$VERSION
+# fix missing AcquireSRWLockExclusive in absl/synchronization/internal/waiter.cc
+mv absl/synchronization/internal/waiter.cc absl/synchronization/internal/waiter.cc.bak
+cat > absl/synchronization/internal/waiter.cc << EOF
+#if !defined(_WIN32_WINNT) ||_WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat absl/synchronization/internal/waiter.cc.bak >> absl/synchronization/internal/waiter.cc
+## fix missing alarm() in absl/base/config.h (version <= 20210324.1)
+#patch -ulbf absl/base/config.h << EOF
+#@@ -334,3 +334,3 @@
+# #define ABSL_HAVE_ALARM 1
+#-#elif defined(_MSC_VER)
+#+#elif defined(_WIN32)
+# // feature tests for Microsoft's library
+#EOF
+# fix absl/base/config.h (version >= 20210324.2)
+patch -ulbf absl/base/config.h << EOF
+@@ -674,3 +674,3 @@
+ // the macro expands to nothing.
+-#if defined(_MSC_VER)
++#if defined(_WIN32)
+ #if defined(ABSL_BUILD_DLL)
+@@ -684,3 +684,3 @@
+ #define ABSL_DLL
+-#endif  // defined(_MSC_VER)
++#endif  // defined(_WIN32)
+
+EOF
+## fix building DLLs
+#patch -ulbf CMake/AbseilHelpers.cmake << EOF
+#@@ -104,22 +104,39 @@
+#     endif()
+#
+#     if(NOT ABSL_CC_LIB_IS_INTERFACE)
+#       add_library(\${_NAME} STATIC "")
+#+      add_library(\${_NAME}_shared SHARED "")
+#       target_sources(\${_NAME} PRIVATE \${ABSL_CC_LIB_SRCS} \${ABSL_CC_LIB_HDRS})
+#+      target_sources(\${_NAME}_shared PRIVATE \${ABSL_CC_LIB_SRCS} \${ABSL_CC_LIB_HDRS})
+#       target_include_directories(\${_NAME}
+#         PUBLIC
+#           \$<BUILD_INTERFACE:\${ABSL_COMMON_INCLUDE_DIRS}>
+#           \$<INSTALL_INTERFACE:\${ABSL_INSTALL_INCLUDEDIR}>
+#       )
+#+      target_include_directories(\${_NAME}_shared
+#+        PUBLIC
+#+          \$<BUILD_INTERFACE:\${ABSL_COMMON_INCLUDE_DIRS}>
+#+          \$<INSTALL_INTERFACE:\${ABSL_INSTALL_INCLUDEDIR}>
+#+      )
+#+      target_compile_options(\${_NAME}_shared
+#+        PRIVATE \${ABSL_CC_LIB_COPTS})
+#       target_compile_options(\${_NAME}
+#         PRIVATE \${ABSL_CC_LIB_COPTS})
+#+      target_compile_options(\${_NAME}_shared
+#+        PRIVATE \${ABSL_CC_LIB_COPTS})
+#       target_link_libraries(\${_NAME}
+#         PUBLIC \${ABSL_CC_LIB_DEPS}
+#         PRIVATE
+#           \${ABSL_CC_LIB_LINKOPTS}
+#           \${ABSL_DEFAULT_LINKOPTS}
+#       )
+#+      target_link_libraries(\${_NAME}_shared
+#+        PUBLIC \${ABSL_CC_LIB_DEPS}
+#+        PRIVATE
+#+          \${ABSL_CC_LIB_LINKOPTS}
+#+          \${ABSL_DEFAULT_LINKOPTS}
+#+      )
+#       target_compile_definitions(\${_NAME} PUBLIC \${ABSL_CC_LIB_DEFINES})
+#
+#       # Add all Abseil targets to a a folder in the IDE for organization.
+#       if(ABSL_CC_LIB_PUBLIC)
+#@@ -131,16 +148,21 @@
+#       endif()
+#
+#       # INTERFACE libraries can't have the CXX_STANDARD property set
+#       set_property(TARGET \${_NAME} PROPERTY CXX_STANDARD \${ABSL_CXX_STANDARD})
+#+      set_property(TARGET \${_NAME}_shared PROPERTY CXX_STANDARD \${ABSL_CXX_STANDARD})
+#       set_property(TARGET \${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+#+      set_property(TARGET \${_NAME}_shared PROPERTY CXX_STANDARD_REQUIRED ON)
+#
+#       # When being installed, we lose the absl_ prefix.  We want to put it back
+#       # to have properly named lib files.  This is a no-op when we are not being
+#       # installed.
+#       set_target_properties(\${_NAME} PROPERTIES
+#         OUTPUT_NAME "absl_\${_NAME}"
+#       )
+#+      set_target_properties(\${_NAME}_shared PROPERTIES
+#+        OUTPUT_NAME "absl_\${_NAME}"
+#+      )
+#     else()
+#       # Generating header-only library
+#       add_library(\${_NAME} INTERFACE)
+#       target_include_directories(\${_NAME}
+#EOF
+#wl-showstatus configure &&
+#cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DABSL_USE_GOOGLETEST_HEAD:BOOL=OFF -DABSL_RUN_TESTS:BOOL=OFF . &&
+# wl-showstatus build-install &&
+# #echo "-Wl,--as-needed -lshlwapi" >> absl/base/CMakeFiles/malloc_internal_shared.dir/linklibs.rsp &&
+# #echo "-Wl,--as-needed -lshlwapi" >> absl/base/CMakeFiles/base_shared.dir/linklibs.rsp &&
+# #echo "-Wl,--as-needed -lshlwapi" >> absl/container/CMakeFiles/hashtablez_sampler_shared.dir/linklibs.rsp &&
+# make install/strip &&
+# mkdir -p $INSTALLPREFIX/cmake &&
+# cp -f abslConfig.cmake $INSTALLPREFIX/cmake/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf abseil-cpp-$VERSION
+#####TO DO: build shared DLLs
+#####TO DO: missing abslConfig.cmake
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DABSL_USE_GOOGLETEST_HEAD:BOOL=OFF -DABSL_RUN_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DABSL_USE_GOOGLETEST_HEAD:BOOL=OFF -DABSL_RUN_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-std=c++17" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DABSL_USE_GOOGLETEST_HEAD:BOOL=OFF -DABSL_RUN_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DABSL_USE_GOOGLETEST_HEAD:BOOL=OFF -DABSL_RUN_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-std=c++17" -S. -Bbuild_shared &&
+ #echo "-Wl,--as-needed -lws2_32 -lwinmm" >> build_shared/Extras/BulletRobotics/CMakeFiles/BulletRobotics.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf abseil-cpp-$VERSION
+
+
+

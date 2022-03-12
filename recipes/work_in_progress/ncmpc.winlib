@@ -1,0 +1,223 @@
+export NAME="ncmpc"
+export STATUS=
+export URL=http://www.musicpd.org/
+export BASENAME=ncmpc
+export DESCRIPTION="ncmpc is a curses client for the Music Player Daemon (MPD). ncmpc connects to a MPD running on a machine on the local network, and controls this with an interface inspired by cplay."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.24
+#export VERSIONDATE=20140814
+#export VERSION=0.25
+#export VERSIONDATE=20160818
+#export VERSION=0.26
+#export VERSIONDATE=20170320
+#export VERSION=0.27
+#export VERSIONDATE=20170326
+#export DEPENDANCIES=pdcurses
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+####/include/ncurses/curses.h:1599:28: error: conflicting types for 'has_key'
+#export VERSION=0.28
+#export VERSIONDATE=20170922
+#export VERSION=0.29
+#export VERSIONDATE=20171106
+#export VERSION=0.30
+#export VERSIONDATE=20180404
+#export VERSION=0.31
+#export VERSIONDATE=20180919
+#export VERSION=0.32
+#export VERSIONDATE=20181006
+#export VERSION=0.33
+#export VERSIONDATE=20181023
+#export VERSION=0.34
+#export VERSIONDATE=20190412
+#export VERSION=0.35
+#export VERSIONDATE=20190914
+export VERSION=0.36
+export VERSIONDATE=20191105
+#export VERSION=0.37
+#export VERSIONDATE=20200124
+#export VERSION=0.38
+#export VERSIONDATE=20200430
+#export VERSION=0.39
+#export VERSIONDATE=20200822
+#export VERSION=0.40
+#export VERSIONDATE=20201008
+#export VERSION=0.41
+#export VERSIONDATE=20201016
+#export VERSION=0.42
+#export VERSIONDATE=20201029
+#export VERSION=0.43
+#export VERSIONDATE=20210128
+#export VERSION=0.44
+#export VERSIONDATE=20210201
+#export VERSION=0.45
+#export VERSIONDATE=20210212
+#export VERSION=0.46
+#export VERSIONDATE=20211127
+####meson.build:167:0: ERROR:  Invalid version of dependency, need 'boost' ['>= 1.62'] found '1.57'.
+wl-showstatus --package-version
+#export DEPENDANCIES=pdcurses,boost
+export DEPENDANCIES=ncurses,boost
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://www.musicpd.org/download/ncmpc/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.musicpd.org/download/ncmpc/$(echo $VERSION|sed -e "s/^\([0-9]*\)\..*$/\1/")/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing sigwinch_channel in src/main.c
+patch -ulbf src/main.c << EOF
+--- src/main.c  2014-07-14 11:34:46.000000000 +0200
++++ src/main.c  2014-08-14 22:28:38.000000000 +0200
+@@ -678,3 +678,5 @@
+        g_io_channel_unref(keyboard_channel);
++#ifndef WIN32
+        g_io_channel_unref(sigwinch_channel);
++#endif
+        close(sigwinch_pipes[0]);
+EOF
+# fix missing sigwinch_channel
+mv src/mpdclient.h src/mpdclient.h.bak
+echo "#include <curses.h>" > src/mpdclient.h
+cat src/mpdclient.h.bak >> src/mpdclient.h
+# fix missing sigwinch_channel
+mv src/screen_client.h src/screen_client.h.bak
+echo "#include <curses.h>" > src/screen_client.h
+cat src/screen_client.h.bak >> src/screen_client.h
+# fix missing sigwinch_channel
+mv src/screen_file.h src/screen_file.h.bak
+echo "#include <curses.h>" > src/screen_file.h
+cat src/screen_file.h.bak >> src/screen_file.h
+# fix missing sigwinch_channel
+mv src/conf.h src/conf.h.bak
+echo "#include <curses.h>" > src/conf.h
+cat src/conf.h.bak >> src/conf.h
+# fix redefinition of bool in src/callbacks.c (version >= 0.26)
+mv src/callbacks.c src/callbacks.c.bak &&
+echo "#include <curses.h>" > src/callbacks.c &&
+cat src/callbacks.c.bak >> src/callbacks.c
+# fix redefinition of bool in src/net/async_connect.c (version >= 0.26)
+mv src/net/async_connect.c src/net/async_connect.c.bak &&
+echo "#include <ws2tcpip.h>" > src/net/async_connect.c &&
+cat src/net/async_connect.c.bak >> src/net/async_connect.c
+# fix redefinition of bool in src/aconnect.c (version >= 0.26)
+mv src/aconnect.c src/aconnect.c.bak &&
+sed -e "s?sys/socket\.h?winsock2.h?" src/aconnect.c.bak > src/aconnect.c
+# fix reference to missing icon file in src/win/ncmpc_win32_rc.rc.in
+mv src/win/ncmpc_win32_rc.rc.in src/win/ncmpc_win32_rc.rc.in.bak
+grep -v ncmpc.ico src/win/ncmpc_win32_rc.rc.in.bak > src/win/ncmpc_win32_rc.rc.in
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-ncurses --without-ncursesw &&
+ echo "#include <curses.h>" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+
+# fix missing src/win/ncmpc_win32_rc.rc
+#sed -e "s?@top_srcdir@?$(pwd)?; s/@VERSION@/$VERSION/g; s/@VERSION_MAJOR@/$(echo $VERSION|sed -e "s/^\([^.]*\).*$/\1/")/g; s/@VERSION_MINOR@/$(echo $VERSION.0|sed -e "s/^[^.]*\.\([^.]*\).*$/\1/")/g; s/@VERSION_REVISION@/$(echo $VERSION.0.0|sed -e "s/^[^.]*\.[^.]*\.\([^.]*\).*$/\1/")/g; s/@VERSION_EXTRA@/$(echo $VERSION.0.0.0|sed -e "s/^[^.]*\.[^.]*\.[^.]*\.\([^.]*\).*$/\1/")/g" src/win/ncmpc_win32_rc.rc.in > src/win/ncmpc_win32_rc.rc
+sed -e "s?@top_srcdir@?..?; s/@VERSION@/$VERSION/g; s/@VERSION_MAJOR@/$(echo $VERSION|sed -e "s/^\([^.]*\).*$/\1/")/g; s/@VERSION_MINOR@/$(echo $VERSION.0|sed -e "s/^[^.]*\.\([^.]*\).*$/\1/")/g; s/@VERSION_REVISION@/$(echo $VERSION.0.0|sed -e "s/^[^.]*\.[^.]*\.\([^.]*\).*$/\1/")/g; s/@VERSION_EXTRA@/$(echo $VERSION.0.0.0|sed -e "s/^[^.]*\.[^.]*\.[^.]*\.\([^.]*\).*$/\1/")/g" src/win/ncmpc_win32_rc.rc.in > src/win/ncmpc_win32_rc.rc
+
+mkdir -p build_win
+#PYTHONPATH=$MINGWPREFIX/lib:$PYTHONPATH $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library shared --curses ncurses --colors ncurses build_win &&
+PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --default-library both --strip --optimization 2 . build_win &&
+ ninja -C build_win -j 1 | cat &&
+    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####application crashes
+
+
+
+#export NAME="ncmpc"
+#export STATUS=
+#export URL=http://www.musicpd.org/
+#export BASENAME=ncmpc
+#export DESCRIPTION="ncmpc is a curses client for the Music Player Daemon (MPD). ncmpc connects to a MPD running on a machine on the local network, and controls this with an interface inspired by cplay."
+#export CATEGORY=communication
+#export TYPE=library
+##export VERSION=0.37
+##export VERSIONDATE=20200124
+#####meson.build:167:0: ERROR:  Invalid version of dependency, need 'boost' ['>= 1.62'] found '1.57'.
+##export VERSION=0.38
+##export VERSIONDATE=20200430
+##export VERSION=0.39
+##export VERSIONDATE=20200822
+##export VERSION=0.40
+##export VERSIONDATE=20201008
+##export VERSION=0.41
+##export VERSIONDATE=20201016
+#####src/gidle.hxx:53:15: error: 'posix' in namespace 'boost::asio' does not name a type
+##export VERSION=0.42
+##export VERSIONDATE=20201029
+#####src\system\meson.build:20:2: ERROR: Unknown variable "c_compiler".
+##export VERSION=0.43
+##export VERSIONDATE=20210128
+##export VERSION=0.44
+##export VERSIONDATE=20210201
+##export VERSION=0.45
+##export VERSIONDATE=20210212
+#export VERSION=0.46
+#export VERSIONDATE=20211127
+#####src/event/BackendEvents.hxx:27:10: fatal error: WinSelectEvents.hxx: No such file or directory
+#####bug reported: https://github.com/MusicPlayerDaemon/MPD/issues/1064
+#wl-showstatus --package-version
+##export DEPENDANCIES=pdcurses,boost
+#export DEPENDANCIES=ncurses,boost
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=meson,ninja
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="http://www.musicpd.org/download/ncmpc/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.musicpd.org/download/ncmpc/$(echo $VERSION|sed -e "s/^\([0-9]*\)\..*$/\1/")/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## fix redefinition of DELETE in src/Command.hxx
+#patch -ulbf src/Command.hxx << EOF
+#@@ -69,2 +69,5 @@
+#        SELECT_ALL,
+#+#ifdef DELETE
+#+#undef DELETE
+#+#endif
+#        DELETE,
+#EOF
+#sed -i.bak -e "s/@VERSION@/$VERSION/" src/win/ncmpc_win32_rc.rc.in
+## fix src/system/meson.build (version >= 0.42)
+#patch -ulbf src/system/meson.build << EOF
+#@@ -19,3 +19,3 @@
+# if is_windows
+#-  winsock_dep = c_compiler.find_library('ws2_32')
+#+  winsock_dep = cc.find_library('ws2_32')
+# else
+#EOF
+## fix src/event/meson.build (version >= 0.42)
+#patch -ulbf src/event/meson.build << EOF
+#@@ -9,3 +9,3 @@
+# if is_windows
+#-  event_sources += 'WinSelectBackend.cxx'
+#+  #event_sources += 'WinSelectBackend.cxx'
+# elif is_linux and get_option('epoll')
+#EOF
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both build_both -Dcurses=ncursesw -Dregex=enabled -Dmouse=disabled -Dlirc=disabled -Dasync_connect=true -Dlyrics_screen=false -Dchat_screen=false -Ddocumentation=disabled -Dmanual=false -Dhtml_manual=false &&
+# cp build_both/src/win/ncmpc_win32_rc.rc src/win/ &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,66 @@
+export NAME="c-vtapi"
+export STATUS=
+export URL=https://github.com/VirusTotal/c-vtapi
+export BASENAME=c-vtapi
+export DESCRIPTION="Official implementation of the VirusTotal API in C programming language"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20181003
+wl-showstatus --package-version
+export DEPENDANCIES=libcurl,libjansson
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/VirusTotal/c-vtapi/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/VirusTotal/c-vtapi/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+patch -ulbf lib/VtObject.c << EOF
+@@ -132 +132 @@
+-  DBG(DGB_LEVEL_MEM, "Allocated new object %p name='%s' size=%zd\n", new_obj, ops->obj_type, ops->obj_size);
++  DBG(DGB_LEVEL_MEM, "Allocated new object %p name='%s' size=%ld\n", new_obj, ops->obj_type, (long)ops->obj_size);
+EOF
+patch -ulbf lib/VtApiPage.c << EOF
+@@ -142 +142 @@
+-  DBG(1, "Recv %zd bytes\n", bytes);
++  DBG(1, "Recv %ld bytes\n", (long)bytes);
+EOF
+# fix lib/VtFile.c
+patch -ulbf lib/VtFile.c << EOF
+@@ -26,2 +26,3 @@
+ #include <stdint.h>
++#include <inttypes.h>
+ #include <string.h>
+@@ -175,6 +176,6 @@
+
+-  DBG(1, "UP: %" CURL_FORMAT_CURL_OFF_T " of %" CURL_FORMAT_CURL_OFF_T
+-         "  DOWN: %" CURL_FORMAT_CURL_OFF_T " of %" CURL_FORMAT_CURL_OFF_T
++  DBG(1, "UP: %" PRIu64 " of %" PRIu64
++         "  DOWN: %" PRIu64 " of %" PRIu64
+          "\\r\\n",
+-         ulnow, ultotal, dlnow, dltotal);
++         (uint64_t)ulnow, (uint64_t)ultotal, (uint64_t)dlnow, (uint64_t)dltotal);
+
+EOF
+# fix missing INFINTE
+sed -i.bak "s/INFINTE/INFINITE/g" lib/vtcapi_common.h lib/VtObject.h
+# fix %lld in lib/VtFileDist.c
+sed -i.bak -e "s/\(printf(.*%\)l\(ld\",\)\s/\1\2(long)/" lib/VtFileDist.c
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

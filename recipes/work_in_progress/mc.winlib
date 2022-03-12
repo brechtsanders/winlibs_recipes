@@ -1,0 +1,131 @@
+export NAME="Midnight Commander"
+export STATUS=
+#export URL=http://www.gnome.org/projects/mc
+export URL=https://www.midnight-commander.org/
+export BASENAME=mc
+#export DESCRIPTION="GNU Midnight Commander is a file manager for free operating systems. Being a text mode application, GNU Midnight Commander can be used locally or remotely, on the console or under X Window System. By using full screen space of the terminals, it provides an intuitive user interface to the operating system, aiming to be a useful tool for users with any level of experience, from a newbie to a guru."
+export DESCRIPTION="GNU Midnight Commander is a visual file manager, licensed under GNU General Public License and therefore qualifies as Free Software. It's a feature rich full-screen text mode application that allows you to copy, move and delete files and whole directory trees, search for files and run commands in the subshell. Internal viewer and editor are included. Midnight Commander is based on versatile text interfaces, such as Ncurses or S-Lang, which allows it to work on a regular console, inside an X Window terminal, over SSH connections and all kinds of remote shells."
+export CATEGORY=
+export TYPE=library
+#export VERSION=4.5.54
+#export VERSIONDATE=20101008
+#export VERSION=4.5.55
+#export VERSIONDATE=20110117
+####checking for glib-config... no
+####checking for GLIB - version >= 1.2.0... no
+####*** The glib-config script installed by GLIB could not be found
+####*** If GLIB was installed in PREFIX, make sure PREFIX/bin is in
+####*** your path, or set the GLIB_CONFIG environment variable to the
+####*** full path to glib-config.
+####configure: error: Test for GLIB failed.  MC requires GLIB.
+#export VERSION=4.8.7
+#export VERSIONDATE=20121230
+#export VERSION=4.8.8
+#export VERSIONDATE=20130402
+#export VERSION=4.8.9
+#export VERSIONDATE=20130711
+#export VERSION=4.8.10
+#export VERSIONDATE=20130803
+#export VERSION=4.8.11
+#export VERSIONDATE=20131202
+#export VERSION=4.8.12
+#export VERSIONDATE=20140401
+#export VERSION=4.8.13
+#export VERSIONDATE=20140906
+#export VERSION=4.8.14
+#export VERSIONDATE=20150323
+#export VERSION=4.8.15
+#export VERSIONDATE=20151110
+#export VERSION=4.8.16
+#export VERSIONDATE=20160405
+#export VERSION=4.8.17
+#export VERSIONDATE=20160508
+#export VERSION=4.8.18
+#export VERSIONDATE=20161003
+#export VERSION=4.8.19
+#export VERSIONDATE=20170306
+#export VERSION=4.8.20
+#export VERSIONDATE=20171126
+#export VERSION=4.8.21
+#export VERSIONDATE=20180603
+#export VERSION=4.8.22
+#export VERSIONDATE=20190102
+#export VERSION=4.8.23
+#export VERSIONDATE=20190624
+#export VERSION=4.8.24
+#export VERSIONDATE=20200120
+#export VERSION=4.8.25
+#export VERSIONDATE=20200719
+#export VERSION=4.8.26
+#export VERSIONDATE=20210122
+export VERSION=4.8.27
+export VERSIONDATE=20210816
+####configure: error: could not determine how to read list of mounted file systems
+wl-showstatus --package-version
+export DEPENDANCIES=slang
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/mc/"
+export DOWNLOADURL="http://www.midnight-commander.org/downloads"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://www.midnight-commander.org/downloads/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix lib/tty/key.c (version >= 4.8.27)
+patch -ulbf lib/tty/key.c << EOF
+@@ -233,2 +233,3 @@
+ {
++#undef SHIFT_PRESSED
+     SHIFT_PRESSED = (1 << 0),
+@@ -1377,3 +1378,3 @@
+ {
+-#ifdef HAVE_SLANG
++#if defined(HAVE_SLANG) && !defined(_WIN32)
+     input_fd = SLang_TT_Read_FD;
+EOF
+# fix lib/tty/tty-internal.c (version >= 4.8.27)
+patch -ulbf lib/tty/tty-internal.c << EOF
+@@ -38,3 +38,7 @@
+
++#ifdef _WIN32
++#include <glib.h>
++#else
+ #include <glib-unix.h>
++#endif
+
+@@ -66,2 +70,6 @@
+ {
++#ifdef _WIN32
++    fprintf (stderr, _("\\nPipe for SIGWINCH not supported on Windows\\n"));
++    exit (EXIT_FAILURE);
++#else
+     GError *mcerror = NULL;
+@@ -98,2 +106,3 @@
+     }
++#endif
+ }
+EOF
+# fix missing files
+mkdir -p winfix
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+# don't fail on error: could not determine how to read list of mounted file systems
+sed -i.bak -e "s/as_fn_error\(.*could not determine how to read list of mounted file systems\)/echo\1/" configure
+# fix detection of socket library
+sed -i.bak2 -e "s/xnet bsd socket inet/ws2_32 &/" configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

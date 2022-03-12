@@ -1,0 +1,266 @@
+export NAME="lldb"
+export STATUS=
+export URL=https://lldb.llvm.org/
+export BASENAME=lldb
+export DESCRIPTION="The LLDB project builds on libraries provided by LLVM and Clang to provide a great native debugger. It uses the Clang ASTs and expression parser, LLVM JIT, LLVM disassembler, etc so that it provides an experience that \"just works\"."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=3.4
+#export VERSIONDATE=20140109
+#export VERSION=3.5.0
+#export VERSIONDATE=20140905
+#export VERSION=3.5.1
+#export VERSIONDATE=20150113
+#export VERSION=3.5.2
+#export VERSIONDATE=20150403
+#export VERSION=3.6.0
+#export VERSIONDATE=20150228
+#export VERSION=3.6.1
+#export VERSIONDATE=20150525
+#export VERSION=3.6.2
+#export VERSIONDATE=20150714
+#export VERSION=3.7.0
+#export VERSIONDATE=20150902
+#export VERSION=3.7.1
+#export VERSIONDATE=20160105
+#export VERSION=3.8.0
+#export VERSIONDATE=20160309
+#export VERSION=3.8.1
+#export VERSIONDATE=20160711
+#export VERSION=3.9.0
+#export VERSIONDATE=20160905
+#export VERSION=3.9.1
+#export VERSIONDATE=20161218
+#export VERSION=4.0.0
+#export VERSIONDATE=20170314
+#export VERSION=4.0.1
+#export VERSIONDATE=20170625
+#export VERSION=5.0.0
+#export VERSIONDATE=20170909
+#export VERSION=5.0.1
+#export VERSIONDATE=20171220
+#export VERSION=5.0.2
+#export VERSIONDATE=20180703
+#export VERSION=6.0.0
+#export VERSIONDATE=20180318
+#export VERSION=6.0.1
+#export VERSIONDATE=20180703
+#export VERSION=7.0.0
+#export VERSIONDATE=20181029
+#export VERSION=7.0.1
+#export VERSIONDATE=20181230
+#export VERSION=7.1.0
+#export VERSIONDATE=20190502
+#export VERSION=8.0.0
+#export VERSIONDATE=20190401
+#export VERSION=8.0.1
+#export VERSIONDATE=20190818
+#export DEPENDANCIES=llvm,clang
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+#export VERSION=9.0.0
+#export VERSIONDATE=20190930
+####Could NOT find PythonLibs (missing: PYTHON_LIBRARIES PYTHON_INCLUDE_DIRS)
+#export VERSION=9.0.1
+#export VERSIONDATE=20200224
+#export VERSION=10.0.0
+#export VERSIONDATE=20200326
+#export VERSION=10.0.1
+#export VERSIONDATE=20200804
+#export VERSION=11.0.0
+#export VERSIONDATE=20201012
+export VERSION=11.1.0
+export VERSIONDATE=20210408
+#export VERSION=12.0.0
+#export VERSIONDATE=20210419
+#export VERSION=13.0.1
+#export VERSIONDATE=20220214
+wl-showstatus --package-version
+#export DEPENDANCIES=llvm,clang,libxml2,pdcurses,pcre,xz,lua
+export DEPENDANCIES=llvm,clang,libxml2,ncurses,pcre,xz,lua
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=
+#export DOWNLOADURL="http://llvm.org/releases/download.html lldb- .src.tar.gz"
+#export DOWNLOADURL="http://llvm.org/releases/download.html lldb- .src.tar.xz"
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases lldb- .src.tar.xz"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://llvm.org/releases/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\.*$/\1/")/$BASENAME-$VERSION.src.tar.gz
+#export DOWNLOADSOURCEURL=http://llvm.org/releases/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\.*$/\1/")/$BASENAME-$VERSION.src.tar.xz
+#export DOWNLOADSOURCEURL=http://llvm.org/releases/$VERSION/$BASENAME-$VERSION.src.tar.xz
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$VERSION/$BASENAME-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfzh $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.src.tar.gz
+tar xfJh $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.src.tar.xz
+#cd $BASENAME-$VERSION
+cd $BASENAME-$VERSION.src
+## fix missing regex_impl.h in include/lldb/Utility/RegularExpression.h (version = 9.0.1)
+#patch -ulbf include/lldb/Utility/RegularExpression.h << EOF
+#@@ -11,3 +11,5 @@
+#
+#-#ifdef _WIN32
+#+#ifdef __MINGW32__
+#+#include <regex.h>
+#+#elif defined(_WIN32)
+# #include "../lib/Support/regex_impl.h"
+#EOF
+# fix include/lldb/Host/windows/PosixApi.h (version >= 9.0.1)
+patch -ulbf include/lldb/Host/windows/PosixApi.h << EOF
+@@ -15,2 +15,6 @@
+ #endif
++#ifdef __MINGW32__
++#include <stdint.h>
++#include <sys/types.h>
++#endif
+
+@@ -86,4 +90,6 @@
+
++#ifndef __MINGW32__
+ int strcasecmp(const char *s1, const char *s2);
+ int strncasecmp(const char *s1, const char *s2, size_t n);
++#endif
+
+EOF
+## fix tools/lldb-mi/Platform.h (version = 9.0.1)
+#patch -ulbf tools/lldb-mi/Platform.h << EOF
+#@@ -9,3 +9,6 @@
+#
+#-#if defined(_MSC_VER)
+#+#if defined(_WIN32)
+#+#ifdef __MINGW32__
+#+#include <sys/types.h>
+#+#endif
+#
+#@@ -47,3 +50,5 @@
+#
+#+#ifndef _PID_T_
+# typedef long pid_t;
+#+#endif
+#
+#EOF
+## fix tools/lldb-mi/MIDataTypes.h (version = 9.0.1)
+#patch -ulbf tools/lldb-mi/MIDataTypes.h << EOF
+#@@ -38,2 +38,11 @@
+# // Portability issues
+#+#ifdef __MINGW32__
+#+#include <stdint.h>
+#+#ifdef _WIN64
+#+typedef int64_t MIint;
+#+typedef uint64_t MIuint;
+#+#else
+#+typedef int MIint;
+#+typedef unsigned int MIuint;
+#+#endif
+# #ifdef _WIN64
+#@@ -54,2 +63,3 @@
+# #endif // _WIN64
+#+#endif // __MINGW32__
+#
+#@@ -58,3 +68,8 @@
+# // Fundamentals:
+#+#ifdef __MINGW32__
+#+typedef int64_t MIint64;             // 64bit signed integer.
+#+typedef uint64_t MIuint64;           // 64bit unsigned integer.
+#+#else
+# typedef long long MIint64;           // 64bit signed integer.
+# typedef unsigned long long MIuint64; // 64bit unsigned integer.
+#+#endif
+#EOF
+# fix missing _SH_DENYNO in source/Host/windows/FileSystem.cpp (version >= 9.0.1)
+patch -ulbf source/Host/windows/FileSystem.cpp << EOF
+@@ -13,2 +13,5 @@
+ #include <sys/types.h>
++#ifdef __MINGW32__
++#include <share.h>
++#endif
+
+EOF
+# fix missing type pid_t in tools/driver/Platform.h (version >= 9.0.1)
+patch -ulbf tools/driver/Platform.h << EOF
+@@ -17,2 +17,5 @@
+ #endif
++#ifdef __MINGW32__
++#include <sys/types.h>
++#endif
+ #include "lldb/Host/windows/windows.h"
+EOF
+# fix source/Host/common/MainLoop.cpp (version >= 9.0.1)
+patch -ulbf source/Host/common/MainLoop.cpp << EOF
+@@ -28,2 +28,6 @@
+ #elif defined(_WIN32)
++#if _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
+ #include <winsock2.h>
+EOF
+# fix source/Initialization/SystemInitializerCommon.cpp (version >= 9.0.1)
+patch -ulbf source/Initialization/SystemInitializerCommon.cpp << EOF
+@@ -25,2 +25,5 @@
+ #if defined(_WIN32)
++#ifdef __MINGW32__
++#include <crtdbg.h>
++#endif
+ #include "Plugins/Process/Windows/Common/ProcessWindowsLog.h"
+EOF
+# fix missing usleep in source/Plugins/Process/gdb-remote/ProcessGDBRemote.cpp (version >= 9.0.1)
+patch -ulbf source/Plugins/Process/gdb-remote/ProcessGDBRemote.cpp << EOF
+@@ -86,2 +86,6 @@
+ #include "llvm/Support/raw_ostream.h"
++#ifdef _WIN32
++#include <windows.h>
++#define usleep(t) Sleep((t)/1000)
++#endif
+
+EOF
+#mkdir -p build &&
+# cd build &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=c++11" -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX .. &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release $(if g++ --help -v 2>/dev/null|grep -q "std=c++11"; then echo '-DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=gnu++11"'; fi) -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX .. &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release $(if g++ --help -v 2>/dev/null|grep -q "std=c++11"; then echo '-DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=gnu++11"'; fi) -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_DISABLE_PYTHON:BOOL=OFF -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release $(if g++ --help -v 2>/dev/null|grep -q "std=c++11"; then echo '-DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=gnu++11"'; fi) -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# #PYTHON_HOME=$PYDIR cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release $(if g++ --help -v 2>/dev/null|grep -q "std=c++11"; then echo '-DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=gnu++11"'; fi) -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLDB_DISABLE_PYTHON:BOOL=OFF -DLLDB_RELOCATABLE_PYTHON:BOOL=OFF -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release $(if g++ --help -v 2>/dev/null|grep -q "std=c++11"; then echo '-DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=gnu++11"'; fi) -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=OFF -DLLDB_DISABLE_LIBEDIT:BOOL=ON -DLLDB_DISABLE_CURSES:BOOL=OFF -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm $(if g++ --help -v 2>/dev/null|grep -q "std=c++11"; then echo '-DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=gnu++11"'; fi) -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=OFF -DLLDB_DISABLE_LIBEDIT:BOOL=ON -DLLDB_DISABLE_CURSES:BOOL=OFF -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang $(if g++ --help -v 2>/dev/null|grep -q "std=c++11"; then echo '-DLLVM_ENABLE_CXX11:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=gnu++11"'; fi) -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=OFF -DLLDB_DISABLE_LIBEDIT:BOOL=ON -DLLDB_DISABLE_CURSES:BOOL=OFF -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLLVM_ENABLE_RTTI:BOOL=ON -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=OFF -DLLDB_DISABLE_LIBEDIT:BOOL=ON -DLLDB_DISABLE_CURSES:BOOL=OFF -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLLVM_ENABLE_RTTI:BOOL=ON -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=OFF -DLLDB_DISABLE_LIBEDIT:BOOL=ON -DLLDB_DISABLE_CURSES:BOOL=OFF -DCURSES_NCURSES_LIBRARY:STRING=-lncurses -DCURSES_INCLUDE_PATH:PATH=$MINGWPREFIX/include/ncurses -DCURSES_CURSES_LIBRARY:STRING=-lncurses -DCURSES_FORM_LIBRARY:STRING=-lform -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF .. &&
+# #-DLibEdit_INCLUDE_DIRS:PATH=$MINGWPREFIX/include
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lpsapi -ldbghelp -lregex/" build.ninja &&
+# cd .. &&
+# wl-showstatus build-install &&
+# #make -Cbuild install/strip &&
+# ninja -Cbuild install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION.src
+# don't link with -lgpm
+sed -i.bak "s/list(APPEND [^ ]*_LIBS gpm)/#&/" source/Core/CMakeLists.txt source/Host/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ #wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS=OFF -DLLVM_BUILD_STATIC:BOOL=ON -DLLVM_ENABLE_SHARED_LIBS:BOOL=OFF -DLLDB_BUILT_STANDALONE:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLVM_ENABLE_RTTI:BOOL=ON -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=OFF -DLLDB_DISABLE_LIBEDIT:BOOL=ON -DLLDB_DISABLE_CURSES:BOOL=OFF -DCURSES_NCURSES_LIBRARY:STRING=-lncurses -DCURSES_INCLUDE_PATH:PATH=$MINGWPREFIX/include/ncurses -DCURSES_CURSES_LIBRARY:STRING=-lncurses -DCURSES_FORM_LIBRARY:STRING=-lform -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS=ON -DLLVM_BUILD_STATIC:BOOL=OFF -DLLVM_ENABLE_SHARED_LIBS:BOOL=ON -DLLDB_BUILT_STANDALONE:BOOL=ON -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=ON -DLLVM_ENABLE_RTTI:BOOL=ON -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang -DSKIP_LLDB_SERVER_BUILD:BOOL=ON -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=OFF -DLLDB_DISABLE_LIBEDIT:BOOL=ON -DLLDB_DISABLE_CURSES:BOOL=OFF -DCURSES_NCURSES_LIBRARY:STRING=-lncurses -DCURSES_INCLUDE_PATH:PATH=$MINGWPREFIX/include/ncurses -DCURSES_CURSES_LIBRARY:STRING=-lncurses -DCURSES_FORM_LIBRARY:STRING=-lform -DLLDB_DISABLE_PYTHON:BOOL=ON -DPYTHON_EXECUTABLE:PATH=$PYDIR/python.exe -DLLDB_PATH_TO_LLVM_BUILD:PATH=$MINGWPREFIX -DLLDB_PATH_TO_CLANG_BUILD:PATH=$MINGWPREFIX -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX -DLLDB_INCLUDE_TESTS:BOOL=OFF -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_shared &&
+ #-DLLDB_INCLUDE_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wa,-mbig-obj" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition -Wl,--discard-all"
+ #-DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,-fno-lto"
+ #PYTHON_LIBRARIES PYTHON_INCLUDE_DIRS
+ #LLDB_BUILT_STANDALONE
+ # fix linker error: export ordinal too large
+ sed -i.bak -e "s/-Wl,--export-all-symbols/-Wl,--allow-multiple-definition/" build_*/build.ninja &&
+ # fix missing GetProcessImageFileNameW
+ sed -i.bak2 -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lpsapi/" build_shared/build.ninja &&
+ #echo " -Wl,--as-needed -lpsapi" >> build_shared/CMakeFiles/lldb-server.rsp &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ cp -u $INSTALLPREFIX/share/llvm/lib/libliblldb.dll.a $INSTALLPREFIX/share/llvm/lib/liblldb.dll.a &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION.src
+#See also: http://www.bencode.net/blog/2012/10/20/clangonwindows/
+####Superseded by llvm-project all-in-one build
+
+
+

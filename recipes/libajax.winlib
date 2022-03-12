@@ -1,0 +1,67 @@
+export NAME="AJAX"
+export STATUS=
+export URL="http://emboss.sourceforge.net/"
+export BASENAME=libajax
+export DESCRIPTION="AJAX is the core library used by all EMBOSS applications. It covers standard data structures, including strings, sequences, file handles, queues, hashes, heaps, lists, dictionaries, trees and dynamic arrays. It also covers standard algorithms including comparisons, pattern matching, sorting, and iterators. AJAX will also provide a set of high level graphics functions suited to the needs of sequence analysis applications."
+export CATEGORY=system
+export TYPE=library
+#export VERSION=6.3.0
+#export VERSIONDATE=20100715
+#export VERSION=6.3.1
+#export VERSIONDATE=20100720
+#export VERSION=6.4.0
+#export VERSIONDATE=20110715
+#export VERSION=6.5.7
+#export VERSIONDATE=20130208
+export VERSION=6.6.0
+export VERSIONDATE=20180116
+wl-showstatus --package-version
+#export DEPENDANCIES=zlib,libpng,mysql,postgresql,libx11,libice,pcre,expat
+export DEPENDANCIES=zlib,libpng,mariadb-client,postgresql,libx11,libice,pcre,expat
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://emboss.sourceforge.net/devrelease/ajax/"
+export DOWNLOADURL="ftp://emboss.open-bio.org/pub/EMBOSS/ EMBOSS-"
+#export DOWNLOADURL="http://emboss.sourceforge.net/download/ EMBOSS-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/EMBOSS-$VERSION.tar.gz
+cd EMBOSS-$VERSION
+# fix missing memmove in ajax/expat/xmlparse.c
+cat > ajax/expat/winconfig.h << EOF
+#include <string.h>
+#define HAVE_MEMMOVE
+EOF
+echo "#include <windows.h>" >> ajax/core/win32.h
+echo "#include <dirent.h>" >> ajax/core/dirent_w32.h
+# fix redefinition of VT_NULL, VT_BOOL, VT_INT in ajax/acd/ajacd.c
+mv ajax/acd/ajacd.c ajax/acd/ajacd.c.bak
+sed -e "s/VT_\(NULL\|BOOL\|INT\)/VT__\1/g" ajax/acd/ajacd.c.bak > ajax/acd/ajacd.c
+# fix missing VERSION (version >= 6.4.0)
+mv ajax/acd/ajacd.c ajax/acd/ajacd.c.bak
+echo "#include \"config.h\"" > ajax/acd/ajacd.c
+cat ajax/acd/ajacd.c.bak >> ajax/acd/ajacd.c
+#make -C ajax check
+# fix linkage with libsocket (version >= 6.4.0)
+mv configure configure.bak
+sed -e "s/-lsocket/-lws2_32/g" configure.bak > configure
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-x CFLAGS="-DWIN32" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-x CFLAGS="-DWIN32" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ make -C ajax install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf EMBOSS-$VERSION
+####*** Warning: linker path does not have real file for library -leplplot
+####*** Warning: linker path does not have real file for library -lsocket
+####TO DO: build DLL
+
+
+

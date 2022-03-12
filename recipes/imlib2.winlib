@@ -1,0 +1,533 @@
+export NAME="Imlib2"
+export STATUS=
+export URL=http://docs.enlightenment.org/api/imlib2/html/
+export BASENAME=imlib2
+export DESCRIPTION="Imlib 2 is the successor to Imlib. It is NOT a newer version - it is a completely new library. Imlib 2 can be installed alongside Imlib 1.x without any problems since they are effectively different libraries - BUT they Have very similar functionality."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=1.4.4
+#export VERSIONDATE=20101117
+#export VERSION=1.4.5
+#export VERSIONDATE=20110807
+#export DEPENDANCIES=libjpeg,libpng,libtiff,giflib,zlib,libbz2,libid3tag,libdl,freetype2,plibc
+#export VERSION=1.4.6
+#export VERSIONDATE=20131222
+#export VERSION=1.4.7
+#export VERSIONDATE=20150405
+#export VERSION=1.4.8
+#export VERSIONDATE=20160312
+#export VERSION=1.4.9
+#export VERSIONDATE=20160501
+#export VERSION=1.4.10
+#export VERSIONDATE=20170416
+####src/modules/loaders/loader_jpeg.c:(.text+0xa9c): undefined reference to `__imlib_GetTag'
+#export VERSION=1.5.0
+#export VERSIONDATE=20180223
+#export VERSION=1.5.1
+#export VERSIONDATE=20180317
+#export VERSION=1.6.0
+#export VERSIONDATE=20191124
+#export VERSION=1.6.1
+#export VERSIONDATE=20191214
+#export VERSION=1.7.0
+#export VERSIONDATE=20200801
+#export VERSION=1.7.1
+#export VERSIONDATE=20201211
+#export VERSION=1.7.2
+#export VERSIONDATE=20210728
+#export VERSION=1.7.3
+#export VERSIONDATE=20210812
+#export VERSION=1.7.4
+#export VERSIONDATE=20210917
+#export VERSION=1.7.5
+#export VERSIONDATE=20211206
+export VERSION=1.8.0
+export VERSIONDATE=20220207
+wl-showstatus --package-version
+export DEPENDANCIES=libjpeg,libpng,libtiff,giflib,zlib,libbz2,libwebp,libid3tag,libdl,freetype2,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://sourceforge.net/projects/enlightenment/files/imlib2-src/"
+export DOWNLOADURL="https://sourceforge.net/projects/enlightenment/files/imlib2-src/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/enlightenment/imlib2-src/$VERSION/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/enlightenment/imlib2-src/$VERSION/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/enlightenment/imlib2-src/$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing S_IRGRP and S_IROTH in src/lib/file.c
+mv src/lib/file.c src/lib/file.c.bak
+cat > src/lib/file.c << EOF
+#define S_IRGRP 0
+#define S_IROTH 0
+EOF
+cat src/lib/file.c.bak >> src/lib/file.c
+# fix missing pwd.h
+mkdir -p winfix
+cat > winfix/pwd.h << EOF
+#define getuid() 0
+#define getpwuid(uid) NULL
+struct passwd {
+ //int pw_uid;
+ //char *pw_name;
+ char *pw_dir;
+};
+EOF
+# fix missing files
+mkdir -p winfix/sys
+touch winfix/sys/ipc.h winfix/sys/shm.h
+# fix missing ELOOP in src/lib/image.c
+mv src/lib/image.c src/lib/image.c.bak
+cat > src/lib/image.c << EOF
+#include <winerror.h>
+#ifndef ELOOP
+#define ELOOP WSAELOOP
+#endif
+EOF
+cat src/lib/image.c.bak >> src/lib/image.c
+## fake missing sys/mman.h (breaks the TGA loader module: modules/loaders/loader_tga.c)
+#mkdir -p winfix/sys
+#cat > winfix/sys/mman.h << EOF
+##define PROT_READ 0x1
+##define MAP_SHARED 2
+##define MAP_FAILED NULL
+##define mmap(a,b,c,d,e,f) MAP_FAILED
+##define munmap(a,b)
+#EOF
+## fix missing mkstemp in src/modules/loaders/loader_zlib.c (version >= 1.4.6)
+#mv src/modules/loaders/loader_zlib.c src/modules/loaders/loader_zlib.c.bak
+#cat > src/modules/loaders/loader_zlib.c << EOF
+##ifdef _WIN32 
+## include <fcntl.h> 
+## define mkstemp(p) _open(_mktemp(p), _O_CREAT | _O_SHORT_LIVED | _O_EXCL) 
+##endif
+##include <common.h>
+##include <image.h>
+#EOF
+#cat src/modules/loaders/loader_zlib.c.bak >> src/modules/loaders/loader_zlib.c
+## fix missing mkstemp in src/modules/loaders/loader_id3.c (version >= 1.4.6)
+#mv src/modules/loaders/loader_id3.c src/modules/loaders/loader_id3.c.bak
+#cat > src/modules/loaders/loader_id3.c << EOF
+##ifdef _WIN32 
+## include <fcntl.h> 
+## define mkstemp(p) _open(_mktemp(p), _O_CREAT | _O_SHORT_LIVED | _O_EXCL) 
+##endif
+#EOF
+#cat src/modules/loaders/loader_id3.c.bak >> src/modules/loaders/loader_id3.c
+## fix missing mkstemp in src/modules/loaders/loader_bz2.c (version >= 1.4.6)
+#mv src/modules/loaders/loader_bz2.c src/modules/loaders/loader_bz2.c.bak
+#cat > src/modules/loaders/loader_bz2.c << EOF
+##ifdef _WIN32 
+## include <fcntl.h> 
+## define mkstemp(p) _open(_mktemp(p), _O_CREAT | _O_SHORT_LIVED | _O_EXCL) 
+##endif
+#EOF
+#cat src/modules/loaders/loader_bz2.c.bak >> src/modules/loaders/loader_bz2.c
+## fix missing DGifOpen/DGifCloseFile parameter in src/modules/loaders/loader_gif.c (version = 1.4.6)
+#if grep -q "DGifCloseFile(.*ErrorCode)" $MINGWPREFIX/include/gif_lib.h; then
+# mv src/modules/loaders/loader_gif.c src/modules/loaders/loader_gif.c.bak &&
+# sed -e "s/\(DGifOpen\|DGifOpenFileName\|DGifCloseFile\)\(([^)]*([^)]*)[^)]*\|[^)]*\))/\1\2, NULL)/g" src/modules/loaders/loader_gif.c.bak > src/modules/loaders/loader_gif.c
+#fi
+## fix DLL exports in src/lib/image.h (version >= 1.5.0 <= 1.5.1)
+#patch -ulbf src/lib/image.h << EOF
+#@@ -11,2 +11,3 @@
+# #endif
+#+#include <Imlib2.h>
+#
+#@@ -105,19 +106,19 @@
+#
+#-void                __imlib_AttachTag(ImlibImage * im, const char *key,
+#+EAPI void                __imlib_AttachTag(ImlibImage * im, const char *key,
+#                                       int val, void *data,
+#                                       ImlibDataDestructorFunction destructor);
+#-ImlibImageTag      *__imlib_GetTag(ImlibImage * im, const char *key);
+#-ImlibImageTag      *__imlib_RemoveTag(ImlibImage * im, const char *key);
+#-void                __imlib_FreeTag(ImlibImage * im, ImlibImageTag * t);
+#-void                __imlib_FreeAllTags(ImlibImage * im);
+#-
+#-void                __imlib_SetCacheSize(int size);
+#-int                 __imlib_GetCacheSize(void);
+#-ImlibImage         *__imlib_ProduceImage(void);
+#-void                __imlib_ConsumeImage(ImlibImage * im);
+#-ImlibImage         *__imlib_FindCachedImage(const char *file);
+#-void                __imlib_AddImageToCache(ImlibImage * im);
+#-void                __imlib_RemoveImageFromCache(ImlibImage * im);
+#-int                 __imlib_CurrentCacheSize(void);
+#-void                __imlib_CleanupImageCache(void);
+#+EAPI ImlibImageTag      *__imlib_GetTag(ImlibImage * im, const char *key);
+#+EAPI ImlibImageTag      *__imlib_RemoveTag(ImlibImage * im, const char *key);
+#+EAPI void                __imlib_FreeTag(ImlibImage * im, ImlibImageTag * t);
+#+EAPI void                __imlib_FreeAllTags(ImlibImage * im);
+#+
+#+EAPI void                __imlib_SetCacheSize(int size);
+#+EAPI int                 __imlib_GetCacheSize(void);
+#+EAPI ImlibImage         *__imlib_ProduceImage(void);
+#+EAPI void                __imlib_ConsumeImage(ImlibImage * im);
+#+EAPI ImlibImage         *__imlib_FindCachedImage(const char *file);
+#+EAPI void                __imlib_AddImageToCache(ImlibImage * im);
+#+EAPI void                __imlib_RemoveImageFromCache(ImlibImage * im);
+#+EAPI int                 __imlib_CurrentCacheSize(void);
+#+EAPI void                __imlib_CleanupImageCache(void);
+#
+#@@ -137,11 +138,11 @@
+# #endif
+#-void                __imlib_RemoveAllLoaders(void);
+#-ImlibLoader        *__imlib_FindBestLoaderForFile(const char *file,
+#+EAPI void                __imlib_RemoveAllLoaders(void);
+#+EAPI ImlibLoader        *__imlib_FindBestLoaderForFile(const char *file,
+#                                                   int for_save);
+#-ImlibLoader        *__imlib_FindBestLoaderForFileFormat(const char *file,
+#+EAPI ImlibLoader        *__imlib_FindBestLoaderForFileFormat(const char *file,
+#                                                         char *format,
+#                                                         int for_save);
+#-void                __imlib_SetImageAlphaFlag(ImlibImage * im, char alpha);
+#-ImlibImage         *__imlib_CreateImage(int w, int h, DATA32 * data);
+#-ImlibImage         *__imlib_LoadImage(const char *file,
+#+EAPI void                __imlib_SetImageAlphaFlag(ImlibImage * im, char alpha);
+#+EAPI ImlibImage         *__imlib_CreateImage(int w, int h, DATA32 * data);
+#+EAPI ImlibImage         *__imlib_LoadImage(const char *file,
+#                                       ImlibProgressFunction progress,
+#@@ -150,3 +151,3 @@
+#                                       ImlibLoadError * er);
+#-int                 __imlib_LoadImageData(ImlibImage * im);
+#+EAPI int                 __imlib_LoadImageData(ImlibImage * im);
+#
+#@@ -155,3 +156,3 @@
+# #endif
+#-void                __imlib_FreeImage(ImlibImage * im);
+#+EAPI void                __imlib_FreeImage(ImlibImage * im);
+#
+#@@ -160,3 +161,3 @@
+# #endif
+#-void                __imlib_FlushCache(void);
+#+EAPI void                __imlib_FlushCache(void);
+#
+#@@ -167,4 +168,4 @@
+# #endif
+#-void                __imlib_DirtyImage(ImlibImage * im);
+#-void                __imlib_SaveImage(ImlibImage * im, const char *file,
+#+EAPI void                __imlib_DirtyImage(ImlibImage * im);
+#+EAPI void                __imlib_SaveImage(ImlibImage * im, const char *file,
+#                                       ImlibProgressFunction progress,
+#EOF
+## fix DLL exports in src/lib/image.h (version >= 1.6.0 <= 1.6.1)
+#patch -ulbf src/lib/image.h << EOF
+#@@ -11,2 +11,3 @@
+# #endif
+#+#include <Imlib2.h>
+#
+#@@ -106,23 +107,23 @@
+#
+#-DATA32             *__imlib_AllocateData(ImlibImage * im);
+#-void                __imlib_FreeData(ImlibImage * im);
+#-void                __imlib_ReplaceData(ImlibImage * im, DATA32 * new_data);
+#+EAPI DATA32             *__imlib_AllocateData(ImlibImage * im);
+#+EAPI void                __imlib_FreeData(ImlibImage * im);
+#+EAPI void                __imlib_ReplaceData(ImlibImage * im, DATA32 * new_data);
+#
+#-void                __imlib_AttachTag(ImlibImage * im, const char *key,
+#+EAPI void                __imlib_AttachTag(ImlibImage * im, const char *key,
+#                                       int val, void *data,
+#                                       ImlibDataDestructorFunction destructor);
+#-ImlibImageTag      *__imlib_GetTag(ImlibImage * im, const char *key);
+#-ImlibImageTag      *__imlib_RemoveTag(ImlibImage * im, const char *key);
+#-void                __imlib_FreeTag(ImlibImage * im, ImlibImageTag * t);
+#-void                __imlib_FreeAllTags(ImlibImage * im);
+#-
+#-void                __imlib_SetCacheSize(int size);
+#-int                 __imlib_GetCacheSize(void);
+#-ImlibImage         *__imlib_ProduceImage(void);
+#-void                __imlib_ConsumeImage(ImlibImage * im);
+#-ImlibImage         *__imlib_FindCachedImage(const char *file);
+#-void                __imlib_AddImageToCache(ImlibImage * im);
+#-void                __imlib_RemoveImageFromCache(ImlibImage * im);
+#-int                 __imlib_CurrentCacheSize(void);
+#-void                __imlib_CleanupImageCache(void);
+#+EAPI ImlibImageTag      *__imlib_GetTag(ImlibImage * im, const char *key);
+#+EAPI ImlibImageTag      *__imlib_RemoveTag(ImlibImage * im, const char *key);
+#+EAPI void                __imlib_FreeTag(ImlibImage * im, ImlibImageTag * t);
+#+EAPI void                __imlib_FreeAllTags(ImlibImage * im);
+#+
+#+EAPI void                __imlib_SetCacheSize(int size);
+#+EAPI int                 __imlib_GetCacheSize(void);
+#+EAPI ImlibImage         *__imlib_ProduceImage(void);
+#+EAPI void                __imlib_ConsumeImage(ImlibImage * im);
+#+EAPI ImlibImage         *__imlib_FindCachedImage(const char *file);
+#+EAPI void                __imlib_AddImageToCache(ImlibImage * im);
+#+EAPI void                __imlib_RemoveImageFromCache(ImlibImage * im);
+#+EAPI int                 __imlib_CurrentCacheSize(void);
+#+EAPI void                __imlib_CleanupImageCache(void);
+#
+#@@ -143,5 +144,5 @@
+# void                __imlib_RemoveAllLoaders(void);
+#-ImlibLoader        *__imlib_FindBestLoaderForFile(const char *file,
+#+EAPI ImlibLoader        *__imlib_FindBestLoaderForFile(const char *file,
+#                                                   int for_save);
+#-ImlibLoader        *__imlib_FindBestLoaderForFormat(const char *format,
+#+EAPI ImlibLoader        *__imlib_FindBestLoaderForFormat(const char *format,
+#                                                     int for_save);
+#@@ -154,3 +155,3 @@
+#                                       ImlibLoadError * er);
+#-int                 __imlib_LoadImageData(ImlibImage * im);
+#+EAPI int                 __imlib_LoadImageData(ImlibImage * im);
+#
+#@@ -159,3 +160,3 @@
+# #endif
+#-void                __imlib_FreeImage(ImlibImage * im);
+#+EAPI void                __imlib_FreeImage(ImlibImage * im);
+#
+#@@ -164,3 +165,3 @@
+# #endif
+#-void                __imlib_FlushCache(void);
+#+EAPI void                __imlib_FlushCache(void);
+#
+#@@ -171,4 +172,4 @@
+# #endif
+#-void                __imlib_DirtyImage(ImlibImage * im);
+#-void                __imlib_SaveImage(ImlibImage * im, const char *file,
+#+EAPI void                __imlib_DirtyImage(ImlibImage * im);
+#+EAPI void                __imlib_SaveImage(ImlibImage * im, const char *file,
+#                                       ImlibProgressFunction progress,
+#EOF
+## fix src/lib/image.h (version >= 1.7.0)
+#patch -ulbf src/lib/image.h << EOF
+#@@ -4,2 +4,3 @@
+# #include "common.h"
+#+#include "Imlib2.h"
+# #ifdef BUILD_X11
+#@@ -95,13 +96,13 @@
+#
+#-void                __imlib_LoadAllLoaders(void);
+#-void                __imlib_RemoveAllLoaders(void);
+#-ImlibLoader       **__imlib_GetLoaderList(void);
+#-ImlibLoader        *__imlib_FindBestLoaderForFile(const char *file,
+#+EAPI void                __imlib_LoadAllLoaders(void);
+#+EAPI void                __imlib_RemoveAllLoaders(void);
+#+EAPI ImlibLoader       **__imlib_GetLoaderList(void);
+#+EAPI ImlibLoader        *__imlib_FindBestLoaderForFile(const char *file,
+#                                                   int for_save);
+#-ImlibLoader        *__imlib_FindBestLoaderForFormat(const char *format,
+#+EAPI ImlibLoader        *__imlib_FindBestLoaderForFormat(const char *format,
+#                                                     int for_save);
+#-ImlibLoader        *__imlib_FindBestLoaderForFileFormat(const char *file,
+#+EAPI ImlibLoader        *__imlib_FindBestLoaderForFileFormat(const char *file,
+#                                                         const char *format,
+#                                                         int for_save);
+#-void                __imlib_LoaderSetFormats(ImlibLoader * l,
+#+EAPI void                __imlib_LoaderSetFormats(ImlibLoader * l,
+#                                              const char *const *fmt,
+#@@ -109,4 +110,4 @@
+#
+#-ImlibImage         *__imlib_CreateImage(int w, int h, DATA32 * data);
+#-ImlibImage         *__imlib_LoadImage(const char *file, FILE * fp,
+#+EAPI ImlibImage         *__imlib_CreateImage(int w, int h, DATA32 * data);
+#+EAPI ImlibImage         *__imlib_LoadImage(const char *file, FILE * fp,
+#                                       ImlibProgressFunction progress,
+#@@ -115,8 +116,8 @@
+#                                       ImlibLoadError * er);
+#-int                 __imlib_LoadEmbedded(ImlibLoader * l, ImlibImage * im,
+#+EAPI int                 __imlib_LoadEmbedded(ImlibLoader * l, ImlibImage * im,
+#                                          const char *file, int load_data);
+#-int                 __imlib_LoadImageData(ImlibImage * im);
+#-void                __imlib_DirtyImage(ImlibImage * im);
+#-void                __imlib_FreeImage(ImlibImage * im);
+#-void                __imlib_SaveImage(ImlibImage * im, const char *file,
+#+EAPI int                 __imlib_LoadImageData(ImlibImage * im);
+#+EAPI void                __imlib_DirtyImage(ImlibImage * im);
+#+EAPI void                __imlib_FreeImage(ImlibImage * im);
+#+EAPI void                __imlib_SaveImage(ImlibImage * im, const char *file,
+#                                       ImlibProgressFunction progress,
+#@@ -125,11 +126,11 @@
+#
+#-DATA32             *__imlib_AllocateData(ImlibImage * im);
+#-void                __imlib_FreeData(ImlibImage * im);
+#-void                __imlib_ReplaceData(ImlibImage * im, DATA32 * new_data);
+#+EAPI DATA32             *__imlib_AllocateData(ImlibImage * im);
+#+EAPI void                __imlib_FreeData(ImlibImage * im);
+#+EAPI void                __imlib_ReplaceData(ImlibImage * im, DATA32 * new_data);
+#
+#-void                __imlib_LoadProgressSetPass(ImlibImage * im,
+#+EAPI void                __imlib_LoadProgressSetPass(ImlibImage * im,
+#                                                 int pass, int n_pass);
+#-int                 __imlib_LoadProgress(ImlibImage * im,
+#+EAPI int                 __imlib_LoadProgress(ImlibImage * im,
+#                                          int x, int y, int w, int h);
+#-int                 __imlib_LoadProgressRows(ImlibImage * im,
+#+EAPI int                 __imlib_LoadProgressRows(ImlibImage * im,
+#                                              int row, int nrows);
+#@@ -155,13 +156,13 @@
+#
+#-void                __imlib_AttachTag(ImlibImage * im, const char *key,
+#+EAPI void                __imlib_AttachTag(ImlibImage * im, const char *key,
+#                                       int val, void *data,
+#                                       ImlibDataDestructorFunction destructor);
+#-ImlibImageTag      *__imlib_GetTag(const ImlibImage * im, const char *key);
+#-ImlibImageTag      *__imlib_RemoveTag(ImlibImage * im, const char *key);
+#-void                __imlib_FreeTag(ImlibImage * im, ImlibImageTag * t);
+#-void                __imlib_FreeAllTags(ImlibImage * im);
+#-
+#-void                __imlib_SetCacheSize(int size);
+#-int                 __imlib_GetCacheSize(void);
+#-int                 __imlib_CurrentCacheSize(void);
+#+EAPI ImlibImageTag      *__imlib_GetTag(const ImlibImage * im, const char *key);
+#+EAPI ImlibImageTag      *__imlib_RemoveTag(ImlibImage * im, const char *key);
+#+EAPI void                __imlib_FreeTag(ImlibImage * im, ImlibImageTag * t);
+#+EAPI void                __imlib_FreeAllTags(ImlibImage * im);
+#+
+#+EAPI void                __imlib_SetCacheSize(int size);
+#+EAPI int                 __imlib_GetCacheSize(void);
+#+EAPI int                 __imlib_CurrentCacheSize(void);
+#
+#EOF
+# fix src/lib/image.h (version >= 1.7.0)
+sed -i.bak -e "s?^#include \"common\.h\"?&\n#include \"Imlib2.h\"?; s/^.* \**__imlib_.*(/EAPI &/" src/lib/image.h
+# fix missing arpa/inet.h in src/modules/loaders/loader_ff.c (version >= 1.5.0)
+patch -ulbf src/modules/loaders/loader_ff.c << EOF
+@@ -1,3 +1,7 @@
+ /* Farbfeld (http://tools.suckless.org/farbfeld) */
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <arpa/inet.h>
++#endif
+ #include <stdint.h>
+EOF
+# fix missing strndup (version >= 1.5.0)
+#for F in src/modules/loaders/loader_zlib.c src/modules/loaders/loader_bz2.c src/bin/imlib2_conv.c src/modules/loaders/loader_xbm.c; do
+for F in src/modules/loaders/loader_zlib.c src/modules/loaders/loader_bz2.c src/bin/imlib2_conv.c src/modules/loaders/loader_xbm.c src/modules/loaders/decompress_load.c; do
+mv $F $F.bak
+cat > $F << EOF
+#include <malloc.h>
+#include <string.h>
+#define strndup MY_strndup
+static inline char* strndup (const char* s, size_t n)
+{
+  char* result;
+  size_t len = strlen(s);
+  if (len > n)
+    len = n;
+  result = (char*)malloc(len + 1);
+  if (!result)
+    return 0;
+  result[len] = 0;
+  return (char*)memcpy(result, s, len);
+}
+EOF
+cat $F.bak >> $F
+done
+# fix missing memmmem() (version >= 1.7.5)
+for F in src/modules/loaders/loader_xbm.c src/modules/loaders/loader_xpm.c; do
+mv $F $F.bak
+cat > $F << EOF
+#include <stddef.h>
+#include <string.h>
+static void* memmem (const void *haystack, size_t haystacklen, const void *needle, size_t needlelen)
+{
+  const char* p;
+  const char* const q = (const char*)haystack + haystacklen - needlelen;
+  if (needlelen == 0)
+    return (void*)haystack;
+  if (haystacklen < needlelen)
+    return NULL;
+  for (p = (const char*)haystack; p <= q; ++p)
+    if (memcmp((const void*)p, needle, needlelen) == 0)
+      return (void *)p;
+  return NULL;
+}
+EOF
+cat $F.bak >> $F
+done
+## fix undefined WIN32 in src/lib/Imlib2.h
+#sed -i.bak -e "s/\bWIN32\b/_WIN32/" src/lib/Imlib2.h
+## fix src/lib/Imlib2.h (version >= 1.7.1)
+#patch -ulbf src/lib/Imlib2.h << EOF
+#@@ -6,4 +6,6 @@
+# #endif
+#-#ifdef WIN32
+#-#ifdef BUILDING_DLL
+#+#ifdef _WIN32
+#+#if defined(STATIC) || defined(STATIC_IMLIB2) || (defined(BUILDING_IMLIB2) && !defined(DLL_EXPORT))
+#+#define EAPI
+#+#elif defined(BUILDING_IMLIB2)
+# #define EAPI __declspec(dllexport)
+#EOF
+# fix src/modules/loaders/loader_png.c (version >= 1.8.0)
+patch -ulbf src/modules/loaders/loader_png.c << EOF
+@@ -5,3 +5,5 @@
+ #include <sys/mman.h>
++#ifndef _WIN32
+ #include <arpa/inet.h>
++#endif
+
+EOF
+# fix src/lib/Imlib2.h.in (version >= 1.7.5)
+patch -ulbf src/lib/Imlib2.h.in << EOF
+@@ -13,4 +13,6 @@
+ #endif
+-#ifdef WIN32
+-#ifdef BUILDING_DLL
++#ifdef _WIN32
++#if defined(STATIC) || defined(STATIC_IMLIB2) || (defined(BUILDING_IMLIB2) && !defined(DLL_EXPORT))
++#define EAPI
++#elif defined(BUILDING_IMLIB2)
+ #define EAPI __declspec(dllexport)
+EOF
+## fix detection of libbz2 in configure (version >= 1.4.7 <= 1.6.1)
+#patch -ulbf configure << EOF
+#--- configure  2015-04-04 20:19:50.000000000 +0200
+#+++ configure  2015-04-06 11:05:07.049271800 +0200
+#@@ -15528,9 +15528,8 @@
+# extern "C"
+# #endif
+#-char BZ2_bzRead ();
+#+#include <bzlib.h>
+# int
+# main ()
+# {
+#-return BZ2_bzRead ();
+#   ;
+#   return 0;
+#EOF
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+# avoid invalid linker flag -Wl,-z,nodelete (version >= 1.8.0)
+sed -i.bak -e "s/-Wl,-z,nodelete//" src/modules/loaders/Makefile.in
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --with-x=no CFLAGS="-I$(pwd)/winfix -DBUILDING_DLL" LDFLAGS="-Wl,--enable-auto-import -lplibc -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --with-x=no CFLAGS="-I$(pwd)/winfix -DBUILDING_DLL" LDFLAGS="-Wl,--enable-auto-import -lplibc -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --with-x=no CFLAGS="-I$(pwd)/winfix -DBUILDING_DLL" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --with-x=no CFLAGS="-I$(pwd)/winfix -DBUILDING_DLL" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --without-x CFLAGS="-I$(pwd)/winfix -DBUILDING_DLL" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --without-x CFLAGS="-I$(pwd)/winfix -DBUILDING_DLL -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--as-needed -lmman -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --without-x CFLAGS="-I$(pwd)/winfix -DBUILDING_DLL -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--as-needed -lmman -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --without-x CFLAGS="-I$(pwd)/winfix -DBUILDING_IMLIB2 -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--as-needed -lmman -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --without-svg --without-x CFLAGS="-I$(pwd)/winfix -DBUILDING_IMLIB2 -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--as-needed -lmman -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-mmx --disable-amd64 --without-x $(if ( ! echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-mmx"; else echo "--enable-amd64"; fi) CFLAGS="-I$(pwd)/winfix -DBUILDING_IMLIB2 -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--as-needed -lmman -lws2_32" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix missing sigsetjmp/siglongjmp
+ if ( echo $RUNPLATFORM | grep -qv x86_64 ) && ( ! gcc --version | grep -q "MinGW-W64" ); then
+  echo "#define sigsetjmp(buf,n) _setjmp(buf)" >> config.h
+ else
+  echo "#define sigsetjmp(buf,n) _setjmp(buf,n)" >> config.h
+ fi &&
+ echo "#define siglongjmp longjmp" >> config.h &&
+ echo "#define sigjmp_buf jmp_buf " >> config.h &&
+ ## fix missing mkstemp (version <= 1.4.5)
+ #echo "#include <plibc.h>" >> config.h &&
+ #( make install-strip || make install-strip LIBS="-lpng" ) &&
+ make install-strip &&
+ ## fix imlib2-config (version >= 1.5.0 <= 1.7.4)
+ #sed -i -e "s?$INSTALLPREFIX?\$MINGWPREFIX?g" $INSTALLPREFIX/bin/imlib2-config &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

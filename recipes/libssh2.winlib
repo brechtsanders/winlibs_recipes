@@ -1,0 +1,154 @@
+export NAME="libssh2"
+export STATUS=
+export URL=http://www.libssh2.org/
+export BASENAME=libssh2
+export DESCRIPTION="libssh2 is a library implementing the SSH2 protocol as defined by Internet Drafts: SECSH-TRANS, SECSH-USERAUTH, SECSH-CONNECTION, SECSH-ARCH, SECSH-FILEXFER, SECSH-DHGEX, SECSH-NUMBERS, and SECSH-PUBLICKEY."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.0
+#export VERSION=1.1
+#export VERSION=1.2
+#export VERSION=1.2.1
+#export VERSIONDATE=
+#export VERSION=1.2.7
+#export VERSIONDATE=20110105
+#export VERSION=1.2.8
+#export VERSIONDATE=20110406
+#export VERSION=1.2.9
+#export VERSIONDATE=20110816
+#export VERSION=1.3.0
+#export VERSIONDATE=20110907
+#export VERSION=1.4.0
+#export VERSIONDATE=20120201
+#export VERSION=1.4.1
+#export VERSIONDATE=20120405
+#export VERSION=1.4.2
+#export VERSIONDATE=20120419
+#export VERSION=1.4.3
+#export VERSIONDATE=20121128
+#export VERSION=1.5.0
+#export VERSIONDATE=20150311
+#export VERSION=1.6.0
+#export VERSIONDATE=20150612
+#export VERSION=1.7.0
+#export VERSIONDATE=20160404
+#export VERSION=1.8.0
+#export VERSIONDATE=20161025
+#export VERSION=1.8.1
+#export VERSIONDATE=20190319
+#export VERSION=1.8.2
+#export VERSIONDATE=20190326
+#export VERSION=1.9.0
+#export VERSIONDATE=20190620
+export VERSION=1.10.0
+export VERSIONDATE=20210829
+####libtool: line 7487: cd: yes/lib: No such file or directory
+wl-showstatus --package-version
+#export DEPENDANCIES=zlib,openssl,libgpg-error,libgcrypt
+#export DEPENDANCIES=libgcrypt
+export DEPENDANCIES=libgcrypt,zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+#export DOWNLOADURL="http://sourceforge.net/projects/libssh2/files/"
+export DOWNLOADURL="http://www.libssh2.org/download/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/libssh2/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://www.libssh2.org/download/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix duplicate definition of usleep (version <= 1.0)
+#patch -ulbf src/libssh2_priv.h << EOF
+#--- src/libssh2_priv.h  Sat Dec 20 00:18:16 2008
+#+++ src/libssh2_priv.h  Fri Mar  6 22:55:48 2009
+#@@ -134,4 +134,5 @@
+# #endif
+# 
+#+#ifndef __MINGW32__
+# /* not really usleep, but safe for the way we use it in this lib */
+# static inline int usleep(int udelay)
+#@@ -140,4 +141,5 @@
+#        return 0;
+# }
+#+#endif
+# 
+# #endif
+#EOF
+## fix static/dynamic build problems (version >= 1.1) -> ssh2.o:ssh2.c:(.text+0x18b): undefined reference to `_imp__libssh2_session_init_ex'
+#patch -ulbf include/libssh2.h << EOF
+#--- include/libssh2.h  Fri Dec 26 22:35:14 2008
+#+++ include/libssh2.h  Thu Apr  2 23:03:48 2009
+#@@ -53,5 +53,5 @@
+# #  ifdef LIBSSH2_LIBRARY
+#-#   define LIBSSH2_API __declspec(dllexport)
+#+#   define LIBSSH2_API
+# #  else
+#-#   define LIBSSH2_API __declspec(dllimport)
+#+#   define LIBSSH2_API
+# #  endif /* LIBSSH2_LIBRARY */
+#EOF
+## link to gdi32 (LDFLAGS doesn't work because it is added in the wrong place)
+#mv src/Makefile.in src/Makefile.in.bak
+#sed -e "s/\(-lws2_32\)/\1 -lgdi32/" src/Makefile.in.bak > src/Makefile.in
+# fix missing _libssh_error in src/libgcrypt.c (version >= 1.4.0)
+patch -ulbf src/libgcrypt.c << EOF
+--- src/libgcrypt.c  2012-02-02 21:30:46 +0100
++++ src/libgcrypt.c  2012-02-02 21:30:50 +0100
+@@ -583,3 +583,3 @@
+ {
+-    return _libssh_error(session, LIBSSH2_ERROR_FILE,
++    return _libssh2_error(session, LIBSSH2_ERROR_FILE,
+                          "Unable to extract public key from private key file: "
+EOF
+# skip building example (version >= 1.1)
+####include/libssh2.h:137: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'libssh2_socket_t'
+cat > example/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+cp -f example/Makefile.in example/Makefile.am
+# fix invalid -Lyes/lib (version >= 1.8.0)
+mkdir -p src/yes/lib tests/yes/lib
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#make check
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared=no && make install
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-libgcrypt &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libgcrypt --without-openssl --with-libz &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-crypto=libgcrypt --with-libz --disable-examples-build &&
+ # fix building DLLs
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ # remove invalid library include path from libtool archive
+ sed -i -e "s?-Lyes/lib ??" $INSTALLPREFIX/lib/libssh2.la &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#export BUILDDEPENDANCIES=cmake
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCRYPTO_BACKEND:STRING=Libgcrypt -DENABLE_ZLIB_COMPRESSION:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCRYPTO_BACKEND:STRING=Libgcrypt -DENABLE_ZLIB_COMPRESSION:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF .. &&
+# cd .. &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# mv -f $INSTALLPREFIX/lib/liblibssh2.dll.a $INSTALLPREFIX/lib/libssh2.dll.a &&
+#    echo OK

@@ -1,0 +1,122 @@
+export NAME="libcddb"
+export STATUS=
+export URL=http://libcddb.sourceforge.net/
+export BASENAME=libcddb
+export DESCRIPTION="Libcddb is a C library to access data on a CDDB server (freedb.org). It allows you to: search the database for possible CD matches; retrieve detailed information about a specific CD; submit new CD entries to the database. Libcddb supports both the custom CDDB protocol and tunnelling the query and read operations over plain HTTP. It is also possible to use an HTTP proxy server. If you want to speed things up, you can make use of the built-in caching facility provided by the library."
+export CATEGORY=db,communication
+export TYPE=library
+#export VERSION=1.2.2
+#export VERSION=1.3.0
+#export VERSION=1.3.1
+export VERSION=1.3.2
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=pcre,libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://sourceforge.net/projects/libcddb/files/"
+export DOWNLOADURL="http://sourceforge.net/projects/libcddb/files/libcddb/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/libcddb/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix missing socket stuff (version <= 1.3.0)
+#patch -u -l include/cddb/cddb_conn.h << EOF
+#--- include/cddb/cddb_conn.h  Sun Oct 15 13:25:35 2006
+#+++ include/cddb/cddb_conn.h  Mon Aug 11 15:00:56 2008
+#@@ -30,3 +30,10 @@
+# #include <stdio.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#define ETIMEDOUT WSAETIMEDOUT
+#+#define EINPROGRESS WSAEINPROGRESS
+#+#define EWOULDBLOCK WSAEWOULDBLOCK
+#+#else
+# #include <netinet/in.h>
+#+#endif
+#EOF
+#patch -u -l lib/cddb_net.c << EOF
+#--- lib/cddb_net.c  Fri Mar 11 22:29:30 2005
+#+++ lib/cddb_net.c  Mon Aug 11 15:11:02 2008
+#@@ -228,2 +228,3 @@
+# 
+#+#ifndef _WIN32
+# /* Time-out enabled work-alikes */
+#@@ -238,2 +239,3 @@
+# }
+#+#endif
+# 
+#@@ -242,2 +244,3 @@
+#     struct hostent *he = NULL;
+#+#ifndef _WIN32
+#     struct sigaction action;
+#@@ -256,3 +259,5 @@
+#         alarm(timeout);         /* set time-out alarm */
+#+#endif
+#         he = gethostbyname(hostname); /* execute DNS query */
+#+#ifndef _WIN32
+#         alarm(0);               /* reset alarm timer */
+#@@ -262,2 +267,3 @@
+#     sigaction(SIGALRM, &old, NULL); /* restore previous signal handler */
+#+#endif
+# 
+#@@ -280,2 +286,9 @@
+# #else
+#+#ifdef _WIN32
+#+    unsigned long flags = 0;
+#+    if (ioctlsocket(sockfd, FIONBIO, &flags) != 0) {
+#+        /* error while trying to set socket to non-blocking */
+#+        return -1;
+#+    }
+#+#else
+#     int flags;
+#@@ -287,2 +300,3 @@
+#     }
+#+#endif /* Windows */
+# #endif /* BEOS */
+#EOF
+#make check
+# fix already defined SEARCH_ALL in include/cddb/cddb_conn.h (version >= 1.3.2)
+patch -ulbf include/cddb/cddb_conn.h << EOF
+--- include/cddb/cddb_conn.h  2009-03-01 04:28:08 +0100
++++ include/cddb/cddb_conn.h  2013-10-21 15:01:40 +0200
+@@ -35,2 +35,5 @@
+ #include "cddb/cddb_site.h"
++#ifdef SEARCH_ALL
++#undef SEARCH_ALL
++#endif
+
+EOF
+# fix invalid parameters to getsockopt in lib/cddb_net.c (version >= 1.3.2)
+patch -ulbf lib/cddb_net.c << EOF
+--- lib/cddb_net.c  2009-03-01 04:28:08 +0100
++++ lib/cddb_net.c  2013-10-21 15:06:12 +0200
+@@ -307,3 +307,7 @@
+             struct timeval tv;
++#ifdef __MINGW32__
++            int l;
++#else
+             size_t l;
++#endif
+
+@@ -327,3 +331,3 @@
+                 l = sizeof(rv);
+-                getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &rv, &l);
++                getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void*)&rv, &l);
+                 if (rv) {
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--allow-multiple-definition -lws2_32 -lpcreposix" &&
+ echo "#undef HAVE_ALARM" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#make -Cutil ipmiutil -j1
+
+
+

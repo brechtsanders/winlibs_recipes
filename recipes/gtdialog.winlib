@@ -1,0 +1,68 @@
+export NAME="gtDialog"
+export STATUS=
+export URL=https://foicica.com/gtdialog/
+export BASENAME=gtdialog
+export DESCRIPTION="gtDialog is a cross-platform application for creating interactive dialogs from the command line or programmatically. It is written completely in C and can display graphical dialogs using GTK+ 2.0 or terminal-based dialogs using a curses implementation like ncurses. gtDialog is based on cocoaDialog and shares many of its dialog types and arguments."
+export CATEGORY=framework
+export TYPE=application,library
+#export VERSION=1.4
+#export VERSIONDATE=20200108
+export VERSION=1.5
+export VERSIONDATE=20211112
+wl-showstatus --package-version
+export DEPENDANCIES=gtk2,ncurses,cdk
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="https://foicica.com/gtdialog/CHANGELOG.html"
+export DOWNLOADURL="https://github.com/orbitalquark/gtdialog/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://foicica.com/gtdialog/download/gtdialog_$VERSION.zip
+export DOWNLOADSOURCEURL=https://github.com/orbitalquark/gtdialog/archive/gtdialog_$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#unzip -oq $TARBALLDIR/$BASENAME/gtdialog_$VERSION.zip
+#cd gtdialog_$VERSION
+tar xfz $TARBALLDIR/$BASENAME/gtdialog_$VERSION.tar.gz
+cd gtdialog-gtdialog_$VERSION
+# fix redefinition of boolean/Beep in gtdialog.c
+patch -ulbf gtdialog.c << EOF
+@@ -40,2 +40,4 @@
+ #include <windows.h>
++#define boolean GTDIALOG_boolean
++#define Beep GTDIALOG_Beep
+ #endif
+EOF
+# fix missing cdk/cdk.h (version >= 1.5)
+sed -i.bak -e "s?cdk/\(cdk\.h\)?\1?" gtdialog.c
+wl-showstatus make &&
+ make curses CFLAGS="-I$MINGWPREFIX/include/cdk" &&
+ make GTK=1 &&
+ #make GTK3=1 &&
+ strip *.exe &&
+ # manually build libgtdialog-curses library
+ ar cru libgtdialog-curses.a gtdialog-curses.o &&
+ ( echo EXPORTS; gcc -E gtdialog.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(gtdialog[^ *]*\).*/\1/p" ) > gtdialog-curses.def &&
+ gcc -shared -s -mwindows -def gtdialog-curses.def -o gtdialog-curses.dll libgtdialog-curses.a -Wl,--add-stdcall-alias -Wl,--out-implib,libgtdialog-curses.dll.a -lncursesw -lcdk &&
+ # manually build libgtdialog library
+ ar cru libgtdialog.a gtdialog.o &&
+ ( echo EXPORTS; sed -ne "s/^.* \**\(gtdialog[^ ]*\) *(.*$/\1/p" gtdialog.h ) > gtdialog.def &&
+ gcc -shared -s -mwindows -def gtdialog.def -o gtdialog.dll libgtdialog.a -Wl,--add-stdcall-alias -Wl,--out-implib,libgtdialog.dll.a $(pkg-config --libs gtk+-2.0) &&
+ wl-showstatus install &&
+ make install PREFIX=$INSTALLPREFIX &&
+ cp -u gtdialog-curses.exe $INSTALLPREFIX/bin/ &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib &&
+ cp -f gtdialog.[hc] $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/bin/ &&
+ cp -f *.dll $INSTALLPREFIX/lib/ &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gtdialog_$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gtdialog-gtdialog_$VERSION
+####./gtdialog.exe msgbox "Test"
+####GDK_PIXBUF_MODULE_FILE=$MINGWPREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache GDK_PIXBUF_MODULEDIR=$MINGWPREFIX/lib/gdk-pixbuf-2.0/2.10.0/loaders ./gtdialog.exe msgbox "Test"
+####TERMINFO=$MINGWPREFIX/lib/terminfo ./gtdialog-curses.exe msgbox "Test"
+
+
+

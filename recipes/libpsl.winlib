@@ -1,0 +1,200 @@
+export NAME="libpsl"
+export STATUS=
+#export URL=http://freecode.com/projects/libpsl
+export URL=https://github.com/rockdaboot/libpsl
+export BASENAME=libpsl
+export DESCRIPTION="Libpsl is a C library which provides functions to check domains against the Mozilla Public Suffix List. It is useful for cookie domain verification, certificate domain verification, highlighting parts of a domain name, and more. Every Web client handling cookies (e.g. browsers) should use the PSL data to secure privacy."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.7.0
+#export VERSIONDATE=20150215
+#export VERSION=0.7.1
+#export VERSIONDATE=20150222
+#export VERSION=0.8.0
+#export VERSIONDATE=20150811
+#export VERSION=0.8.1
+#export VERSIONDATE=20150815
+#export VERSION=0.9.0
+#export VERSIONDATE=20150915
+#export VERSION=0.10.0
+#export VERSIONDATE=20150920
+#export VERSION=0.11.0
+#export VERSIONDATE=20150923
+#export VERSION=0.13.0
+#export VERSIONDATE=20160404
+#export VERSION=0.14.0
+#export VERSIONDATE=20160730
+####configure: error: no suitable Python interpreter found
+#export VERSION=0.15.0
+#export VERSIONDATE=20161113
+#export VERSION=0.16.0
+#export VERSIONDATE=20161211
+#export VERSION=0.16.1
+#export VERSIONDATE=20161215
+#export VERSION=0.17.0
+#export VERSIONDATE=20170116
+####src/psl.c:61:21: fatal error: in6addr.h: No such file or directory
+#export VERSION=0.18.0
+#export VERSIONDATE=20170720
+#export VERSION=0.19.0
+#export VERSIONDATE=20171109
+#export VERSION=0.19.1
+#export VERSIONDATE=20171110
+#export VERSION=0.20.0
+#export VERSIONDATE=20180222
+#export VERSION=0.20.1
+#export VERSIONDATE=20180226
+#export VERSION=0.20.2
+#export VERSIONDATE=20180427
+#export VERSION=0.21.0
+#export VERSIONDATE=20190417
+export VERSION=0.21.1
+export VERSIONDATE=20200719
+####UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f in position 259: character maps to <undefined>
+wl-showstatus --package-version
+#export DEPENDANCIES=gettext,icu,libidn2
+export DEPENDANCIES=gettext,icu,libidn2,libunistring
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/rockdaboot/libpsl/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/rockdaboot/libpsl/archive/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/rockdaboot/libpsl/releases/download/libpsl-$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/rockdaboot/libpsl/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/arpa
+echo '#define nl_langinfo(codeset) "UTF-8"' > winfix/langinfo.h
+echo "#include <ws2tcpip.h>" > winfix/arpa/inet.h
+# fix missing inet_pton in src/psl2c.c (version >= 0.7.1)
+mv src/psl2c.c src/psl2c.c.bak
+echo "#define _WIN32_WINNT 0x0600" > src/psl2c.c
+cat src/psl2c.c.bak >> src/psl2c.c
+## fix missing inet_pton in src/psl.c (version >= 0.7.1 <= 0.15.0)
+#mv src/psl.c src/psl.c.bak
+#echo "#define _WIN32_WINNT 0x0600" > src/psl.c
+##cat src/psl.c.bak >> src/psl.c
+#grep -v "#include <bits/stat.h>" src/psl.c.bak >> src/psl.c
+# fix missing sys/socket.h in src/psl.c (version >= 0.16.0)
+patch -ulbf src/psl.c << EOF
+--- src/psl.c  2016-12-06 20:15:52.000000000 +0100
++++ src/psl.c  2016-12-11 08:55:57.269008500 +0100
+@@ -56,4 +56,12 @@
+ #include <sys/stat.h>
++#ifdef _WIN32
++#define _WIN32_WINNT 0x0600
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#include <in6addr.h>
++#else
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#include <arpa/inet.h>
++#endif
+ #include <unistd.h>
+@@ -67,3 +75,2 @@
+ #include <langinfo.h>
+-#include <arpa/inet.h>
+ #ifdef HAVE_ALLOCA_H
+EOF
+## fix missing alloca/inet_pton in src/psl2c.c
+#mv src/psl2c.c src/psl2c.c.bak2 &&
+#echo "#define inet_pton(af,src,dst) 0" > src/psl2c.c &&
+##sed -e "s/alloca/malloc/g" src/psl2c.c.bak2 > src/psl2c.c &&
+#cat src/psl2c.c.bak >> src/psl2c.c &&
+##echo "#include <windows.h>" >> src/psl2c.c
+##echo "int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) { return main(_argc, _argv); }" >> src/psl2c.c
+## fix missing alloca/inet_pton in src/psl.c
+#mv src/psl.c src/psl.c.bak2 &&
+#echo "#define inet_pton(af,src,dst) 0" > src/psl.c &&
+##sed -e "s/alloca/malloc/g" src/psl.c.bak2 >> src/psl.c &&
+#cat src/psl.c.bak2 >> src/psl.c
+## fix missing in6addr.h in src/psl.c
+#mv src/psl.c src/psl.c.bak3 &&
+#sed -e "s?#include <in6addr\.h>?//&?" src/psl.c.bak3 > src/psl.c
+# fix missing realpath in src/psl2c.c (version >= 0.13.0)
+mv src/psl2c.c src/psl2c.c.bak
+cat > src/psl2c.c << EOF
+#include <ctype.h>
+#include <direct.h>
+#include <sys/stat.h>
+#include <windows.h>
+
+static char* slashify (char* str)
+{
+  char *p = str;
+  while (*p) {
+    if (*p == '\\\\')
+      *p = '/';
+    p++;
+  }
+  return str;
+}
+
+static char* strlower (char* str)
+{
+  char *p = str;
+  while (*p) {
+    *p = (char)tolower(*p);
+    p++;
+  }
+  return str;
+}
+
+static char* mingw_realpath (const char* name, char* resolved)
+{
+  char *rpath = NULL;
+  if (name == NULL || name[0] == '\\0')
+    return NULL;
+  if (resolved == NULL) {
+    rpath = (char*)malloc(MAX_PATH + 1);
+    if (rpath == NULL)
+      return NULL;
+  } else
+    rpath = resolved;
+  GetFullPathName(name, MAX_PATH, rpath, NULL);
+  strlower(slashify (rpath));
+  struct stat st;
+  if (stat (rpath, &st) < 0) {
+    if (resolved == NULL)
+      free (rpath);
+    return NULL;
+  }
+  return rpath;
+}
+
+#define realpath(filename,resolved) mingw_realpath(filename, resolved)
+EOF
+cat src/psl2c.c.bak >> src/psl2c.c
+# fix python issue in src/psl-make-dafsa
+mv src/psl-make-dafsa src/psl-make-dafsa.bak &&
+#sed -e "s?^\(#\!.*\)python?\1$PYDIR/python.exe?" src/psl-make-dafsa.bak > src/psl-make-dafsa
+sed -e "s?^\(#\!.*\)python?\1$PY2DIR/python.exe?" src/psl-make-dafsa.bak > src/psl-make-dafsa
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" -enable-builtin=libicu LDFLAGS="-Wl,--as-needed -lws2_32 -lintl" &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" -enable-builtin=libicu LDFLAGS="-Wl,--as-needed -lws2_32 -lintl" &&
+PYTHON=$PY2DIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" -enable-builtin=libicu LDFLAGS="-Wl,--as-needed -lws2_32 -lintl" &&
+ wl-showstatus build &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ #( PATH=$PYDIR:$PATH make install-strip || ( 
+ # # fix missing kDafsa (version >= 0.13.0 <= 0.15.0)
+ # echo "static const unsigned char kDafsa[1];" >> src/suffixes_dafsa.c &&
+ # PATH=$PYDIR:$PATH make install-strip
+ #)) &&
+ #PATH=$PYDIR:$PATH make install-strip &&
+ PATH=$PY2DIR:$PATH make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

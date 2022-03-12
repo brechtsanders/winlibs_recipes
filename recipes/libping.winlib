@@ -1,0 +1,179 @@
+export NAME="libping"
+export STATUS=
+export URL=http://www.joedog.org/libping/
+export BASENAME=libping
+export DESCRIPTION="Libping is a small C library designed to allow a programmer to make ICMP_ECHO requests directly from a script or program."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.15
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="ftp://ftp.joedog.org/pub/libping/"
+#export DOWNLOADURL="http://www.joedog.org/pub/libping/"
+export DOWNLOADURL="http://download.joedog.org/libping/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=ftp://ftp.joedog.org/pub/libping/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://download.joedog.org/libping/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+mv lib/sock.h lib/sock.h.bak
+cat > lib/sock.h << EOF
+#ifndef INCLUDED_SOCK_H
+#define INCLUDED_SOCK_H
+#include <winsock2.h>
+typedef int socklen_t;
+#endif
+EOF
+cat lib/sock.h.bak >> lib/sock.h
+# fix missing files
+mkdir win32fix win32fix/netinet win32fix/sys
+touch win32fix/netinet/in_systm.h
+touch win32fix/netinet/in.h
+touch win32fix/netinet/ip.h
+cat > win32fix/netinet/ip_icmp.h << EOF
+#include <winsock2.h>
+#include <stdint.h>
+#define ICMP_ECHO 8
+#define ICMP_MINLEN 8
+typedef uint16_t n_short;
+typedef u_long n_time;
+struct ip {
+ u_char ip_hl:4;
+ u_char ip_v:4;
+ u_char ip_tos;
+ short ip_len;
+ u_short ip_id;
+ short ip_off;
+ u_char ip_ttl;
+ u_char ip_p;
+ u_short ip_sum;
+ struct in_addr ip_src;
+ struct in_addr ip_dst;
+};
+struct icmp {
+ u_char icmp_type;
+ u_char icmp_code;
+ u_short icmp_cksum;
+ union {
+  u_char ih_pptr;
+  struct in_addr ih_gwaddr;
+  struct ih_idseq {
+   n_short icd_id;
+   n_short icd_seq;
+  } ih_idseq;
+  int ih_void;
+ } icmp_hun;
+#define icmp_pptr icmp_hun.ih_pptr
+#define icmp_gwaddr icmp_hun.ih_gwaddr
+#define icmp_id icmp_hun.ih_idseq.icd_id
+#define icmp_seq icmp_hun.ih_idseq.icd_seq
+#define icmp_void icmp_hun.ih_void
+ union {
+  struct id_ts {
+   n_time its_otime;
+   n_time its_rtime;
+   n_time its_ttime;
+  } id_ts;
+  struct id_ip  {
+   struct ip idi_ip;
+  } id_ip;
+  u_long id_mask;
+  char id_data[1];
+ } icmp_dun;
+#define icmp_otime icmp_dun.id_ts.its_otime
+#define icmp_rtime icmp_dun.id_ts.its_rtime
+#define icmp_ttime icmp_dun.id_ts.its_ttime
+#define icmp_ip icmp_dun.id_ip.idi_ip
+#define icmp_mask icmp_dun.id_mask
+#define icmp_data icmp_dun.id_data
+};
+EOF
+echo "#include <winsock2.h>" > win32fix/sys/socket.h
+touch win32fix/netdb.h
+patch -ulbf lib/sock.c << EOF
+--- lib/sock.c  Fri Apr 12 15:36:34 2002
++++ lib/sock.c  Mon Mar  2 21:27:35 2009
+@@ -141,3 +141,3 @@
+   ling.l_linger = 0;
+-  if( setsockopt( C->sock, SOL_SOCKET, SO_LINGER, &ling, sizeof( ling )) < 0 ){ 
++  if( setsockopt( C->sock, SOL_SOCKET, SO_LINGER, (void*)&ling, sizeof( ling )) < 0 ){ 
+     return -1;    
+@@ -188,3 +188,3 @@
+       len = sizeof(error);
+-      if( getsockopt( C->sock, SOL_SOCKET, SO_ERROR, &error, &len ) < 0 )
++      if( getsockopt( C->sock, SOL_SOCKET, SO_ERROR, (void*)&error, &len ) < 0 )
+         return(-1); 
+@@ -287,2 +287,6 @@
+ {
++#ifdef __WIN32__
++  unsigned long flags = nonblock;
++  return ioctlsocket(sock, FIONBIO, &flags);
++#else
+ #if HAVE_FCNTL_H 
+@@ -312,2 +316,3 @@
+   return ioctl( sd, FIONBIO, &status );
++#endif
+ #endif
+EOF
+# fix missing bzero in lib/smtp.c
+mv lib/smtp.c lib/smtp.c.bak &&
+echo "#define bzero(b,len) memset(b, 0, len)" > lib/smtp.c &&
+cat lib/smtp.c.bak >> lib/smtp.c
+# fix missing bzero in lib/memory.c
+mv lib/memory.c lib/memory.c.bak &&
+echo "#define bzero(b,len) memset(b, 0, len)" > lib/memory.c &&
+cat lib/memory.c.bak >> lib/memory.c
+# fix missing bzero/bcopy/inet_aton in lib/sock.c
+mv lib/sock.c lib/sock.c.bak
+cat > lib/sock.c << EOF
+#define bzero(b,len) memset(b, 0, len)
+#define bcopy(source, dest, size) memcpy((dest), (source), (size))
+#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))
+EOF
+cat lib/sock.c.bak >> lib/sock.c
+# fix missing inet_aton in lib/ping.c
+mv lib/ping.c lib/ping.c.bak &&
+echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > lib/ping.c &&
+cat lib/ping.c.bak >> lib/ping.c
+# fix src/main.c
+patch -ulbf src/main.c << EOF
+@@ -25,2 +25,5 @@
+ #include <getopt.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#endif
+
+@@ -173,2 +176,9 @@
+ {
++#ifdef _WIN32
++  static WSADATA wsaData;
++  int wsaerr = WSAStartup(MAKEWORD(1, 0), &wsaData);
++  if (wsaerr)
++    exit(1);
++  atexit((void(*)())WSACleanup);
++#endif
+   int test = 0;
+EOF
+# avoid chown/chgrp/chmod during installation
+sed -i.bak -e "s/chown\|chgrp\|chmod/#&/" src/Makefile.in
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" LDFLAGS="-lws2_32" &&
+ wl-showstatus build-install &&
+ #make install &&
+ make install LIBS="-Wl,--as-needed -lws2_32" &&
+ mkdir -p $INSTALLPREFIX/include &&
+ cp -f include/ping.h $INSTALLPREFIX/include/ &&
+ ( echo EXPORTS && gcc -E include/ping.h|sed -n -e "s/(.*//p"|sed -e "s/int //" ) > libping.def &&
+ gcc -shared -s -mwindows -def libping.def -o $INSTALLPREFIX/bin/libping.dll $INSTALLPREFIX/lib/libping.a -Wl,--out-implib,$INSTALLPREFIX/lib/libping.dll.a -lws2_32 &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

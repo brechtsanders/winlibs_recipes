@@ -1,0 +1,551 @@
+#export NAME="Cyrus SASL"
+#export STATUS=
+#export URL=http://asg.web.cmu.edu/sasl/sasl-library.html
+#export BASENAME=cyrus-sasl
+#export DESCRIPTION="This is the Cyrus SASL API implentation. It can be used on the client or server side to provide authentication. See RFC 2222 for more information."
+#export CATEGORY=security
+#export TYPE=library
+##export VERSION=2.1.23
+#export VERSION=2.1.25
+#export VERSIONDATE=20110913
+#wl-showstatus --package-version
+#export DEPENDANCIES=libcrypt,openssl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+#export DOWNLOADURL="http://ftp.andrew.cmu.edu/pub/cyrus-mail/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.andrew.cmu.edu/pub/cyrus-mail/cyrus-sasl-$VERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/cyrus-sasl-$VERSION.tar.gz
+#cd cyrus-sasl-$VERSION
+## fix missing files
+#mkdir -p sys netinet
+#touch sys/uio.h netinet/in.h
+#echo "#include <winsock2.h>" > sys/socket.h 
+#cat > sys/un.h << EOF
+##define ETIMEDOUT WSAETIMEDOUT
+#EOF
+## fix plugins/digestmd5.c
+#patch -ulbf plugins/digestmd5.c << EOF
+#--- plugins/digestmd5.c  2009-04-28 17:09:18 +0200
+#+++ plugins/digestmd5.c  2010-11-24 23:58:44 +0100
+#@@ -2717,3 +2717,3 @@
+#        128,                            /* max_ssf */
+#-#elif WITH_DES
+#+#elif defined(WITH_DES)
+#        112,
+#@@ -4036,3 +4036,3 @@
+#        128,                            /* max ssf */
+#-#elif WITH_DES
+#+#elif defined(WITH_DES)
+#        112,
+#EOF
+## fix lib/checkpw.c
+#patch -ulbf lib/checkpw.c << EOF
+#--- lib/checkpw.c  2009-04-28 17:09:16 +0200
+#+++ lib/checkpw.c  2010-11-25 00:27:18 +0100
+#@@ -749,2 +749,7 @@
+# {
+#+#ifdef WIN32
+#+    unsigned long flags = 1;
+#+    if (ioctlsocket(fd, FIONBIO, &flags) == SOCKET_ERROR)
+#+        return -1;
+#+#else
+#     int f, r;
+#@@ -772,2 +777,3 @@
+#        return -1;
+#+#endif
+#EOF
+## fix redefinition of getopt in lib/saslutil.c
+#patch -ulbf lib/saslutil.c << EOF
+#--- lib/saslutil.c  2010-11-25 09:19:36 +0100
+#+++ lib/saslutil.c  2010-11-25 09:19:42 +0100
+#@@ -472,3 +472,3 @@
+#
+#-#ifdef WIN32
+#+#if defined(WIN32) && !defined(__MINGW32__)
+# /*****************************************************************************
+#EOF
+## fix invalid dllimport variable in lib/common.c (version >= 2.1.25)
+#mv lib/common.c lib/common.c.bak
+#sed -e "s/LIBSASL_VAR \(const sasl_utils_t \*sasl_global_utils\)/\1/" lib/common.c.bak > lib/common.c
+## avoid use of ln -s in lib/Makefile.in
+#mv lib/Makefile.in lib/Makefile.in.bak
+#sed -e "s/ln -s/cp -f/" lib/Makefile.in.bak > lib/Makefile.in
+## fix redefinition of handle_t in sasldb/db_gdbm.c
+#mv sasldb/db_gdbm.c sasldb/db_gdbm.c.bak (version >= 2.1.25)
+#sed -e "s/handle_t/db_handle_t/g" sasldb/db_gdbm.c.bak > sasldb/db_gdbm.c
+## fix for building DLLs
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# #autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+# libtoolize --force -i
+#fi
+#mv config/ltconfig config/ltconfig.bak
+#sed -e "s/^\(enable_win32_dll=\)no/\1yes/" config/ltconfig.bak > config/ltconfig
+## -DHAVE_STRUCT_SOCKADDR_STORAGE
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -lws2_32 -ladvapi32 -lkernel32 -Wl,--enable-stdcall-fixup" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --with-gnu-ld --enable-win32-dll --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -lws2_32 -ladvapi32 -lkernel32 -Wl,-no-undefined -Wl,--enable-stdcall-fixup" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined -Wl,--enable-stdcall-fixup" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -lws2_32 -ladvapi32 -lkernel32 -no-undefined -Wl,-no-undefined -Wl,--enable-stdcall-fixup" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -Wl,-lws2_32 -Wl,-ladvapi32 -Wl,-lkernel32 -no-undefined -Wl,-no-undefined -Wl,--enable-stdcall-fixup" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -lws2_32" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-saslauthd --without-authdaemond CFLAGS="-DWIN32" LDFLAGS="-Wl,-no-undefined" LIBS="-Wl,--as-needed -Wl,-lws2_32" &&
+# #mv libtool libtool.bak && ln -sf `which libtool` libtool && 
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# mv config.h config.h.bak &&
+# sed -e "s?\(struct sockaddr_storage\)?\1_?" config.h.bak > config.h &&
+# grep "SASL_ROOT_KEY\|SASL_PLUGIN_PATH_ATTR\|SASL_CONF_PATH_ATTR" win32/include/config.h >> config.h &&
+# ( make install-strip || (
+#  make -Cinclude install-strip &&
+#  make -Csasldb install-strip &&
+#  make -Cplugins install-strip &&
+#  make -Clib install-strip &&
+#  #make -Cutils install-strip &&
+#  make -Cdoc install-strip &&
+#  make -Cman install-strip
+# ) ) &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf cyrus-sasl-$VERSION
+#####ar: sasldb.o: No such file or directory
+##cp lib/get*.o plugins/.libs/
+##make -j1 -Cplugins libsasldb_la_LIBADD="-L`pwd`/lib"
+## To do: build DLLs
+#####See also: http://blog.chinaunix.net/uid-9935135-id-181735.html
+
+
+
+#export NAME="Cyrus SASL"
+#export STATUS=
+##export URL=http://asg.web.cmu.edu/sasl/sasl-library.html
+#export URL=https://www.cyrusimap.org/sasl/
+#export BASENAME=cyrus-sasl
+#export DESCRIPTION="This is the Cyrus SASL API implentation. It can be used on the client or server side to provide authentication. See RFC 2222 for more information."
+#export CATEGORY=security
+#export TYPE=library
+#export VERSION=2.1.25
+#export VERSIONDATE=20130213
+#wl-showstatus --package-version
+#export DEPENDANCIES=libcrypt,openssl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+##export DOWNLOADURL="http://ftp.andrew.cmu.edu/pub/cyrus-mail/"
+#export DOWNLOADURL="https://github.com/cyrusimap/cyrus-sasl/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.andrew.cmu.edu/pub/cyrus-mail/cyrus-sasl-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=https://github.com/cyrusimap/cyrus-sasl/releases/download/cyrus-sasl-$VERSION/cyrus-sasl-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/cyrus-sasl-$VERSION.tar.gz
+#cd cyrus-sasl-$VERSION
+#patch -ulbf lib/getaddrinfo.c << EOF
+#--- lib/getaddrinfo.c  2003-03-19 18:25:28 +0000
+#+++ lib/getaddrinfo.c  2009-08-19 16:52:53 +0000
+#@@ -59,11 +59,13 @@
+#  */
+#
+# #include "config.h"
+#+#ifndef HAVE_GETADDRINFO
+#+
+# #ifndef WIN32
+# #include <sys/param.h>
+#-# ifndef macintosh
+#+# ifndef macintosh
+# #  include <arpa/inet.h>
+#-# endif /* macintosh */
+#+# endif /* macintosh */
+# #endif /* WIN32 */
+# #include <ctype.h>
+#
+#@@ -252,3 +254,5 @@
+# #endif
+#     return EAI_NODATA;
+# }
+#+
+#+#endif /* HAVE_GETADDRINFO */
+#
+#
+#
+#EOF
+#patch -ulbf lib/getnameinfo.c << EOF
+#--- lib/getnameinfo.c  2003-02-13 19:55:54 +0000
+#+++ lib/getnameinfo.c  2009-08-19 16:52:39 +0000
+#@@ -59,8 +59,10 @@
+#  */
+#
+# #include "config.h"
+#-#ifndef WIN32
+#-# include <arpa/inet.h>
+#+#ifndef HAVE_GETADDRINFO
+#+
+#+#ifndef WIN32
+#+# include <arpa/inet.h>
+# #endif /* WIN32 */
+# #include <stdio.h>
+# #include <string.h>
+#@@ -106,3 +108,5 @@
+#
+#     return 0;
+# }
+#+
+#+#endif /* HAVE_GETNAMEINFO */
+#
+#
+#
+#EOF
+#patch -ulbf lib/saslutil.c << EOF
+#--- lib/saslutil.c  2010-12-01 15:52:54 +0100
+#+++ lib/saslutil.c  2013-02-13 22:19:00 +0100
+#@@ -460,13 +460,13 @@
+#     randinit(rpool);
+#
+#     for (lup = 0; lup < len; lup++) {
+#-#if defined(WIN32)
+#+#if defined(WIN32) && !defined(__MINGW32__)
+#        if (rand_s(&randomValue) != 0) {
+#            randomValue = rand();
+#        }
+#
+#        buf[lup] = (char) (randomValue >> 8);
+#-#elif defined(macintosh)
+#+#elif defined(macintosh) || defined(__MINGW32__)
+#        buf[lup] = (char) (rand() >> 8);
+# #else /* !WIN32 && !macintosh */
+# #ifdef HAVE_JRAND48
+#@@ -593,7 +593,7 @@
+#     return (0);
+# }
+#
+#-#ifdef WIN32
+#+#ifdef WIN32OLD
+# /*****************************************************************************
+#
+#  *
+#  *  MODULE NAME : GETOPT.C
+#EOF
+#patch -ulbf plugins/plugin_common.h << EOF
+#--- plugins/plugin_common.h  2006-01-17 12:18:21 +0000
+#+++ plugins/plugin_common.h  2009-08-19 16:25:58 +0000
+#@@ -51,6 +51,7 @@
+# #ifndef macintosh
+# #ifdef WIN32
+# # include <winsock2.h>
+#+# include <ws2tcpip.h>
+# #else
+# # include <sys/socket.h>
+# # include <netinet/in.h>
+#EOF
+#patch -ulbf plugins/plugin_common.c << EOF
+#--- plugins/plugin_common.c  2009-04-28 15:09:17 +0000
+#+++ plugins/plugin_common.c  2009-08-19 16:27:19 +0000
+#@@ -46,6 +46,7 @@
+# #ifndef macintosh
+# #ifdef WIN32
+# # include <winsock2.h>
+#+# include <ws2tcpip.h>
+# #else
+# # include <sys/socket.h>
+# # include <netinet/in.h>
+#EOF
+#patch -ulbf include/prop.h << EOF
+#--- include/prop.h  2003-12-12 00:47:22 +0000
+#+++ include/prop.h  2009-08-18 18:06:14 +0000
+#@@ -32,7 +32,7 @@
+#  * exported.  */
+# /* Under Unix, life is simpler: we just need to mark library functions
+#  * as extern.  (Technically, we don't even have to do that.) */
+#-#ifdef WIN32
+#+#ifdef WIN32OLD
+# # ifdef LIBSASL_EXPORTS
+# #  define LIBSASL_API  __declspec(dllexport)
+# # else /* LIBSASL_EXPORTS */
+#@@ -44,7 +44,7 @@
+#
+# /* Same as above, but used during a variable declaration. Only Unix definition
+#  * is different, as we can't assign an initial value to an extern variable */
+#-#ifdef WIN32
+#+#ifdef WIN32OLD
+# # ifdef LIBSASL_EXPORTS
+# #  define LIBSASL_VAR  __declspec(dllexport)
+# # else /* LIBSASL_EXPORTS */
+#EOF
+#patch -ulbf plugins/plugin_common.h << EOF
+#--- plugins/plugin_common.h  2006-01-17 12:18:21 +0000
+#+++ plugins/plugin_common.h  2009-08-19 16:25:58 +0000
+#@@ -63,7 +64,7 @@
+# #include <saslutil.h>
+# #include <saslplug.h>
+#
+#-#ifdef WIN32
+#+#ifdef WIN32OLD
+# #define PLUG_API __declspec(dllexport)
+# #else
+# #define PLUG_API extern
+#EOF
+#patch -ulbf sample/client.c << EOF
+#--- sample/client.c  2010-12-01 15:52:56 +0100
+#+++ sample/client.c  2013-02-13 22:29:32 +0100
+#@@ -52,10 +52,14 @@
+# #include <unistd.h>
+# #endif
+#
+#+#ifdef WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/socket.h>
+# #include <netinet/in.h>
+# #include <arpa/inet.h>
+# #include <netdb.h>
+#+#endif
+#
+# #include <assert.h>
+#
+#@@ -141,7 +145,22 @@
+# static char *
+# getpassphrase(const char *prompt)
+# {
+#+#ifdef WIN32
+#+  static char buf[128];
+#+       char* p = buf;
+#+  fputs(prompt, stderr);
+#+  for (;;) {
+#+      char c = _getch();
+#+      if (c == '\r' || c == '\n')
+#+          break;
+#+      *p++ = c;
+#+  }
+#+       *p = 0;
+#+  fputs("\n", stderr);
+#+  return buf;
+#+#else
+#   return getpass(prompt);
+#+#endif
+# }
+# #endif /* ! HAVE_GETPASSPHRASE */
+#EOF
+#patch -ulbf sample/server.c << EOF
+#--- sample/server.c  2010-12-01 15:52:56 +0100
+#+++ sample/server.c  2013-02-13 22:31:22 +0100
+#@@ -77,8 +77,12 @@
+# #endif
+#
+#+#ifdef WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/socket.h>
+# #include <netinet/in.h>
+# #include <arpa/inet.h>
+# #include <netdb.h>
+#+#endif
+#
+# #include <sasl.h>
+#EOF
+## fix missing getaddrinfo/freeaddrinfo function in lib/common.c
+#mv lib/common.c lib/common.c.bak2
+#cat > lib/common.c << EOF
+##define _WIN32_WINNT 0x0501
+#//#include <ws2tcpip.h>
+#EOF
+#cat lib/common.c.bak2 >> lib/common.c
+### fix missing PVALENTA in (version >= 2.1.25)
+##for F in lib/*.c; do
+## mv $F $F.bak &&
+## echo "#include <windows.h>" > $F &&
+## cat $F.bak >> $F
+##done
+#### fix DllMain in plugins/*.c
+###for F in plugins/*_init.c; do
+### mv $F $F.bak &&
+### sed -e "s/#ifdef WIN32/#if defined(WIN32) \&\& \!defined(__MINGW32__)/" $F.bak > $F
+###done
+### fix DllMain in plugins/*.c
+##for F in $(grep -l "DllMain( HANDLE hModule" plugins/*.c); do
+##patch -ulbf $F << EOF
+##--- plugins/anonymous_init.c  2011-09-09 12:48:04 +0200
+##+++ plugins/anonymous_init.c  2013-12-04 14:21:50 +0100
+##@@ -24 +24 @@
+##-BOOL APIENTRY DllMain( HANDLE hModule,
+##+BOOL APIENTRY DllMain( HINSTANCE hModule,
+##EOF
+##done
+### create pkgconfig .pc file
+##mkdir -p $INSTALLPREFIX/lib/pkgconfig
+##cat > $INSTALLPREFIX/lib/pkgconfig/libsasl2.pc << EOF
+##prefix=$INSTALLPREFIX
+##exec_prefix=\${prefix}
+##libdir=\${exec_prefix}/lib
+##includedir=\${prefix}/include
+##
+##Name: libsasl2
+##Description: $DESCRIPTION
+##Version: $VERSION
+##Libs: -L\${libdir} -lsasl2 -lws2_32 -lgdi32 -ldl
+##Cflags: -I\${includedir}
+##EOF
+### fix for building DLLs
+##mv config/ltconfig config/ltconfig.bak &&
+##sed -e "s/\(enable_win32_dll.*can_build_shared=\)no/\1yes/" config/ltconfig.bak > config/ltconfig
+## fix for building DLLs on MSYS
+#sed -i.bak -e "s/\(enable_win32_dll=\)no/\1yes/; s/ | mingw\*/& | msys*/" config/ltconfig
+#wl-showstatus configure &&
+##mkdir -p m4 &&
+##autoreconf -f -i -I $(pwd)/m4 -I $MINGWPREFIX/share/aclocal &&
+### fix for building DLLs
+##libtoolize --force -i &&
+##aclocal --force &&
+##automake -a -c --no-force &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32-dll --enable-shared --enable-static --enable-staticdlopen --without-saslauthd --without-authdaemond --disable-sample --disable-alwaystrue --disable-checkapop --disable-otp --disable-gssapi --disable-gss_mutexes --disable-ntlm --enable-login --without-dbpath --without-dblib --without-bdb-libdir --without-bdb-incdir --without-gdbm --without-pam --without-pwcheck --without-openssl --without-des --without-opie --without-ldap --without-mysql --without-pgsql --without-sqlite --without-dmalloc --without-sfio CFLAGS="-DWIN32" LDFLAGS="-Wl,--as-needed -lws2_32 -lgdi32 -Wl,-no-undefined" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --disable-static --disable-staticdlopen --without-saslauthd --without-authdaemond --disable-sample --disable-alwaystrue --disable-checkapop --disable-otp --disable-gssapi --disable-gss_mutexes --disable-ntlm --enable-login --without-dbpath --without-dblib --without-bdb-libdir --without-bdb-incdir --without-gdbm --without-pam --without-pwcheck --without-openssl --without-des --without-opie --without-ldap --without-mysql --without-pgsql --without-sqlite --without-dmalloc --without-sfio CFLAGS="-DWIN32" LDFLAGS="-Wl,--as-needed -lws2_32 -lgdi32 -Wl,-no-undefined" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --disable-staticdlopen --without-saslauthd --without-authdaemond --disable-sample --disable-alwaystrue --disable-checkapop --disable-otp --disable-gssapi --disable-gss_mutexes --disable-ntlm --enable-login --without-dbpath --without-dblib --without-bdb-libdir --without-bdb-incdir --without-gdbm --without-pam --without-pwcheck --without-openssl --without-des --without-opie --without-ldap --without-mysql --without-pgsql --without-sqlite --without-dmalloc --without-sfio CFLAGS="-DWIN32" LDFLAGS="-Wl,--as-needed -lws2_32 -lgdi32 -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --disable-staticdlopen --without-saslauthd --without-authdaemond --disable-sample --disable-alwaystrue --disable-checkapop --disable-otp --disable-gssapi --disable-gss_mutexes --disable-ntlm --enable-login --without-dbpath --without-dblib --without-bdb-libdir --without-bdb-incdir --without-gdbm --without-pam --without-pwcheck --without-openssl --without-des --without-opie --without-ldap --without-mysql --without-pgsql --without-sqlite --without-dmalloc --without-sfio CFLAGS="-DWIN32" LIBS="-Wl,--as-needed -Wl,-lws2_32 -Wl,-lgdi32 -Wl,-no-undefined" &&
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# (
+#  mv config.h config.h.bak &&
+#  cat > config.h << EOF
+#//#define WINVER WindowsXP
+#//#define _WIN32_WINNT 0x0501
+##define WINVER 0x0502
+##define _WIN32_WINNT 0x0501
+##define HAVE_GETADDRINFO 1
+##define HAVE_GETNAMEINFO 1
+##define HAVE_SOCKLEN_T 1
+##define HAVE_STRUCT_SOCKADDR_STORAGE 1
+#EOF
+#  sed -e "s?\(#include <\(sys/uio\.h\|sys/socket\.h\)>\)?//\1?; s?netinet/in\.h?ws2tcpip.h?" config.h.bak >> config.h
+# ) &&
+# grep "SASL_ROOT_KEY\|SASL_PLUGIN_PATH_ATTR\|SASL_CONF_PATH_ATTR" win32/include/config.h >> config.h &&
+# wl-showstatus build &&
+# #make -Clib SASL_DL_LIB="-ldl -Wl,--as-needed -Wl,-lws2_32" &&
+# make -Clib SASL_DL_LIB="-Wl,--as-needed -Wl,-ldl -Wl,-lws2_32" &&
+# ( make || make -j1 ) &&
+# wl-showstatus build-install &&
+# #( make all install-strip || make -j1 all install-strip ) &&
+# make all install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cyrus-sasl-$VERSION
+## To do: build DLLs
+#####See also: http://blog.chinaunix.net/uid-9935135-id-181735.html
+
+
+
+#********************************************************
+#* WARNING:
+#* Plugins are being installed into /home/win32/inst_cyrus-sasl-2.1.25/lib/sasl2,
+#* but the library will look for them in /usr/lib/sasl2.
+#* You need to make sure that the plugins will eventually
+#* be in /usr/lib/sasl2 -- the easiest way is to make a
+#* symbolic link from /usr/lib/sasl2 to /home/win32/inst_cyrus-sasl-2.1.25/lib/sasl2,
+#* but this may not be appropriate for your site, so this
+#* installation procedure won't do it for you.
+#*
+#* If you don't want to do this for some reason, you can
+#* set the location where the library will look for plugins
+#* by setting the environment variable SASL_PATH to the path
+#* the library should use.
+#********************************************************
+
+
+
+
+
+
+
+
+export NAME="Cyrus SASL"
+export STATUS=
+export URL=https://www.cyrusimap.org/sasl/
+#export URL=https://github.com/cyrusimap/cyrus-sasl
+export BASENAME=cyrus-sasl
+export DESCRIPTION="This is the Cyrus SASL API implentation. It can be used on the client or server side to provide authentication. See RFC 2222 for more information."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=2.1.27
+#export VERSIONDATE=20200111
+export VERSION=2.1.28
+export VERSIONDATE=20220223
+wl-showstatus --package-version
+#export DEPENDANCIES=libcrypt,openssl,lmdb
+export DEPENDANCIES=libcrypt,openssl,lmdb,libntlm
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/cyrusimap/cyrus-sasl/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.andrew.cmu.edu/pub/cyrus-mail/cyrus-sasl-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/cyrusimap/cyrus-sasl/releases/download/cyrus-sasl-$VERSION/cyrus-sasl-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/cyrus-sasl-$VERSION.tar.gz
+cd cyrus-sasl-$VERSION
+# fix missing _tfinddata_t in lib/windlopen.c (version >= 2.1.27)
+mv lib/windlopen.c lib/windlopen.c.bak &&
+echo "#include <tchar.h>" > lib/windlopen.c &&
+cat lib/windlopen.c.bak >> lib/windlopen.c
+# fix missing _tcslen' in lib/common.c (version >= 2.1.27)
+mv lib/common.c lib/common.c.bak &&
+echo "#define _UNICODE" > lib/common.c &&
+echo "#define UNICODE" >> lib/common.c &&
+echo "#include <tchar.h>" >> lib/common.c &&
+cat lib/common.c.bak >> lib/common.c
+# use dlfcn instead of Windows mechanism (version >= 2.1.27)
+mv lib/windlopen.c lib/windlopen.c.orig &&
+sed -e "s/\.so/.dll/" lib/dlopen.c > lib/windlopen.c
+## fix missing _sasl_check_db (version >= 2.1.27)
+#sed -i.bak -e "s/^int _sasl_check_db/__declspec(dllexport) &/" $(grep -l "^int _sasl_check_db" sasldb/*.c)
+# fix redefinition of pid_t in plugins/ntlm.c (version >= 2.1.27)
+patch -ulbf plugins/ntlm.c << EOF
+@@ -58,3 +58,5 @@
+ # include <process.h>      /* for getpid */
++# ifndef __MINGW32__
+   typedef int pid_t;
++# endif
+ #else
+EOF
+# fix redefinition of getaddrinfo/freeaddrinfo/socklen_t (version >= 2.1.27)
+mv config.h.in config.h.in.bak
+cat config.h.in > config.h.in << EOF
+#define _WIN32_WINNT 0x0501
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define HAVE_GETADDRINFO 1
+#define HAVE_SOCKLEN_T 1
+EOF
+cat config.h.in.bak >> config.h.in
+# avoid softlinks
+sed -i.bak -e "s/ln -s /cp /" lib/Makefile.in
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-staticdlopen --without-saslauthd --without-authdaemond --disable-sample --disable-alwaystrue --disable-checkapop --disable-otp --disable-gssapi --disable-gss_mutexes --disable-ntlm --enable-login --without-dbpath --without-dblib --without-bdb-libdir --without-bdb-incdir --without-gdbm --without-pam --without-pwcheck --without-openssl --without-des --without-opie --without-ldap --without-mysql --without-pgsql --without-sqlite --without-dmalloc --without-sfio CFLAGS="-DWIN32" LIBS="-Wl,--as-needed -Wl,-lws2_32 -Wl,-lgdi32 -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-staticdlopen --without-saslauthd --without-authdaemond --disable-sample --disable-alwaystrue --disable-checkapop --disable-otp --disable-gssapi --disable-gss_mutexes --disable-ntlm --enable-login --without-dbpath --with-dblib=lmdb --without-bdb-libdir --without-bdb-incdir --without-gdbm --without-pam --without-pwcheck --without-openssl --without-des --without-opie --without-ldap --without-mysql --without-pgsql --without-sqlite --without-dmalloc --without-sfio --with-openssl=$MINGWPREFIX CFLAGS="-DWIN32" LIBS="-Wl,--as-needed -Wl,-lws2_32 -Wl,-lgdi32 -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-staticdlopen --without-saslauthd --without-authdaemond --disable-sample --disable-alwaystrue --disable-checkapop --disable-otp --disable-gssapi --disable-gss_mutexes --enable-ntlm --enable-login --without-dbpath --with-dblib=lmdb --without-bdb-libdir --without-bdb-incdir --without-gdbm --without-pam --without-pwcheck --without-openssl --without-des --without-opie --without-ldap --without-mysql --without-pgsql --without-sqlite --without-dmalloc --without-sfio --with-openssl=$MINGWPREFIX CFLAGS="-DWIN32" LIBS="-Wl,--as-needed -Wl,-lws2_32 -Wl,-lgdi32 -Wl,-no-undefined" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ ( make install-strip || ( make -Clib install-strip && make -i install-strip )) &&
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ cp -f libsasl2.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cyrus-sasl-$VERSION
+
+
+
+# # fix missing exports in plugin DLLs
+# for F in $(find plugins/.libs -name '*.dll'); do
+#  L=$(echo $F | sed -e "s/^.*\/lib\([^-]*\)[-0-9]*\.dll/\1/")
+#  echo fixing exports in plugins/.libs/lib$L.dll.a
+#  pexports $F | sed -e "s/^sasl\(_.*\)$/&\n$L\1 = &/" > plugins/.libs/$L.def
+#  dlltool -D $F -d plugins/.libs/$L.def -l plugins/.libs/lib$L.dll.a
+# done
+# cp -f plugins/.libs/lib*.dll.a lib/
+# make -Clib -j1 am__append_1="$(ls -1 plugins/.libs/lib*.dll.a | sed -e "s?^.*/??")"
+# make -Clib -j1 am__append_1="-L../plugins/.libs $(ls -1 plugins/.libs/lib*.dll.a | sed -e "s?^.*/lib\(.*\)\.dll\.a?-l\1?")"
+# cp -f plugins/*.la lib/
+# make -Clib -j1 am__append_1="$(ls -1 plugins/*.la | sed -e "s?^plugins/??")"
+# make -Clib -j1 am__append_1="$(ls -1 plugins/*.la | sed -e "s?^?\$(top_srcdir)/?")"

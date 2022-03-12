@@ -1,0 +1,47 @@
+export NAME="LibCSS"
+export STATUS=
+export URL=https://www.netsurf-browser.org/projects/libcss/
+#export URL=https://github.com/servo/libcss
+export BASENAME=libcss
+export DESCRIPTION="LibCSS is a CSS (Cascading Style Sheet) parser and selection engine, written in C."
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=0.9.1
+export VERSIONDATE=20210303
+wl-showstatus --package-version
+export DEPENDANCIES=libparserutils,libwapcaplet
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=MIT
+export DOWNLOADURL="http://download.netsurf-browser.org/libs/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.netsurf-browser.org/libs/releases/libcss-$VERSION-src.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/libcss-$VERSION-src.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus build &&
+ #$PERLDIR/bin/perl.exe build/make-entities.pl &&
+ touch SUCCESS &&
+ for F in $(find src -name '*.c'); do
+  echo CC $F &&
+  gcc -c -o $F.o $F -Isrc -Iinclude -O3 || rm -f SUCCESS
+ done &&
+ rm SUCCESS &&
+ ar cru $BASENAME.a $(find src -name '*.c.o') &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p $BASENAME.a | sed -n -e "s/^*\([^ ]*\) T .*$/\1/p" ) > $BASENAME.def &&
+ gcc -shared -s -mwindows -def $BASENAME.def -o $BASENAME.dll $BASENAME.a -Wl,--out-implib,$BASENAME.dll.a -lparserutils -lwapcaplet &&
+ sed -e "s?PREFIX?$INSTALLPREFIX?; s?LIBDIR?lib?; s?INCLUDEDIR?include?; s?VERSION?$VERSION?" $BASENAME.pc.in > $BASENAME.pc &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.pc $INSTALLPREFIX/lib/pkgconfig &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

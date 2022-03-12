@@ -1,0 +1,107 @@
+export NAME="Nagios"
+export STATUS=
+export URL=http://www.nagios.org/
+export BASENAME=nagios
+export DESCRIPTION="Nagios is an Open Source host, service and network monitoring program."
+export CATEGORY=sysadmin
+export TYPE=library
+#export VERSION=3.0.1
+#export VERSION=3.1.0
+#export VERSION=3.1.2
+#export VERSION=3.2.0
+#export VERSION=3.2.1
+#export VERSION=3.2.2
+#export VERSION=3.2.3
+#export VERSION=3.3.1
+#export VERSIONDATE=20111215
+#export VERSION=3.4.0
+#export VERSIONDATE=20120505
+#export VERSION=3.4.1
+#export VERSIONDATE=20120514
+#export VERSION=3.4.2
+#export VERSIONDATE=20121110
+####Error: nanosleep() needed for timing operations.
+#export VERSION=3.4.3
+#export VERSIONDATE=20121201
+#export VERSION=3.4.4
+#export VERSIONDATE=20130112
+#export VERSION=3.5.0
+#export VERSIONDATE=20130315
+export VERSION=3.5.1
+export VERSIONDATE=20130831
+####base/nebmods.c:109:2: error: conversion to non-scalar type requested
+####base/nebmods.c:206:2: warning: implicit declaration of function 'mkstemp' [-Wimplicit-function-declaration]
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://sourceforge.net/projects/nagios/files/"
+export DOWNLOADURL="http://sourceforge.net/projects/nagios/files/nagios-3.x/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/nagios/nagios-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/nagios-$VERSION.tar.gz -C $BASENAME-$VERSION
+cd $BASENAME-$VERSION/nagios
+# don't stop on missing nanosleep
+mv configure configure.bak
+#sed -e "s?^\( *nanosleep *();\)?//\1?" configure.bak > configure
+sed -e 's?\("$ac_cv_search_nanosleep" \)!=\( no\)?\1==\2?' configure.bak > configure
+# fix for empty initialization of pthread_t which is a struct
+mv base/nebmods.c base/nebmods.c.bak
+sed -e "s?new_module->thread_id=(pthread_t)NULL;?new_module->thread_id=(ptw32_handle_t){NULL,0};?" base/nebmods.c.bak > base/nebmods.c
+# fix for SIGALRM which is not implemented
+mv base/checks.c base/checks.c.bak
+#sed -e "s?\(signal(SIGALRM,\)?//\1?; s?\(alarm(host_check_timeout);\)?//\1?" base/checks.c.bak > base/checks.c
+sed -e "s?\(signal(SIGALRM,\)?//\1?" base/checks.c.bak > base/checks.c
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-nanosleep CFLAGS="-I`pwd`/include -DWNOHANG=0" &&
+ make all &&
+    echo OK
+#### base/utils.c:396: error: `F_SETFL' undeclared (first use in this function)
+#### base/utils.c:396: error: `O_NONBLOCK' undeclared (first use in this function)
+
+patch -ulbf base/netutils.c << EOF
+--- base/netutils.c  Wed Jun 17 05:23:38 2009
++++ base/netutils.c  Wed Jun 24 20:38:48 2009
+@@ -28,2 +28,8 @@
+ #include "../include/netutils.h"
++#ifdef __WIN32__
++#include <windows.h>
++#include <ws2tcpip.h>
++#define EINPROGRESS WSAEINPROGRESS
++#define socklen_t int
++#endif
+ 
+@@ -36,3 +42,7 @@
+        char *port_str=NULL;
++#ifdef __WIN32__
++        unsigned long flags=0;
++#else
+        int flags=0;
++#endif
+        fd_set rfds;
+@@ -62,4 +72,8 @@
+        /* make socket non-blocking */
++#ifdef __WIN32__
++        ioctlsocket(*sd, FIONBIO, &flags);
++#else
+        flags=fcntl(*sd,F_GETFL,0);
+        fcntl(*sd,F_SETFL,flags|O_NONBLOCK);
++#endif
+EOF
+
+wl-showstatus build-install &&
+ make install &&
+ make nagios &&
+    echo OK
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION
+cd ../..
+#rm -rf $BASENAME-$VERSION
+
+
+

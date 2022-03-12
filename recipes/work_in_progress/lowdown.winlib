@@ -1,0 +1,125 @@
+export NAME="lowdown"
+export STATUS=
+export URL=https://kristaps.bsd.lv/lowdown/
+#export URL=https://github.com/kristapsdz/lowdown
+export BASENAME=lowdown
+export DESCRIPTION="simple markdown translator"
+export CATEGORY=fileformat
+export TYPE=application
+#export VERSION=0.8.4
+#export VERSIONDATE=20210630
+export VERSION=0.10.0
+export VERSIONDATE=20220125
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=ISC
+#export DOWNLOADURL="https://github.com/kristapsdz/lowdown/releases/"
+export DOWNLOADURL="https://github.com/kristapsdz/lowdown/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/kristapsdz/lowdown/archive/refs/tags/VERSION_$(echo $VERSION|tr . _).tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfzv $TARBALLDIR/$BASENAME/VERSION_$(echo $VERSION|tr . _).tar.gz
+cd lowdown-VERSION_$(echo $VERSION|tr . _)
+# fix main.c (version >= 0.8.4)
+patch -ulbf main.c << EOF
+@@ -26,3 +26,5 @@
+ #endif
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+
+@@ -42,3 +44,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <termios.h> /* struct winsize */
++#endif
+ #include <unistd.h>
+@@ -155,2 +159,5 @@
+ {
++#ifdef _WIN32
++       return 72;
++#else
+        struct winsize   size;
+@@ -161,2 +168,3 @@
+        return size.ws_col;
++#endif
+ }
+EOF
+# fix compats.c (version >= 0.8.4)
+patch -ulbf compats.c << EOF
+@@ -214,2 +214,5 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+@@ -218,5 +221,8 @@
+ #include <arpa/nameser.h>
++#endif
+
+ #include <ctype.h>
++#ifndef _WIN32
+ #include <resolv.h>
++#endif
+ #include <stdio.h>
+@@ -225,2 +231,7 @@
+ #include <string.h>
++#ifdef _WIN32
++#ifndef O_CLOEXEC
++#define O_CLOEXEC 0
++#endif
++#endif
+
+@@ -510,3 +521,8 @@
+  */
++#ifdef _WIN32
++#define bzero(b,len) memset((b), 0, (len))
++#else
+ static void (* volatile ssh_bzero)(void *, size_t) = bzero;
++#endif
++
+
+EOF
+wl-showstatus configure &&
+ CC=gcc ./configure &&
+ wl-showstatus build &&
+ make CC="gcc -Duid_t=int -Dgid_t=int -Dnlink_t=size_t" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lowdown-VERSION_$(echo $VERSION|tr . _)
+
+
+
+wl-showstatus configure &&
+ #mkdir -p m4 &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK

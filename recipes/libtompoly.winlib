@@ -1,0 +1,53 @@
+export NAME="LibTomPoly"
+export STATUS=
+export URL=http://www.libtom.net/LibTomPoly/
+#export URL=https://github.com/libtom/libtompoly
+export BASENAME=libtompoly
+export DESCRIPTION="Provides access to polynomials of finite characteristic of varying degrees (it will grow to accomodate), includes several algebraic operations"
+export CATEGORY=math
+export TYPE=library
+export VERSION=0.04
+export VERSIONDATE=20171024
+wl-showstatus --package-version
+export DEPENDANCIES=libtommath
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="public domain"
+#export LICENSETYPE=WTFPL
+export DOWNLOADURL="https://github.com/libtom/libtompoly/releases ltp-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/libtom/libtompoly/releases/download/$VERSION/ltp-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/ltp-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing MIN/MAX in pb_add.c
+mv pb_add.c pb_add.c.bak
+cat > pb_add.c << EOF
+#define MIN(x,y) ((x)<(y)?(x):(y))
+#define MAX(x,y) ((x)>(y)?(x):(y))
+EOF
+cat pb_add.c.bak >> pb_add.c
+# fix missing MIN/MAX in pb_sub.c
+mv pb_sub.c pb_sub.c.bak
+cat > pb_sub.c << EOF
+#define MIN(x,y) ((x)<(y)?(x):(y))
+#define MAX(x,y) ((x)>(y)?(x):(y))
+EOF
+cat pb_sub.c.bak >> pb_sub.c
+wl-showstatus build &&
+ make CC=gcc &&
+ ( echo EXPORTS; nm -f posix --defined-only -p libtompoly.a | sed -n -e "s/^_*\(pb_[^ ]*\) T .*$/\1/p" ) > libtompoly.def &&
+ gcc -shared -s -mwindows -def libtompoly.def -o libtompoly.dll libtompoly.a -Wl,--out-implib,libtompoly.dll.a -ltommath &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f tompoly.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

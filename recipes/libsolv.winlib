@@ -1,0 +1,239 @@
+export NAME="libsolv"
+export STATUS=
+#export URL=http://www.ohloh.net/p/libsolv
+export URL=https://en.opensuse.org/openSUSE:Libzypp_satsolver
+#export URL=https://github.com/openSUSE/libsolv/
+export BASENAME=libsolv
+export DESCRIPTION="libsolv, a free package dependency solver using a satisfiability algorithm"
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=0.6.23
+#export VERSIONDATE=20160930
+#export VERSION=0.6.24
+#export VERSIONDATE=20161111
+#export VERSION=0.6.25
+#export VERSIONDATE=20170207
+#export VERSION=0.6.26
+#export VERSIONDATE=20170215
+####src/poolvendor.c:17:21: fatal error: fnmatch.h: No such file or directory
+####src/poolvendor.c:69:51:error: 'FNM_CASEFOLD' undeclared (first use in this function)
+#export VERSION=0.6.27
+#export VERSIONDATE=20170426
+####ext/solv_xfopen.c:46:3: error: #error Need to implement custom I/O
+#export VERSION=0.6.28
+#export VERSIONDATE=20170701
+####ext/solv_xfopen.c:367:26: error: 'F_GETFL' undeclared (first use in this function)
+#export VERSION=0.6.29
+#export VERSIONDATE=20170908
+#export VERSION=0.6.30
+#export VERSIONDATE=20171023
+#export VERSION=0.6.31
+#export VERSIONDATE=20180131
+#export VERSION=0.6.32
+#export VERSIONDATE=20180214
+#export VERSION=0.6.33
+#export VERSIONDATE=20180301
+#export VERSION=0.6.34
+#export VERSIONDATE=20180323
+#export VERSION=0.6.35
+#export VERSIONDATE=20180810
+#export VERSION=0.6.36
+#export VERSIONDATE=20190628
+#export VERSION=0.6.37
+#export VERSIONDATE=20210526
+#export VERSION=0.6.38
+#export VERSIONDATE=20210916
+#export VERSION=0.6.39
+#export VERSIONDATE=20220304
+#export VERSION=0.7.0
+#export VERSIONDATE=20181024
+#export VERSION=0.7.1
+#export VERSIONDATE=20181031
+#export VERSION=0.7.2
+#export VERSIONDATE=20181208
+#export VERSION=0.7.3
+#export VERSIONDATE=20190131
+#export VERSION=0.7.4
+#export VERSIONDATE=20190330
+#export VERSION=0.7.5
+#export VERSIONDATE=20190612
+#export VERSION=0.7.6
+#export VERSIONDATE=20190829
+#export VERSION=0.7.7
+#export VERSIONDATE=20191018
+#export VERSION=0.7.8
+#export VERSIONDATE=20191112
+####ext/solv_xfopen.c:46:3: error: #error Need to implement custom I/O
+#export VERSION=0.7.9
+#export VERSIONDATE=20191122
+#export VERSION=0.7.10
+#export VERSIONDATE=20191210
+#export VERSION=0.7.11
+#export VERSIONDATE=20200122
+#export VERSION=0.7.12
+#export VERSIONDATE=20200420
+#export VERSION=0.7.13
+#export VERSIONDATE=20200424
+#export VERSION=0.7.14
+#export VERSIONDATE=20200527
+#export VERSION=0.7.15
+#export VERSIONDATE=20200911
+####ext/solv_xfopen.c:(.text+0x46f): undefined reference to `solv_free'
+#export VERSION=0.7.16
+#export VERSIONDATE=20201020
+#export VERSION=0.7.17
+#export VERSIONDATE=20210119
+#export VERSION=0.7.18
+#export VERSIONDATE=20210326
+#export VERSION=0.7.19
+#export VERSIONDATE=20210407
+#export VERSION=0.7.20
+#export VERSIONDATE=20210926
+export VERSION=0.7.21
+export VERSIONDATE=20220226
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libbz2,zchunk,xz,expat
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.BSD
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/openSUSE/libsolv/releases"
+export DOWNLOADURL="https://github.com/openSUSE/libsolv/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/openSUSE/libsolv/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/openSUSE/libsolv/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing fnmatch.h (version <= 0.7.8)
+#mkdir -p winfix
+#cat > winfix/fnmatch.h << EOF
+##ifndef INCLUDED_WINFIX_FNMATCH_H
+##define INCLUDED_WINFIX_FNMATCH_H
+#//#include <windows.h>
+##include <shlwapi.h>
+##define FNM_NOCASE      0x08
+##define FNM_CASEFOLD    0x08
+##define FNM_NOMATCH     1
+#/*
+#inline int fnmatch(const char* pattern, const char* filepath, int flags)
+#{
+#  if (PathMatchSpec(filepath, pattern) == TRUE)
+#    return 0;
+#  return FNM_NOMATCH;
+#}
+#*/
+##define fnmatch(pattern,filepath,flags) (PathMatchSpec(filepath, pattern) == TRUE ? 0 : FNM_NOMATCH)
+##endif
+#EOF
+#for F in $(grep -l "#include <fnmatch.h>" src/*.c); do
+# mv $F $F.bak &&
+# sed -e 's?<fnmatch.h>?"../winfix/fnmatch.h"?' $F.bak > $F
+#done
+## don't use unsupported FD_CLOEXEC in src/repopage.c (version <= 0.7.8)
+#patch -ulbf src/repopage.c << EOF
+#--- src/repopage.c  2017-02-07 13:20:53.000000000 +0100
+#+++ src/repopage.c  2017-02-09 18:53:53.130373100 +0100
+#@@ -787,4 +787,6 @@
+#     can_seek = 0;
+#+#ifndef _WIN32
+#   else
+#     fcntl(store->pagefd, F_SETFD, FD_CLOEXEC);
+#+#endif
+#
+#EOF
+## fix src/sha2.c (version <= 0.7.8)
+#patch -ulbf src/sha2.c << EOF
+#--- src/sha2.c  2017-02-07 13:20:53.000000000 +0100
+#+++ src/sha2.c  2017-02-09 18:56:29.303668100 +0100
+#@@ -38,3 +38,5 @@
+# #include <stdio.h>
+#+#ifndef _WIN32
+# #include <sys/uio.h>
+#+#endif
+# #include <unistd.h>
+#EOF
+## fix missing strcasestr in src/repodata.c (version <= 0.7.6)
+#mv src/repodata.c src/repodata.c.bak
+#cat > src/repodata.c << EOF
+##include <string.h>
+#inline const char* strcasestr (const char* s1, const char* s2)
+#{
+#  if (!s1 || !s2)
+#    return 0;
+#  size_t s2len = strlen(s2);
+#  while (*s1)
+#    if (!strnicmp(s1++, s2, s2len))
+#      return (s1 - 1);
+#  return 0;
+#}
+#EOF
+#cat src/repodata.c.bak >> src/repodata.c
+## fix missing pread in src/repopage.c (version <= 0.7.8)
+#mv src/repopage.c src/repopage.c.bak2
+#cat > src/repopage.c << EOF
+##include <sys/types.h>
+##include <unistd.h>
+##include <io.h>
+##include <stdio.h>
+#inline ssize_t pread (int fd, void* buf, size_t count, off_t offset)
+#{
+#  ssize_t result;
+#  off_t oldpos = lseek (fd, 0, SEEK_CUR);
+#  lseek(fd, offset, SEEK_SET);
+#  result = read(fd, buf, count);
+#  lseek(fd, oldpos, SEEK_SET);
+#  return result;
+#}
+#EOF
+#cat src/repopage.c.bak2 >> src/repopage.c
+## fix mkdir in ext/testcase.c (version >= 0.6.28 <= 0.7.8)
+#mv ext/testcase.c ext/testcase.c.bak &&
+#sed -e "s/\(mkdir\s*([^,]*\),[^)]*)/\1)/g" ext/testcase.c.bak > ext/testcase.c
+## fix missing sys/wait.h in tools/repo2solv.c (version <= 0.7.8)
+#sed -i.bak -e "s?.*sys/wait.h?//&?" tools/repo2solv.c
+#wl-showstatus configure &&
+##cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DDISABLE_SHARED:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_STATIC:BOOL=OFF . &&
+##PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DDISABLE_SHARED:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DWITH_SYSTEM_ZCHUNK:BOOL=ON . &&
+#PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=OFF -DDISABLE_SHARED:BOOL=OFF -DWITHOUT_COOKIEOPEN:BOOL=ON -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_ZSTD_COMPRESSION:BOOL=ON -DENABLE_ZCHUNK_COMPRESSION:BOOL=ON -DWITH_SYSTEM_ZCHUNK:BOOL=ON -DENABLE_PUBKEY:BOOL=OFF -DENABLE_TCL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF . &&
+# echo "-Wl,--as-needed -lregex -lshlwapi" >> src/CMakeFiles/libsolv.dir/linklibs.rsp &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+# avoid __declspec(dllexport) as exported function are not declared with SOLV_API and mixing with explicit __declspec(dllexport) causes symbols to not be exported (version >= 0.7.16)
+echo "#define SOLV_API" > win32/config.h
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DDISABLE_SHARED:BOOL=ON -DMULTI_SEMANTICS:BOOL=ON -DWITHOUT_COOKIEOPEN:BOOL=ON -DWITH_LIBXML2:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_ZSTD_COMPRESSION:BOOL=ON -DENABLE_ZCHUNK_COMPRESSION:BOOL=OFF -DENABLE_PUBKEY:BOOL=OFF -DENABLE_TCL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -S. -Bbuild_static &&
+# PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DDISABLE_SHARED:BOOL=ON -DMULTI_SEMANTICS:BOOL=ON -DWITHOUT_COOKIEOPEN:BOOL=ON -DWITH_LIBXML2:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_ZSTD_COMPRESSION:BOOL=ON -DENABLE_ZCHUNK_COMPRESSION:BOOL=ON -DWITH_SYSTEM_ZCHUNK:BOOL=ON -DENABLE_PUBKEY:BOOL=OFF -DENABLE_TCL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# #PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=OFF -DDISABLE_SHARED:BOOL=OFF -DMULTI_SEMANTICS:BOOL=ON -DWITHOUT_COOKIEOPEN:BOOL=ON -DWITH_LIBXML2:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_ZSTD_COMPRESSION:BOOL=ON -DENABLE_ZCHUNK_COMPRESSION:BOOL=OFF -DENABLE_PUBKEY:BOOL=OFF -DENABLE_TCL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -S. -Bbuild_shared &&
+# PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=OFF -DDISABLE_SHARED:BOOL=OFF -DMULTI_SEMANTICS:BOOL=ON -DWITHOUT_COOKIEOPEN:BOOL=ON -DWITH_LIBXML2:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_ZSTD_COMPRESSION:BOOL=ON -DENABLE_ZCHUNK_COMPRESSION:BOOL=ON -DWITH_SYSTEM_ZCHUNK:BOOL=ON -DENABLE_PUBKEY:BOOL=OFF -DENABLE_TCL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# ## fix missing LibSolvConfig.cmake
+# #mkdir -p $INSTALLPREFIX/lib/cmake/LibSolv &&
+# #cp -u $INSTALLPREFIX/share/cmake/Modules/FindLibSolv.cmake $INSTALLPREFIX/lib/cmake/LibSolv/LibSolvConfig.cmake &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DDISABLE_SHARED:BOOL=ON -DMULTI_SEMANTICS:BOOL=ON -DWITHOUT_COOKIEOPEN:BOOL=ON -DWITH_LIBXML2:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_ZSTD_COMPRESSION:BOOL=ON -DENABLE_ZCHUNK_COMPRESSION:BOOL=ON -DWITH_SYSTEM_ZCHUNK:BOOL=ON -DENABLE_PUBKEY:BOOL=OFF -DENABLE_TCL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=OFF -DDISABLE_SHARED:BOOL=OFF -DMULTI_SEMANTICS:BOOL=ON -DWITHOUT_COOKIEOPEN:BOOL=ON -DWITH_LIBXML2:BOOL=OFF -DENABLE_BZIP2_COMPRESSION:BOOL=ON -DENABLE_LZMA_COMPRESSION:BOOL=ON -DENABLE_ZSTD_COMPRESSION:BOOL=ON -DENABLE_ZCHUNK_COMPRESSION:BOOL=ON -DWITH_SYSTEM_ZCHUNK:BOOL=ON -DENABLE_PUBKEY:BOOL=OFF -DENABLE_TCL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ ## fix missing LibSolvConfig.cmake
+ #mkdir -p $INSTALLPREFIX/lib/cmake/LibSolv &&
+ #cp -u $INSTALLPREFIX/share/cmake/Modules/FindLibSolv.cmake $INSTALLPREFIX/lib/cmake/LibSolv/LibSolvConfig.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####Supersedes sat-solver (https://github.com/openSUSE/sat-solver)
+
+
+

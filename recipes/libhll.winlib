@@ -1,0 +1,87 @@
+export NAME="LibHLL"
+export STATUS=
+export URL=https://github.com/ivitjuk/libhll
+export BASENAME=libhll
+export DESCRIPTION="C implementation of the HyperLogLog cardinality estimator"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20200118
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=ISC
+export DOWNLOADURL="https://github.com/ivitjuk/libhll/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/ivitjuk/libhll/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix type issue
+sed -i.bak -e "s/1UL << 32/1ULL << 32/g" hll/hll.c
+# fix missing getline hll_demo.c
+mv hll_demo.c hll_demo.c.bak
+cat > hll_demo.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+sed -e "s/%\([0-9]\)*lu/%\1I64u/g" hll_demo.c.bak >> hll_demo.c
+# skip tests
+sed -i.bak -e "s/^add_subdirectory(test)/#&/" CMakeLists.txt
+wl-showstatus configure &&
+cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+ wl-showstatus build &&
+ ( make || make hll ) &&
+ ( echo EXPORTS; gcc -E hll/hll.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(hll_[^ *]*\).*/\1/p" ) > hll.def &&
+ gcc -shared -s -mwindows -def hll.def -o hll.dll libhll.a -Wl,--add-stdcall-alias -Wl,--out-implib,libhll.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f hll/hll.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

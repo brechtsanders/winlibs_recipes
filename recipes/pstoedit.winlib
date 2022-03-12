@@ -1,0 +1,71 @@
+export NAME="pstoedit"
+export STATUS=
+export URL=http://www.pstoedit.net/
+export BASENAME=pstoedit
+export DESCRIPTION="pstoedit translates PostScript and PDF graphics into other vector formats."
+export CATEGORY=graphics,fileformat
+export TYPE=library
+#export VERSION=3.70
+#export VERSIONDATE=20170110
+#export VERSION=3.71
+#export VERSIONDATE=20180416
+#export VERSION=3.72
+#export VERSIONDATE=20180520
+#export VERSION=3.73
+#export VERSIONDATE=20180603
+#export VERSION=3.74
+#export VERSIONDATE=20190603
+#export VERSION=3.75
+#export VERSIONDATE=20200102
+#export VERSION=3.76
+#export VERSIONDATE=20210830
+#export VERSION=3.77
+#export VERSIONDATE=20210904
+export VERSION=3.78
+export VERSIONDATE=20211123
+wl-showstatus --package-version
+export DEPENDANCIES=libzip,libming,imagemagick,libgd
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=copying
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/pstoedit/files/pstoedit/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/pstoedit/pstoedit/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of strncpy_s/strcpy_s/strcat_s src/cppcomp.h
+if ( gcc --version | grep -q "MinGW-W64" ); then
+ mv src/cppcomp.h src/cppcomp.h.bak &&
+ sed -e "s/\(inline void \)\(str[a-z]*_s\)/\1MY_\2/" src/cppcomp.h.bak > src/cppcomp.h
+fi
+# fix missing IS_DIR in src/miscutil.cpp
+mv src/miscutil.cpp src/miscutil.cpp.bak &&
+echo "#include <sys/stat.h>" > src/miscutil.cpp
+cat src/miscutil.cpp.bak >> src/miscutil.cpp
+# fix missing srandom/random in src/drvpptx.cpp
+mv src/drvpptx.cpp src/drvpptx.cpp.bak &&
+sed -e "s/\b\(s*rand\)om\b/\1/" src/drvpptx.cpp.bak > src/drvpptx.cpp
+# fix missing zip_source_file in src/drvpptx.cpp (version >= 3.75)
+mv src/drvpptx.cpp src/drvpptx.cpp.bak2 &&
+echo "#include <zip.h>" > src/drvpptx.cpp
+cat src/drvpptx.cpp.bak2 >> src/drvpptx.cpp
+# skip making doc to avoid error about missing latex2man (version >= 3.72)
+cat > doc/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CXXFLAGS="-I$(pwd)/othersrc/gsdllinc" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

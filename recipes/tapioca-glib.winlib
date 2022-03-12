@@ -1,0 +1,74 @@
+export NAME="Tapioca"
+export STATUS=
+export URL=http://tapioca-voip.sourceforge.net/
+export BASENAME=tapioca-glib
+export DESCRIPTION="Tapioca is a framework for Voice over IP (VoIP) and IM applications. Its main goal is to provide an easy way for developing and using VoIP/IM services in any kind of application. It provides a pluggable interface for different protocols, such as SIP/XMPP."
+export CATEGORY=audio,communication
+export TYPE=library
+export VERSION=0.14.0.1
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,dbus-glib,gtk2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2.1
+export DOWNLOADURL="http://sourceforge.net/projects/tapioca-voip/files/tapioca-glib/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/tapioca-voip/tapioca-glib/$VERSION/tapioca-glib-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing uint in tapioca/core/tpa-text.c
+mv tapioca/core/tpa-text.c tapioca/core/tpa-text.c.bak
+echo "#define uint guint" > tapioca/core/tpa-text.c
+cat tapioca/core/tpa-text.c.bak >> tapioca/core/tpa-text.c
+# fix for building DLL
+patch -ulbf configure.ac << EOF
+--- configure.ac  Wed May 23 21:04:23 2007
++++ configure.ac  Wed Apr 29 22:01:46 2009
+@@ -1,2 +1,3 @@
+ AC_INIT(tapioca-glib, 0.14.0)
++AC_LIBTOOL_WIN32_DLL
+EOF
+# fix for duplicate installation files
+patch -ulbf tapioca/core/Makefile.in << EOF
+--- tapioca/core/Makefile.in  2010-01-29 13:18:14 +0100
++++ tapioca/core/Makefile.in  2010-01-29 13:48:42 +0100
+@@ -330,5 +330,3 @@
+        tpa-text.h \\
+-       tpa-manager.h \\
+        tpa-account.h \\
+-       tpa-session.h \\
+     tpa-ifaces.h
+EOF
+
+cat $MINGWPREFIX/share/aclocal/libtool.m4 >> aclocal.m4
+cat $MINGWPREFIX/share/aclocal/ltoptions.m4 >> aclocal.m4
+cat $MINGWPREFIX/share/aclocal/ltversion.m4 >> aclocal.m4
+cat $MINGWPREFIX/share/aclocal/ltsugar.m4 >> aclocal.m4
+cat $MINGWPREFIX/share/aclocal/lt~obsolete.m4 >> aclocal.m4
+echo "AC_CONFIG_MACRO_DIR([m4])" >> configure.ac
+
+wl-showstatus configure &&
+#NOCONFIGURE=1 ./autogen.sh
+autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+####configure.ac:2: error: possibly undefined macro: AC_LIBTOOL_WIN32_DLL
+####      If this token and others are legitimate, please use m4_pattern_allow.
+####      See the Autoconf documentation.
+####configure.ac:15: error: possibly undefined macro: AM_DISABLE_STATIC
+####configure.ac:29: error: possibly undefined macro: AC_PROG_LIBTOOL
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ make -j1 -i install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

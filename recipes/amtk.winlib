@@ -1,0 +1,65 @@
+export NAME="Amtk"
+export STATUS=
+export URL=https://wiki.gnome.org/Projects/Amtk
+export BASENAME=amtk
+export DESCRIPTION="Amtk is the acronym for \"Actions, Menus and Toolbars Kit\". It is a basic GtkUIManager replacement based on GAction. It is suitable for both a traditional UI or a modern UI with a GtkHeaderBar."
+export CATEGORY=gui
+export TYPE=library
+export VERSION=5.3.1
+export VERSIONDATE=20210320
+wl-showstatus --package-version
+export DEPENDANCIES=gtk3
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://download.gnome.org/sources/amtk/"
+#export DOWNLOADURL="https://gitlab.gnome.org/GNOME/amtk/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://download.gnome.org/sources/amtk/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+# fix quotes issue when defining -DG_LOG_DOMAIN as command line argument in meson.build (version >= 5.1.1)
+####See bug report: https://github.com/mesonbuild/meson/issues/7728
+patch -ulbf meson.build << EOF
+@@ -65,5 +65,5 @@
+ add_project_arguments(
+-  '-DG_LOG_DOMAIN="@0@"'.format(meson.project_name()),
+   language: 'c'
+ )
++cargs = ['-DG_LOG_DOMAIN="@0@"'.format(meson.project_name())]
+
+EOF
+
+#-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS
+## fix location of Perl
+#sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix detection of Python
+#sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix missing gio-unix
+##sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+#sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgobject_introspection=true -Dgtk_doc=false . build_both &&
+ #sed -i.bak -e "s?$(cygpath -w $(pwd)/build_both/docs|sed -e 's?\\?&&?g')?$(cygpath -m $(pwd)/build_both/docs)?g; s?\(reference\)\\\\?\1/?" build_both/amtk-5-scan.c &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PKG_CONFIG= PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib:$PYTHONPATH ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

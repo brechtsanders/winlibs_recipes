@@ -1,0 +1,113 @@
+export NAME="libAfterImage"
+export STATUS=
+export URL=http://www.afterstep.org/afterimage/
+export BASENAME=libafterimage
+export DESCRIPTION="libAfterImage is a generic image manipulation library. It was initially implemented to address AfterStep Window Manager's needs for image handling, but it evolved into extremely powerfull and flexible software, suitable for virtually any project that has needs for loading, manipulating, displaying images, as well as writing images in files. Most of the popular image formats are supported using standard libraries, with XCF, XPM, PPM/PNM, BMP, ICO, TGA and GIF being supported internally."
+export CATEGORY=graphics,fileformat
+export TYPE=library
+export VERSION=1.20
+export VERSIONDATE=20200227
+wl-showstatus --package-version
+export DEPENDANCIES=freetype2,libpng,libjpeg,giflib,libtiff,librsvg,glib2,gdk-pixbuf
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://www.afterstep.org/afterimage/getcode.php"
+#export DOWNLOADURL="ftp://ftp.afterstep.org/stable/libAfterImage/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://ftp.afterstep.org/stable/libAfterImage/libAfterImage-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/libAfterImage-$VERSION.tar.bz2
+cd libAfterImage-$VERSION
+patch -ulbf libjpeg/jmorecfg.h << EOF
+@@ -181,4 +181,7 @@
+  * typedefs live at a different point on the speed/space tradeoff curve.)
+  */
++#ifdef __MINGW32__
++#include <basetsd.h>
++#else
+
+ /* UINT8 must hold at least the values 0..255. */
+@@ -220,4 +223,6 @@
+ #endif
+
++#endif //__MINGW32__
++
+ /* Datatype used for image dimensions.  The JPEG standard only supports
+  * images up to 64K*64K due to 16-bit fields in SOF markers.  Therefore
+@@ -307,5 +312,9 @@
+ #if defined FALSE || defined TRUE || defined QGLOBAL_H
+ /* Qt3 defines FALSE and TRUE as "const" variables in qglobal.h */
++#ifdef __MINGW32__
++#include <rpcndr.h>
++#else
+ typedef int boolean;
++#endif
+ #ifndef FALSE                  /* in case these macros already exist */
+ #define FALSE  0               /* values of boolean */
+EOF
+# fix export.c (version >= 1.20)
+patch -ulbf export.c << EOF
+@@ -498,2 +498,3 @@
+        if( (info_ptr = png_create_info_struct(png_ptr)) != NULL )
++#ifndef _WIN32
+                        if( setjmp(png_ptr->jmpbuf) )
+@@ -503,2 +504,3 @@
+                }
++#endif
+
+EOF
+# fix import.c (version >= 1.20)
+patch -ulbf import.c << EOF
+@@ -1253,3 +1253,5 @@
+                         */
++#ifndef _WIN32
+                        if ( !setjmp (png_ptr->jmpbuf))
++#endif
+                        {
+@@ -1470,3 +1472,3 @@
+ {
+-   ASImPNGReadBuffer *buf = (ASImPNGReadBuffer *)png_ptr->io_ptr;
++   ASImPNGReadBuffer *buf = (ASImPNGReadBuffer *)png_get_io_ptr(png_ptr);
+    memcpy(data, buf->buffer, length);
+EOF
+# fix use of incorrect config.h
+mv win32/config.h win32/config.h.bak &&
+echo "#include \"../config.h\"" > win32/config.h
+wl-showstatus configure &&
+ # mkdir -p m4 &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-staticlibs --enable-sharedlibs --without-builtin-jpeg --without-builtin-png --without-builtin-zlib --without-builtin-gif &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-staticlibs --enable-sharedlibs --without-builtin-zlib --without-builtin-jpeg --with-jpeg --with-jpeg-includes=$MINGWPREFIX/include --without-builtin-png --with-png --with-png-includes=$MINGWPREFIX/include --without-builtin-gif --with-tiff --with-tiff-includes=$MINGWPREFIX/include --with-ttf --with-ttf-includes=$MINGWPREFIX/include --with-xpm --with-svg --without-afterbase --without-x --disable-glx --disable-shaping CFLAGS="-I$MINGWPREFIX/include/freetype2/freetype" LDFLAGS="-Wl,--as-needed -lfreetype -lpng -ljpeg -lgif" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build &&
+ make libAfterImage.a AfterImage.dll LIB_SHARED_CYG=AfterImage.dll LIB_SHARED_CYG_AR=libAfterImage.dll.a USER_LD_FLAGS="-s -Wl,--allow-multiple-definition -Wl,--as-needed -lfreetype -lpng -ljpeg -lgif" &&
+ make -Capps LIB_SHARED=../libAfterImage.dll.a &&
+ strip apps/*.exe &&
+ wl-showstatus build-install &&
+ make install.cyg install.inc LIB_SHARED_CYG=AfterImage.dll LIB_SHARED_CYG_AR=libAfterImage.dll.a &&
+ make -Capps install.man &&
+ cp -f apps/*.exe $INSTALLPREFIX/bin/ &&
+ cp libAfterImage.a  $INSTALLPREFIX/lib/ &&
+ sed -i -e "s?$INSTALLPREFIX?\$(dirname \$(dirname \$0))?g" $INSTALLPREFIX/bin/afterimage-config $INSTALLPREFIX/bin/afterimage-libs &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libAfterImage-$VERSION
+
+
+

@@ -1,0 +1,67 @@
+export NAME="fontilus"
+export STATUS=
+export URL=http://www.gnome.org/projects/fontilus
+export BASENAME=fontilus
+export DESCRIPTION="Fontilus is a set of extensions for Nautilus to help manage fonts on your system."
+export CATEGORY=font
+export TYPE=library
+export VERSION=0.4
+export VERSIONDATE=20101118
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,freetype2,gtk2,gdk-pixbuf,libgnomeui,gnome-vfs,libxft
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/fontilus/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix mkdir in src/font-method.c
+patch -ulbf src/font-method.c << EOF
+--- src/font-method.c  2003-01-09 16:39:00 +0100
++++ src/font-method.c  2010-11-18 22:32:30 +0100
+@@ -199,3 +199,7 @@
+     fontsdir = g_strconcat(g_get_home_dir(), G_DIR_SEPARATOR_S, ".fonts",NULL);
+
++#ifndef _WIN32
+     if (mkdir(fontsdir, 0755) && errno != EEXIST) {
++#else
++    if (mkdir(fontsdir) && errno != EEXIST) {
++#endif
+        g_free(fontsdir);
+EOF
+# fix missing gdk/gdkx.h
+mkdir -p gdk
+cat > gdk/gdkx.h << EOF
+#include <gdk/gdkwin32.h>
+//#include <X11/X.h>
+//#include <X11/Xlib.h>
+//#define GDK_WINDOW_XID(dw) (int)GDK_WINDOW_HWND(dw)
+//#define GDK_DISPLAY_XDISPLAY(d) gdk_display_get_default_screen(d)
+//#define GDK_SCREEN_XDISPLAY(d) gdk_display_get_default_screen(d)
+EOF
+# fix missing src/.libs/zlib1.dll-def
+mkdir -p src/.libs
+pexports `which zlib1.dll` > src/.libs/zlib1.dll-def
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ # fix error: /include/w32api/winspool.h:255: error: two or more data types in declaration specifiers
+ mv config.h config.h.bak &&
+ echo "#include <windows.h>" > config.h &&
+ cat config.h.bak >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+####src/font-view.c:108: undefined reference to `GDK_PIXMAP_XDISPLAY'
+####src/font-view.c:109: undefined reference to `GDK_VISUAL_XVISUAL'
+####src/font-view.c:110: undefined reference to `GDK_COLORMAP_XCOLORMAP'
+####src/font-view.c:177: undefined reference to `GDK_DRAWABLE_XID'
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

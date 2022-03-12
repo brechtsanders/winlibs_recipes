@@ -1,0 +1,50 @@
+export NAME="librestpp"
+export STATUS=
+export URL=https://github.com/Kev/librestpp
+export BASENAME=librestpp
+export DESCRIPTION="Simple C++ REST server framework"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20171118
+wl-showstatus --package-version
+export DEPENDANCIES=boost,websocketpp,rapidjson,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=scons
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/Kev/librestpp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Kev/librestpp/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL	
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing _1
+sed -i.bak -e "s/\b_1\b/boost::placeholders::&/" restpp/drivers/WebSocketPPServerDriverBase.h restpp/drivers/WebSocketPPASIOTLSServerDriver.cpp restpp/RESTServer.cpp
+# fix building both static and shared libraries
+mv CMakeLists.txt CMakeLists.txt.bak &&
+sed -e "s/add_library([^ ]*/& STATIC/" CMakeLists.txt.bak > CMakeLists.txt &&
+sed -n -e "s/\(add_library(\)\([^ ]*\)/\1\2_shared SHARED/; /add_library(/,/)/p" CMakeLists.txt.bak >> CMakeLists.txt
+sed -n -e "s/\(add_library(\)\([^ ]*\)/set_target_properties(\2_shared PROPERTIES OUTPUT_NAME \2)/p" CMakeLists.txt.bak >> CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win -DCMAKE_CXX_FLAGS:STRING="-std=c++11" &&
+ # fix dependancies for shared library
+ echo "-Wl,--as-needed -lws2_32 -lmswsock -lcrypto -lssl -lboost_system -lboost_filesystem" >> build_win/CMakeFiles/restpp_shared.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_win install/strip &&
+ strip *.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.dll $INSTALLPREFIX/bin &&
+ cp -f *.dll.a $INSTALLPREFIX/lib &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

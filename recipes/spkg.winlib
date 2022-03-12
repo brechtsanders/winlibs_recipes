@@ -1,0 +1,74 @@
+export NAME="spkg"
+export STATUS=
+export URL=http://spkg.megous.com/
+export BASENAME=spkg
+export DESCRIPTION="spkg is the unofficial Slackware Linux package manager. spkg is implemented in C and optimized for speed."
+export CATEGORY=development
+export TYPE=library,application
+#export VERSION=1.0rc13
+#export VERSIONDATE=20101209
+#export VERSION=1.0
+#export VERSIONDATE=20110316
+#export VERSION=1.0.1
+#export VERSIONDATE=20130402
+#export VERSION=1.1
+#export VERSIONDATE=20171126
+#export VERSION=1.3
+#export VERSIONDATE=20220119
+export VERSION=1.4
+export VERSIONDATE=20220121
+wl-showstatus --package-version
+export DEPENDANCIES=judy,glib2,popt,zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=free
+#export DOWNLOADURL="http://spkg.megous.com/dl/releases/"
+export DOWNLOADURL="https://github.com/megous/spkg/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://spkg.megous.com/dl/releases/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/megous/spkg/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix include/sys.h for 64-bit
+patch -ulbf include/sys.h << EOF
+--- include/sys.h  2006-08-19 18:20:32 +0200
++++ include/sys.h  2012-02-12 21:05:16 +0100
+@@ -21,2 +21,5 @@
+ #include <sys/stat.h>
++#if defined(__MINGW64__) || `if gcc --version|grep -q "MinGW-W64"; then echo 1; else echo 0; fi`
++typedef uintptr_t sigset_t;
++#endif
+
+EOF
+## fix redefinition of usleep in src/sys.c (version >= 1.0.19)
+#patch -ulbf src/sys.c << EOF
+#--- src/sys.c  2009-04-03 13:59:13 +0200
+#+++ src/sys.c  2015-04-12 15:31:10 +0200
+#@@ -35,9 +34,0 @@
+#-int usleep(unsigned int usec)
+#-{
+#-   unsigned int dwMilliseconds = usec/1000;
+#-   if (dwMilliseconds > 0)
+#-   {
+#-      Sleep (dwMilliseconds);
+#-   }
+#-   return (0);
+#-}
+#EOF
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

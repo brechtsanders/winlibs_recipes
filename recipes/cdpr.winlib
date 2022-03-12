@@ -1,0 +1,67 @@
+export NAME="cdpr"
+export STATUS=
+export URL=https://sourceforge.net/projects/cdpr/
+export BASENAME=cdpr
+export DESCRIPTION="cdpr is used to decode a Cisco Disovery Protocol (CDP) packet, by default it will report the device ID, the IP Address (of the device), and the port number that the machine is connected to. Optionally it will decode the entire CDP packet."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=2.4
+export VERSIONDATE=20160227
+wl-showstatus --package-version
+#export DEPENDANCIES=winpcap
+export DEPENDANCIES=libpcap
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/cdpr/files/cdpr/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/cdpr/cdpr/$VERSION/$BASENAME-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" > winfix/arpa/inet.h
+## fix missing inet_ntop in cdpr.c
+#mv cdpr.c cdpr.c.bak
+#cat > cdpr.c << EOF
+##include <stdlib.h>
+#//#define _WIN32_WINNT 0x0501
+##include <winsock2.h>
+#const char* inet_ntop (int af, const void* src, char* dst, int cnt)
+#{
+#  struct sockaddr_in srcaddr;
+#  memset(&srcaddr, 0, sizeof(struct sockaddr_in));
+#  memcpy(&(srcaddr.sin_addr), src, sizeof(srcaddr.sin_addr));
+#  srcaddr.sin_family = af;
+#  if (WSAAddressToString((struct sockaddr*)&srcaddr, sizeof(struct sockaddr_in), 0, dst, (LPDWORD)&cnt) != 0) {
+#    //DWORD rv = WSAGetLastError();
+#    //fprintf(stderr, "WSAAddressToString() : %d\n",rv);
+#    return NULL;
+#  }
+#  return dst;
+#}
+#EOF
+#cat cdpr.c.bak >> cdpr.c
+# fix missing u_int8/u_int16/u_int32
+for F in cdp.h cdpr.c; do
+ mv $F $F.bak2
+ echo "#include <stdint.h>" > $F
+ sed -e "s/\bu_\(int[0-9]\{1,2\}\)/u\1/" $F.bak2 >> $F
+done
+wl-showstatus build &&
+ #make CFLAGS="-DWIN32 -O2 -I$(pwd)/winfix -I$MINGWPREFIX/include/pcap" LDFLAGS="-lpcap -lws2_32" &&
+ make CFLAGS="-fcommon -DWIN32 -O2 -I$(pwd)/winfix -I$MINGWPREFIX/include/pcap" LDFLAGS="-lpcap -lws2_32" &&
+ strip *.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

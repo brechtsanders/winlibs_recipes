@@ -1,0 +1,146 @@
+export NAME="Apache XML Security for C++"
+export STATUS=
+export URL=http://santuario.apache.org/cindex.html
+export BASENAME=xml-security-c
+export DESCRIPTION="The Apache XML Security for C++ library is an implementation of the XML Digital Signature and Encryption specifications, along with some additional XKMS code. It is designed to be easily ported to new platforms, and is generally tested on Windows, Linux, OS X, and Solaris. Other platforms with autoconf support may also work."
+export CATEGORY=security,dataprocessing
+export TYPE=library
+#export VERSION=1.7.0
+#export VERSIONDATE=20130112
+#export VERSION=1.7.1
+#export VERSIONDATE=20130618
+####xsec/dsig/DSIGConstants.cpp:152:30: warning: 'DSIGConstants::s_unicodeStrEmpty' redeclared without dllimport attribute after being referenced with dll linkage [enabled by default]
+#export VERSION=1.7.2
+#export VERSIONDATE=20130627
+#export VERSION=1.7.3
+#export VERSIONDATE=20150316
+####dsig/DSIGConstants.cpp:152:15: error: definition of static data member 'DSIGConstants::s_unicodeStrEmpty' of dllimport'd class
+#export VERSION=2.0.0
+#export VERSIONDATE=20180627
+#export VERSION=2.0.1
+#export VERSIONDATE=20180803
+#export VERSION=2.0.2
+#export VERSIONDATE=20181103
+#export VERSION=2.0.3
+#export VERSIONDATE=20211026
+export VERSION=2.0.4
+export VERSIONDATE=20211104
+wl-showstatus --package-version
+export DEPENDANCIES=xerces,openssl
+export OPTIONALDEPENDANCIES=xalan-c
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=Apache
+#export DOWNLOADURL="http://santuario.apache.org/download.html"
+export DOWNLOADURL="https://downloads.apache.org/santuario/c-library/"
+#export DOWNLOADURL="http://www.eu.apache.org/dist/santuario/c-library/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.eu.apache.org/dist/santuario/c-library/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://downloads.apache.org/santuario/c-library/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix building DLL (version <= 2.0.1)
+#patch -ulbf xsec/framework/XSECDefs.hpp << EOF
+#@@ -42,3 +42,14 @@
+#
+#-#if defined (_WIN32)
+#+#if defined (__MINGW32__)
+#+#      include <xsec/framework/XSECW32Config.hpp>
+#+#      define WIN32_LEAN_AND_MEAN
+#+#      include <windows.h>
+#+#    ifdef XSEC_LIBRARY_BUILD
+#+#      define PLATFORM_EXPORT __declspec(dllexport)
+#+#      define PLATFORM_IMPORT __declspec(dllexport)
+#+#    else
+#+#      define PLATFORM_EXPORT __declspec(dllimport)
+#+#      define PLATFORM_IMPORT __declspec(dllimport)
+#+#    endif
+#+#elif defined (_WIN32)
+# #      include <xsec/framework/XSECW32Config.hpp>
+#@@ -94,3 +105,3 @@
+#
+#-#if defined(DLL_EXPORT)
+#+#if defined(DLL_EXPORT) || (defined(__MINGW32__) && defined(XSEC_BUILDING_LIBRARY))
+#   #if defined(XSEC_BUILDING_LIBRARY)
+#EOF
+# fix building DLL in xsec/framework/XSECDefs.hpp (version >= 2.0.2)
+patch -ulbf xsec/framework/XSECDefs.hpp << EOF
+@@ -44,3 +44,3 @@
+ #      include <xsec/framework/XSECW32Config.hpp>
+-#      if defined (_DEBUG) && defined (_XSEC_DO_MEMDEBUG)
++#      if defined (_DEBUG) && defined (_XSEC_DO_MEMDEBUG) && !defined(__MINGW32__)
+ #              define _CRTDBG_MAP_ALLOC
+@@ -94,3 +94,9 @@
+
+-#if defined(DLL_EXPORT)
++#if defined(__MINGW32__) && !defined(STATIC) && !defined(STATIC_XSEC)
++  #if defined(XSEC_BUILDING_LIBRARY)
++    #define XSEC_EXPORT __declspec(dllexport)
++  #else
++    #define XSEC_EXPORT __declspec(dllimport)
++  #endif
++#elif defined(DLL_EXPORT)
+   #if defined(XSEC_BUILDING_LIBRARY)
+EOF
+## fix type conversion issue in xsec/tools/checksig/InteropResolver.cpp (version <= 1.7.3)
+#patch -ulbf xsec/tools/checksig/InteropResolver.cpp << EOF
+#@@ -648 +648 @@
+#-       return false;
+#+       return NULL;
+#EOF
+## fix type conversion issue in xsec/enc/XSECCryptoSymmetricKey.hpp (version <= 1.7.3)
+#patch -ulbf xsec/enc/XSECCryptoSymmetricKey.hpp << EOF
+#@@ -187,3 +187,3 @@
+#                              const unsigned char* tag = NULL,
+#-                             unsigned int taglen = NULL) = 0;
+#+                             unsigned int taglen = 0) = 0;
+#
+#EOF
+## avoid inline assembler in xsec/utils/winutils/XSECBinHTTPURIInputStream.cpp (version <= 1.7.3)
+#patch -ulbf xsec/utils/winutils/XSECBinHTTPURIInputStream.cpp << EOF
+#@@ -79,3 +79,3 @@
+# static void* compareAndSwap(void** toFill, const void* const newValue, const void* const toCompare) {
+#-#if defined _WIN64
+#+#if defined(_WIN64) || defined(__MINGW32__)
+#     return ::InterlockedCompareExchangePointer(toFill, (void*)newValue, (void*)toCompare);
+#EOF
+## fix DLL export symbols in xsec/framework/XSECDefs.hpp (version >= 2.0.2)
+#patch -ulbf xsec/framework/XSECDefs.hpp << EOF
+#@@ -95,3 +95,3 @@
+# #if defined(__MINGW32__)
+#-  #if defined(STATIC) || defined(STATIC_XSEC)
+#+  #if defined(STATIC) || defined(STATIC_XSEC) || (defined(XSEC_BUILDING_LIBRARY) && !defined(DLL_EXPORT))
+#     #define XSEC_EXPORT
+#EOF
+# fix Windows build
+sed -i.bak -e "s?unix\(utils/[^ ]*\)Unix?win\1Win32?g; s?/unixutils?/winutils?g" xsec/Makefile.am
+#sed -i.bak -e "s?unix\(utils/[^ ]*\)Unix?win\1Win32?g; s?/unixutils?/winutils?g" xsec/Makefile.in
+## fix Windows build
+##sed -i.bak -e "s/-Wall//g" configure.ac
+#sed -i.bak -e "s/-Wall//g; s/-DDLL_EXPORT//g" configure
+wl-showstatus configure &&
+ # fix building shared library (DLL)
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-Wattributes -I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-Wno-attributes -I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-fpermissive -I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-openssl --without-nss CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-fpermissive" LDFLAGS="-Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-openssl --without-nss --disable-xkms CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-fpermissive" LDFLAGS="-Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-openssl --without-nss --disable-xkms CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-std=c++11 -fpermissive" LDFLAGS="-Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-openssl --without-nss --disable-xkms CFLAGS="-I$(pwd)/winfix -DXSEC_BUILDING_LIBRARY" CXXFLAGS="-fpermissive -DXSEC_BUILDING_LIBRARY" LDFLAGS="-Wl,-no-undefined" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## don't use WINCAPI to avoid build errors (version <= 2.0.1)
+ #sed -i.bak -e "s/^#define \(XSEC_HAVE_WINCAPI\) 1/#undef \1/" xsec/framework/XSECW32Config.hpp &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####See also: http://mail-archives.apache.org/mod_mbox/santuario-dev/201201.mbox/%3C2C790095645FA0449857F0E7AA2C9D20037BC172@fmbex512.dsto.defence.gov.au%3E
+
+
+

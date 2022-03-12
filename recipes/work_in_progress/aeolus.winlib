@@ -1,0 +1,61 @@
+export NAME="Aeolus"
+export STATUS=
+export URL=http://kokkinizita.linuxaudio.org/linuxaudio/aeolus/
+#export URL=https://github.com/fugalh/aeolus
+export BASENAME=aeolus
+export DESCRIPTION="Aeolus is a synthesised (i.e. not sampled) pipe organ emulator that should be good enough to make an organist enjoy playing it. It is a software synthesiser optimised for this job, with possibly hundreds of controls for each stop, that enable the user to \"voice\" his instrument."
+export CATEGORY=audio
+export TYPE=library
+#export VERSION=0.9.5
+#export VERSIONDATE=20180320
+#export VERSION=0.9.7
+#export VERSIONDATE=20180826
+export VERSION=0.9.9
+export VERSIONDATE=20200620
+####source/audio.cc:249:50: warning: invalid conversion from 'jack_native_thread_t {aka void*}' to 'pthread_t {aka long long unsigned int}' [-fpermissive]
+wl-showstatus --package-version
+export DEPENDANCIES=clthreads,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://kokkinizita.linuxaudio.org/linuxaudio/downloads/index.html"
+#export DOWNLOADURL="https://github.com/fugalh/aeolus/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://kokkinizita.linuxaudio.org/linuxaudio/downloads/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix
+cat > winfix/endian.h << EOF
+#define __LITTLE_ENDIAN 1234
+#define __BYTE_ORDER __LITTLE_ENDIAN
+//#define VERSION "$VERSION"
+//#define LIBDIR "../lib"
+EOF
+# fix source/main.cc
+patch -ulbf source/main.cc << EOF
+@@ -194,2 +194,3 @@
+
++#ifndef _WIN32
+     if (mlockall (MCL_CURRENT | MCL_FUTURE)) fprintf (stderr, "Warning: memory
+lock failed.\n");
+@@ -198,2 +199,5 @@
+     else       sprintf (s, "%s/aeolus_x11.so", LIBDIR);
++#else
++    if (t_opt) sprintf (s, "aeolus_txt.dll");
++#endif
+     so_handle = dlopen (s, RTLD_NOW);
+EOF
+sed -e "s/\.so/.dll/g" source/Makefile > source/Makefile.mingw
+wl-showstatus build &&
+ make -Csource -fMakefile.mingw CPPFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32 -DVERSION=\\\"$VERSION\\\" -DLIBDIR=\\\"../lib\\\"" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

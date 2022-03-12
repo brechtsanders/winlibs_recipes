@@ -1,0 +1,90 @@
+export NAME="UNIXem"
+export STATUS=
+export URL=https://github.com/synesissoftware/UNIXem
+export BASENAME=unixem
+export DESCRIPTION="UNIXem is a small and simple library that provides emulation of several popular Unix API functions on the Windows platform. Its primary purpose is to assist Windows programmers who are porting to Unix or are writing multi-platform code. API functions include opendir/readdir/closedir, glob/globfree, readv/writev, pathconf/realpath, mmap/munmap/msync, dlopen/dlclose/dlsym/dlerror, gettimeofday, and getpagesize."
+export CATEGORY=portability
+export TYPE=library
+#export VERSION=1.9.1
+#export VERSIONDATE=20180811
+#export VERSION=1.11.4
+#export VERSIONDATE=20191009
+#export VERSION=1.12.3
+#export VERSIONDATE=20191014
+#export VERSION=0.12.5
+#export VERSIONDATE=20200719
+export VERSION=0.12.6
+export VERSIONDATE=20201217
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/synesissoftware/UNIXem/releases"
+export DOWNLOADURL="https://github.com/synesissoftware/UNIXem/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/synesissoftware/UNIXem/archive/UNIXem-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/synesissoftware/UNIXem/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/synesissoftware/UNIXem/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/UNIXem-$VERSION.tar.gz
+#cd UNIXem-UNIXem-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd UNIXem-$VERSION
+# fix _get_osfhandle issue in src/mmap.c
+patch -ulbf src/mmap.c << EOF
+@@ -68,2 +68,4 @@
+ UNIXEM_STGCLS_IMP long __cdecl _get_osfhandle(int __handle);
++#elif defined(__MINGW32__)
++_CRTIMP intptr_t _get_osfhandle(int __handle);
+ #elif defined(__GNUC__)
+EOF
+# fix conflicting definition of unixem_internal_FILETIMEToUNIXTime and missing FILETIME in src/time.c (version >= 1.11.4)
+patch -ulbf src/time.c << EOF
+@@ -67,2 +67,3 @@
+
++#include <winbase.h>
+ #include <windows.h>
+@@ -118,3 +119,3 @@
+ unixem_internal_FILETIMEToUNIXTime(
+-    FILETIME const* ft
++    void const* ft
+ ,   long*           microseconds
+@@ -128,5 +129,5 @@
+
+-    i = ft->dwHighDateTime;
++    i = ((FILETIME*)ft)->dwHighDateTime;
+     i <<= 32;
+-    i |= ft->dwLowDateTime;
++    i |= ((FILETIME*)ft)->dwLowDateTime;
+
+EOF
+# fix include/sys/time.h (version >= 0.12.6)
+echo "#include_next <sys/time.h>" >> include/sys/time.h
+# fix for building with MinGW
+sed -e "s/^\(COMP_TAG\s*=\s*\).*$/\1mingw/; s/^\(PROJ_BASE_DIR\s*=\s*\).*$/\1./; s/^\(PROJ_OBJ_DIR\s*=\s*\).*$/\1obj/; s/^\(PROJ_LIB_DIR\)\(\s*=\s*.*\)$/\1\2\nB64_LIB_DIR\2/; s/^\(CC\s*=\s*\).*$/\1gcc -Wno-error=int-to-pointer-cast/; s/^\(RM\s*=\s*\).*$/\1rm -f/; s/^\(CP\s*=\s*\).*$/\1cp -f/; s?\\\\\(.\)?/\1?g; s?@-if.*mkdir?mkdir -p?; s/\.lib/.a/g" build/gcc34/makefile > makefile
+mkdir -p obj
+wl-showstatus build &&
+ #( make -fmakefile || make -fmakefile CC_F_WARNING_MAX= ) &&
+ make -fmakefile CC_F_WARNING_ERR= CPPC_F_WARNING_ERR= CC_F_WARNING_MAX= &&
+ # manually build shared library (version >= 0.12.6)
+ ( echo "EXPORTS" && nm -f posix --defined-only -p lib/unixem.core.mingw.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > libunixem.def &&
+ gcc -shared -s -mwindows -def libunixem.def -o unixem.dll lib/unixem.core.mingw.a -Wl,--out-implib,libunixem.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/unixemulation $INSTALLPREFIX/lib &&
+ cp -rf include/* $INSTALLPREFIX/include/unixemulation/ &&
+ #cp -f lib/unixem.mingw.a $INSTALLPREFIX/lib/libunixem.a &&
+ cp -f lib/unixem.core.mingw.a $INSTALLPREFIX/lib/libunixem.a &&
+ mkdir -p $INSTALLPREFIX/bin/ &&
+ cp -f unixem.dll $INSTALLPREFIX/bin/ &&
+ cp -f libunixem.dll.a $INSTALLPREFIX/lib/ &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf UNIXem-UNIXem-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf UNIXem-$VERSION
+####CFLAGS="-I$MINGWPREFIX/include/unixemulation" LDFLAGS="-Wl,--as-needed -lunixem" 
+
+
+

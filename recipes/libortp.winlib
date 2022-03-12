@@ -1,0 +1,385 @@
+#export NAME="ortp"
+#export STATUS=
+#export URL=http://www.linphone.org/index.php/eng/code_review/ortp
+#export BASENAME=libortp
+#export DESCRIPTION="oRTP - a Real-time Transport Protocol (RFC3550) stack."
+#export CATEGORY=audio,communication
+#export TYPE=library
+##export VERSION=0.13.1
+##export VERSION=0.15.0
+##export VERSION=0.16.0
+##export VERSION=0.16.1
+##export VERSION=0.16.2
+##export VERSIONDATE=20100520
+##export VERSION=0.16.3
+##export VERSIONDATE=20101006
+##export VERSION=0.16.4
+##export VERSIONDATE=20110209
+##export VERSION=0.16.5
+##export VERSIONDATE=20110329
+##export VERSION=0.18.0
+##export VERSIONDATE=20111226
+##export VERSION=0.20.0
+##export VERSIONDATE=20120223
+##export VERSION=0.22.0
+##export VERSIONDATE=20130612
+##export VERSION=0.23.0
+##export VERSIONDATE=20140711
+#####src/ortp_srtp.c:309:9: error: 'srtp_policy_t' has no member named 'allow_repeat_tx'
+##export VERSION=0.24.0
+##export VERSIONDATE=20150313
+##export VERSION=0.24.1
+##export VERSIONDATE=20150402
+##export VERSION=0.24.2
+##export VERSIONDATE=20150515
+##export VERSION=0.25.0
+##export VERSIONDATE=20151103
+##export DEPENDANCIES=srtp,pthreads,openssl
+#export VERSION=0.27.0
+#export VERSIONDATE=20161013
+#####configure: error: "Could not find bctoolbox (required dependency)"
+#wl-showstatus --package-version
+#export DEPENDANCIES=srtp,pthreads,openssl,bctoolbox
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=LGPL
+##export DOWNLOADURL="http://download.savannah.nongnu.org/releases/linphone/ortp/sources/ ortp-"
+#export DOWNLOADURL="http://download.savannah.gnu.org/releases/linphone/ortp/sources/ ortp-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://download.savannah.nongnu.org/releases/linphone/ortp/sources/ortp-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/linphone/ortp/sources/ortp-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/ortp-$VERSION.tar.gz
+#cd ortp-$VERSION
+### fix for missing getaddrinfo/freeaddrinfo (version <= 0.13.1)
+##mv src/rtpsession_inet.c src/rtpsession_inet.c.bak
+##cat > src/rtpsession_inet.c << EOF
+###if _WIN32_WINNT < 0x0501
+###define _WIN32_WINNT 0x0501
+###endif
+###include <ws2tcpip.h>
+##EOF
+##cat src/rtpsession_inet.c.bak >> src/rtpsession_inet.c
+### fix for missing getaddrinfo/freeaddrinfo and type errors (version 0.16.0)
+##patch -ulbf src/rtpsession_inet.c << EOF
+##--- src/rtpsession_inet.c  Wed Apr  8 11:39:50 2009
+##+++ src/rtpsession_inet.c  Mon Jul  6 20:13:42 2009
+##@@ -19,2 +19,3 @@
+## 
+##+#define _WIN32_WINNT 0x0501
+## #include "ortp/ortp.h"
+##@@ -723,6 +724,6 @@
+##                
+##-           while (session->rtp.tr->t_recvfrom(session->rtp.tr,trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
+##+           while (session->rtp.tr->t_recvfrom(session->rtp.tr,(void*)trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
+## 
+##            if (session->rtcp.tr)
+##-             while (session->rtcp.tr->t_recvfrom(session->rtcp.tr,trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
+##+             while (session->rtcp.tr->t_recvfrom(session->rtcp.tr,(void*)trashmp,0,(struct sockaddr *)&from,&fromlen)>0){};
+##                freemsg(trashmp);
+##@@ -732,6 +733,6 @@
+##        if (session->rtp.socket>=0){
+##-               while (recvfrom(session->rtp.socket,trash,sizeof(trash),0,(struct sockaddr *)&from,&fromlen)>0){};
+##+               while (recvfrom(session->rtp.socket,(void*)trash,sizeof(trash),0,(struct sockaddr *)&from,&fromlen)>0){};
+##        }
+##        if (session->rtcp.socket>=0){
+##-               while (recvfrom(session->rtcp.socket,trash,sizeof(trash),0,(struct sockaddr*)&from,&fromlen)>0){};
+##+               while (recvfrom(session->rtcp.socket,(void*)trash,sizeof(trash),0,(struct sockaddr*)&from,&fromlen)>0){};
+##        }
+##@@ -813,3 +814,3 @@
+##                        msgpullup(m,-1);
+##-               error = sendto (sockfd, m->b_rptr, (int) (m->b_wptr - m->b_rptr),
+##+               error = sendto (sockfd, (void*)m->b_rptr, (int) (m->b_wptr - m->b_rptr),
+##                         0,destaddr,destlen);
+##@@ -857,3 +858,3 @@
+##                        }
+##-                       error = sendto (sockfd, m->b_rptr,
+##+                       error = sendto (sockfd, (void*)m->b_rptr,
+##                        (int) (m->b_wptr - m->b_rptr), 0,
+##@@ -898,3 +899,3 @@
+##                if (sock_connected){
+##-                       error=recv(sockfd,mp->b_wptr,bufsz,0);
+##+                       error=recv(sockfd,(void*)mp->b_wptr,bufsz,0);
+##                }else if (rtp_session_using_transport(session, rtp)) 
+##@@ -903,3 +904,3 @@
+##                                  &addrlen);
+##-               else error = recvfrom(sockfd, mp->b_wptr,
+##+               else error = recvfrom(sockfd, (void*)mp->b_wptr,
+##                                  bufsz, 0,
+##@@ -979,3 +980,3 @@
+##                if (sock_connected){
+##-                       error=recv(session->rtcp.socket,mp->b_wptr,RTCP_MAX_RECV_BUFSIZE,0);
+##+                       error=recv(session->rtcp.socket,(void*)mp->b_wptr,RTCP_MAX_RECV_BUFSIZE,0);
+##                }else {
+##@@ -988,3 +989,3 @@
+##                        else
+##-                         error=recvfrom (session->rtcp.socket, mp->b_wptr,
+##+                         error=recvfrom (session->rtcp.socket, (void*)mp->b_wptr,
+##                                  RTCP_MAX_RECV_BUFSIZE, 0,
+##EOF
+### fix include/ortp/stun_udp.h to avoid redefinition of snprintf and WSANOTINITIALISED (version <= 0.16.0)
+##patch -ulbf include/ortp/stun_udp.h << EOF
+##--- include/ortp/stun_udp.h  Mon Jan 12 16:25:52 2009
+##+++ include/ortp/stun_udp.h  Thu Apr 30 09:48:16 2009
+##@@ -47,3 +47,5 @@
+## #if defined(WIN32) || defined(_WIN32_WCE)
+##+#if !defined(snprintf)
+## #define snprintf _snprintf
+##+#endif
+## 
+##@@ -96,2 +98,3 @@
+## typedef int Socket;
+##+#if !defined(__MINGW32__)
+## #define INVALID_SOCKET -1
+##@@ -102,2 +105,3 @@
+## #define WSANOTINITIALISED  EPROTONOSUPPORT
+##+#endif
+##EOF
+### fix missing allow_repeat_tx in src/ortp_srtp.c (version = 0.23.0)
+##patch -ulbf src/ortp_srtp.c << EOF
+##--- src/ortp_srtp.c  2013-08-08 12:59:56.000000000 +0200
+##+++ src/ortp_srtp.c  2014-07-11 08:15:54.000000000 +0200
+##@@ -308,3 +308,3 @@
+##
+##-               policy.allow_repeat_tx=1; /*this is necessary to allow telephone-event to be sent 3 times for end of dtmf packet.*/
+##+               //policy.allow_repeat_tx=1; /*this is necessary to allow telephone-event to be sent 3 times for end of dtmf packet.*/
+##                outgoing_ssrc.type = ssrc_specific;
+##EOF
+## fix missing brackets in src/rtpsession_inet.c (version >= 0.27.0)
+#patch -ulbf src/rtpsession_inet.c << EOF
+#@@ -143,3 +143,3 @@
+#                case AF_INET6:
+#-                       if IN6_IS_ADDR_MULTICAST(&(((struct sockaddr_in6 *) res->ai_addr)->sin6_addr))
+#+                       if (IN6_IS_ADDR_MULTICAST(&(((struct sockaddr_in6 *) res->ai_addr)->sin6_addr)))
+#                        {
+#EOF
+### fix for building .DLL files
+##mv configure.ac configure.ac.bak
+##echo "AC_LIBTOOL_WIN32_DLL" > configure.ac
+##cat configure.ac.bak >> configure.ac
+##autogen.sh
+#####configure.ac:1: error: m4_defn: undefined macro: _m4_divert_diversion
+### don't make tests (src/tests/rtpsend.c won't compile because of missing nanosleep) (version <= 0.23.0)
+##cat > src/tests/Makefile.in << EOF
+##all:
+##depend:
+##install:
+##install-strip:
+##EOF
+### fix building DLLs on 64-bit
+##if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+## autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+##fi
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-debug=no --disable-strict &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --enable-debug=no --disable-tests --disable-strict &&
+# wl-showstatus build-install &&
+# ## fix building DLLs
+# #mv libtool libtool.bak &&
+# #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ortp-$VERSION
+
+
+
+export NAME="libortp"
+export STATUS=
+export URL=https://github.com/BelledonneCommunications/ortp
+export BASENAME=libortp
+export DESCRIPTION="oRTP is a C library implementing the RTP protocol (rfc3550)."
+export CATEGORY=audio,communication
+export TYPE=library
+#export VERSION=4.4.24
+#export VERSIONDATE=20210127
+#export VERSION=4.4.25
+#export VERSIONDATE=20210204
+#export VERSION=4.4.26
+#export VERSIONDATE=20210204
+#export VERSION=4.4.27
+#export VERSIONDATE=20210206
+#export VERSION=4.4.28
+#export VERSIONDATE=20210212
+#export VERSION=4.4.29
+#export VERSIONDATE=20210216
+#export VERSION=4.4.31
+#export VERSIONDATE=20210218
+#export VERSION=4.4.32
+#export VERSIONDATE=20210220
+#export VERSION=4.4.33
+#export VERSIONDATE=20210304
+#export VERSION=4.4.34
+#export VERSIONDATE=20210309
+#export VERSION=4.5.0
+#export VERSIONDATE=20210329
+#export VERSION=4.5.1
+#export VERSIONDATE=20210401
+#export VERSION=4.5.3
+#export VERSIONDATE=20210415
+#export VERSION=4.5.7
+#export VERSIONDATE=20210421
+#export VERSION=4.5.10
+#export VERSIONDATE=20210427
+#export VERSION=4.5.13
+#export VERSIONDATE=20210506
+#export VERSION=4.5.14
+#export VERSIONDATE=20210511
+#export VERSION=4.5.15
+#export VERSIONDATE=20210513
+#export VERSION=4.5.20
+#export VERSIONDATE=20210615
+#export VERSION=4.5.22
+#export VERSIONDATE=20210625
+#export VERSION=5.0.0
+#export VERSIONDATE=20210708
+#export VERSION=5.0.5
+#export VERSIONDATE=20210811
+#export VERSION=5.0.8
+#export VERSIONDATE=20210819
+#export VERSION=5.0.11
+#export VERSIONDATE=20210827
+#export VERSION=5.0.13
+#export VERSIONDATE=20210831
+#export VERSION=5.0.16
+#export VERSIONDATE=20210902
+#export VERSION=5.0.18
+#export VERSIONDATE=20210906
+#export VERSION=5.0.22
+#export VERSIONDATE=20210910
+#export VERSION=5.0.23
+#export VERSIONDATE=20210917
+#export VERSION=5.0.24
+#export VERSIONDATE=20210922
+#export VERSION=5.0.26
+#export VERSIONDATE=20210925
+#export VERSION=5.0.27
+#export VERSIONDATE=20210928
+#export VERSION=5.0.28
+#export VERSIONDATE=20210930
+#export VERSION=5.0.32
+#export VERSIONDATE=20211005
+#export VERSION=5.0.35
+#export VERSIONDATE=20211015
+#export VERSION=5.0.37
+#export VERSIONDATE=20211022
+#export VERSION=5.0.66
+#export VERSIONDATE=20220122
+#export VERSION=5.0.67
+#export VERSIONDATE=20220201
+#export VERSION=5.0.70
+#export VERSIONDATE=20220216
+#export VERSION=5.0.71
+#export VERSIONDATE=20220309
+#export VERSION=5.1.0
+#export VERSIONDATE=20220209
+#export VERSION=5.1.2
+#export VERSIONDATE=20220216
+export VERSION=5.1.3
+export VERSIONDATE=20220225
+wl-showstatus --package-version
+export DEPENDANCIES=bctoolbox
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/BelledonneCommunications/ortp/releases"
+export DOWNLOADURL="https://github.com/BelledonneCommunications/ortp/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/BelledonneCommunications/ortp/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/BelledonneCommunications/ortp/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd ortp-$VERSION
+# fix src/rtpsession_inet.c (version >= 4.4.24)
+patch -ulbf src/rtpsession_inet.c << EOF
+@@ -24,2 +24,6 @@
+
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
+ #if __APPLE__
+@@ -40,3 +44,3 @@
+ #undef ExternC
+-#ifdef ORTP_WINDOWS_DESKTOP
++#if defined(ORTP_WINDOWS_DESKTOP) &&  defined(OS_NON_ADAPTIVE_FLOW)
+ #include <QOS2.h>
+@@ -152,3 +156,3 @@
+                case AF_INET6:
+-                       if IN6_IS_ADDR_MULTICAST(&(((struct sockaddr_in6 *) res->ai_addr)->sin6_addr))
++                       if (IN6_IS_ADDR_MULTICAST(&(((struct sockaddr_in6 *) res->ai_addr)->sin6_addr)))
+                        {
+@@ -663,3 +667,3 @@
+
+-#if (_WIN32_WINNT >= 0x0600) && defined(ORTP_WINDOWS_DESKTOP)
++#if (_WIN32_WINNT >= 0x0600) && defined(ORTP_WINDOWS_DESKTOP) && defined(OS_NON_ADAPTIVE_FLOW)
+ #ifndef ENABLE_MICROSOFT_STORE_APP
+@@ -737,3 +741,3 @@
+                }
+-#if (_WIN32_WINNT >= 0x0600) && defined(ORTP_WINDOWS_DESKTOP)
++#if (_WIN32_WINNT >= 0x0600) && defined(ORTP_WINDOWS_DESKTOP) && defined(OS_NON_ADAPTIVE_FLOW)
+ #ifndef ENABLE_MICROSOFT_STORE_APP
+@@ -1059,3 +1063,3 @@
+                } else {
+-                       PIN6_PKTINFO pPktInfo = NULL;
++                       IN6_PKTINFO* pPktInfo = NULL;
+                        cmsg->cmsg_len = WSA_CMSG_LEN(sizeof(IN6_PKTINFO));
+@@ -1063,3 +1067,3 @@
+                        cmsg->cmsg_type = IPV6_PKTINFO;
+-                       pPktInfo = (PIN6_PKTINFO)WSA_CMSG_DATA(cmsg);
++                       pPktInfo = (IN6_PKTINFO*)WSA_CMSG_DATA(cmsg);
+                        pPktInfo->ipi6_addr = m->recv_addr.addr.ipi6_addr;
+@@ -1072,3 +1076,3 @@
+        if (m->recv_addr.family == AF_INET || useV4==TRUE) { // Add IPV4 to the message control
+-               PIN_PKTINFO pPktInfo = NULL;
++               IN_PKTINFO* pPktInfo = NULL;
+                cmsg->cmsg_len = WSA_CMSG_LEN(sizeof(IN_PKTINFO));
+@@ -1076,3 +1080,3 @@
+                cmsg->cmsg_type = IP_PKTINFO;
+-               pPktInfo = (PIN_PKTINFO)WSA_CMSG_DATA(cmsg);
++               pPktInfo = (IN_PKTINFO*)WSA_CMSG_DATA(cmsg);
+                if (useV4 == TRUE)
+EOF
+# fix missing inet_pton in src/port.c (version >= 4.4.24)
+mv src/port.c src/port.c.bak
+cat > src/port.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat src/port.c.bak >> src/port.c
+# fix missing QOS_FLOWID/QOS_NON_ADAPTIVE_FLOW in src/rtpsession.c (version >= 5.0.5)
+mv src/rtpsession.c src/rtpsession.c.bak
+cat > src/rtpsession.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <windows.h>
+typedef UINT32 QOS_FLOWID, *PQOS_FLOWID;
+#define QOS_NON_ADAPTIVE_FLOW 0x00000002
+EOF
+cat src/rtpsession.c.bak >> src/rtpsession.c
+# fix src/CMakeLists.txt (version >= 4.4.24)
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -127,3 +127,3 @@
+        endif()
+-       if(WIN32)
++       if(MSVC)
+                target_compile_options(ortp PRIVATE "/DELAYLOAD:Qwave.dll")
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_DOC:BOOL=OFF -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ortp-$VERSION
+
+
+

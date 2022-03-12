@@ -1,0 +1,118 @@
+export NAME="OpenAL"
+export STATUS=
+#export URL=http://connect.creativelabs.com/openal/
+export URL=https://github.com/kcat/openal-soft
+export BASENAME=openal
+export DESCRIPTION="OpenAL is a cross-platform 3D audio API appropriate for use with gaming applications and many other types of audio applications."
+export CATEGORY=audio,hardware
+export TYPE=library
+#export VERSION=1.12.854
+#export VERSIONDATE=20101014
+#export VERSION=1.13
+#export VERSIONDATE=20110301
+#export DEPENDANCIES=portaudio
+#export VERSION=1.17.2
+#export VERSIONDATE=20170530
+#export VERSION=1.18.0
+#export VERSIONDATE=20170605
+#export VERSION=1.18.1
+#export VERSIONDATE=20170816
+#export VERSION=1.18.2
+#export VERSIONDATE=20170925
+#export VERSION=1.19.0
+#export VERSIONDATE=20180907
+#export VERSION=1.19.1
+#export VERSIONDATE=20181013
+#export DEPENDANCIES=portaudio
+#export OPTIONALDEPENDANCIES=pulseaudio,sdl2
+#export BUILDDEPENDANCIES=cmake,pexports
+#export VERSION=1.20.0
+#export VERSIONDATE=20191129
+#export VERSION=1.20.1
+#export VERSIONDATE=20200124
+#export VERSION=1.21.0
+#export VERSIONDATE=20201104
+export VERSION=1.21.1
+export VERSIONDATE=20210205
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=qt,sdl2,portaudio
+export BUILDDEPENDANCIES=cmake,pexports
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://connect.creativelabs.com/openal/Downloads/Forms/AllItems.aspx openal-soft- .tbz2"
+#export DOWNLOADURL="https://github.com/kcat/openal-soft/releases openal-soft-"
+export DOWNLOADURL="https://github.com/kcat/openal-soft/tags openal-soft-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://connect.creativelabs.com/openal/Downloads/openal-soft-$VERSION.tbz2
+#export DOWNLOADSOURCEURL=https://github.com/kcat/openal-soft/archive/openal-soft-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/kcat/openal-soft/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/kcat/openal-soft/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/openal-soft-$VERSION.tbz2
+#tar xfz $TARBALLDIR/$BASENAME/openal-soft-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd openal-soft*$VERSION
+# fix missing poll.h and poll() in alc/backends/pulseaudio.cpp (version >= 1.20.1)
+patch -ulbf alc/backends/pulseaudio.cpp << EOF
+@@ -25,3 +25,13 @@
+
++#ifdef WIN32
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++#undef _WIN32_WINNT
++#define _WIN32_WINNT 0x0600
++#endif
++#include <winsock2.h>
++//#include <pthread.h>
++#define poll WSAPoll
++#else
+ #include <poll.h>
++#endif
+ #include <cstring>
+EOF
+# fix conflicting definitions of __cpuid/__cpuidex in core/cpu_caps.cpp (version >= 1.21.1)
+patch -ulbf core/cpu_caps.cpp << EOF
+@@ -17,3 +17,7 @@
+ #ifdef HAVE_CPUID_H
++#define __cpuid DUMMY__cpuid
++#define __cpuidex DUMMY__cpuidex
+ #include <cpuid.h>
++#undef DUMMY__cpuid
++#undef DUMMY__cpuidex
+ #endif
+EOF
+## fix C++ issue with missing include of limits
+#if echo $CXX|grep -q clang++; then
+# for F in $(find -name '*.cpp'); do
+#  mv $F $F.bak1 &&
+#  echo "#include <limits>" > $F &&
+#  cat $F.bak1 >> $F
+# done
+#fi
+# fix -D_WIN32_WINNT=0x0502 issue in CMakeLists.txt
+sed -i.bak -e "s/\(CHECK_INCLUDE_FILES.*\)-D_WIN32_WINNT=0x0502/\1/" CMakeLists.txt
+## disable -Werror in CMakeLists.txt
+#sed -i.bak2 -e "s/-Werror//" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORTAUDIO:BOOL=ON -S. -Bbuild_win &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DALSOFT_BACKEND_WINMM:BOOL=ON -DALSOFT_REQUIRE_WINMM:BOOL=ON -DALSOFT_REQUIRE_WASAPI:BOOL=ON -DALSOFT_BACKEND_PORTAUDIO:BOOL=ON -DALSOFT_BACKEND_PULSEAUDIO:BOOL=OFF -DALSOFT_EXAMPLES:BOOL=OFF -DALSOFT_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DALSOFT_BACKEND_WINMM:BOOL=OFF -DALSOFT_REQUIRE_WINMM:BOOL=OFF -DALSOFT_REQUIRE_WASAPI:BOOL=ON -DALSOFT_BACKEND_PORTAUDIO:BOOL=ON -DALSOFT_BACKEND_PULSEAUDIO:BOOL=ON -DALSOFT_BACKEND_DSOUND:BOOL=OFF -DALSOFT_REQUIRE_DSOUND:BOOL=OFF -DALSOFT_EXAMPLES:BOOL=OFF -DALSOFT_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DALSOFT_BACKEND_WINMM:BOOL=ON -DALSOFT_REQUIRE_WINMM:BOOL=ON -DALSOFT_REQUIRE_WASAPI:BOOL=ON -DALSOFT_BACKEND_PORTAUDIO:BOOL=ON -DALSOFT_BACKEND_PULSEAUDIO:BOOL=OFF -DDSOUND_LIBRARY:STRING=-ldsound DSOUND_INCLUDE_DIR:PATH= -DALSOFT_EXAMPLES:BOOL=OFF -DALSOFT_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ # fix problem linking to correct windows library
+ sed -i.bak -e "s?C:/Windows/System32/\([^ ]*\)\.dll?-l\1?" build_win/CMakeFiles/OpenAL.dir/linklibs.rsp &&
+ # ling with -lws2_32 for WSAPoll() (version >= 1.20.1)
+ echo "-Wl,--as-needed -lws2_32" >> build_win/CMakeFiles/OpenAL.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ #( make -Cbuild_win install/strip || ( make -Cbuild_win install && strip $INSTALLPREFIX/*.dll $INSTALLPREFIX/*.exe ) ) &&
+ ( PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install/strip || ( PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install && strip $INSTALLPREFIX/*.dll $INSTALLPREFIX/*.exe ) ) &&
+ pexports -o $INSTALLPREFIX/bin/OpenAL32.dll > libopenal.def && 
+ dlltool --def libopenal.def --dllname $INSTALLPREFIX/bin/OpenAL32.dll --output-lib $INSTALLPREFIX/lib/libopenal.dll.a && 
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf openal-soft*$VERSION
+####PATH=$MINGWPREFIX/qt/bin:$PATH QT_PLUGIN_PATH=$MINGWPREFIX/qt/plugins alsoft-config.exe
+
+
+

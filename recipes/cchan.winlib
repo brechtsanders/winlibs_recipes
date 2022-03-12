@@ -1,0 +1,46 @@
+export NAME="cchan"
+export STATUS=
+export URL=http://repo.hu/projects/cchan/
+export BASENAME=cchan
+export DESCRIPTION="This is a small library that implements a \"channel\" construct for inter-thread communication in C programs."
+export CATEGORY=system
+export TYPE=library
+export VERSION=0.1
+export VERSIONDATE=20160208
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,sdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=README
+export LICENSETYPE="Public Domain"
+export DOWNLOADURL="http://repo.hu/projects/cchan/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://repo.hu/projects/cchan/releases/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing random in test2.c
+mv test2.c test2.c.bak
+sed -e "s/\(random(\)/rand(/g" test2.c.bak > test2.c
+mv test2sdl.c test2sdl.c.bak
+sed -e "s/\(random(\)/rand(/g" test2sdl.c.bak > test2sdl.c
+mv Makefile Makefile.bak
+sed -e "s/-pthread/-lpthread/" Makefile.bak > Makefile
+wl-showstatus build &&
+ ( make CC=gcc || make cchan_sdl.a cchan_pthread.a CC=gcc ) &&
+ echo "EXPORTS" > cchan.def &&
+ sed -ne "s/^.*\(cchan_.*\)(.*/\1/p" cchan.h >> cchan.def &&
+ gcc -shared -s -mwindows -def cchan.def -o cchan_pthread.dll -Wl,--out-implib,libcchan_pthread.dll.a cchan_pthread.a -Wl,--as-needed $(if ! gcc --version|grep -q posix; then echo "-lpthreadGC2"; fi) &&
+ gcc -shared -s -mwindows -def cchan.def -o cchan_sdl.dll -Wl,--out-implib,libcchan_sdl.dll.a cchan_sdl.a -Wl,--as-needed -lSDL &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

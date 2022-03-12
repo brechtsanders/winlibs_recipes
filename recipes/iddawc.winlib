@@ -1,0 +1,92 @@
+export NAME="iddawc"
+export STATUS=
+export URL=https://babelouest.github.io/iddawc/
+#export URL=https://github.com/babelouest/iddawc
+export BASENAME=iddawc
+export DESCRIPTION="OAuth2 and OIDC client library"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.9.5
+#export VERSIONDATE=20200607
+#export VERSION=0.9.6
+#export VERSIONDATE=20200717
+#export VERSION=0.9.7
+#export VERSIONDATE=20201015
+#export VERSION=0.9.8
+#export VERSIONDATE=20210110
+#export VERSION=0.9.9
+#export VERSIONDATE=20210404
+#export VERSION=1.0.0
+#export VERSIONDATE=20210501
+#export VERSION=1.0.1
+#export VERSIONDATE=20210922
+#export VERSION=1.1.0
+#export VERSIONDATE=20211030
+export VERSION=1.1.1
+export VERSIONDATE=20211119
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libjansson,gnutls,libnettle,orcania,ulfius,yder,rhonabwy
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/babelouest/iddawc/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/babelouest/iddawc/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing uint in include/iddawc.h and src/iddawc.c
+sed -i.bak -e "s/uint/unsigned int/g" include/iddawc.h src/iddawc.c
+# fix missing R_KEY_TYPE_ECDSA in src/iddawc.c
+sed -i.bak2 -e "s/R_KEY_TYPE_ECDSA/R_KEY_TYPE_EC/g" src/iddawc.c
+# fix missing F_OK in tools/idwcc/static_compressed_inmemory_website_callback.c (version >= 1.0.0)
+mv tools/idwcc/static_compressed_inmemory_website_callback.c tools/idwcc/static_compressed_inmemory_website_callback.c.bak &&
+echo "#include <io.h>" > tools/idwcc/static_compressed_inmemory_website_callback.c &&
+cat tools/idwcc/static_compressed_inmemory_website_callback.c.bak >> tools/idwcc/static_compressed_inmemory_website_callback.c
+# fix missing htons/aton in tools/idwcc/idwcc.c (version >= 1.0.0)
+patch -ulbf tools/idwcc/idwcc.c << EOF
+@@ -26,4 +26,9 @@
+ #include <ctype.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))
++#else
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
++#endif
+ #include <orcania.h>
+EOF
+# fix missing uint in tools/idwcc/idwcc.c (version >= 1.1.0)
+sed -i.bak -e "s/\buint\b/unsigned int/" tools/idwcc/idwcc.c
+# remove compiler flags -Wall/-Werror (version >= 1.0.0)
+sed -i.bak -e "s/-Wall -Werror//" CMakeLists.txt
+# remove compiler flags -Wall/-Werror (version >= 1.0.1)
+sed -i.bak2 -e "s/^\s*COMPILE_OPTIONS -Wextra\s*$//" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja --trace-expand --debug-find --trace-redirect=output-trace.txt -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DDOWNLOAD_DEPENDENCIES:BOOL=OFF -DBUILD_IDDAWC_DOCUMENTATION:BOOL=OFF -DBUILD_RHONABWY_DOCUMENTATION:BOOL=OFF -DBUILD_IDDAWC_TESTING:BOOL=OFF -DBUILD_RHONABWY_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja --trace-expand --debug-find --trace-redirect=output-trace.txt -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DDOWNLOAD_DEPENDENCIES:BOOL=OFF -DSEARCH_ORCANIA:BOOL=OFF -DSEARCH_ORCANIA_I:BOOL=ON -DSEARCH_ORCANIA_R:BOOL=ON -DSEARCH_ORCANIA_U:BOOL=OFF -DSEARCH_RHONABWY_I:BOOL=ON -DSEARCH_ULFIUS_I:BOOL=ON -DSEARCH_ULFIUS_R:BOOL=ON -DSEARCH_YDER:BOOL=ON -DSEARCH_YDER_I:BOOL=ON -DSEARCH_YDER_R:BOOL=ON -DBUILD_IDDAWC_DOCUMENTATION:BOOL=OFF -DBUILD_RHONABWY_DOCUMENTATION:BOOL=OFF -DBUILD_IDDAWC_TESTING:BOOL=OFF -DBUILD_RHONABWY_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ # fix missing dependancies
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ljansson -lgnutls/" build_win/build.ninja &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -ljansson -lgnutls/" build_win/build.ninja &&
+ wl-showstatus build &&
+ ( ninja -Cbuild_win || (
+  # fix incorrect size calculation (version >= 1.1.1)
+  sed -i.bak -e "s/\(cert_x509_data_len = \)\(cert_x509_len\)\(\*sizeof\)/\1sizeof(\2)\3/" build_win/rhonabwy-src/src/jwk.c &&
+  # fix undefined type uint (version >= 1.1.1)
+  sed -i.bak -e "s/\buint\b/unsigned int/g" build_win/rhonabwy-src/src/jwe.c build_win/rhonabwy-src/src/jws.c build_win/rhonabwy-src/src/jwt.c &&
+  # fix invalid %zu printf format (version >= 1.1.1)
+  sed -i.bak -e "s/\(printf([^\"]*\"[^\"%]*\)%zu\([^\"%]*\)%zu\([^\"%]*\", *\)\([^,)]*\)\(, *\)\([^,)]*\)\()\)/\1%lu\2%lu\3(unsigned long)\4\5(unsigned long)\6\7/" build_win/rhonabwy-src/tools/rnbyc/rnbyc.c &&
+  ninja -Cbuild_win
+ )) &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ cp -u build_win/libiddawc.a $INSTALLPREFIX/lib &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,155 @@
+export NAME="LWAN"
+export STATUS=
+#export URL=https://github.com/lpereira/lwan
+export URL=http://lwan.ws/
+export BASENAME=lwan
+export DESCRIPTION="Experimental, scalable, high performance HTTP server"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20160209
+#export VERSION=0.1
+#export VERSIONDATE=20171211
+#export VERSION=0.2
+#export VERSIONDATE=20190119
+#export VERSION=0.3
+#export VERSIONDATE=20200128
+export VERSION=0.4
+export VERSIONDATE=20211002
+####usr/include/libucontext/bits.h:6:10: fatal error: ucontext.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=lua,zopfli,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/lpereira/lwan/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/lpereira/lwan/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/lpereira/lwan/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing alloca.h in src/lib/missing/string.h
+patch -ulbf src/lib/missing/string.h << EOF
+@@ -44,4 +44,8 @@
+ #undef NEED_ALLOCA_H
++#ifdef _WIN32
++#include <malloc.h>
++#else
+ #include <alloca.h>
+ #endif
++#endif
+
+EOF
+# fix missing netinet/in.h in src/lib/lwan.h
+patch -ulbf src/lib/lwan.h << EOF
+@@ -29,3 +29,8 @@
+ #include <string.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <netinet/in.h>
++#endif
+
+EOF
+# fix src/bin/tools/bin2hex.c (version >= 0.4)
+patch -ulbf src/bin/tools/bin2hex.c << EOF
+@@ -32,3 +32,7 @@
+ {
++#ifdef O_CLOEXEC
+     int fd = open(path, O_RDONLY | O_CLOEXEC);
++#else
++    int fd = open(path, O_RDONLY);
++#endif
+     struct stat st;
+EOF
+# fix src/lib/lwan-config.c (version >= 0.4)
+patch -ulbf src/lib/lwan-config.c << EOF
+@@ -774,3 +774,7 @@
+
++#ifdef O_CLOEXEC
+     fd = open(path, O_RDONLY | O_CLOEXEC);
++#else
++    fd = open(path, O_RDONLY);
++#endif
+     if (fd < 0) {
+EOF
+# fix src/lib/missing/sys/socket.h (version >= 0.4)
+patch -ulbf src/lib/missing/sys/socket.h << EOF
+@@ -20,3 +20,8 @@
+
++#ifdef _WIN32
++#include_next <winsock2.h>
++#include_next <ws2tcpip.h>
++#else
+ #include_next <sys/socket.h>
++#endif
+
+EOF
+# fix src/lib/missing.c (version >= 0.4)
+patch -ulbf src/lib/missing.c << EOF
+@@ -33,2 +33,6 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#endif
+
+@@ -97,2 +101,3 @@
+     }
++#ifdef O_CLOEXEC
+     if (flags & SOCK_CLOEXEC) {
+@@ -101,2 +106,3 @@
+     }
++#endif
+     if (flags) {
+@@ -457,4 +463,6 @@
+
++#ifdef O_CLOEXEC
+     if (flags & O_CLOEXEC)
+         fl |= FD_CLOEXEC;
++#endif
+
+@@ -617,2 +625,11 @@
+ {
++#ifdef _WIN32
++    HCRYPTPROV rndprov;
++    ssize_t total_read = (ssize_t)buffer_len;
++    if (!CryptAcquireContext(&rndprov, NULL, NULL, PROV_RSA_FULL, CRYPT_SILENT))
++       buffer_len = 0;
++    else if (!CryptGenRandom(rndprov, (DWORD)buffer_len, buffer))
++       buffer_len = 0;
++    CryptReleaseContext(rndprov, 0);
++#else
+     int fd;
+@@ -627,2 +644,3 @@
+     close(fd);
++#endif
+
+EOF
+# fix CMakeLists.txt (version >= 0.4)
+patch -ulbf CMakeLists.txt << EOF
+@@ -301,3 +301,3 @@
+
+-if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^i[3456]86|x86_64")
++if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^i[3456]86|x86_64" AND NOT WIN32)
+        set(HAVE_LIBUCONTEXT 1)
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SYSLOG:BOOL=OFF -DPYTHON_EXECUTABLE=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ CC=gcc ninja -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

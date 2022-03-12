@@ -1,0 +1,81 @@
+export NAME="Primer3"
+export STATUS=
+export URL=http://primer3.org/
+#export URL=https://github.com/primer3-org/primer3
+export BASENAME=primer3
+export DESCRIPTION="Primer3 is a widely used program for designing PCR primers (PCR = \"Polymerase Chain Reaction\"). PCR is an essential and ubiquitous tool in genetics and molecular biology. Primer3 can also design hybridization probes and sequencing primers."
+export CATEGORY=science
+export TYPE=library
+#export VERSION=2.5.0
+#export VERSIONDATE=20200604
+#export VERSION=2.6.0
+#export VERSIONDATE=20220109
+export VERSION=2.6.1
+export VERSIONDATE=20220126
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/primer3-org/primer3/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/primer3-org/primer3/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing getline in src/masker.c
+mv src/masker.c src/masker.c.bak
+cat > src/masker.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define GETLINE_BUFLEN 128
+static ssize_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  ssize_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat src/masker.c.bak >> src/masker.c
+wl-showstatus build-install &&
+ make -Csrc install PREFIX=$INSTALLPREFIX CC_OPTS="-I$MINGWPREFIX/include/mman-win32" LDLIBS="-Wl,--as-needed -lmman" &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,82 @@
+export NAME="librepush"
+export STATUS=
+export URL=https://rezolab.rez-gif.supelec.fr/librepush/librepush/blob/master/README.md
+export BASENAME=librepush
+export DESCRIPTION="Librepush is a free implementation of a push server and library for mobile devices. It consists of a server, that is responsible for sending push messages to the device, a mobile service that is responsible for aggregating connections to the server and delivering messages to the correct application, and a library that can be used to communicate with the service and add push notifications to your applications."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20171106
+wl-showstatus --package-version
+export DEPENDANCIES=gnutls,libmicrohttpd,jsoncpp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://rezolab.rez-gif.supelec.fr/librepush/librepush/branches"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://rezolab.rez-gif.supelec.fr/librepush/librepush/repository/archive.tar.bz2
+export DOWNLOADSOURCEURL=https://rezolab.rez-gif.supelec.fr/librepush/librepush/repository/$VERSION/archive.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+mv $TARBALLDIR/$BASENAME/archive.tar.bz2 $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#cd librepush.git
+cd librepush-$VERSION*
+patch -ulbf src/mobileServer.h << EOF
+@@ -24,2 +24,6 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <sys/socket.h>
+@@ -29,2 +33,3 @@
+ #include <arpa/inet.h>
++#endif
+
+EOF
+patch -ulbf src/mobileServer.cpp << EOF
+@@ -55,3 +55,7 @@
+        gnutls_priority_deinit(m_priority_cache);
++#ifdef _WIN32
++       closesocket(m_sock);
++#else
+        close(m_sock);
++#endif
+ }
+@@ -134,3 +138,7 @@
+        if(ret < 0) {
++#ifdef _WIN32
++               closesocket(socket);
++#else
+                close(socket);
++#endif
+                gnutls_deinit(session);
+EOF
+patch -ulbf src/main.cpp << EOF
+@@ -100,2 +100,3 @@
+
++#ifndef _WIN32
+        struct sigaction sigIntHandler;
+@@ -105,2 +106,3 @@
+        sigaction(SIGINT, &sigIntHandler, NULL);
++#endif
+
+EOF
+# don't abort on warnings
+sed -i -e "s/-Wall -Werror//" Makefile.am
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ #make install-strip LIBS="-lpthread -Wl,--as-needed -lws2_32" &&
+ ( make install-strip LIBS="-lpthread -Wl,--as-needed -lws2_32" || make install-strip CXX="g++ -fpermissive" LIBS="-lpthread -Wl,--as-needed -lws2_32" ) &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf librepush.git
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf librepush-$VERSION*
+
+
+

@@ -1,0 +1,98 @@
+export NAME="MiniDLNA"
+export STATUS=
+export URL=http://sourceforge.net/projects/minidlna/
+export BASENAME=minidlna
+export DESCRIPTION="MiniDLNA (aka ReadyDLNA) is server software with the aim of being fully compliant with DLNA/UPnP-AV clients."
+#export DESCRIPTION="ReadyMedia (formerly known as MiniDLNA) is a simple media server software, with the aim of being fully compliant with DLNA/UPnP-AV clients. It was originally developed by a NETGEAR employee for the ReadyNAS product line."
+export CATEGORY=audio,video,communication
+export TYPE=application
+#export VERSION=1.0.25
+#export VERSIONDATE=20130112
+#export VERSION=1.0.26
+#export VERSIONDATE=20130508
+#export VERSION=1.1.0
+#export VERSIONDATE=20130508
+####minidlna.c:164:10: error: 'SIGCHLD' undeclared (first use in this function)
+#export VERSION=1.1.1
+#export VERSIONDATE=20131105
+####upnphttp.h:110:23: error: expected ':', ',', ';', '}' or '__attribute__' before 'entries'
+#export VERSION=1.1.2
+#export VERSIONDATE=20140307
+#export VERSION=1.1.3
+#export VERSIONDATE=20140606
+####checking for struct ip_mreq... configure: error: No multicast support
+#export VERSION=1.1.4
+#export VERSIONDATE=20140827
+#export VERSION=1.1.5
+#export VERSIONDATE=20150911
+#export VERSION=1.2.0
+#export VERSIONDATE=20170518
+#export VERSION=1.2.1
+#export VERSIONDATE=20170827
+export VERSION=1.3.0
+export VERSIONDATE=20201125
+####process.h:36:2: error: unknown type name 'pid_t'
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,libexif,libjpeg,libid3tag,flac,libogg,libvorbis,sqlite3,ffmpeg4,ossp-uuid,sys_queue_h
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=LICENCE
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://sourceforge.net/projects/minidlna/files/minidlna/ minidlna_ _src.tar.gz"
+export DOWNLOADURL="http://sourceforge.net/projects/minidlna/files/minidlna/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/minidlna/minidlna/$VERSION/$BASENAME\_$VERSION\_src.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/minidlna/minidlna/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME\_$VERSION\_src.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/netinet/in.h
+echo "#include <ws2tcpip.h>" >> winfix/netinet/in.h
+cat > pwd.h << EOF
+typedef int uid_t;
+#define getuid() 0
+#define getpwuid(uid) NULL
+#define getpwnam(username) NULL
+struct passwd {
+ int pw_uid;
+ char *pw_name;
+};
+EOF
+touch winfix/sys/wait.h winfix/netinet/in.h winfix/arpa/inet.h
+#touch winfix/sys/queue.h
+# fix missing pid_t in minidlna.c
+mv minidlna.c minidlna.c.bak
+echo "#include <sys/types.h>" > minidlna.c
+cat minidlna.c.bak >> minidlna.c
+# fix configure (version >= 1.3.0)
+patch -ulbf configure << EOF
+@@ -10311,4 +10311,4 @@
+
+-test x"\$ac_cv_header_poll_h" != x"yes" && as_fn_error \$? "poll.h not found or not usable" "\$LINENO" 5
+-test x"\$ac_cv_header_sys_queue_h" != x"yes" && as_fn_error \$? "sys/queue.h not found or not usable" "\$LINENO" 5
++test x"\$ac_cv_header_poll_h" != x"yes" && echo \$? "poll.h not found or not usable" "\$LINENO" 5
++test x"\$ac_cv_header_sys_queue_h" != x"yes" && echo \$? "sys/queue.h not found or not usable" "\$LINENO" 5
+
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed" &&
+ C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$C_INCLUDE_PATH CPLUS_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$CPLUS_INCLUDE_PATH LIBRARY_PATH=$MINGWPREFIX/ffmpeg4/lib:$LIBRARY_PATH LD_RUN_PATH=$MINGWPREFIX/ffmpeg4/lib:$LD_RUN_PATH PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig:$PKG_CONFIG_PATH PATH=$MINGWPREFIX/ffmpeg4/bin:$PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include" LDFLAGS="-Wl,--as-needed" &&
+ wl-showstatus build-install &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####See also: https://github.com/keenetic/minidlna/
+
+
+

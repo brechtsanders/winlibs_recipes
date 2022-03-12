@@ -1,0 +1,127 @@
+#export NAME="libcacard"
+#export STATUS=
+#export URL=http://spice-space.org/
+#export BASENAME=libcacard
+#export DESCRIPTION="libcacard (Virtual Smart Card Emulator library) - This emulator is designed to provide emulation of actual smart cards to a virtual card reader running in a guest virtual machine. The emulated smart cards can be representations of real smart cards, or the cards could be pure software constructs."
+#export CATEGORY=hardware
+#export TYPE=library
+##export VERSION=0.1.2
+##export VERSIONDATE=20121221
+#####mutex.h:38:1: error: unknown type name 'uint32_t'
+##export VERSION=2.5.0
+##export VERSIONDATE=20150922
+##export VERSION=2.5.1
+##export VERSIONDATE=20151127
+##export VERSION=2.5.2
+##export VERSIONDATE=20151208
+##export VERSION=2.5.3
+##export VERSIONDATE=20170302
+##export VERSION=2.6.0
+##export VERSIONDATE=20180809
+##export VERSION=2.6.1
+##export VERSIONDATE=20180831
+#export VERSION=2.7.0
+#export VERSIONDATE=20190724
+#####Cannot export cac_is_cac_card: symbol not defined
+#####src/vscclient.c:641:9: warning: unknown conversion type character 'z' in format [-Wformat=]
+##export VERSION=2.8.0
+##export VERSIONDATE=20201006
+#wl-showstatus --package-version
+#export DEPENDANCIES=glib2,nss
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="http://spice-space.org/download/libcacard/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://spice-space.org/download/libcacard/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://spice-space.org/download/libcacard/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+##tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+### fix missing uint32_t in mutex.h (version <= 0.1.2)
+##mv mutex.h mutex.h.bak
+##echo "#include <stdint.h>" > mutex.h
+##sed -e "s/\(#ifdef _WIN32\)/\1DISABLE/" mutex.h.bak >> mutex.h
+### fix missing files (version <= 0.1.2)
+##mkdir -p winfix/sys winfix/netinet winfix/arpa
+##echo "#include <winsock2.h>" > winfix/sys/socket.h
+##cat > winfix/netinet/in.h << EOF
+###define _WIN32_WINNT 0x0501
+###include <ws2tcpip.h>
+##EOF
+##touch winfix/netdb.h winfix/arpa/inet.h
+## fix src/vscclient.c (version >= 2.5.0)
+#mv src/vscclient.c src/vscclient.c.bak
+#cat > src/vscclient.c << EOF
+##define _WIN32_WINNT 0x0501
+##include <winsock2.h>
+##include <ws2tcpip.h>
+#EOF
+#cat src/vscclient.c.bak >> src/vscclient.c
+## fix missing cac_is_cac_card in cac.c (version >= 2.5.0)
+#echo "VCardStatus cac_is_cac_card(VReader *reader) { return 0; }" >> src/cac.c
+## fix src/vcard_emul_nss.c for 64-bit (version >= 2.5.0)
+#mv src/vcard_emul_nss.c src/vcard_emul_nss.c.bak
+#cat > src/vcard_emul_nss.c << EOF
+##ifdef __MINGW64__
+##define _AMD64_
+##include <nspr/prtypes.h>
+##endif
+#EOF
+#cat src/vcard_emul_nss.c.bak >> src/vcard_emul_nss.c
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined -lpthread -lws2_32" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -lws2_32" &&
+# ## fix building DLLs
+# #mv libtool libtool.bak &&
+# #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="libcacard"
+export STATUS=
+export URL=http://spice-space.org/
+export BASENAME=libcacard
+export DESCRIPTION="libcacard (Virtual Smart Card Emulator library) - This emulator is designed to provide emulation of actual smart cards to a virtual card reader running in a guest virtual machine. The emulated smart cards can be representations of real smart cards, or the cards could be pure software constructs."
+export CATEGORY=hardware
+export TYPE=library
+#export VERSION=2.8.0
+#export VERSIONDATE=20201006
+export VERSION=2.8.1
+export VERSIONDATE=20210819
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,nss,pcsclite,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://spice-space.org/download/libcacard/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://spice-space.org/download/libcacard/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## don't define weak symbols to fix link error: relocation truncated to fit (version >= 2.8.0)
+#sed -i.bak -e "s/__attribute__((weak)) //" fuzz/fuzzer.c
+# disable fuzzer
+sed -i.bak -e "s/^subdir('fuzz')/#&/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dpcsc=enabled -Ddisable_tests=true -Dc_link_args="-Wl,--as-needed -lws2_32" . build_both &&
+ # fix missing timeGetTime
+ sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\" /&\"-lwinmm\" /" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

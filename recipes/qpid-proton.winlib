@@ -1,0 +1,165 @@
+export NAME="Qpid Proton"
+export STATUS=
+export URL=https://qpid.apache.org/proton/
+export BASENAME=qpid-proton
+export DESCRIPTION="The AMQP messaging toolkit - Qpid Proton is a high-performance, lightweight messaging library. It can be used in the widest range of messaging applications, including brokers, client libraries, routers, bridges, proxies, and more. Proton makes it trivial to integrate with the AMQP 1.0 ecosystem from any platform, environment, or language."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=0.23.0
+#export VERSIONDATE=20180629
+#export VERSION=0.25.0
+#export VERSIONDATE=20180907
+#export VERSION=0.26.0
+#export VERSIONDATE=20181008
+#export VERSION=0.27.0
+#export VERSIONDATE=20190209
+#export VERSION=0.27.1
+#export VERSIONDATE=20190422
+#export VERSION=0.28.0
+#export VERSIONDATE=20190511
+#export VERSION=0.29.0
+#export VERSIONDATE=20190817
+#export VERSION=0.30.0
+#export VERSIONDATE=20191214
+#export VERSION=0.31.0
+#export VERSIONDATE=20200512
+#export VERSION=0.32.0
+#export VERSIONDATE=20200828
+#export VERSION=0.33.0
+#export VERSIONDATE=20201120
+#export VERSION=0.34.0
+#export VERSIONDATE=20210412
+#export VERSION=0.35.0
+#export VERSIONDATE=20210701
+export VERSION=0.36.0
+export VERSIONDATE=20220122
+####c/src/proactor/win_iocp.c:37:10: fatal error: queue: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,openssl,cyrus-sasl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=doxygen
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=Apache
+#export DOWNLOADURL="https://qpid.apache.org/proton/"
+#export DOWNLOADURL="https://github.com/apache/qpid-proton/releases"
+export DOWNLOADURL="https://github.com/apache/qpid-proton/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.apache.org/dyn/closer.lua/qpid/proton/$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/apache/qpid-proton/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/apache/qpid-proton/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix c/src/ssl/openssl.c (version >= 0.26.0 <= 0.30.0)
+#mv c/src/ssl/openssl.c c/src/ssl/openssl.c.bak &&
+#echo "#define _WIN32_WINNT 0x0600" > c/src/ssl/openssl.c &&
+#cat c/src/ssl/openssl.c.bak >> c/src/ssl/openssl.c
+## fix c/src/platform/platform_fmt.h (version >= 0.26.0)
+#patch -ulbf c/src/platform/platform_fmt.h << EOF
+#@@ -36,4 +36,4 @@
+# #include <inttypes.h>
+#-#define PN_ZI "zi"
+#-#define PN_ZU "zu"
+#+#define PN_ZI PRIiPTR
+#+#define PN_ZU PRIuPTR
+#
+#EOF
+## fix c/src/ssl/openssl.c (version >= 0.31.0 <= 0.34.0)
+#patch -ulbf c/src/ssl/openssl.c << EOF
+#@@ -1 +1,2 @@
+#+#define _WIN32_WINNT 0x0600
+# /*
+#@@ -1589,2 +1590,3 @@
+# INIT_ONCE initialize_once = INIT_ONCE_STATIC_INIT;
+#+static BOOL initialize(PINIT_ONCE initonce, PVOID param, PVOID* context);
+# static inline bool ensure_initialized(void) {
+#@@ -1624,3 +1626,7 @@
+#
+#+#ifdef _WIN32
+#+static BOOL initialize(PINIT_ONCE initonce, PVOID param, PVOID* context) {
+#+#else
+# static void initialize(void) {
+#+#endif
+#   int i;
+#@@ -1633,3 +1639,7 @@
+#   locks = (pni_mutex_t*)malloc(CRYPTO_num_locks() * sizeof(pni_mutex_t));
+#+#ifdef _WIN32
+#+  if (!locks) return TRUE;
+#+#else
+#   if (!locks) return;
+#+#endif
+#   for(i = 0;  i < CRYPTO_num_locks();  i++)
+#@@ -1643,2 +1653,5 @@
+#   init_ok = true;
+#+#ifdef _WIN32
+#+  return TRUE;
+#+#endif
+# }
+#EOF
+# fix c/src/ssl/openssl.c (version >= 0.35.0)
+patch -ulbf c/src/ssl/openssl.c << EOF
+@@ -1 +1,3 @@
++#define _WIN32_WINNT 0x0600
++#include <windows.h>
+ /*
+@@ -1584,2 +1586,3 @@
+ INIT_ONCE initialize_once = INIT_ONCE_STATIC_INIT;
++static BOOL initialize(PINIT_ONCE initonce, PVOID param, PVOID* context);
+ static inline bool ensure_initialized(void) {
+@@ -1619,3 +1622,7 @@
+
++#ifdef _WIN32
++static BOOL initialize(PINIT_ONCE initonce, PVOID param, PVOID* context) {
++#else
+ static void initialize(void) {
++#endif
+   int i;
+@@ -1628,3 +1635,7 @@
+   locks = (pni_mutex_t*)malloc(CRYPTO_num_locks() * sizeof(pni_mutex_t));
++#ifdef _WIN32
++  if (!locks) return TRUE;
++#else
+   if (!locks) return;
++#endif
+   for(i = 0;  i < CRYPTO_num_locks();  i++)
+@@ -1638,2 +1649,5 @@
+   init_ok = true;
++#ifdef _WIN32
++  return TRUE;
++#endif
+ }
+EOF
+# fix already define IN in c/src/core/engine-internal.h (version >= 0.35.0)
+patch -ulbf c/src/core/engine-internal.h << EOF
+@@ -383,2 +383,3 @@
+
++#undef IN
+ typedef enum {IN, OUT} pn_dir_t;
+EOF
+# fix missing GetTickCount64 in c/src/proactor/win_iocp.cpp (version >= 0.34.0)
+mv c/src/proactor/win_iocp.cpp c/src/proactor/win_iocp.cpp.bak
+cat > c/src/proactor/win_iocp.cpp << EOF
+#if _WIN32_WINNT < 0x0600 
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600 
+#endif
+EOF
+cat c/src/proactor/win_iocp.cpp.bak >> c/src/proactor/win_iocp.cpp
+# remove -std=c99 to avoid printf errors
+sed -i.bak -e "s/-std=c99\|-Werror\|-Wall\|-pedantic-errors\|-pedantic//g" CMakeLists.txt c/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIBS:BOOL=ON -DSSL_IMPL:STRING=openssl -DBUILD_GO:BOOL=OFF -DENABLE_VALGRIND:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DENABLE_FUZZ_TESTING:BOOL=OFF -DFUZZ_LONG_TESTS:BOOL=OFF -DFUZZ_REGRESSION_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIBS:BOOL=ON -DSSL_IMPL:STRING=openssl -DSASL_IMPL:STRING=cyrus -DBUILD_PYTHON:BOOL=OFF -DBUILD_RUBY:BOOL=OFF -DENABLE_WARNING_ERROR:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DENABLE_BENCHMARKS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ for F in $INSTALLPREFIX/lib/*-static.a; do
+  cp $F $(echo $F|sed -e "s/-static\(\.a\)$/\1/")
+ done &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

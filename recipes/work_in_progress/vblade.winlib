@@ -1,0 +1,83 @@
+export NAME="vblade"
+export STATUS=
+export URL=http://aoetools.sourceforge.net/
+export BASENAME=vblade
+export DESCRIPTION="Virtual EtherDrive(R) blade AoE target"
+export CATEGORY=system
+export TYPE=application
+#export VERSION=20
+#export VERSIONDATE=20110909
+#export VERSION=21
+#export VERSIONDATE=20130502
+export VERSION=22
+export VERSIONDATE=20140811
+####linux.c:40:21: error: storage size of 'sa' isn't known
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://sourceforge.net/projects/aoetools/files/vblade/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/aoetools/vblade/$VERSION/$BASENAME-$VERSION.tgz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/aoetools/vblade/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/netinet winfix/sys winfix/asm winfix/linux winfix/net
+echo "#include <winsock2.h>" > winfix/netinet/in.h
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/features.h touch winfix/asm/types.h winfix/linux/if_packet.h winfix/linux/if_ether.h winfix/sys/ioctl.h winfix/net/if.h winfix/linux/fs.h
+# fix missing types in dat.h
+mv dat.h dat.h.bak
+cat > dat.h << EOF
+typedef unsigned short ushort;
+typedef unsigned long ulong;
+EOF
+cat dat.h.bak >> dat.h
+# fix aoe.c
+patch -ulbf aoe.c << EOF
+--- aoe.c  2009-08-14 20:39:26 +0200
++++ aoe.c  2011-09-09 09:33:28 +0200
+@@ -340,2 +340,9 @@
+
++#ifdef __MINGW32__
++       {
++               SYSTEM_INFO sysinfo;
++               GetSystemInfo(&sysinfo);
++               pagesz = sysinfo.dwPageSize;
++       }
++#else
+        if ((pagesz = sysconf(_SC_PAGESIZE)) < 0) {
+@@ -344,2 +351,3 @@
+        }
++#endif
+        if ((buf = malloc(bufsz + pagesz)) == NULL) {
+@@ -479,3 +487,5 @@
+                case 's':
++#ifdef O_SYNC
+                        omode |= O_SYNC;
++#endif
+                        break;
+EOF
+# fix missing types in bpf.c
+mv bpf.c bpf.c.bak
+cat > bpf.c << EOF
+#include <stdint.h>
+typedef unsigned int uint;
+typedef uint32_t u_int32_t;
+EOF
+cat bpf.c.bak >> bpf.c
+wl-showstatus build &&
+make -j1 CFLAGS="-Iwinfix" &&
+ wl-showstatus build-install &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

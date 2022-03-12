@@ -1,0 +1,66 @@
+export NAME="pngnq"
+export STATUS=
+export URL=http://pngnq.sourceforge.net/
+export BASENAME=pngnq
+export DESCRIPTION="Pngnq is a tool for quantizing PNG images in RGBA format."
+export CATEGORY=graphics
+export TYPE=library
+export VERSION=1.1
+export VERSIONDATE=20210607
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libpng
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://sourceforge.net/projects/pngnq/files/pngnq/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/pngnq/pngnq/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/errors.h (version >= 1.1)
+patch -ulbf src/errors.h << EOF
+@@ -3,3 +3,5 @@
+  */
++#ifndef _WIN32
+ #include "syslog.h"
++#endif
+
+@@ -9,2 +11,3 @@
+
++#ifndef _WIN32
+ #define PNGNQ_LOG_ERR(...)(syslog(LOG_ERR,\\
+@@ -15,2 +18,6 @@
+     syslog(LOG_WARNING, __VA_ARGS__);
++#else
++#define PNGNQ_LOG_ERR(...)
++#define PNGNQ_LOG_WARNING(...)
++#endif
+
+EOF
+## fix missing Z_BEST_COMPRESSION in src/rwpng.c (version >= 1.1)
+#sed -i.bak -e "s/Z_BEST_COMPRESSION/9/" src/rwpng.c
+# fix missing Z_BEST_COMPRESSION and strncmp in src/rwpng.c (version >= 1.1)
+mv src/rwpng.c src/rwpng.c.bak &&
+echo "#include <zlib.h>" > src/rwpng.c &&
+echo "#include <string.h>" >> src/rwpng.c &&
+cat src/rwpng.c.bak >> src/rwpng.c
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lz -lpng" ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

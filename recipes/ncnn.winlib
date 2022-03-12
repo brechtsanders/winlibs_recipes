@@ -1,0 +1,81 @@
+export NAME="ncnn"
+export STATUS=
+export URL=https://github.com/Tencent/ncnn
+export BASENAME=ncnn
+export DESCRIPTION="ncnn is a high-performance neural network inference computing framework optimized for mobile platforms."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=20201218
+#export VERSIONDATE=20210102
+#export VERSION=20210124
+#export VERSIONDATE=20210124
+#export VERSION=20210322
+#export VERSIONDATE=20210322
+#export VERSION=20210507
+#export VERSIONDATE=20210507
+#export VERSION=20210524
+#export VERSIONDATE=20210524
+#export VERSION=20210525
+#export VERSIONDATE=20210526
+export VERSION=20210720
+export VERSIONDATE=20210720
+#export VERSION=20211122
+#export VERSIONDATE=20211122
+#export VERSION=20211208
+#export VERSIONDATE=20211208
+#export VERSION=20220216
+#export VERSIONDATE=20220216
+####IMPORTED_LOCATION not set for imported target "MachineIndependent" configuration "Release".
+wl-showstatus --package-version
+export DEPENDANCIES=glslang,vulkan-loader,protobuf
+export OPTIONALDEPENDANCIES=opencv
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/Tencent/ncnn/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Tencent/ncnn/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/layer/x86/convolution_3x3.h (version >= 20201218)
+patch -ulbf src/layer/x86/convolution_3x3.h << EOF
+@@ -1081,3 +1081,3 @@
+                     // transpose d to d_t
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+                     {
+EOF
+# fix src/gpu.cpp (version >= 20201218)
+patch -ulbf src/gpu.cpp << EOF
+@@ -23,3 +23,3 @@
+ #include "glslang/SPIRV/GlslangToSpv.h"
+-#include "glslang/glslang/Public/ShaderLang.h"
++#include "glslang/Public/ShaderLang.h"
+
+EOF
+# fix also building shared library
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC /\1 /" src/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DNCNN_THREADS:BOOL=ON -DNCNN_VULKAN:BOOL=ON -DNCNN_SYSTEM_GLSLANG:BOOL=ON -DGLSLANG_TARGET_DIR:PATH=$MINGWPREFIX/lib/cmake -DOpenCV_DIR:PATH=$MINGWPREFIX -DNCNN_BUILD_EXAMPLES:BOOL=OFF -DNCNN_BENCHMARK:BOOL=OFF -DNCNN_BUILD_BENCHMARK:BOOL=OFF -DNCNN_BUILD_TESTS:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ # fix missing MachineIndependent-NOTFOUND
+ sed -i.bak -e "s/ MachineIndependent-NOTFOUND / /" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DNCNN_THREADS:BOOL=ON -DNCNN_VULKAN:BOOL=ON -DNCNN_SYSTEM_GLSLANG:BOOL=ON -DGLSLANG_TARGET_DIR:PATH=$MINGWPREFIX/lib/cmake -DOpenCV_DIR:PATH=$MINGWPREFIX -DNCNN_BUILD_EXAMPLES:BOOL=OFF -DNCNN_BENCHMARK:BOOL=OFF -DNCNN_BUILD_BENCHMARK:BOOL=OFF -DNCNN_BUILD_TESTS:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ # fix missing MachineIndependent-NOTFOUND
+ sed -i.bak -e "s/ MachineIndependent-NOTFOUND / /" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/src/*.dll build_shared/tools/*.exe build_shared/tools/*/*.exe &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_shared/src/*.dll build_shared/tools/*.exe build_shared/tools/*/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

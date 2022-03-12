@@ -1,0 +1,46 @@
+export NAME="vtparse"
+export STATUS=
+export URL=https://vt100.net/emu/dec_ansi_parser
+#export URL=https://github.com/astoeckel/vtparse
+export BASENAME=vtparse
+export DESCRIPTION="A parser for DEC's ANSI-compatible video terminals"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20200515
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=AGPL
+export DOWNLOADURL="https://github.com/astoeckel/vtparse/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/astoeckel/vtparse/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+#export BUILDDEPENDANCIES=meson,ninja
+#-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS
+## fix missing gio-unix
+#sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -C build_both install &&
+ strip build_both/libvtparse.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_both/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_both/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

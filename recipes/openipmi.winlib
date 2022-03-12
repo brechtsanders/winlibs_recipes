@@ -1,0 +1,727 @@
+export NAME="OpenIPMI"
+export STATUS=
+#export URL=http://openipmi.sourceforge.net/
+export URL=https://sourceforge.net/projects/openipmi/
+#export URL=https://github.com/cminyard/openipmi/
+export BASENAME=openipmi
+export DESCRIPTION="OpenIPMI is an effort to create a full-function IPMI system to allow full access to all IPMI information on a server and to abstract it to a level that will make it easy to use."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=2.0.14
+#export VERSION=2.0.17
+#export VERSIONDATE=20100430
+#export VERSION=2.0.18
+#export VERSIONDATE=20100503
+#export VERSION=2.0.19
+#export VERSIONDATE=20111013
+#export VERSION=2.0.21
+#export VERSIONDATE=20140129
+#export VERSION=2.0.22
+#export VERSIONDATE=20160602
+####unix/posix_os_hnd.c:562:27: error: unknown type name 'clockid_t'
+#export VERSION=2.0.23
+#export VERSIONDATE=20170615
+####configure: error: conditional "HAVE_OPENIPMI_SMI" was never defined.
+#export VERSION=2.0.24
+#export VERSIONDATE=20170816
+#export VERSION=2.0.25
+#export VERSIONDATE=20180417
+#export VERSION=2.0.26
+#export VERSIONDATE=20181214
+#export VERSION=2.0.27
+#export VERSIONDATE=20190307
+####Makefile:329: *** missing separator.  Stop.
+#export VERSION=2.0.28
+#export VERSIONDATE=20191213
+#export VERSION=2.0.29
+#export VERSIONDATE=20200613
+#export VERSION=2.0.30
+#export VERSIONDATE=20201109
+#export VERSION=2.0.31
+#export VERSIONDATE=20210126
+export VERSION=2.0.32
+export VERSIONDATE=20211106
+wl-showstatus --package-version
+#export DEPENDANCIES=popt,pthreads,openssl,glib2,gdbm
+export DEPENDANCIES=popt,pthreads,openssl,glib2,gdbm,netsnmp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=swig
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL2
+#export DOWNLOADURL="http://sourceforge.net/projects/openipmi/files/ OpenIPMI-"
+export DOWNLOADURL="http://sourceforge.net/projects/openipmi/files/OpenIPMI%202.0%20Library/ OpenIPMI-"
+#export DOWNLOADURL="https://github.com/cminyard/openipmi/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/openipmi/OpenIPMI-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/openipmi/OpenIPMI-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/openipmi/OpenIPMI%20$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")%20Library/OpenIPMI-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/OpenIPMI-$VERSION.tar.gz
+cd OpenIPMI-$VERSION
+# create dummy syslog.h
+cat > syslog.h << EOF
+#define LOG_ERR 3
+static void syslog (int priority, const char *format, ...) {}
+EOF
+# fix missing includes
+mkdir netinet sys arpa
+echo "#include <winsock2.h>" > netinet/in.h
+touch netdb.h
+touch sys/socket.h
+touch arpa/inet.h
+touch sys/poll.h
+echo "#include <malloc.h>" > alloca.h
+# fix missing definition of ECANCELED
+cat >> include/OpenIPMI/ipmi_err.h << EOF
+#ifndef ECANCELED
+#define ECANCELED -1
+#endif
+#ifndef EMSGSIZE
+#define EMSGSIZE WSAEMSGSIZE
+#endif
+#ifndef ETIMEDOUT
+#define ETIMEDOUT WSAETIMEDOUT
+#endif
+EOF
+# fix missing strtok_r/inet_ntop/inet_pton
+#cat >> include/OpenIPMI/ipmi_posix.h << EOF
+###ifndef __IPMI_POSIX_H2
+##define __IPMI_POSIX_H2
+##ifndef strtok_r
+##define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))
+##endif
+##include <stdio.h>
+#inline const char* inet_ntop (int af, void const *src, char *dst, size_t size)
+#{
+#  switch (af) {
+#    case AF_INET:
+#    {
+#      char tmp[16];
+#      sprintf(tmp, "%u.%u.%u.%u", ((unsigned char*)src)[0], ((unsigned char*)src)[1], ((unsigned char*)src)[2], ((unsigned char*)src)[3]);
+#      return strcpy(dst, tmp);
+#    }
+#    default:
+#      return NULL;//to do: implement AF_INET6
+#  }
+#}
+#inline int inet_pton (int af, const char * src, void * dst)
+#{
+#  switch (af) {
+#    case AF_INET:
+#    {
+#      int ch;
+#      unsigned char tmp[4];
+#      unsigned char* tp = tmp;
+#      int saw_digit = 0;
+#      int octets = 0;
+#      *tmp = 0;
+#      while ((ch = *src++) != '\\0') {
+#        if ('0' <= ch && ch <= '9') {
+#          unsigned octet = *tp * 10 + ch - '0';
+#          if (saw_digit && *tp == 0)
+#            return (0);
+#          if (octet > 255)
+#            return (0);
+#          *tp = octet;
+#          if (!saw_digit) {
+#            if (++octets > 4)
+#              return (0);
+#            saw_digit = 1;
+#          }
+#        } else if (ch == '.' && saw_digit) {
+#          if (octets == 4)
+#            return (0);
+#          *++tp = 0;
+#          saw_digit = 0;
+#        } else
+#          return (0);
+#      }
+#      if (octets < 4)
+#        return (0);
+#      memcpy(dst, tmp, 4);
+#      return (1);
+#    }
+#    default:
+#      return -1;//to do: implement AF_INET6
+#  }
+#}
+##endif
+#EOF
+## fix lib/oem_atca_conn.c (duplicate definition of s_addr => replace with s_addr0, setting socket non-blocking) (version <= 2.0.30)
+#patch -ulbf lib/oem_atca_conn.c << EOF
+#--- lib/oem_atca_conn.c  Tue Jul 29 16:19:02 2008
+#+++ lib/oem_atca_conn.c 2013-01-06 21:05:54 +0100
+#@@ -37,2 +37,8 @@
+# #include <sys/types.h>
+#+#ifdef __WIN32__
+#+#include <winsock2.h>
+#+#include <ws2tcpip.h>
+#+#include <OpenIPMI/ipmi_posix.h>
+#+#define bcmp(b1,b2,len) memcmp((b1), (b2), (size_t)(len))
+#+#else
+# #include <sys/socket.h>
+#@@ -42,2 +48,3 @@
+# #include <arpa/inet.h>
+#+#endif
+#
+#@@ -59,3 +66,3 @@
+#         {
+#-           struct sockaddr     s_addr;
+#+           struct sockaddr     s_addr0;
+#             struct sockaddr_in  s_addr4;
+#@@ -70,7 +77,7 @@
+# {
+#-    if (a1->s_ipsock.s_addr.sa_family != a2->s_ipsock.s_addr.sa_family) {
+#+    if (a1->s_ipsock.s_addr0.sa_family != a2->s_ipsock.s_addr0.sa_family) {
+#        if (DEBUG_RAWMSG || DEBUG_MSG_ERR)
+#            ipmi_log(IPMI_LOG_DEBUG, "Address family mismatch: %d %d",
+#-                    a1->s_ipsock.s_addr.sa_family,
+#-                    a2->s_ipsock.s_addr.sa_family);
+#+                    a1->s_ipsock.s_addr0.sa_family,
+#+                    a2->s_ipsock.s_addr0.sa_family);
+#        return 0;
+#@@ -78,3 +85,3 @@
+#
+#-    switch (a1->s_ipsock.s_addr.sa_family) {
+#+    switch (a1->s_ipsock.s_addr0.sa_family) {
+#     case PF_INET:
+#@@ -105,3 +112,3 @@
+#                 "ipmi_lan: Unknown protocol family: 0x%x",
+#-                a1->s_ipsock.s_addr.sa_family);
+#+                a1->s_ipsock.s_addr0.sa_family);
+#        break;
+#@@ -181,3 +188,3 @@
+#     from_len = sizeof(ipaddrd);
+#-    len = recvfrom(fd, data, sizeof(data), 0, (struct sockaddr *)&ipaddrd,
+#+    len = recvfrom(fd, data, sizeof(data), 0, (struct sockaddr *)&ipaddrd,
+#                   &from_len);
+#@@ -255,3 +262,8 @@
+#        }
+#+#ifdef __WIN32__
+#+        unsigned long flags = 0;
+#+        rv = ioctlsocket(fd_sock, FIONBIO, &flags);
+#+#else
+#        rv = fcntl(fd_sock, F_SETFL, O_NONBLOCK);
+#+#endif
+#        if (rv) {
+#@@ -265,3 +277,3 @@
+#                                        fd_sock,
+#-                                       fd_sock_handler,
+#+                                       fd_sock_handler,
+#                                        NULL,
+#@@ -303,6 +315,6 @@
+#                     "Invalid length for IPV4 address");
+#-
+#+
+#            goto out;
+#        }
+#-       ainfo->addr.s_ipsock.s_addr.sa_family = AF_INET;
+#+       ainfo->addr.s_ipsock.s_addr0.sa_family = AF_INET;
+#        memcpy(&ainfo->addr.s_ipsock.s_addr4.sin_addr.s_addr, msg->data+10, 4);
+#@@ -312,3 +324,3 @@
+#     out:
+#-       ainfo->addr.s_ipsock.s_addr.sa_family = AF_UNSPEC;
+#+       ainfo->addr.s_ipsock.s_addr0.sa_family = AF_UNSPEC;
+#     }
+#@@ -605,3 +617,3 @@
+#
+#-    switch (a->s_ipsock.s_addr.sa_family) {
+#+    switch (a->s_ipsock.s_addr0.sa_family) {
+#     case PF_INET:
+#@@ -754,3 +766,3 @@
+#
+#-    if (msg->data[0] != 0)
+#+    if (msg->data[0] != 0)
+#        err = IPMI_IPMI_ERR_VAL(msg->data[0]);
+#@@ -798,3 +810,3 @@
+#     msg.data_len = 1;
+#-
+#+
+#     rspi->data1 = handler;
+#EOF
+## fix lib/ipmi_lan.c (duplicate definition of s_addr => replace with s_addr0, setting socket non-blocking) (version <= 2.0.30)
+#patch -ulbf lib/ipmi_lan.c << EOF
+#--- lib/ipmi_lan.c  2010-07-14 19:36:56 +0200
+#+++ lib/ipmi_lan.c  2013-01-06 21:24:14 +0100
+#@@ -36,6 +36,15 @@
+# #include <sys/types.h>
+#+#ifdef __WIN32__
+#+#include <winsock2.h>
+#+#include <ws2tcpip.h>
+#+#include <OpenIPMI/ipmi_posix.h>
+#+#define bcmp(b1,b2,len) memcmp((b1), (b2), (size_t)(len))
+#+#else
+# #include <sys/socket.h>
+# #include <netinet/in.h>
+#+#endif
+# #include <sys/stat.h>
+#+#ifndef __WIN32__
+# #include <sys/poll.h>
+#+#endif
+# #include <sys/time.h>
+#@@ -138,3 +147,3 @@
+#         {
+#-           struct sockaddr     s_addr;
+#+           struct sockaddr     s_addr0;
+#             struct sockaddr_in  s_addr4;
+#@@ -358,3 +367,3 @@
+#        unsigned int          addr_len;
+#-
+#+
+#        ipmi_msg_t            msg;
+#@@ -614,3 +623,3 @@
+#        return EAGAIN;
+#-
+#+
+#     auths[auth_num] = auth;
+#@@ -707,3 +716,3 @@
+#        return EAGAIN;
+#-
+#+
+#     confs[conf_num] = conf;
+#@@ -815,3 +824,3 @@
+#        return EAGAIN;
+#-
+#+
+#     integs[integ_num] = integ;
+#@@ -1113,7 +1122,7 @@
+#
+#-    if (a1->s_ipsock.s_addr.sa_family != a2->s_ipsock.s_addr.sa_family) {
+#+    if (a1->s_ipsock.s_addr0.sa_family != a2->s_ipsock.s_addr0.sa_family) {
+#        if (DEBUG_RAWMSG || DEBUG_MSG_ERR)
+#            ipmi_log(IPMI_LOG_DEBUG, "Address family mismatch: %d %d",
+#-                    a1->s_ipsock.s_addr.sa_family,
+#-                    a2->s_ipsock.s_addr.sa_family);
+#+                    a1->s_ipsock.s_addr0.sa_family,
+#+                    a2->s_ipsock.s_addr0.sa_family);
+#        return 0;
+#@@ -1121,3 +1130,3 @@
+#
+#-    switch (a1->s_ipsock.s_addr.sa_family) {
+#+    switch (a1->s_ipsock.s_addr0.sa_family) {
+#     case PF_INET:
+#@@ -1148,3 +1157,3 @@
+#                 "ipmi_lan: Unknown protocol family: 0x%x",
+#-                a1->s_ipsock.s_addr.sa_family);
+#+                a1->s_ipsock.s_addr0.sa_family);
+#        break;
+#@@ -1289,3 +1298,8 @@
+#        /* We want it to be non-blocking. */
+#+#ifdef __WIN32__
+#+        unsigned long flags = 1;
+#+        rv = ioctlsocket(item->fd, FIONBIO, &flags);
+#+#else
+#        rv = fcntl(item->fd, F_SETFL, O_NONBLOCK);
+#+#endif
+#        if (rv) {
+#@@ -1300,3 +1314,3 @@
+#                                            item->fd,
+#-                                           data_handler,
+#+                                           data_handler,
+#                                            item,
+#@@ -1412,3 +1426,3 @@
+#     for (i=0; i<lan->cparm.num_ip_addr; i++) {
+#-       struct sockaddr *addr = &lan->cparm.ip_addr[i].s_ipsock.s_addr;
+#+       struct sockaddr *addr = &lan->cparm.ip_addr[i].s_ipsock.s_addr0;
+#
+#@@ -1470,3 +1484,3 @@
+#         return -1;
+#-
+#+
+#     if (tv1->tv_sec > tv2->tv_sec)
+#@@ -1475,4 +1489,4 @@
+#     if (tv1->tv_usec < tv2->tv_usec)
+#-        return -1;
+#-
+#+        return -1;
+#+
+#     if (tv1->tv_usec > tv2->tv_usec)
+#@@ -2121,3 +2135,3 @@
+#     msg.data_len = 0;
+#-
+#+
+#     /* Send a message to check the working of the interface. */
+#@@ -2270,3 +2284,3 @@
+#        ipmi_unlock(lan->ip_lock);
+#-    }
+#+    }
+# }
+#@@ -2347,3 +2361,3 @@
+#        int connected = lan->connected;
+#-
+#+
+#        ipmi_lock(lan->con_change_lock);
+#@@ -2397,3 +2411,3 @@
+#                 "  fail_start_time=%ld.%6.6ld",
+#-                IPMI_CONN_NAME(ipmi),
+#+                IPMI_CONN_NAME(ipmi),
+#                 seq, lan->seq_table[seq].addr.addr_type,
+#@@ -2829,3 +2843,3 @@
+#                     IPMI_CONN_NAME(ipmi), rv);
+#-
+#+
+#            q_item->msg.netfn |= 1; /* Convert it to a response. */
+#@@ -3015,3 +3029,3 @@
+#     ipmi_unlock(lan->seq_num_lock);
+#-
+#+
+#     if (handle_send_rsp)
+#@@ -3206,3 +3220,3 @@
+#     handle_payload(ipmi, lan, addr_num, payload_type, tmsg, payload_len);
+#-
+#+
+#  out:
+#@@ -3481,3 +3495,3 @@
+#     from_len = sizeof(ipaddrd.s_ipsock);
+#-    len = recvfrom(fd, data, sizeof(data), 0, (struct sockaddr *)&ipaddrd,
+#+    len = recvfrom(fd, data, sizeof(data), 0, (struct sockaddr *)&ipaddrd,
+#                   &from_len);
+#@@ -3535,3 +3549,3 @@
+#     }
+#-
+#+
+#     lan_put(ipmi);
+#@@ -3810,4 +3824,4 @@
+#        count = snprintf(info, len, "rmcp: ");
+#-
+#-    switch (a->s_ipsock.s_addr.sa_family) {
+#+
+#+    switch (a->s_ipsock.s_addr0.sa_family) {
+#     case PF_INET:
+#@@ -4036,3 +4050,3 @@
+#                validate. */
+#-
+#+
+#            ipmi_handle_rsp_item(NULL, rspi, handler);
+#@@ -4980,3 +4994,3 @@
+#                IPMI_CONN_NAME(lan->ipmi));
+#-    }
+#+    }
+#     if (lan->cparm.authtype == IPMI_AUTHTYPE_RMCP_PLUS) {
+#@@ -5253,4 +5267,4 @@
+#     }
+#-    rv = ipmi_ip_setup_con(paddrs,
+#-                          pports,
+#+    rv = ipmi_ip_setup_con(paddrs,
+#+                          pports,
+#                           num_ip_addrs,
+#@@ -5311,3 +5325,3 @@
+#     /* Look in the first IP addresses list. */
+#-    idx = hash_lan_addr(&cparm->ip_addr[0].s_ipsock.s_addr);
+#+    idx = hash_lan_addr(&cparm->ip_addr[0].s_ipsock.s_addr0);
+#     ipmi_lock(lan_list_lock);
+#@@ -5568,3 +5582,3 @@
+#            break;
+#-
+#+
+#        default:
+#@@ -5602,3 +5616,3 @@
+#         struct addrinfo hints, *res0;
+#-
+#+
+#         memset(&hints, 0, sizeof(hints));
+#@@ -5837,3 +5851,3 @@
+#        for (i=0; i<l->lan->cparm.num_ip_addr; i++) {
+#-           if (l->lan->cparm.ip_addr[i].s_ipsock.s_addr.sa_family
+#+           if (l->lan->cparm.ip_addr[i].s_ipsock.s_addr0.sa_family
+#                != src_addr->sa_family)
+#@@ -6602,3 +6616,3 @@
+#        goto out_err;
+#-
+#+
+#     return nargs;
+#@@ -7045 +7059,55 @@
+# }
+#+const char* inet_ntop (int af, void const *src, char *dst, size_t size)
+#+{
+#+  switch (af) {
+#+    case AF_INET:
+#+    {
+#+      char tmp[16];
+#+      sprintf(tmp, "%u.%u.%u.%u", ((unsigned char*)src)[0], ((unsigned char*)src)[1], ((unsigned char*)src)[2], ((unsigned char*)src)[3]);
+#+      return strcpy(dst, tmp);
+#+    }
+#+    default:
+#+      return NULL;//to do: implement AF_INET6
+#+  }
+#+}
+#+int inet_pton (int af, const char * src, void * dst)
+#+{
+#+  switch (af) {
+#+    case AF_INET:
+#+    {
+#+      int ch;
+#+      unsigned char tmp[4];
+#+      unsigned char* tp = tmp;
+#+      int saw_digit = 0;
+#+      int octets = 0;
+#+      *tmp = 0;
+#+      while ((ch = *src++) != '\0') {
+#+        if ('0' <= ch && ch <= '9') {
+#+          unsigned octet = *tp * 10 + ch - '0';
+#+          if (saw_digit && *tp == 0)
+#+            return (0);
+#+          if (octet > 255)
+#+            return (0);
+#+          *tp = octet;
+#+          if (!saw_digit) {
+#+            if (++octets > 4)
+#+              return (0);
+#+            saw_digit = 1;
+#+          }
+#+        } else if (ch == '.' && saw_digit) {
+#+          if (octets == 4)
+#+            return (0);
+#+          *++tp = 0;
+#+          saw_digit = 0;
+#+        } else
+#+          return (0);
+#+      }
+#+      if (octets < 4)
+#+        return (0);
+#+      memcpy(dst, tmp, 4);
+#+      return (1);
+#+    }
+#+    default:
+#+      return -1;//to do: implement AF_INET6
+#+  }
+#+}
+#
+#EOF
+## fix missing definitions (version <= 2.0.28)
+#mv include/OpenIPMI/selector.h include/OpenIPMI/selector.h.bak
+#echo "#include <winsock2.h>" > include/OpenIPMI/selector.h
+#cat include/OpenIPMI/selector.h.bak >> include/OpenIPMI/selector.h
+## fix missing definitions (version >= 2.0.29 <= 2.0.30)
+#mv include/OpenIPMI/selector.h include/OpenIPMI/selector.h.bak &&
+#echo "#include <winsock2.h>" > include/OpenIPMI/selector.h &&
+#echo "#include <sys/types.h>" >> include/OpenIPMI/selector.h &&
+#sed -e "s/sigset_t/_&/" include/OpenIPMI/selector.h.bak >> include/OpenIPMI/selector.h
+# fix missing definitions
+mv unix/selector.c unix/selector.c.bak
+echo "#include \"OpenIPMI/ipmi_err.h\"" > unix/selector.c
+cat unix/selector.c.bak >> unix/selector.c
+# fix unix/posix_os_hnd.c (missing sigaction stuff)
+mv unix/posix_os_hnd.c unix/posix_os_hnd.c.bak
+sed -e "s?\(extern void posix_vlog\)?/*\1?; s?\(#pragma weak posix_vlog\)?\1*/void posix_vlog(char *format, enum ipmi_log_type_e log_type, va_list ap){}?" unix/posix_os_hnd.c.bak > unix/posix_os_hnd.c
+# fix unix/posix_thread_os_hnd.c (missing sigaction stuff)
+patch -ulbf unix/posix_thread_os_hnd.c << EOF
+--- unix/posix_thread_os_hnd.c  Mon May 15 15:29:08 2006
++++ unix/posix_thread_os_hnd.c  Wed Jul 30 18:12:56 2008
+@@ -61,6 +61,6 @@
+    more. */
+-extern void posix_vlog(char                 *format,
++/*extern void posix_vlog(char                 *format,
+                       enum ipmi_log_type_e log_type,
+                       va_list              ap);
+-#pragma weak posix_vlog
++#pragma weak posix_vlog*/void posix_vlog(char *format, enum ipmi_log_type_e log_type, va_list ap){}
+ 
+@@ -71,3 +71,5 @@
+     int              wake_sig;
++#ifndef __WIN32__
+     struct sigaction oldact;
++#endif
+ #ifdef HAVE_GDBM
+@@ -412,3 +414,7 @@
+ 
++#ifdef __WIN32__
++    if ((id->lock_count == 0) || (pthread_self().p != id->owner.p)) {
++#else
+     if ((id->lock_count == 0) || (pthread_self() != id->owner)) {
++#endif
+        rv = pthread_mutex_lock(&id->mutex);
+@@ -430,3 +436,7 @@
+        handler->log(handler, IPMI_LOG_FATAL, "lock count went negative");
++#ifdef __WIN32__
++    if (pthread_self().p != id->owner.p)
++#else
+     if (pthread_self() != id->owner)
++#endif
+        handler->log(handler, IPMI_LOG_FATAL, "lock release by non-owner");
+@@ -659,3 +669,5 @@
+ 
++#ifndef __WIN32__
+     sigaction(info->wake_sig, &info->oldact, NULL);
++#endif
+     sel_free_selector(info->sel);
+@@ -874,3 +886,5 @@
+     pt_os_hnd_data_t *info;
++#ifndef __WIN32__
+     struct sigaction act;
++#endif
+     int              rv;
+@@ -891,2 +905,3 @@
+ 
++#ifndef __WIN32__
+     act.sa_handler = posix_thread_sighandler;
+@@ -900,2 +915,3 @@
+     }
++#endif
+EOF
+# fix unix/test_heap.c (missing sigaction and &stderr)
+patch -ulbf unix/test_heap.c << EOF
+--- unix/test_heap.c  Thu Sep  2 18:51:27 2004
++++ unix/test_heap.c  Wed Jul 30 18:16:46 2008
+@@ -64,3 +64,8 @@
+ 
++#ifndef __WIN32__
+ #define HEAP_DEBUG
++#else
++#define test_check(s)
++#define test_print(s)
++#endif
+ 
+@@ -88,3 +93,5 @@
+     test_heap_node_t *val1;
++#ifndef __WIN32__
+     struct sigaction act;
++#endif
+     int              rand_val;
+@@ -112,4 +119,7 @@
+     srand(random_seed);
++#ifndef __WIN32__
+     test_debug_out = &stdout;
++#endif
+ 
++#ifndef __WIN32__
+     act.sa_handler = handle_fault;
+@@ -121,2 +131,3 @@
+     }
++#endif
+EOF
+# fix missing definition of SIGUSR1
+mv unix/test_handlers.c unix/test_handlers.c.bak
+echo "#define SIGUSR1 -1" > unix/test_handlers.c
+cat unix/test_handlers.c.bak >> unix/test_handlers.c
+# fix missing strtok_r
+mv sample/ipmicmd.c sample/ipmicmd.c.bak
+echo "#include <OpenIPMI/ipmi_posix.h>" > sample/ipmicmd.c
+cat sample/ipmicmd.c.bak >> sample/ipmicmd.c
+## fix for missing inet_pton in lib/normal_fru.c (version <= 2.0.30)
+#mv lib/normal_fru.c lib/normal_fru.c.bak
+#echo "#include <OpenIPMI/ipmi_posix.h>" > lib/normal_fru.c
+#cat lib/normal_fru.c.bak >> lib/normal_fru.c
+# add winsock initialization to sample/sample.c
+patch -ulbf sample/sample.c << EOF
+--- sample/sample.c  Fri Aug  1 09:33:01 2008
++++ sample/sample.c  Fri Aug  1 09:32:02 2008
+@@ -403,2 +403,12 @@
+ {
++#ifdef __WIN32__
++    //initialize WINSOCK
++    static WSADATA wsaData;
++    int wsaerr = WSAStartup(MAKEWORD(1, 0), &wsaData);
++    if (wsaerr) {
++      fprintf(stderr, "WSAStartup failed\n");
++      return 1;
++    }
++    atexit((void(*)())WSACleanup);
++#endif
+     int         rv;
+EOF
+## fix missing strtok_r/inet_ntop/inet_pton
+#cat > win32fix.h << EOF
+##ifndef strtok_r
+##define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))
+##endif
+##include <sys/types.h>
+#const char* inet_ntop (int af, void const *src, char *dst, size_t size);
+#int inet_pton (int af, const char * src, void * dst);
+#EOF
+# fix missing strtok_r/inet_ntop/inet_pton (version >= 2.0.31)
+cat > win32fix.h << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+# fix missing uint16_t in include/OpenIPMI/ipmi_addr.h (version >= 2.0.21)
+mv include/OpenIPMI/ipmi_addr.h include/OpenIPMI/ipmi_addr.h.bak
+echo "#include <stdint.h>" > include/OpenIPMI/ipmi_addr.h
+cat include/OpenIPMI/ipmi_addr.h.bak >> include/OpenIPMI/ipmi_addr.h
+# fix missing EKEYREVOKED in lib/rakp.c (version >= 2.0.21)
+mv lib/rakp.c lib/rakp.c.bak
+cat > lib/rakp.c << EOF
+#include <errno.h>
+#ifndef EKEYREJECTED
+#define EKEYREJECTED 129
+#endif
+EOF
+cat lib/rakp.c.bak >> lib/rakp.c
+## fix lanserv/persist.c (version >= 2.0.29)
+#patch -ulbf lanserv/persist.c << EOF
+#@@ -132,3 +132,7 @@
+#        if (stat(dname, &st) != 0) {
+#+#ifdef _WIN32
+#+           if (mkdir(dname) != 0) {
+#+#else
+#            if (mkdir(dname, 0755) != 0) {
+#+#endif
+#                rv = errno;
+#EOF
+## fix include/OpenIPMI/dllvisibility.h (version = 2.0.30)
+##### bug reported: https://sourceforge.net/p/openipmi/bugs/92/
+#patch -ulbf include/OpenIPMI/dllvisibility.h << EOF
+#@@ -37,3 +37,6 @@
+# #if defined _WIN32 || defined __CYGWIN__
+#-  #ifdef BUILDING_DLL
+#+  #if !defined DLL_EXPORT || defined STATIC
+#+    #define IPMI_DLL_PUBLIC
+#+    #define IPMI_DLL_LOCAL
+#+  #elif defined BUILDING_OPENIPMI_DLL
+#     #ifdef __GNUC__
+#EOF
+## fix unix/test_heap.c (version >= 2.0.31)
+#patch -ulbf unix/test_heap.c << EOF
+#@@ -87,3 +87,5 @@
+#     test_heap_node_t *val1;
+#+#ifndef _WIN32
+#     struct sigaction act;
+#+#endif
+#     int              rand_val;
+#@@ -112,2 +114,3 @@
+#
+#+#ifndef _WIN32
+#     act.sa_handler = handle_fault;
+#@@ -119,2 +122,3 @@
+#     }
+#+#endif
+#
+#EOF
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+# fix missing HAVE_OPENIPMI_SMI in configure (version >= 2.0.23)
+sed -i.bak -e "s/\(\slinux\*\))/\1|mingw*|msys*)/" configure
+#mv sample/Makefile sample/Makefile.bak
+#sed -e "s/-rdynamic//" sample/Makefile.bak > sample/Makefile
+#make -C sample
+#cd sample; /bin/sh ../libtool --tag=CC --mode=link gcc -Wall -Wsign-compare -I../include -DIPMI_CHECK_LOCKS -g -O2     -Wl,--allow-multiple-definition -o openipmicmd.exe  ipmicmd.o ../utils/libOpenIPMIutils.la ../lib/libOpenIPMI.la ../unix/libOpenIPMIposix.la -lcrypto  -lcurses -lgdi32 ;  cd ..
+# skip building Unix and command line stuff (version >= 2.0.29)
+#sed -i.bak -e "s/ unix \| cmdlang \| ui / /" Makefile.in
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=no --with-perl=no --with-python=no LDFLAGS="-lws2_32 -liphlpapi -lgdi32 -Wl,--allow-multiple-definition" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=no --with-perl=no --with-python=no LDFLAGS="-lws2_32 -liphlpapi -lgdi32 -Wl,--allow-multiple-definition -Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=no --with-perl=no --with-python=no LDFLAGS="-lws2_32 -liphlpapi -lgdi32 -Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=no --with-perl=no --with-python=no LDFLAGS="-lws2_32 -liphlpapi -lgdi32 -Wl,--enable-auto-import -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=no --with-perl=no --with-python=no LDFLAGS="-lws2_32 -liphlpapi -lgdi32 -Wl,--enable-auto-import -Wl,--allow-multiple-definition -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl --with-ucdsnmp --without-tcl --without-perl --without-python --without-swig LDFLAGS="-lws2_32 -liphlpapi -lgdi32" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ echo "#include \"win32fix.h\"" >> config.h &&
+ echo "#undef HAVE_OPENIPMI_SMI" >> config.h &&
+ make -Cutils install-strip &&
+ #make -Cutils install-strip CFLAGS="-DBUILDING_OPENIPMI_DLL" &&
+ make -Clib install-strip &&
+ #make -Clib install-strip CFLAGS="-DBUILDING_OPENIPMI_DLL" &&
+ make -Cinclude install-strip &&
+ make -Cman install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenIPMI-$VERSION
+
+
+

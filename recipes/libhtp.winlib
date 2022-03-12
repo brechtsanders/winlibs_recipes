@@ -1,0 +1,105 @@
+export NAME="LibHTP"
+export STATUS=
+export URL=https://github.com/OISF/libhtp
+export BASENAME=libhtp
+export DESCRIPTION="LibHTP is a security-aware parser for the HTTP protocol and the related bits and pieces."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=0.5.18
+#export VERSIONDATE=20160301
+#export VERSION=0.5.19
+#export VERSIONDATE=20160322
+#export VERSION=0.5.20
+#export VERSIONDATE=20160607
+#export VERSION=0.5.21
+#export VERSIONDATE=20160713
+#export VERSION=0.5.22
+#export VERSIONDATE=20160907
+#export VERSION=0.5.23
+#export VERSIONDATE=20161101
+#export VERSION=0.5.24
+#export VERSIONDATE=20170607
+#export VERSION=0.5.25
+#export VERSIONDATE=20170628
+#export VERSION=0.5.26
+#export VERSIONDATE=20180214
+#export VERSION=0.5.27
+#export VERSIONDATE=20180718
+#export VERSION=0.5.28
+#export VERSIONDATE=20181105
+#export VERSION=0.5.29
+#export VERSIONDATE=20181222
+#export VERSION=0.5.30
+#export VERSIONDATE=20190307
+#export VERSION=0.5.31
+#export VERSIONDATE=20190924
+#export VERSION=0.5.32
+#export VERSIONDATE=20191213
+#export VERSION=0.5.33
+#export VERSIONDATE=20200428
+#export VERSION=0.5.34
+#export VERSIONDATE=20200911
+#export VERSION=0.5.35
+#export VERSIONDATE=20201009
+#export VERSION=0.5.36
+#export VERSIONDATE=20201203
+#export VERSION=0.5.37
+#export VERSIONDATE=20210302
+#export VERSION=0.5.38
+#export VERSIONDATE=20210701
+export VERSION=0.5.39
+export VERSIONDATE=20211116
+####htp/htp_multipart.c:687:64: error: 'S_IRWXG' undeclared (first use in this function)
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="http://suricata-ids.org/download/"
+export DOWNLOADURL="https://github.com/OISF/libhtp/releases htp-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/OISF/libhtp/releases/download/$VERSION/htp-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/OISF/libhtp/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz || mv $TARBALLDIR/$BASENAME/$VERSION $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/htp-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd htp-$VERSION
+cd $BASENAME-$VERSION
+# fix missing S_IRWXG/S_IRWXO in htp/htp_multipart.c for non-MinGW-W64
+if ! gcc --version|grep -q MinGW-W64; then
+ mv htp/htp_multipart.c htp/htp_multipart.c.bak &&
+ sed -e "s/| S_IRWXG | S_IRWXO//" htp/htp_multipart.c.bak > htp/htp_multipart.c
+fi
+# fix missing inet_pton in htp/htp_util.c (version >= 0.5.39)
+mv htp/htp_util.c htp/htp_util.c.bak
+cat > htp/htp_util.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat htp/htp_util.c.bak >> htp/htp_util.c
+## don't use -fstack-protector compiler flag
+#sed -i.bak -e "s/-fstack-protector//" configure
+# don't use stack protection
+sed -i.bak -e "s/\(gcc_have_fstack_protector\|gcc_have_fortify_source\)=yes/\1=no/; s/ \(-fstack-protector\|-D_FORTIFY_SOURCE=2\)//" configure.ac
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -liconv -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ #( make install-strip || make install-strip LIBS="-Wl,--as-needed -liconv" || make install-strip LIBS="-Wl,--as-needed -liconv -fstack-protector" ) &&
+ make install-strip &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf htp-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

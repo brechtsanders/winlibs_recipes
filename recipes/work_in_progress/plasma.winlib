@@ -1,0 +1,163 @@
+export NAME="PLASMA"
+export STATUS=
+export URL=http://icl.cs.utk.edu/plasma/
+export BASENAME=plasma
+export DESCRIPTION="The Parallel Linear Algebra for Scalable Multi-core Architectures (PLASMA) project aims to address the critical and highly disruptive situation that is facing the Linear Algebra and High Performance Computing community due to the introduction of multi-core architectures."
+export CATEGORY=math
+export TYPE=library
+#export VERSION=2.7.0
+#export VERSIONDATE=20150321
+export VERSION=2.7.1
+export VERSIONDATE=20150428
+#export VERSION=2.8.0
+#export VERSIONDATE=20151208
+####Forbidden: You don't have permission to access /projectsfiles/plasma/pubs/plasma_2.8.0.tar.gz on this server.   http://icl.cs.utk.edu/projectsfiles/plasma/pubs/plasma_2.8.0.tar.gz
+wl-showstatus --package-version
+#export DEPENDANCIES=openblas,lapack
+export DEPENDANCIES=openblas
+export OPTIONALDEPENDANCIES=hwloc
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="http://icl.cs.utk.edu/plasma/software/index.html"
+export DOWNLOADURL="http://icl.cs.utk.edu/projectsfiles/plasma/pubs/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://icl.cs.utk.edu/projectsfiles/plasma/pubs/plasma_$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/plasma_$VERSION.tar.gz
+cd plasma_$VERSION
+# fix missing include of complex in include/plasmatypes.h
+patch -ulbf include/plasmatypes.h << EOF
+--- include/plasmatypes.h  2015-03-01 20:07:41.000000000 +0100
++++ include/plasmatypes.h  2015-03-22 08:41:38.867876600 +0100
+@@ -224,2 +224,6 @@
+     typedef double _Complex PLASMA_Complex64_t;
++# elif defined(__MINGW32__)
++    #include <complex.h>
++    typedef float  _Complex PLASMA_Complex32_t;
++    typedef double _Complex PLASMA_Complex64_t;
+ # else
+@@ -235,4 +239,8 @@
+ # endif
++#ifndef isnan
+ # define isnan _isnan
++#endif
++#ifndef isinf
+ # define isinf !_finite
++#endif
+
+EOF
+# fix redefinition of struct timezone in timing/timing.c
+patch -ulbf timing/timing.c << EOF
+@@ -15,7 +15,7 @@
+  **/
+
+ #if defined( _WIN32 ) || defined( _WIN64 )
+-#define int64_t __int64
++#include <stdint.h>
+ #endif
+
+ #include <math.h>
+@@ -40,6 +40,7 @@
+ #define DELTA_EPOCH_IN_MICROSECS  11644473600000000ULL
+ #endif
+
++#ifndef __MINGW32__
+ struct timezone
+ {
+     int  tz_minuteswest; /* minutes W of Greenwich */
+@@ -78,6 +79,7 @@
+     }
+     return 0;
+ }
++#endif
+
+ #else  /* Non-Windows */
+ #include <unistd.h>
+EOF
+# fix missing int64_t in testing/testing_zpemv.c
+mv testing/testing_zpemv.c testing/testing_zpemv.c.bak
+echo "#include <stdint.h>" > testing/testing_zpemv.c
+cat testing/testing_zpemv.c.bak >> testing/testing_zpemv.c
+# fix missing intptr_t in quark/quark.h (version >= 2.7.1)
+mv quark/quark.h quark/quark.h.bak
+echo "#include <stdint.h>" > quark/quark.h
+cat quark/quark.h.bak >> quark/quark.h
+# skip building testing
+cat > testing/Makefile << EOF
+clean:
+all:
+install:
+install-strip:
+test:
+EOF
+cp -f testing/Makefile testing/lin/Makefile
+cp -f testing/Makefile examples/Makefile
+wl-showstatus configure
+cat > make.inc << EOF
+CC        = gcc
+FC        = gfortran
+LOADER    = gfortran
+ARCH      = ar
+ARCHFLAGS = cr
+RANLIB    = ranlib
+#CFLAGS    = -O2 -DNOCHANGE
+CFLAGS    = -O2 -DADD_
+FFLAGS    = -O2
+LDFLAGS   = -s -Wl,--as-needed
+#LIBBLAS     = -lblas
+LIBBLAS     = -lopenblas
+#LIBCBLAS    = -lgslcblas
+LIBCBLAS    = -lopenblas
+#LIBLAPACK   = -llapack
+LIBLAPACK   = -lopenblas
+INCCLAPACK  = 
+#LIBCLAPACK  = -llapack
+LIBCLAPACK  = -lopenblas
+EOF
+wl-showstatus build &&
+make &&
+ wl-showstatus build-install &&
+ make install prefix=$INSTALLPREFIX &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf plasma_$VERSION
+####To do: build DLL
+
+
+
+#export NAME="PLASMA"
+#export STATUS=
+#export URL=http://icl.cs.utk.edu/plasma/
+#export BASENAME=plasma
+#export DESCRIPTION="The Parallel Linear Algebra for Scalable Multi-core Architectures (PLASMA) project aims to address the critical and highly disruptive situation that is facing the Linear Algebra and High Performance Computing community due to the introduction of multi-core architectures."
+#export CATEGORY=math
+#export TYPE=library
+#export VERSION=19.8.1
+#export VERSIONDATE=20191118
+#wl-showstatus --package-version
+#export DEPENDANCIES=openblas
+#export OPTIONALDEPENDANCIES=hwloc
+#export BUILDDEPENDANCIES=cmake
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=
+#export DOWNLOADURL="https://bitbucket.org/icl/plasma/downloads/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://bitbucket.org/icl/plasma/downloads/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## avoid check_symbol_exists error (version >= 19.8.1)
+#sed -i.bak -e "s/check_symbol_exists/#&/" Modules/FindMKL.cmake
+#wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+#####TO DO: also build static library
+#####grep -i "shared\|static" $(find . -name CMakeLists.txt)

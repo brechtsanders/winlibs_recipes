@@ -1,0 +1,346 @@
+export NAME="XCB"
+export STATUS=
+export URL=http://xcb.freedesktop.org/
+export BASENAME=xcb
+export DESCRIPTION="The X protocol C-language Binding (XCB) is a replacement for Xlib featuring a small footprint, latency hiding, direct access to the protocol, improved threading support, and extensibility."
+export CATEGORY=x
+export TYPE=library
+#export VERSION=1.1.93
+#export VERSIONDATE=20101122
+#export VERSION=1.7
+#export VERSIONDATE=20101122
+#export VERSION=1.8
+#export VERSIONDATE=20120112
+#export VERSION=1.8.1
+#export VERSIONDATE=20120309
+#export VERSION=1.9
+#export VERSIONDATE=20121005
+#export VERSION=1.9.1
+#export VERSIONDATE=20130530
+#export VERSION=1.9.2
+#export VERSIONDATE=20131108
+#export VERSION=1.9.3
+#export VERSIONDATE=20131108
+#export VERSION=1.10
+#export VERSIONDATE=20131222
+#export VERSION=1.11
+#export VERSIONDATE=20140801
+#export VERSION=1.11.1
+#export VERSIONDATE=20150906
+#export VERSION=1.12
+#export VERSIONDATE=20160919
+#export VERSION=1.13
+#export VERSIONDATE=20180305
+#export VERSION=1.13.1
+#export VERSIONDATE=20180928
+export VERSION=1.14
+export VERSIONDATE=20200304
+wl-showstatus --package-version
+export DEPENDANCIES=xcbproto,libpthreadstubs,libxau,libxdmcp,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=libxslt
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://xcb.freedesktop.org/dist/ libxcb-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://xcb.freedesktop.org/dist/libxcb-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://xcb.freedesktop.org/dist/libxcb-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/libxcb-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/libxcb-$VERSION.tar.xz
+cd libxcb-$VERSION
+# fix missing files
+mkdir src/netinet src/sys
+echo "#include <winsock2.h>" > src/netinet/in.h
+touch src/sys/select.h src/sys/uio.h
+cat > src/sys/socket.h << EOF
+#include <winsock2.h>
+/*#include <ip6_misc.h>*/
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+#undef AF_INET6
+#define in_addr_t uint32_t
+EOF
+touch src/sys/un.h
+touch src/netinet/tcp.h
+cat > src/netdb.h << EOF
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#include <winsock2.h>
+#include <ws2tcpip.h>
+struct sockaddr_un
+{
+  short          sun_family;
+  unsigned short sun_port;
+  struct         in_addr sun_addr;
+  char           sun_path[108-2-4]; 
+};
+EOF
+# fix missing definition of struct iovec
+mv src/xcbint.h src/xcbint.h.bak
+echo "#include <X11/Xtrans/Xtrans.h>" > src/xcbint.h
+cat src/xcbint.h.bak >> src/xcbint.h
+mv src/xcbext.h src/xcbext.h.bak
+echo "#include <X11/Xtrans/Xtrans.h>" > src/xcbext.h
+cat src/xcbext.h.bak >> src/xcbext.h
+## fix non-blocking mode in src/xcb_conn.c (version = 1.7)
+#patch -ulbf src/xcb_conn.c << EOF
+#--- src/xcb_conn.c  Tue Nov  4 10:36:18 2008
+#+++ src/xcb_conn.c      2010-11-22 13:15:32 +0100
+#@@ -50,2 +50,7 @@
+# {
+#+#ifdef __WIN32__
+#+    unsigned long flags = 1;
+#+    if (ioctlsocket(fd, FIONBIO, &flags) == -1)
+#+        return 0;
+#+#else
+#     int flags = fcntl(fd, F_GETFL, 0);
+#@@ -58,2 +63,3 @@
+#         return 0;
+#+#endif
+#     return 1;
+#@@ -61,2 +67,12 @@
+#
+#+#ifdef __WIN32__  /* provide iovec/writev on Windows platform */
+#+static inline int writev (int sock, struct iovec *iov, int nvecs)
+#+{
+#+  DWORD ret;
+#+  if (WSASend(sock, (LPWSABUF)iov, nvecs, &ret, 0, NULL, NULL) != 0)
+#+    return -1;
+#+  return ret;
+#+}
+#+#endif
+#+
+# static int write_setup(xcb_connection_t *c, xcb_auth_info_t *auth_info)
+#EOF
+## fix non-blocking mode in src/xcb_util.c (version = 1.7)
+#patch -ulbf src/xcb_util.c << EOF
+#--- src/xcb_util.c  2010-08-13 13:43:32 +0200
+#+++ src/xcb_util.c  2010-11-22 13:48:38 +0100
+#@@ -234,4 +234,6 @@
+#        fd = socket(family, type, proto);
+#+#ifndef __MINGW32__
+#        if (fd >= 0)
+#            fcntl(fd, F_SETFD, FD_CLOEXEC);
+#+#endif
+#     }
+#EOF
+## fix invalid error_connection in src/xcb_util.c (version = 1.8)
+#patch -ulbf src/xcb_util.c << EOF
+#--- src/xcb_util.c  2012-01-11 18:06:36 +0100
+#+++ src/xcb_util.c  2012-01-12 23:12:14 +0100
+#@@ -432,3 +432,3 @@
+#         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+#-            c = (xcb_connection_t *) &error_connection;
+#+            c = _xcb_conn_ret_error(XCB_CONN_ERROR);
+#             goto out;
+#EOF
+# fix src/xcb_in.c
+mv src/xcb_in.c src/xcb_in.c.bak
+echo "#include <winsock2.h>" > src/xcb_in.c
+cat src/xcb_in.c.bak >> src/xcb_in.c
+## fix src/xproto.h - must be done after configure (version <= 1.1.93)
+#patch -ulbf src/xproto.h << EOF
+#--- src/xproto.h  Wed Jul 15 14:48:16 2009
+#+++ src/xproto.h  Wed Jul 15 15:04:52 2009
+#@@ -512,2 +512,3 @@
+# 
+#+/*
+# typedef enum xcb_window_t {
+#@@ -515,2 +516,4 @@
+# } xcb_window_t;
+#+*/
+#+#define XCB_WINDOW_NONE 0
+# 
+#@@ -1005,2 +1008,3 @@
+# 
+#+/*
+# typedef enum xcb_atom_t {
+#@@ -1008,2 +1012,4 @@
+# } xcb_atom_t;
+#+*/
+#+#define XCB_ATOM_NONE 0
+# 
+#@@ -1049,2 +1055,3 @@
+# 
+#+/*
+# typedef enum xcb_colormap_t {
+#@@ -1052,2 +1059,4 @@
+# } xcb_colormap_t;
+#+*/
+#+#define XCB_COLORMAP_NONE 0
+# 
+#@@ -1869,2 +1878,3 @@
+# 
+#+/*
+# typedef enum xcb_cursor_t {
+#@@ -1872,2 +1882,4 @@
+# } xcb_cursor_t;
+#+*/
+#+#define XCB_CURSOR_NONE 0
+# 
+#@@ -3593,2 +3605,3 @@
+# 
+#+/*
+# typedef enum xcb_pixmap_t {
+#@@ -3596,2 +3609,4 @@
+# } xcb_pixmap_t;
+#+*/
+#+#define XCB_PIXMAP_NONE 0
+# 
+#@@ -3620,2 +3635,3 @@
+# 
+#+/*
+# typedef enum xcb_font_t {
+#@@ -3623,2 +3639,4 @@
+# } xcb_font_t;
+#+*/
+#+#define XCB_FONT_NONE 0
+#EOF
+## fix src/render.h - must be done after configure (version <= 1.1.93)
+#patch -ulbf src/render.h << EOF
+#--- src/render.h  Wed Jul 15 14:48:18 2009
+#+++ src/render.h  Wed Jul 15 15:46:14 2009
+#@@ -30,6 +30,9 @@
+# } xcb_render_pict_type_t;
+#-
+#+
+#+/*
+# typedef enum xcb_render_picture_t {
+#     XCB_RENDER_PICTURE_NONE
+#-} xcb_render_picture_t;
+#+} xcb_render_picture_t;
+#+*/
+#+#define XCB_RENDER_PICTURE_NONE 0
+#EOF
+## fix src/xfixes.h - must be done after configure (version <= 1.1.93)
+#patch -ulbf src/xfixes.h << EOF
+#--- src/xfixes.h  Wed Jul 15 14:48:18 2009
+#+++ src/xfixes.h  Wed Jul 15 15:49:02 2009
+#@@ -238,2 +238,3 @@
+# 
+#+/*
+# typedef enum xcb_xfixes_region_t {
+#@@ -241,2 +242,4 @@
+# } xcb_xfixes_region_t;
+#+*/
+#+#define XCB_XFIXES_REGION_NONE 0
+#EOF
+## fix redefinition of struct iovec in src/xcb_windefs.h (version >= 1.8)
+#patch -ulbf src/xcb_windefs.h << EOF
+#--- src/xcb_windefs.h  2011-11-10 15:36:14 +0100
+#+++ src/xcb_windefs.h  2012-01-12 23:08:22 +0100
+#@@ -37,2 +37,3 @@
+#
+#+#if 0
+# struct iovec  {
+#@@ -41,2 +42,3 @@
+# };
+#+#endif
+#
+#EOF
+# fix redefinition of struct iovec in src/xcb_windefs.h (version >= 1.9)
+patch -ulbf src/xcb_windefs.h << EOF
+--- src/xcb_windefs.h  2012-10-05 20:36:52 +0200
++++ src/xcb_windefs.h  2011-07-02 22:20:42 +0200
+@@ -36,8 +36,10 @@
+ #include <windef.h>
+
++#ifndef __MINGW32__
+ struct iovec  {
+     void *iov_base;    /* Pointer to data.  */
+     int iov_len;       /* Length of data.  */
+ };
++#endif
+
+ typedef unsigned int in_addr_t;
+EOF
+## fix src/xcb_auth.c (version >= 1.9 <= 1.13)
+#patch -ulbf src/xcb_auth.c << EOF
+#--- src/xcb_auth.c  2012-01-28 21:52:54 +0100
+#+++ src/xcb_auth.c  2012-10-08 09:48:34 +0200
+#@@ -271,3 +271,3 @@
+#    length for \`sockaddr_un.sun_path') */
+#-static struct sockaddr *get_peer_sock_name(int (*socket_func)(int,
+#+static struct sockaddr *get_peer_sock_name(int (*socket_func)(SOCKET,
+#                                                              struct sockaddr *,
+#EOF
+# fix src/xcb_auth.c (version >= 1.13.1)
+patch -ulbf src/xcb_auth.c << EOF
+@@ -46,2 +46,3 @@
+    it unwrapped, to avoid conflicts with types defined in X headers */
++#include <winsock2.h>
+ #include <X11/Xwindows.h>
+@@ -271,3 +272,3 @@
+    length for `sockaddr_un.sun_path') */
+-static struct sockaddr *get_peer_sock_name(int (*socket_func)(int,
++static struct sockaddr *get_peer_sock_name(int (*socket_func)(SOCKET,
+                                                               struct sockaddr *,
+EOF
+## fix missing field.isfd in src/c_client.py (version >= 1.9.3)
+#patch -ulbf src/c_client.py << EOF
+#--- src/c_client.py  2013-11-08 05:27:52 +0100
+#+++ src/c_client.py  2013-11-13 15:32:54 +0100
+#@@ -2158,5 +2158,2 @@
+#     _c('    ')
+#-    for field in param_fields:
+#-        if field.isfd:
+#-            _c('    xcb_send_fd(c, %s);', field.c_field_name)
+#
+#@@ -2266,5 +2263,2 @@
+# def _c_reply_has_fds(self):
+#-    for field in self.fields:
+#-        if field.isfd:
+#-            return True
+#     return False
+#EOF
+## fix winsock.h/winsock2.h problems in src/xcb_auth.c (version >= 1.9.3)
+#mv src/xcb_auth.c src/xcb_auth.c.bak
+#echo "#include <winsock2.h>" > src/xcb_auth.c
+#cat src/xcb_auth.c.bak >> src/xcb_auth.c
+# fix redefinition of struct iovec in src/xcb_windefs.h (already defined in $MINGWPREFIX/include/X11/Xtrans/Xtrans.h) (version >= 1.11)
+patch -ulbf src/xcb_windefs.h << EOF
+--- src/xcb_windefs.h  2014-03-21 14:44:22.000000000 +0100
++++ src/xcb_windefs.h  2014-08-01 20:21:44.000000000 +0200
+@@ -36,8 +36,10 @@
+ #include <windef.h>
+
++#ifndef __MINGW32__
+ struct iovec  {
+     void *iov_base;    /* Pointer to data.  */
+     int iov_len;       /* Length of data.  */
+ };
++#endif
+
+ typedef unsigned int in_addr_t;
+EOF
+# fix inconsistent use of tabs and spaces in indentation in src/c_client.py (version >= 1.12)
+mv src/c_client.py src/c_client.py.bak &&
+sed -e "s/\t/        /g" src/c_client.py.bak > src/c_client.py
+# fix missing BYTE in src/xcb_auth.c
+mv src/xcb_auth.c src/xcb_auth.c.bak &&
+echo "#include <winsock2.h>" > src/xcb_auth.c &&
+cat src/xcb_auth.c.bak >> src/xcb_auth.c
+wl-showstatus configure &&
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+#fi
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-doxygen=none LDFLAGS="-lpthread -lws2_32 -no-undefined -Wl,-no-undefined" &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-doxygen=none LDFLAGS="-Wl,--as-needed -lpthread -lws2_32 -Wl,-no-undefined" &&
+#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-doxygen=no LDFLAGS="-Wl,--as-needed -lpthread -lws2_32 -Wl,-no-undefined" &&
+PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-dependency-tracking --without-doxygen LDFLAGS="-Wl,--as-needed -lpthread -lws2_32 -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ #PYTHONPATH=$MINGWPREFIX/python/lib/site-packages:$PYTHONPATH make &&
+ #PYTHONPATH=$MINGWPREFIX/python/lib/site-packages:$PYTHONPATH make XCBPROTO_XCBPYTHONDIR=$MINGWPREFIX/python/lib/site-packages &&
+ #( make install-strip || make install-strip LIBS="-Wl,--as-needed -lpthread -lws2_32" ) &&
+ #PYTHONPATH=$MINGWPREFIX/python/lib/site-packages:$PYTHONPATH make install-strip XCBPROTO_XCBPYTHONDIR=$MINGWPREFIX/python/lib/site-packages XCBPROTO_XCBINCLUDEDIR=$MINGWPREFIX/share/xcb &&
+ PYTHONPATH=$MINGWPREFIX/python/lib/site-packages make install-strip XCBPROTO_XCBPYTHONDIR=$MINGWPREFIX/python/lib/site-packages XCBPROTO_XCBINCLUDEDIR=$MINGWPREFIX/share/xcb &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libxcb-$VERSION
+####rm -rf $PYDIR/Lib/site-packages/xcbgen
+
+
+

@@ -1,0 +1,106 @@
+export NAME="avahi"
+export STATUS=
+export URL=http://www.avahi.org/
+export BASENAME=avahi
+export DESCRIPTION="Avahi is a system which facilitates service discovery on a local network. This means that you can plug your laptop or computer into a network and instantly be able to view other people who you can chat with, find printers to print to or find files being shared. This kind of technology is already found in Apple MacOS X (branded Rendezvous, Bonjour and sometimes Zeroconf) and is very convenient."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.6.22
+#export VERSION=0.6.24
+####../avahi-common/watch.h:45: error: `POLLIN' undeclared here (not in a function)
+####../avahi-common/watch.h:45: error: enumerator value for `AVAHI_WATCH_IN' not integer constant
+#export VERSION=0.6.25
+####address.c:27:24: netinet/in.h: No such file or directory
+####address.c:28:24: sys/socket.h: No such file or directory
+####address.c:29:23: arpa/inet.h: No such file or directory
+#export VERSION=0.6.26
+#export VERSION=0.6.27
+#export VERSION=0.6.28
+#export VERSIONDATE=
+####No package 'gtk+-3.0' found
+#export VERSION=0.6.29
+#export VERSIONDATE=20110309
+#export VERSION=0.6.30
+#export VERSIONDATE=20110404
+#export VERSION=0.6.31
+#export VERSIONDATE=20120215
+#export VERSION=0.6.32
+#export VERSIONDATE=20170530
+#export VERSION=0.7
+#export VERSIONDATE=20170710
+export VERSION=0.8
+export VERSIONDATE=20200218
+####avahi-common/simple-watch.c:24:22: fatal error: sys/poll.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="http://avahi.org/download/"
+#export DOWNLOADURL="https://github.com/lathiat/avahi/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://avahi.org/download/avahi-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/avahi-$VERSION.tar.gz
+cd avahi-$VERSION
+
+mv configure configure.bak
+sed -e "s/-Wl,-z,defs//" configure.bak > configure
+
+echo "#define _SC_OPEN_MAX 4" >> tests/testutils.h
+
+mkdir -p win32fix/netinet win32fix/sys win32fix/arpa
+echo "#include <winsock2.h>" > win32fix/sys/socket.h
+echo "#include <winsock2.h>" > win32fix/netinet/in.h
+touch win32fix/arpa/inet.h win32fix/sys/poll.h
+cat > win32fix/poll.h << EOF
+#if _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#define poll(x,y,z) WSAPoll(x,y,z)
+EOF
+
+
+#mkdir -p avahi-common/netinet avahi-common/sys avahi-common/arpa
+#echo "#include <winsock2.h>" > avahi-common/netinet/in.h
+#touch avahi-common/sys/socket.h
+#touch avahi-common/arpa/inet.h
+
+mv avahi-common/simple-watch.c avahi-common/simple-watch.c.bak
+cat > avahi-common/simple-watch.c << EOF
+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+#define poll(x,y,z) WSAPoll(x,y,z)
+EOF
+cat avahi-common/simple-watch.c.bak >> avahi-common/simple-watch.c
+
+#mv avahi-common/Makefile avahi-common/Makefile.bak
+#sed -e "s?^\(CFLAGS *= *\)?\1-I../win32fix ?" avahi-common/Makefile.bak > avahi-common/Makefile
+
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+wl-showstatus configure &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --with-distro=none --disable-qt3 --disable-qt4 --disable-gtk --disable-gdbm --disable-libdaemon --disable-python --disable-pygtk --disable-python-dbus --disable-mono --disable-monodoc --disable-autoipd --disable-doxygen-doc --disable-doxygen-dot --disable-doxygen-xml --disable-doxygen-html --disable-manpages --disable-xmltoman --enable-tests --disable-dbus CFLAGS="-I`pwd`/win32fix" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib -I`pwd`/win32fix" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --with-distro=none --disable-qt3 --disable-qt4 --disable-gtk --disable-gdbm --disable-libdaemon --disable-python --disable-pygtk --disable-python-dbus --disable-mono --disable-monodoc --disable-autoipd --disable-doxygen-doc --disable-doxygen-dot --disable-doxygen-xml --disable-doxygen-html --disable-manpages --disable-xmltoman --enable-tests --disable-dbus CFLAGS="-I`pwd`/win32fix" &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib -I`pwd`/win32fix" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --with-distro=none --disable-qt3 --disable-qt4 --disable-qt5 --disable-gtk --disable-gdbm --disable-libdaemon --disable-python --disable-pygtk --disable-python-dbus --disable-mono --disable-monodoc --disable-autoipd --disable-doxygen-doc --disable-doxygen-dot --disable-doxygen-xml --disable-doxygen-html --disable-manpages --disable-xmltoman --disable-tests --disable-dbus CFLAGS="-I`pwd`/win32fix" &&
+ #--enable-compat-libdns_sd --enable-compat-howl
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+####avahi-common/simple-watch.c:24:22: error: sys/poll.h: No such file or directory
+####../avahi-common/watch.h:43: error: 'POLLIN' undeclared here (not in a function)
+####../avahi-common/watch.h:44: error: 'POLLOUT' undeclared here (not in a function)
+####../avahi-common/watch.h:45: error: 'POLLERR' undeclared here (not in a function)
+####../avahi-common/watch.h:46: error: 'POLLHUP' undeclared here (not in a function)
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION
+cd ..
+
+
+

@@ -1,0 +1,86 @@
+export NAME="Open-source ARJ"
+export STATUS=
+export URL=http://arj.sourceforge.net/
+#export URL=https://github.com/joncampbell123/arj
+export BASENAME=arj
+export DESCRIPTION="Open-source implementation of the world-famous ARJ archiver"
+export CATEGORY=compression
+export TYPE=application
+#export VERSION=3.10.22
+#export VERSIONDATE=20210714
+export VERSION=master
+export VERSIONDATE=20210714
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://sourceforge.net/projects/arj/files/arj/"
+#export DOWNLOADURL="https://github.com/joncampbell123/arj/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://arj.sourceforge.net/files/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/arj/arj/2.78_3.10%20build%2022/arj-3.10.22.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/joncampbell123/arj/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix ntstream.h
+patch -ulbf ntstream.h << EOF
+@@ -13,3 +13,5 @@
+
++#ifndef __MINGW32__
+ #include <largeint.h>
++#endif
+
+EOF
+# fix environ.h
+patch -ulbf environ.h << EOF
+@@ -86,3 +86,3 @@
+
+-#if TARGET==OS2||TARGET==WIN32
++#if (TARGET==OS2||TARGET==WIN32) && !defined(__MINGW32__)
+  #define HAVE_EAS
+EOF
+# fix arj_arcv.c
+patch -ulbf arj_arcv.c << EOF
+@@ -3252,3 +3252,5 @@
+       {
++#ifdef M_UXSPECIAL_UNSUPP
+        msg_cprintf(H_ALERT, M_UXSPECIAL_UNSUPP);
++#endif
+        msg_cprintf(0, (FMSG *)vd_space);
+EOF
+# fix missing S_IREAD/S_IWRITE in environ.c
+mv environ.c environ.c.bak &&
+echo "#include <sys/stat.h>" > environ.c &&
+cat environ.c.bak >> environ.c
+
+#cd gnu &&
+# aclocal --force -I $MINGWPREFIX/share/aclocal &&
+# libtoolize --force -i &&
+# autoconf --force &&
+# autoheader --force &&
+# #autoheader --force -B aclocal -B aclocal_java &&
+# #automake --force-missing --add-missing &&
+# cd .. &&
+#    echo OK
+
+wl-showstatus configure &&
+ gnu/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build &&
+ make && 
+    echo OK
+
+wl-showstatus build &&
+ make CC=gcc CFLAGS="-DHAVE_STRLWR -DHAVE_STRUPR" &&
+    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

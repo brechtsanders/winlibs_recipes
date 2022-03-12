@@ -1,0 +1,84 @@
+export NAME="ONC/RPC"
+export STATUS=
+#export URL=http://sourceforge.net/projects/oncrpc-windows/
+export URL=https://github.com/Memphiz/oncrpc-win32
+export BASENAME=oncrpc
+export DESCRIPTION="A windows port of ONC/RPC library. The ONC/RPC is an implementation of a remote procedure call protocol for distributing applications over one or more computers. ONC/RPC was originally developed by SUN. This port was originally part of the TACO project."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=2
+export VERSIONDATE=20160104
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LGPL
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/oncrpc-windows/files/oncrpc-windows/ release-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/oncrpc-windows/oncrpc-windows/release-$VERSION/oncrpc_win32_release_$VERSION.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/oncrpc_win32_release_$VERSION.zip -d $BASENAME-$VERSION
+cd $BASENAME-$VERSION/oncrpc
+# fix missing FILE in win32/librpc/xdr_stdi.c
+echo "" >> win32/librpc/all_oncrpc.h
+echo "#include <stdio.h>" >> win32/librpc/all_oncrpc.h
+# fix type mismatch in win32/librpc/nt.c
+patch -ulbf win32/librpc/nt.c << EOF
+@@ -77,3 +77,3 @@
+             0,                    // no bytes of raw data
+-            lpszStrings,          // array of error strings
++            (const CHAR**)lpszStrings,// array of error strings
+             NULL);                // no raw data
+EOF
+# fix type mismatch in win32/librpc/Getrpcen.c
+patch -ulbf win32/librpc/Getrpcen.c << EOF
+@@ -215,3 +215,3 @@
+
+-static struct rpcdata *
++struct rpcdata *
+ _rpcdata()
+EOF
+# fix type mismatch in win32/librpc/Clnt_per.c
+patch -ulbf win32/librpc/Clnt_per.c << EOF
+@@ -272,3 +272,3 @@
+ {
+-       extern int sys_nerr;
++       DllImport extern int sys_nerr;
+ #ifndef WIN32
+EOF
+# modify win32/service/inst_pm.c
+mv win32/service/inst_pm.c win32/service/inst_pm.c.bak &&
+sed -e "s/portmap\.exe/portmap_service.exe/" win32/service/inst_pm.c.bak > win32/service/inst_pm.c
+# fix win32/rpcinfo/getopt.c
+mv win32/rpcinfo/getopt.c win32/rpcinfo/getopt.c.bak
+echo "#include <stdio.h>" > win32/rpcinfo/getopt.c
+cat win32/rpcinfo/getopt.c.bak >> win32/rpcinfo/getopt.c
+wl-showstatus build &&
+ for F in $(sed -ne "s/^\s*\([^ ]*\)\.OBJ.*$/\1.c/p" win32/librpc/makefile.bc) clnt_raw.c; do
+  echo win32/librpc/$F &&
+  gcc -c -o win32/librpc/$F.o -DWIN32 -Iwin32/include win32/librpc/$F
+ done &&
+ ar cru liboncrpc.a win32/librpc/*.o &&
+ gcc -shared -s -mwindows -def win32/librpc/oncrpc.def -Wl,--export-all-symbols -o oncrpc.dll -Wl,--out-implib=liboncrpc.dll.a liboncrpc.a -lws2_32 &&
+ gcc -mconsole -s -Iwin32/include win32/librpc/portmap.c liboncrpc.dll.a -lws2_32 -o portmap.exe &&
+ #gcc -mconsole -s -Iwin32/include win32/rpcgen/*.c -o rpcgen.exe &&
+ gcc -mconsole -s -Iwin32/include win32/rpcinfo/rpc*.c -o rpcinfo.exe liboncrpc.dll.a -lws2_32 &&
+ gcc -mconsole -s -Iwin32/include win32/service/inst_pm.c -o inst_pm.exe &&
+ gcc -mconsole -s -D_NT -Iwin32/include win32/service/service.c win32/service/portmap.c -o portmap_service.exe liboncrpc.dll.a -lws2_32 &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/etc &&
+ cp -rf win32/include/* $INSTALLPREFIX/include &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll *.exe $INSTALLPREFIX/bin/ &&
+ cp -f win32/drivers/etc/* $INSTALLPREFIX/etc/ &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: fix rpcgen.exe
+####To do: check if possible replacement for portablexdr
+
+
+

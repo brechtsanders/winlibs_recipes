@@ -1,0 +1,226 @@
+export NAME="httpd"
+export STATUS=
+#export URL=https://httpd.apache.org/docs/current/programs/httpd.html
+export URL=https://github.com/apache/httpd
+export BASENAME=httpd
+export DESCRIPTION="httpd is the Apache HyperText Transfer Protocol (HTTP) server program. It is designed to be run as a standalone daemon process. When used like this it will create a pool of child processes or threads to handle requests."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=2.4.26
+#export VERSIONDATE=20170623
+#export VERSION=2.4.27
+#export VERSIONDATE=20170707
+#export VERSION=2.4.28
+#export VERSIONDATE=20170925
+#export VERSION=2.4.29
+#export VERSIONDATE=20171018
+#export VERSION=2.4.30
+#export VERSIONDATE=20180220
+#export VERSION=2.4.31
+#export VERSIONDATE=20180304
+#export VERSION=2.4.32
+#export VERSIONDATE=20180310
+#export VERSION=2.4.33
+#export VERSIONDATE=20180320
+#export VERSION=2.4.34
+#export VERSIONDATE=20180711
+#export VERSION=2.4.35
+#export VERSIONDATE=20180918
+#export VERSION=2.4.36
+#export VERSIONDATE=20181011
+#export VERSION=2.4.37
+#export VERSIONDATE=20181018
+#export VERSION=2.4.38
+#export VERSIONDATE=20190118
+#export VERSION=2.4.39
+#export VERSIONDATE=20190328
+#export VERSION=2.4.40
+#export VERSIONDATE=20190803
+#export VERSION=2.4.41
+#export VERSIONDATE=20190810
+####TARGET_PDB_FILE is not supported by the target linker.
+#export DEPENDANCIES=apr,libxml2,nghttp2,pcre,lua,openssl,zlib
+#export OPTIONALDEPENDANCIES=brotli
+#export BUILDDEPENDANCIES=
+#export VERSION=2.4.42
+#export VERSIONDATE=20200320
+#export VERSION=2.4.43
+#export VERSIONDATE=20200327
+#export VERSION=2.4.44
+#export VERSIONDATE=20200730
+####modules/lua/mod_lua.h:51:28: error: too few arguments to function 'lua_resume'
+#export VERSION=2.4.45
+#export VERSIONDATE=20200730
+#export VERSION=2.4.46
+#export VERSIONDATE=20200802
+#export VERSION=2.4.47
+#export VERSIONDATE=20210422
+#export VERSION=2.4.48
+#export VERSIONDATE=20210518
+#export VERSION=2.4.49
+#export VERSIONDATE=20210915
+#export VERSION=2.4.50
+#export VERSIONDATE=20211004
+#export VERSION=2.4.51
+#export VERSIONDATE=20211008
+export VERSION=2.4.52
+export VERSIONDATE=20220122
+wl-showstatus --package-version
+export DEPENDANCIES=apr,libxml2,nghttp2,pcre,lua,openssl,zlib
+export OPTIONALDEPENDANCIES=brotli
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+#export DOWNLOADURL="https://github.com/apache/httpd/releases"
+export DOWNLOADURL="https://github.com/apache/httpd/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/apache/httpd/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/apache/httpd/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing sys/times.h in include/scoreboard.h
+patch -ulbf include/scoreboard.h << EOF
+@@ -30,4 +30,6 @@
+ #include <sys/time.h>
++#ifdef HAVE_SYS_TIMES_H
+ #include <sys/times.h>
+ #endif
++#endif
+
+EOF
+# fix objidl.h issues (like missing CLIPFORMAT) in os/win32/util_win32.c
+####error: unknown type name 'CLIPFORMAT'
+mv os/win32/util_win32.c os/win32/util_win32.c.bak &&
+echo "#include <winsock2.h>" > os/win32/util_win32.c &&
+cat os/win32/util_win32.c.bak >> os/win32/util_win32.c
+# fix objidl.h issues (like missing CLIPFORMAT) in os/win32/ap_regkey.c
+mv os/win32/ap_regkey.c os/win32/ap_regkey.c.bak &&
+echo "#include <winsock2.h>" > os/win32/ap_regkey.c &&
+cat os/win32/ap_regkey.c.bak >> os/win32/ap_regkey.c
+# fix objidl.h issues (like missing CLIPFORMAT) and winuser.h issues in server/mpm/winnt/service.c
+####error: redefinition of 'struct tagCBT_CREATEWNDA'
+mv server/mpm/winnt/service.c server/mpm/winnt/service.c.bak &&
+echo "#include <winsock2.h>" > server/mpm/winnt/service.c &&
+sed -e "s?^.*\(_WINUSER_\|winuser\.h\)?//&?" server/mpm/winnt/service.c.bak >> server/mpm/winnt/service.c
+# fix missing build/config.sub
+cp -u $MINGWPREFIX/share/apr/build/config.sub build/
+# fix include/ap_config.h for Windows
+mv include/ap_config.h include/ap_config.h.bak
+cat > include/ap_config.h << EOF
+#if defined(_WIN32) && !defined(WIN32)
+#define WIN32
+#endif
+EOF
+cat include/ap_config.h.bak >> include/ap_config.h
+## avoid AC_MSG_WARN in configure.in
+#mv configure.in configure.in.bak &&
+#sed -e "s/AC_MSG_WARN/#&/; s?AC_MSG_ERROR.*APR-util not found?apu_config=$MINGWPREFIX/bin/apu-1-config #&?" configure.in.bak > configure.in
+#wl-showstatus configure &&
+#mkdir -p m4 &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal -I $MINGWPREFIX/share/apr/build &&
+##./autogen.sh &&
+##    echo OK
+### fix building DLLs on 64-bit
+##if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+## echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+## autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+##fi
+##INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+##PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+##PYTHON=$PYDIR/python.exe 
+##PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX/bin/apr-1-config LDFLAGS="-Wl,--as-needed -lapr-1" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-apr=$MINGWPREFIX/bin/apr-1-config CFLAGS="-DWIN32" CXXFLAGS="-DWIN32" LDFLAGS="-Wl,--as-needed -lapr-1" &&
+# ## fix building DLLs
+# #mv libtool libtool.bak &&
+# #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# #wl-showstatus build &&
+# #make &&
+# wl-showstatus build-install &&
+# make install &&
+#    echo OK
+## fix server/exports.c (version >= 2.4.42)
+#patch -ulbf server/exports.c << EOF
+#@@ -133,3 +133,3 @@
+#
+#-const void *ap_ugly_hack = NULL;
+#+AP_DECLARE_DATA const void *ap_ugly_hack = NULL;
+#
+#EOF
+# fix server/main.c (version >= 2.4.42)
+patch -ulbf server/main.c << EOF
+@@ -837,3 +837,3 @@
+
+-#ifdef AP_USING_AUTOCONF
++#if 0
+ /* This ugly little hack pulls any function referenced in exports.c into
+EOF
+# fix error: too few arguments to function 'lua_resume' in modules/lua/mod_lua.h (version >= 2.4.45)
+patch -ulbf modules/lua/mod_lua.h << EOF
+@@ -50,3 +50,7 @@
+ #define lua_load(a,b,c,d)  lua_load(a,b,c,d,NULL)
++#if LUA_VERSION_NUM < 504
+ #define lua_resume(a,b)    lua_resume(a, NULL, b)
++#else
++#define lua_resume(a,b)    lua_resume(a, NULL, b, NULL)
++#endif
+ #define luaL_setfuncs_compat(a,b) luaL_setfuncs(a,b,0)
+EOF
+# fix missing ERR_GET_FUNC in modules/ssl/ssl_engine_init.c (version >= 2.4.49)
+sed -i.bak -e "s/^.*\(ERR_GET_FUNC\)/#ifndef \1\n#define \1(err) -1\n#endif\n&/" modules/ssl/ssl_engine_init.c
+## fix space and quote issues in CMakeLists.txt (version >= 2.4.42)
+#sed -i.bak -e "s/\(-DAPP_FILE\) \(\\\$\)/\1=\2/" CMakeLists.txt
+#sed -i.bak -e "s/\(-DAPP_FILE\) \(\\\${[^}]*}\)/\1=\\\\\"\2\\\\\"/" CMakeLists.txt
+# fix CMakeLists.txt (version >= 2.4.42)
+patch -ulbf CMakeLists.txt << EOF
+@@ -107,3 +107,3 @@
+ MACRO(DEFINE_WITH_BLANKS output_definition input_symbol input_value)
+-  IF(MSVC_IDE OR \${CMAKE_MAJOR_VERSION}.\${CMAKE_MINOR_VERSION}.\${CMAKE_PATCH_VERSION} VERSION_GREATER 2.8.11)
++  IF(FALSE)
+     SET(\${output_definition} "-D\${input_symbol}=\\"\${input_value}\\"")
+@@ -810,3 +810,3 @@
+     SET(install_modules_pdb \${install_modules_pdb} "\$<TARGET_PDB_FILE:\${mod_name}>")
+-    IF("\${\${mod_name}_install_lib}")
++    IF(MSVC AND "\${\${mod_name}_install_lib}")
+       SET(installed_mod_libs_exps
+@@ -819,4 +819,3 @@
+     SET_TARGET_PROPERTIES(\${mod_name} PROPERTIES
+-      SUFFIX .so
+-      LINK_FLAGS /base:@\${PROJECT_BINARY_DIR}/BaseAddr.ref,\${mod_name}.so
++      SUFFIX .dll
+     )
+@@ -845,2 +844,3 @@
+ ADD_LIBRARY(libhttpd SHARED \${LIBHTTPD_SOURCES} build/win32/httpd.rc)
++IF(MSVC)
+ SET_TARGET_PROPERTIES(libhttpd PROPERTIES
+@@ -848,2 +848,3 @@
+ )
++ENDIF()
+ SET(install_targets \${install_targets} libhttpd)
+@@ -960,3 +961,5 @@
+ INSTALL(FILES \${installed_mod_libs_exps} DESTINATION lib)
++IF(MSVC)
+ INSTALL(FILES "\$<TARGET_LINKER_FILE_DIR:libhttpd>/libhttpd.exp" DESTINATION LIB)
++ENDIF()
+
+EOF
+touch include/ap_config_auto.h
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPCRE_INCLUDE_DIR:STRING=$MINGWPREFIX/include -DPCRE_LIBRARIES:STRING="-lpcre" -DNGHTTP2_INCLUDE_DIR:STRING=$MINGWPREFIX/include -DNGHTTP2_LIBRARIES:STRING="-lnghttp2" -DAPR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/apr-1 -DINSTALL_PDB:BOOL=OFF -DEXTRA_LIBS:STRING="-Wl,--as-needed -lapr-1 -laprutil-1" -S. -Bbuild_win &&
+ #echo "-Wl,--as-needed -lapr-1 -laprutil-1" >> build_win/CMakeFiles/abs.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ sed -i -e "s/\.so/.dll/g" $INSTALLPREFIX/conf/httpd.conf &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,58 @@
+export NAME="mktemp"
+export STATUS=
+export URL=http://www.mktemp.org/
+export BASENAME=mktemp
+export DESCRIPTION="Mktemp is a small program to allow safe temporary file creation from shell scripts."
+export CATEGORY=system
+export TYPE=library
+export VERSION=1.7
+export VERSIONDATE=20130722
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="ISC-style license"
+export DOWNLOADURL="http://www.mktemp.org/mktemp/dist/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.mktemp.org/mktemp/dist/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing _mkdir in priv_mktemp.c
+patch -ulbf priv_mktemp.c << EOF
+@@ -32,2 +32,5 @@
+ #endif /* HAVE_UNISTD_H */
++#ifdef __MINGW32__
++# include <direct.h>
++#endif
+
+@@ -81,3 +84,7 @@
+                case MKTEMP_FILE:
++#ifdef _WIN32
++                       fd = open(path, O_CREAT|O_EXCL|O_RDWR|O_BINARY, S_IRUSR|S_IWUSR);
++#else
+                        fd = open(path, O_CREAT|O_EXCL|O_RDWR, S_IRUSR|S_IWUSR);
++#endif
+                        if (fd != -1 || errno != EEXIST)
+EOF
+patch -ulbf mktemp.c << EOF
+@@ -81,2 +81,7 @@
+ {
++#ifdef _WIN32
++#undef _PATH_TMP
++       char* tempdir = getenv("TEMP");
++#define _PATH_TMP tempdir
++#endif
+        int ch, fd, uflag = 0, quiet = 0, tflag = 0, Tflag = 0, makedir = 0;
+EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ ( make install || make -j1 install ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

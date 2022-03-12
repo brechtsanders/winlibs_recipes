@@ -1,0 +1,88 @@
+export NAME="DCMTK - DICOM Toolkit"
+export STATUS=
+export URL=http://www.dcmtk.org/dcmtk.php
+export BASENAME=dcmtk
+export DESCRIPTION="DCMTK is a collection of libraries and applications implementing large parts the DICOM standard. It includes software for examining, constructing and converting DICOM image files, handling offline media, sending and receiving images over a network connection, as well as demonstrative image storage and worklist servers. DCMTK is is written in a mixture of ANSI C and C++. It comes in complete source code and is made available as \"open source\" software."
+export CATEGORY=
+export TYPE=library
+#export VERSION=3.6.0
+#export VERSIONDATE=20170710
+#export VERSION=3.6.2
+#export VERSIONDATE=20170718
+#export VERSION=3.6.3
+#export VERSIONDATE=20180209
+#export VERSION=3.6.4
+#export VERSIONDATE=20181201
+####ofstd/include/dcmtk/ofstd/offile.h:200:34: error: cannot convert 'bool' to 'FILE* {aka _iobuf*}' in assignment
+#export VERSION=3.6.5
+#export VERSIONDATE=20191030
+export VERSION=3.6.6
+export VERSIONDATE=20210125
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,zlib,libpng,libtiff,openssl,libxml2,libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,doxygen
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE=
+#export DOWNLOADURL="http://dicom.offis.de/dcmtk"
+export DOWNLOADURL="ftp://dicom.offis.de/pub/dicom/offis/software/dcmtk/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://dicom.offis.de/pub/dicom/offis/software/dcmtk/dcmtk$(echo $VERSION|sed -e "s/\.//g")/dcmtk-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix _popen/_pclose type issues in ofstd/include/dcmtk/ofstd/offile.h
+sed -i.bak -e "s/#ifdef _WIN32/#if defined(_WIN32) \&\& !defined(__MINGW32__)/" ofstd/include/dcmtk/ofstd/offile.h
+# fix missing WKSTA_USER_INFO_0 in ofstd/libsrc/ofstd.cc (version >= 3.6.5)
+####error lm.h is deprecated, please use levmar.h instead!
+echo "#include <levmar.h>" | gcc -E -xc - &> /dev/null && patch -ulbf ofstd/libsrc/ofstd.cc << EOF
+@@ -161,3 +161,5 @@
+ #include <direct.h>      /* for _mkdir() */
+-#include <lm.h>          /* for NetWkstaUserGetInfo */
++#include <levmar.h>          /* for NetWkstaUserGetInfo */
++#include <lmerr.h>
++#include <lmwksta.h>
+ #include <ws2tcpip.h>    /* for struct sockaddr_in6 */
+EOF
+#wl-showstatus configure &&
+#cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DDCMTK_WITH_ZLIB:BOOL=ON -DWITH_ZLIBINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_PNG:BOOL=ON -DWITH_LIBPNGINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_TIFF:BOOL=ON -DWITH_LIBTIFFINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_XML:BOOL=ON -DWITH_LIBXMLINC:PATH=$MINGWPREFIX/include/libxml2 -DDCMTK_WITH_OPENSSL:BOOL=ON -DWITH_OPENSSLINC:PATH=$MINGWPREFIX/include/openssl . &&
+# #echo "#define HAVE_PROTOTYPE_ISNAN 1" >> include/dcmtk/config/osconfig.h &&
+# #echo "#define HAVE_VSNPRINTF 1" >> include/dcmtk/config/osconfig.h &&
+# # fix missing FlsAlloc/FlsGetValue/FlsSetValue/FlsFree
+# echo "#if _WIN32_WINNT < 0x0600" >> config/include/dcmtk/config/osconfig.h &&
+# echo "#undef _WIN32_WINNT" >> config/include/dcmtk/config/osconfig.h &&
+# echo "#define _WIN32_WINNT 0x0600" >> config/include/dcmtk/config/osconfig.h &&
+# echo "#endif" >> config/include/dcmtk/config/osconfig.h &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DDCMTK_WITH_ZLIB:BOOL=ON -DWITH_ZLIBINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_PNG:BOOL=ON -DWITH_LIBPNGINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_TIFF:BOOL=ON -DWITH_LIBTIFFINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_XML:BOOL=ON -DWITH_LIBXMLINC:PATH=$MINGWPREFIX/include/libxml2 -DDCMTK_WITH_OPENSSL:BOOL=ON -DWITH_OPENSSLINC:PATH=$MINGWPREFIX/include/openssl -S. -Bbuild_static &&
+ #echo "#define HAVE_PROTOTYPE_ISNAN 1" >> build_static/include/dcmtk/config/osconfig.h &&
+ #echo "#define HAVE_VSNPRINTF 1" >> build_static/include/dcmtk/config/osconfig.h &&
+ # fix missing FlsAlloc/FlsGetValue/FlsSetValue/FlsFree
+ echo "#if _WIN32_WINNT < 0x0600" >> build_static/config/include/dcmtk/config/osconfig.h &&
+ echo "#undef _WIN32_WINNT" >> build_static/config/include/dcmtk/config/osconfig.h &&
+ echo "#define _WIN32_WINNT 0x0600" >> build_static/config/include/dcmtk/config/osconfig.h &&
+ echo "#endif" >> build_static/config/include/dcmtk/config/osconfig.h &&
+ wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DDCMTK_WITH_ZLIB:BOOL=ON -DWITH_ZLIBINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_PNG:BOOL=ON -DWITH_LIBPNGINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_TIFF:BOOL=ON -DWITH_LIBTIFFINC:PATH=$MINGWPREFIX/include -DDCMTK_WITH_XML:BOOL=ON -DWITH_LIBXMLINC:PATH=$MINGWPREFIX/include/libxml2 -DDCMTK_WITH_OPENSSL:BOOL=ON -DWITH_OPENSSLINC:PATH=$MINGWPREFIX/include/openssl -S. -Bbuild_shared &&
+ #echo "#define HAVE_PROTOTYPE_ISNAN 1" >> build_shared/include/dcmtk/config/osconfig.h &&
+ #echo "#define HAVE_VSNPRINTF 1" >> build_shared/include/dcmtk/config/osconfig.h &&
+ # fix missing FlsAlloc/FlsGetValue/FlsSetValue/FlsFree
+ echo "#if _WIN32_WINNT < 0x0600" >> build_shared/config/include/dcmtk/config/osconfig.h &&
+ echo "#undef _WIN32_WINNT" >> build_shared/config/include/dcmtk/config/osconfig.h &&
+ echo "#define _WIN32_WINNT 0x0600" >> build_shared/config/include/dcmtk/config/osconfig.h &&
+ echo "#endif" >> build_shared/config/include/dcmtk/config/osconfig.h &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

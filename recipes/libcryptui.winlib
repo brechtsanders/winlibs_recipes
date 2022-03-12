@@ -1,0 +1,91 @@
+export NAME="libcryptui"
+export STATUS=
+export URL=https://launchpad.net/libcryptui
+export BASENAME=libcryptui
+export DESCRIPTION="libcryptui is a library used to list GnuPG keys. It is gradually being replaced by the GCR library, and will soon be deprecated."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=3.6.0
+#export VERSIONDATE=20130227
+#export VERSION=3.7.5
+#export VERSIONDATE=20130227
+#export VERSION=3.8.0
+#export VERSIONDATE=20130325
+#export VERSION=3.10.0
+#export VERSIONDATE=20130924
+#export VERSION=3.10.1
+#export VERSIONDATE=20131017
+####src/ProcWait.h:36:7: error: expected identifier before numeric constant
+####src/GetPass.cc:25:21: fatal error: termios.h: No such file or directory
+export VERSION=3.12.2
+export VERSIONDATE=20140514
+####libcryptui/cryptui-keyset.c:364:29: error: 'cryptui_marshal_VOID__STRING_POINTER' undeclared (first use in this function)
+wl-showstatus --package-version
+#export DEPENDANCIES=gpgme,dbus,libnotify,libgnome-keyring,gnupg
+export DEPENDANCIES=gpgme,dbus,libnotify,libgnome-keyring,gnupg,gobject-introspection
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/libcryptui/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/GNOME/sources/libcryptui/`echo $VERSION|sed -e "s/^\([0-9][0-9]*\.[0-9][0-9]*\)\..*.*$/\1/"`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing gdk/gdkx.h
+mkdir -p gdk
+cat > gdk/gdkx.h << EOF
+//fix error: /include/winspool.h:255: error: two or more data types in declaration specifiers
+#undef Status
+#include <gdk/gdkwin32.h>
+#include <X11/X.h>
+//#include <X11/Xlib.h>
+//#define GDK_WINDOW_XID(dw) (int)GDK_WINDOW_HWND(dw)
+EOF
+# fix missing F_GETFD/F_SETFD/FD_CLOEXEC in libegg/eggsmclient-xsmp.c
+patch -ulbf libegg/eggsmclient-xsmp.c << EOF
+--- libegg/eggsmclient-xsmp.c  2011-07-22 09:33:04 +0200
++++ libegg/eggsmclient-xsmp.c  2013-02-27 20:40:46 +0100
+@@ -1324,3 +1324,7 @@
+
++#ifdef __MINGW32__
++      SetHandleInformation((HANDLE)_get_osfhandle(fd), HANDLE_FLAG_INHERIT, 0);
++#else
+       fcntl (fd, F_SETFD, fcntl (fd, F_GETFD, 0) | FD_CLOEXEC);
++#endif
+       channel = g_io_channel_unix_new (fd);
+EOF
+# fix missing files
+mkdir -p sys
+touch sys/signal.h sys/wait.h err.h
+cat > syslog.h << EOF
+#define LOG_CRIT    2    //critical conditions
+#define LOG_ERR     3    //error conditions
+#define LOG_WARNING 4    //warning conditions
+#define LOG_NOTICE  5    //normal but significant condition
+#define LOG_INFO    6    //informational
+#define LOG_DEBUG   7    //debug-level messages
+#define LOG_AUTH     (4<<3)    //security/authorization messages
+#define LOG_PID    0x01    //log the pid with each message
+EOF
+# fix detection of GnuPG (version >= 3.12.2)
+sed -i.bak -e "s/as_fn_error\(.*Appropriate version of GnuPG not found\)/echo\1/" configure
+wl-showstatus configure &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,--as-needed" &&
+ #PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,--as-needed" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gpg-check --disable-introspection LDFLAGS="-Wl,--as-needed" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-Wl,--as-needed" &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection LDFLAGS="-Wl,--as-needed" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #( make install-strip || ( make -Clibcryptui libcryptui.la && make -i install-strip ) ) &&
+ ( PATH=$PYDIR:$PATH make install-strip || ( PATH=$PYDIR:$PATH make -Clibcryptui libcryptui.la && PATH=$PYDIR:$PATH make -i install-strip ) ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: also build deamon folder
+
+
+

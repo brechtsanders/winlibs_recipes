@@ -1,0 +1,81 @@
+export NAME="tn5250"
+export STATUS=
+export URL=http://tn5250.sourceforge.net/
+#export URL=http://sourceforge.net/projects/tn5250/
+export BASENAME=tn5250
+export DESCRIPTION="tn5250 emulates a 5250 terminal or printer over telnet, for connecting to IBM iSeries and AS/400 computers running i5/OS and OS/400. It runs on any Unix or Windows system."
+export CATEGORY=communication
+export TYPE=library,application
+export VERSION=0.17.4
+export VERSIONDATE=20160127
+wl-showstatus --package-version
+export DEPENDANCIES=openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/tn5250/files/tn5250/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/tn5250/tn5250/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing syslog.h
+mkdir -p winfix
+cat > winfix/syslog.h << EOF
+#ifndef __DUMMY_SYSLOG_H_INCLUDED
+#define __DUMMY_SYSLOG_H_INCLUDED
+//#define LOG_ERR 3
+//#define LOG_NOTICE 5
+#define LOG_INFO 6
+//#define LOG_PRIMASK 0x07
+#define LOG_DAEMON (3<<3)
+//#define LOG_AUTHPRIV (10<<3)
+#define LOG_PID 0x01
+static void openlog (const char *ident, int option, int facility) {}
+static void syslog (int priority, const char *format, ...) {}
+static void vsyslog (int priority, const char *format, va_list ap) {}
+//static void closelog (void) {}
+#endif
+EOF
+# fix missing getpwnam/setuid in lp5250d/lp5250d.c
+patch -ulbf lp5250d/lp5250d.c << EOF
+--- lp5250d/lp5250d.c  2008-11-21 09:12:21.000000000 +0100
++++ lp5250d/lp5250d.c  2016-01-27 22:14:18.377962700 +0100
+@@ -271,2 +271,7 @@
+ {
++#ifdef _WIN32
++  printf ("Setting UID not supported on this platform (user: %s)\n", user);
++  perror ("getpwnam()");
++  return (-1);
++#else
+   struct passwd *pwent;
+@@ -291,2 +296,3 @@
+   return (0);
++#endif
+ }
+EOF
+# fix use of deprecated SSLv2_client_method/SSLv3_client_method in lib5250/sslstream.c
+sed -i.bak -e "s/SSLv[23]_client_method/TLS_client_method/" lib5250/sslstream.c
+wl-showstatus configure &&
+ # fix building DLLs on 64-bit
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+ fi &&
+ # avoid obsolete CRYPTO_num_locks/SSL_library_init when detecting openssl 1.1.0 or higher
+ sed -i.bak -e "s?return \(CRYPTO_num_locks\|SSL_library_init\) ();?//&?" configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-curses --without-ssl --without-python CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ echo "#define HAVE_SYSLOG_H 1" >> config.h &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ ( make install-strip || make -C lib5250 install-strip ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: also build application (daemon)
+
+
+

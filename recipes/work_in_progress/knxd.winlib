@@ -1,0 +1,140 @@
+export NAME="knxd"
+export STATUS=
+export URL=https://github.com/knxd/knxd
+export BASENAME=knxd
+export DESCRIPTION="KNX is a very common building automation protocol which runs on dedicated 9600-baud wire as well as IP multicast. knxd is an advanced router/gateway which runs on any Linux computer; it can talk to all known KNX interfaces."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.14.25
+#export VERSIONDATE=20181116
+#export VERSION=0.14.26
+#export VERSIONDATE=20200212
+#export VERSION=0.14.29
+#export VERSIONDATE=20190120
+#export VERSION=0.14.31
+#export VERSIONDATE=20190220
+#export VERSION=0.14.34
+#export VERSIONDATE=20190327
+#export VERSION=0.14.35
+#export VERSIONDATE=20200406
+#export VERSION=0.14.36
+#export VERSIONDATE=20200424
+#export VERSION=0.14.37
+#export VERSIONDATE=20200512
+#export VERSION=0.14.38
+#export VERSIONDATE=20200525
+#export VERSION=0.14.39
+#export VERSIONDATE=20200618
+#export VERSION=0.14.44
+#export VERSIONDATE=20210317
+#export VERSION=0.14.50
+#export VERSIONDATE=20210319
+#export VERSION=0.14.51
+#export VERSIONDATE=20210427
+export VERSION=0.14.53
+export VERSIONDATE=20220122
+wl-showstatus --package-version
+export DEPENDANCIES=fmt
+#export DEPENDANCIES=libusb,fmt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/knxd/knxd/releases"
+export DOWNLOADURL="https://github.com/knxd/knxd/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/knxd/knxd/archive/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/knxd/knxd/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/knxd/knxd/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix non-blocking socket code in src/common/iobuf.cpp (version >= 0.14.31)
+patch -ulbf src/common/iobuf.cpp << EOF
+@@ -22,3 +22,7 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <fcntl.h>
++#endif
+ #include "iobuf.h"
+@@ -140,2 +144,6 @@
+ {
++#ifdef _WIN32
++  u_long mode = 1;
++  ioctlsocket(fd, FIONBIO, &mode);
++#else
+   int flags = fcntl(fd, F_GETFL, 0);
+@@ -145,2 +153,3 @@
+   fcntl(fd, F_SETFL, flags);
++#endif
+ }
+EOF
+# fix missing select() in src/client/c/io.c (version >= 0.14.31)
+patch -ulbf src/client/c/io.c << EOF
+@@ -34,2 +34,5 @@
+ #endif
++#ifdef _WIN32
++#include <winsock2.h>
++#endif
+
+EOF
+# don't suport Unix sockets in src/client/c/openlocal.c (version >= 0.14.31)
+patch -ulbf src/client/c/openlocal.c << EOF
+@@ -35,2 +35,6 @@
+ {
++#ifdef _WIN32
++  errno = ENOSYS;
++  return 0;
++#else
+   EIBConnection *con = (EIBConnection *) malloc (sizeof (EIBConnection));
+@@ -67,2 +71,3 @@
+   return con;
++#endif
+ }
+EOF
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/net
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/sys/un.h winfix/netinet/in.h winfix/netinet/tcp.h winfix/netdb.h winfix/net/if.h
+# fix configure.ac (version >= 0.14.34)
+patch -ulbf configure.ac << EOF
+@@ -28,3 +28,3 @@
+
+-AC_INIT(knxd, m4_esyscmd(sh -c "./tools/version.sh | tr -d '\\n'"))
++AC_INIT(knxd, [$VERSION])
+ AM_INIT_AUTOMAKE([foreign])
+EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-systemd --disable-usb --disable-java CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK && ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

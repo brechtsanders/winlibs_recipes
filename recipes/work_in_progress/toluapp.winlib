@@ -1,0 +1,69 @@
+export NAME="tolua++"
+export STATUS=
+#export URL=http://www.codenix.com/~tolua/
+export URL=https://github.com/LuaDist/toluapp
+export BASENAME=toluapp
+export DESCRIPTION="tolua++ is an extension of toLua, a tool to integrate C/Cpp code with Lua"
+export CATEGORY=development
+export TYPE=library
+export VERSION=1.0.93
+export VERSIONDATE=20200210
+####src/lib/tolua_map.c:414:19: error: 'LUA_GLOBALSINDEX' undeclared (first use in this function)
+wl-showstatus --package-version
+export DEPENDANCIES=lua,luajit
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/LuaDist/toluapp/releases"
+export DOWNLOADURL="https://github.com/LuaDist/toluapp/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/LuaDist/toluapp/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/LuaDist/toluapp/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined LUA_GLOBALSINDEX in src/lib/tolua_map.c
+mv src/lib/tolua_map.c src/lib/tolua_map.c.bak &&
+echo "#include <luajit-2.0/lua.h>" > src/lib/tolua_map.c &&
+cat src/lib/tolua_map.c.bak >> src/lib/tolua_map.c
+# fix undefined LUAMOD_API/luaL_getn in src/bin/tolua.c
+mv src/bin/tolua.c src/bin/tolua.c.bak &&
+echo "#include <luaconf.h>" > src/bin/tolua.c &&
+echo "#include <luajit-2.0/lauxlib.h>" >> src/bin/tolua.c &&
+cat src/bin/tolua.c.bak >> src/bin/tolua.c
+# fix undefined lua_getfenv in src/lib/tolua_push.c
+mv src/lib/tolua_push.c src/lib/tolua_push.c.bak &&
+echo "#include <luajit-2.0/lua.h>" > src/lib/tolua_push.c &&
+cat src/lib/tolua_push.c.bak >> src/lib/tolua_push.c
+# fix undefined lua_getfenv in src/lib/tolua_event.c
+mv src/lib/tolua_event.c src/lib/tolua_event.c.bak &&
+echo "#include <luajit-2.0/lua.h>" > src/lib/tolua_event.c &&
+cat src/lib/tolua_event.c.bak >> src/lib/tolua_event.c
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF .. &&
+ echo "-Wl,--as-needed $(pkg-config --static --libs luajit)" >> CMakeFiles/toluapp_lib.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed $(pkg-config --static --libs luajit)" >> CMakeFiles/toluapp.dir/linklibs.rsp &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON .. &&
+ echo "-Wl,--as-needed $(pkg-config --libs luajit)" >> CMakeFiles/toluapp_lib.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed $(pkg-config --libs luajit)" >> CMakeFiles/toluapp.dir/linklibs.rsp &&
+ cd .. &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+    build_shared/toluapp.exe --help &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: fix segmentation fault when running toluapp.exe --help
+
+
+

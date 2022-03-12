@@ -1,0 +1,79 @@
+export NAME="ripMIME"
+export STATUS=
+export URL=http://www.pldaniels.com/ripmime/
+export BASENAME=ripmime
+export DESCRIPTION="ripMIME's primary pupose is to extract attachments out of MIME encoded e-mail."
+export CATEGORY=dataprocessing
+export TYPE=application
+export VERSION=1.4.0.10
+export VERSIONDATE=20120908
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="http://www.pldaniels.com/ripmime/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.pldaniels.com/ripmime/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p tnef/netinet
+touch tnef/netinet/in.h
+cat > syslog.h << EOF
+EOF
+# fix missing link() in mime.c
+mv mime.c mime.c.bak
+echo "#define link(oldname, newname) -1" > mime.c
+cat mime.c.bak >> mime.c
+# fix logger.c
+mv logger.c logger.c.bak
+cat > logger.c << EOF
+#define _LOGGER_SYSLOG -1
+static void syslog (int priority, const char *format, ...) {}
+EOF
+cat logger.c.bak >> logger.c
+# fix ripOLE/logger.c
+mv ripOLE/logger.c ripOLE/logger.c.bak
+cat > ripOLE/logger.c << EOF
+#define _LOGGER_SYSLOG -1
+static void syslog (int priority, const char *format, ...) {}
+EOF
+cat ripOLE/logger.c.bak >> ripOLE/logger.c
+# fix ripOLE/ole.c
+mv ripOLE/ole.c ripOLE/ole.c.bak
+echo "#include <io.h>" > ripOLE/ole.c
+sed -e "s/\(mkdir *([^,]*\),[^)]*/\1/" ripOLE/ole.c.bak >> ripOLE/ole.c
+# fix ripmime.c
+mv ripmime.c ripmime.c.bak
+cat > ripmime.c << EOF
+#define LOG_INFO    6    //informational
+#define LOG_MAIL     (2<<3)    //mail system
+#define _LOGGER_SYSLOG -1
+//static void syslog (int priority, const char *format, ...) {}
+#define signal(s,a)
+#define alarm(t)
+EOF
+sed -e "s/\(mkdir *([^,]*\),[^)]*/\1/" ripmime.c.bak >> ripmime.c
+# fix Makefile
+mv Makefile Makefile.bak
+sed -e "s/\(-o\|cp\)\( ripmime\) /\1\2.exe /; s/\(strip ripmime\)\( *\)$/\1.exe\2/" Makefile.bak > Makefile
+# remove -Wall/-Werror from Makefile
+mv Makefile Makefile.bak2
+sed -e "s/-Wall\|-Werror//g" Makefile.bak2 > Makefile
+# remove -Wall/-Werror from ripOLE/Makefile
+mv ripOLE/Makefile ripOLE/Makefile.bak2
+sed -e "s/-Wall\|-Werror//g" ripOLE/Makefile.bak2 > ripOLE/Makefile
+wl-showstatus build &&
+make CC="gcc -DWIN32" LIBS="-liconv" -j1 &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/man/man1 &&
+ make install LOCATION=$INSTALLPREFIX &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

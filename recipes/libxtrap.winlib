@@ -1,0 +1,69 @@
+export NAME="X.Org libXTrap"
+export STATUS=
+#export URL=http://www.freedesktop.org/wiki/Software/xlibs
+export URL=http://www.x.org/
+export BASENAME=libxtrap
+export DESCRIPTION="The X.Org project provides an open source implementation of the X Window System. X Trap extension."
+export CATEGORY=x
+export TYPE=library
+#export VERSION=1.0.0
+#export VERSIONDATE=20101013
+export VERSION=1.0.1
+export VERSIONDATE=20130104
+wl-showstatus --package-version
+#export DEPENDANCIES=libx11,libxt,trapproto,libxext,xextproto
+export DEPENDANCIES=libx11,libxt,trapproto,libxext,xorgproto
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://xorg.freedesktop.org/archive/individual/lib/ libXTrap-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://xorg.freedesktop.org/archive/individual/lib/libXTrap-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/libXTrap-$VERSION.tar.bz2
+cd libXTrap-$VERSION
+## fix incorrect number of parameters to gettimeofday in src/XEWrappers.c
+####XEWrappers.c:166:43: error: macro "gettimeofday" passed 2 arguments, but takes just 1
+#mv src/XEWrappers.c src/XEWrappers.c.bak
+#sed -e "s/\(gettimeofday.*\), NULL/\1/" src/XEWrappers.c.bak > src/XEWrappers.c
+# fix incorrect number of parameters to gettimeofday in src/XEWrappers.c (except on MinGW-W64)
+if ! gcc --version|grep -q "MinGW-W64"; then
+patch -ulbf src/XEWrappers.c << EOF
+--- src/XEWrappers.c  2013-01-03 18:20:44 +0100
++++ src/XEWrappers.c  2013-01-04 22:07:48 +0100
+@@ -68,2 +68,3 @@
+ #endif /* vms */
++#undef gettimeofday
+
+EOF
+else
+mv src/XEWrappers.c src/XEWrappers.c.bak
+#echo "#include <winsock2.h>" > src/XEWrappers.c
+#sed -e "s/\(gettimeofday.*\), NULL/\1/" src/XEWrappers.c.bak >> src/XEWrappers.c
+cat > src/XEWrappers.c << EOF
+#include <winsock2.h>
+inline int mygettimeofday(struct timeval* p, void* tz)
+{
+  union {
+    long long ns100; /* time since 1 Jan 1601 in 100ns units */
+    FILETIME ft;
+  } now;
+  GetSystemTimeAsFileTime( &(now.ft) );
+  p->tv_usec = (long)((now.ns100 / 10LL) % 1000000LL );
+  p->tv_sec = (long)((now.ns100 - (116444736000000000LL)) / 10000000LL);
+  return 0;
+}
+EOF
+sed -e "s/\(gettimeofday\)/my\1/" src/XEWrappers.c.bak >> src/XEWrappers.c
+fi
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libXTrap-$VERSION
+
+
+

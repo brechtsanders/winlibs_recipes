@@ -1,0 +1,115 @@
+export NAME="Jhbuild"
+export STATUS=
+export URL=http://live.gnome.org/Jhbuild
+export BASENAME=jhbuild
+export DESCRIPTION="JHBuild is a tool designed to ease building collections of source packages, called \"modules\". JHBuild uses \"module set\" files to describe the modules available to build. The \"module set\" files include dependency information that allows JHBuild to discover what modules need to be built and in what order."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=2.32.4
+#export VERSIONDATE=20101221
+#export VERSION=3.2.0
+#export VERSIONDATE=20110927
+#export VERSION=3.2.1
+#export VERSIONDATE=20111009
+#export VERSION=3.4.0
+#export VERSIONDATE=20120416
+####install-check.c:42: undefined reference to `fork'
+#export VERSION=3.5.3
+#export VERSIONDATE=20120709
+#export VERSION=3.5.5
+#export VERSIONDATE=20120813
+#export VERSION=3.5.91
+#export VERSIONDATE=20120906
+#export VERSION=3.10.0
+#export VERSIONDATE=20131125
+#export VERSION=3.12.0
+#export VERSIONDATE=20140420
+#export VERSION=3.34.0
+#export VERSIONDATE=20190907
+#export VERSION=3.35.1
+#export VERSIONDATE=20191003
+####configure: error: Python interpreter is too old
+#export VERSION=3.35.2
+#export VERSIONDATE=20191109
+#export VERSION=3.36.0
+#export VERSIONDATE=20200307
+export VERSION=3.38.0
+export VERSIONDATE=20200913
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=itstool
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/jhbuild/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/$BASENAME/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing file
+mkdir -p sys
+touch sys/wait.h
+## workaround for missing fork in install-check.c (version <= 3.34.0)
+#####D:\Prog\MinGW-mSys.newer\home\win32\jhbuild-2.32.4/install-check.c:42: undefined reference to `fork'
+#patch -ulbf install-check.c << EOF
+#--- install-check.c  2009-08-19 17:15:20 +0200
+#+++ install-check.c  2012-04-16 21:27:26 +0200
+#@@ -31,28 +31,2 @@
+# {
+#-  struct stat b1, b2;
+#-  int status;
+#-  pid_t pid, rpid;
+#-
+#-  if (stat (f2, &b2) || stat (f1, &b1))
+#-    return;
+#-
+#-  if (b1.st_size != b2.st_size)
+#-    return;
+#-
+#-  pid = fork ();
+#-
+#-  if (pid == 0)
+#-    execlp ("cmp", "cmp", "-s", f1, f2, NULL);
+#-  else if (pid < 0)
+#-    return;
+#-
+#-  do
+#-    rpid = waitpid (pid, &status, 0);
+#-  while (rpid == -1 && errno == EINTR);
+#-
+#-  if (rpid != pid)
+#-    status = -1;
+#-
+#-  if (status != -1 && WIFEXITED (status) && WEXITSTATUS (status) == 0)
+#-    exit (0);
+# }
+#
+#EOF
+# fix problem detecting GNU gettext tools on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ mv configure configure.bak
+ sed -e "s/as_fn_error\(.*GNU gettext tools not found; required for intltool\)/as_echo\1/" configure.bak > configure
+fi
+wl-showstatus configure &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PYTHON=$PY2DIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+#PERL="$PERLDIR/bin/perl.exe" PYTHON=$PY2DIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PYTHON=$PY2DIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ #PATH=$PY2DIR:$PATH make install-strip pyexecdir=$INSTALLPREFIX/python2/Lib/site-packages pythondir=$INSTALLPREFIX/python2/Lib/site-packages &&
+ PATH=$PYDIR:$PATH make install-strip pyexecdir=$INSTALLPREFIX/python2/Lib/site-packages pythondir=$INSTALLPREFIX/python2/Lib/site-packages &&
+ rm -f $INSTALLPREFIX/bin/python2 &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: fix invalid compare workaround
+####To do: fix absolute path in bin/jhbuild
+####To do: fix error when run: install-check.exe: Bad file number
+#PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages:$PYTHONPATH $PY2DIR/python.exe $MINGWPREFIX/bin/jhbuild sanitycheck
+#PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages:$PYTHONPATH $PYDIR/python.exe $MINGWPREFIX/bin/jhbuild sanitycheck
+
+
+

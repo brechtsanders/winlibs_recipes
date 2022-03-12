@@ -1,0 +1,197 @@
+#export NAME="OpenFst"
+#export STATUS=
+#export URL=http://www.openfst.org/
+#export BASENAME=openfst
+#export DESCRIPTION="OpenFst is a library for constructing, combining, optimizing, and searching weighted finite-state transducers (FSTs). Weighted finite-state transducers are automata where each transition has an input label, an output label, and a weight. The more familiar finite-state acceptor is represented as a transducer with each transition's input and output label equal. Finite-state acceptors are used to represent sets of strings (specifically, regular or rational sets); finite-state transducers are used to represent binary relations between pairs of strings (specifically, rational transductions). The weights can be used to represent the cost of taking a particular transition."
+#export CATEGORY=dataprocessing
+#export TYPE=library
+##export VERSION=1.5.0
+##export VERSIONDATE=20151015
+#####src/include/fst/mapped-file.h:21:22: fatal error: sys/mman.h: No such file or directory
+##export VERSION=1.5.1
+##export VERSIONDATE=20160405
+##export VERSION=1.5.2
+##export VERSIONDATE=20160412
+##export VERSION=1.5.3
+##export VERSIONDATE=20160524
+##export VERSION=1.5.4
+##export VERSIONDATE=20160825
+#####src/lib/symbol-table-ops.cc:136:43: error: 'to_string' is not a member of 'std'
+##export VERSION=1.6.0
+##export VERSIONDATE=20170108
+##export VERSION=1.6.1
+##export VERSIONDATE=20170207
+#####src/include/fst/lock.h:36:8: error: 'mutex' in namespace 'std' does not name a type
+##export VERSION=1.6.2
+##export VERSIONDATE=20170314
+##export VERSION=1.6.3
+##export VERSIONDATE=20170706
+##export VERSION=1.6.5
+##export VERSIONDATE=20171102
+##export VERSION=1.6.6
+##export VERSIONDATE=20180129
+##export VERSION=1.6.7
+##export VERSIONDATE=20180303
+##export VERSION=1.6.8
+##export VERSIONDATE=20180623
+##export VERSION=1.6.9
+##export VERSIONDATE=20180725
+##export VERSION=1.7.0
+##export VERSIONDATE=20181222
+##export VERSION=1.7.1
+##export VERSIONDATE=20190201
+##export VERSION=1.7.2
+##export VERSIONDATE=20190412
+##export VERSION=1.7.3
+##export VERSIONDATE=20190718
+##export VERSION=1.7.4
+##export VERSIONDATE=20191017
+##export VERSION=1.7.5
+##export VERSIONDATE=20191104
+##export VERSION=1.7.6
+##export VERSIONDATE=20200221
+##export VERSION=1.7.7
+##export VERSIONDATE=20200317
+##export VERSION=1.7.8
+##export VERSIONDATE=20200702
+#export VERSION=1.7.9
+#export VERSIONDATE=20200722
+#####configure: error: Test float equality failed! Compile with -msse -mfpmath=sse if using g++.
+#wl-showstatus --package-version
+#export DEPENDANCIES=libdl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+#export DOWNLOADURL="http://www.openfst.org/twiki/bin/view/FST/FstDownload"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.openfst.org/twiki/pub/FST/FstDownload/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix missing mmap.h
+#mv src/include/fst/mapped-file.h src/include/fst/mapped-file.h.bak
+#grep -v "#include <sys/mman.h>" src/include/fst/mapped-file.h.bak > src/include/fst/mapped-file.h
+#mv src/lib/mapped-file.cc src/lib/mapped-file.cc.bak
+#cat > src/lib/mapped-file.cc << EOF
+##include <io.h>
+##include <windows.h>
+##define PROT_READ  PAGE_READONLY
+##define PROT_WRITE PAGE_READWRITE
+##define PROT_EXEC  PAGE_EXECUTE_READ
+##define MAP_SHARED 0
+##define MAP_FAILED NULL
+#DWORD get_page_size ()
+#{
+#  SYSTEM_INFO sysinfo;
+#  GetSystemInfo(&sysinfo);
+#  return sysinfo.dwPageSize;
+#}
+#static void* mmap (void *start, size_t length, int prot, int flags, int fd, off_t offset)
+#{
+#  HANDLE handle;
+#/*
+#  if (offset % get_page_size() != 0)
+#    return NULL;
+#*/
+#  if ((handle = CreateFileMapping((HANDLE)_get_osfhandle(fd), NULL, prot, 0, 0, NULL)) == NULL)
+#    return NULL;
+#  start = MapViewOfFile(handle, FILE_MAP_COPY, 0, offset, length);
+#  CloseHandle(handle);
+#  return start;
+#}
+#static int munmap (void *start, size_t length)
+#{
+#  UnmapViewOfFile(start);
+#  return 0;
+#}
+#EOF
+#sed -e "s/sysconf(_SC_PAGESIZE)/get_page_size()/g; s?^#include <sys/mman\.h>?//&?" src/lib/mapped-file.cc.bak >> src/lib/mapped-file.cc
+### fix missing std::to_string in src/lib/symbol-table-ops.cc (version >= 1.5.2)
+##mv src/lib/symbol-table-ops.cc src/lib/symbol-table-ops.cc.bak &&
+##cat > src/lib/symbol-table-ops.cc << EOF
+###include <string>
+###include <sstream>
+##template <typename T> std::string ToString(T val)
+##{
+##    std::stringstream stream;
+##    stream << val;
+##    return stream.str();
+##}
+##EOF
+##sed -e "s/std::to_string/ToString/g" src/lib/symbol-table-ops.cc.bak >> src/lib/symbol-table-ops.cc
+######error: '_hypot' was not declared in this scope
+##for F in src/lib/*.cc src/script/*.cc; do
+## mv $F $F.bak &&
+## echo "#undef __STRICT_ANSI__" > $F &&
+## cat $F.bak >> $F
+##done
+## fix static_assert error in src/include/fst/float-weight.h (version >= 1.7.0)
+#sed -i.bak -e "s?static_assert.*NoWeight?//&?" src/include/fst/float-weight.h
+#wl-showstatus configure &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CXXFLAGS="-O" LDFLAGS="-Wl,--as-needed -ldl -Wl,-no-undefined" &&
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CXXFLAGS="-Wa,-mbig-obj -Og -msse -mfpmath=sse" LDFLAGS="-Wl,--as-needed -ldl -Wl,-no-undefined" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CXXFLAGS="-Os -Wa,-mbig-obj $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-msse2 -mfpmath=sse"; fi)" LDFLAGS="-Wl,--as-needed -ldl -Wl,-no-undefined" &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# wl-showstatus build &&
+# ( make || make CXX="g++ -D_USE_MATH_DEFINES" ||
+#  ( make -Csrc/script LIBS="-L$(pwd)/src/lib -Wl,--as-needed -lfst -ldl" && make install-strip ) 
+# ) &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# #make check &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="OpenFst"
+export STATUS=
+export URL=http://www.openfst.org/
+export BASENAME=openfst
+export DESCRIPTION="OpenFst is a library for constructing, combining, optimizing, and searching weighted finite-state transducers (FSTs). Weighted finite-state transducers are automata where each transition has an input label, an output label, and a weight. The more familiar finite-state acceptor is represented as a transducer with each transition's input and output label equal. Finite-state acceptors are used to represent sets of strings (specifically, regular or rational sets); finite-state transducers are used to represent binary relations between pairs of strings (specifically, rational transductions). The weights can be used to represent the cost of taking a particular transition."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=1.8.0
+#export VERSIONDATE=20201120
+#export VERSION=1.8.1
+#export VERSIONDATE=20210219
+export VERSION=1.8.2
+export VERSIONDATE=20220204
+wl-showstatus --package-version
+export DEPENDANCIES=libdl,mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://www.openfst.org/twiki/bin/view/FST/FstDownload"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.openfst.org/twiki/pub/FST/FstDownload/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CXXFLAGS="-std=c++17 -D_USE_MATH_DEFINES -I$MINGWPREFIX/include/mman-win32 -Os -Wa,-mbig-obj $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-msse2 -mfpmath=sse"; fi)" LDFLAGS="-Wl,--as-needed -lmman -ldl" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CXXFLAGS="-std=c++17 -D_USE_MATH_DEFINES -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32 -Os -Wa,-mbig-obj $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-msse2 -mfpmath=sse"; fi)" LDFLAGS="-Wl,--as-needed -lmman -ldl" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || (
+  # fix redefinition of ssize_t in src/include/fst/windows_defs.inc on 32-bit Windows (version >= 1.8.0)
+  mv src/include/fst/windows_defs.inc src/include/fst/windows_defs.inc.bak &&
+  touch src/include/fst/windows_defs.inc &&
+  make install-strip
+ )) &&
+ #make check &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

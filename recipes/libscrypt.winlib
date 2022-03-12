@@ -1,0 +1,60 @@
+export NAME="libscrypt"
+export STATUS=
+export URL=http://www.lolware.net/libscrypt.html
+#export URL=https://github.com/technion/libscrypt
+export BASENAME=libscrypt
+#export DESCRIPTION="libscrypt - password hashing library"
+export DESCRIPTION="A shared library that implements scrypt() functionality - a replacement for bcrypt()"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.21
+#export VERSIONDATE=20170609
+export VERSION=1.22
+export VERSIONDATE=20220210
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/technion/libscrypt/releases"
+export DOWNLOADURL="https://github.com/technion/libscrypt/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/technion/libscrypt/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/technion/libscrypt/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix libscrypt.h (version >= 1.22)
+patch -ulbf libscrypt.h << EOF
+@@ -35,3 +35,5 @@
+
+-#ifndef _MSC_VER
++#ifdef _WIN32
++#define libscrypt_salt_gen(rand,len) 0
++#else
+ /* Generates a salt. Uses /dev/urandom/
+EOF
+# customize make for Windows
+#sed -e "s/-fstack-protector\|-fPIC\|-Wl,-z,now\|-Wl,-z,relro\|-lc//g; s/-Wl,-soname,\([a-z]*\)\.so\.[0-9]*/-s -Wl,--out-implib,\1.dll.a/; s/\.so\.[0-9]*/.dll/g; s/ln -s/echo SKIPPING &/g" Makefile > Makefile.mingw
+#sed -e "s/-g\b\|-fPIC\|-Wl,-z,now\|-Wl,-z,relro\|-lc//g; s/^CFLAGS_EXTRA.*$/& \$(CFLAGS)/; s/^LDFLAGS.*/& -fstack-protector/; s/-Wl,-soname,\([a-z]*\)\.so\.[0-9]*/-s -Wl,--out-implib,\1.dll.a/; s/\.so\.[0-9]*/.dll/g; s/ln -s/echo SKIPPING &/g" Makefile > Makefile.mingw
+sed -e "s/-g\b\|-fPIC\|-Wl,-z,now\|-Wl,-z,relro\|-lc//g; s/^LDFLAGS.*/& -fstack-protector/; s/-Wl,-soname,\([a-z]*\)\.so\.[0-9]*/-s -Wl,--out-implib,\1.dll.a/; s/\.so\.[0-9]*/.dll/g; s/ln -s/echo SKIPPING &/g" Makefile > Makefile.mingw
+# fix undefined reference to __strcpy_chk
+####/include/string.h:228: undefined reference to `__strcpy_chk'
+#sed -i.bak -e "s/-fstack-protector\|-D_FORTIFY_SOURCE=2//g" Makefile.mingw
+wl-showstatus build &&
+ make -f Makefile.mingw CC=gcc &&
+ wl-showstatus build-install &&
+ make -f Makefile.mingw install install-static CC=gcc PREFIX=$INSTALLPREFIX &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

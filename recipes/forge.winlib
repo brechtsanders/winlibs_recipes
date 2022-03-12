@@ -1,0 +1,101 @@
+export NAME="Forge"
+export STATUS=
+export URL=https://github.com/arrayfire/forge
+export BASENAME=forge
+export DESCRIPTION="Forge - High Performance Visualizations"
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=3.2.0
+#export VERSIONDATE=20160611
+#export VERSION=3.2.2
+#export VERSIONDATE=20160612
+####GLEW-MX not found
+#export VERSION=1.0.0
+#export VERSIONDATE=20170518
+#export VERSION=1.0.1
+#export VERSIONDATE=20170519
+#export VERSION=1.0.2
+#export VERSIONDATE=20180622
+export VERSION=1.0.3
+export VERSIONDATE=20181117
+####The imported target "glbinding::glbinding-aux" references the file "/custombuilt/./libglbinding-aux.dll" but this file does not exist.
+#export VERSION=1.0.4
+#export VERSIONDATE=20190302
+#export VERSION=1.0.5
+#export VERSIONDATE=20200211
+#export VERSION=1.0.6
+#export VERSIONDATE=20210406
+#export VERSION=1.0.7
+#export VERSIONDATE=20210428
+#export VERSION=1.0.8
+#export VERSIONDATE=20210727
+####CMake Error: install(EXPORT "ForgeTargets" ...) includes target "forge" which requires target "forge_glad_interface" that is not in the export set.
+wl-showstatus --package-version
+export DEPENDANCIES=glfw3,glew,glbinding,freetype2,glm,boost
+#freeimage
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/arrayfire/forge/releases af"
+export DOWNLOADURL="https://github.com/arrayfire/forge/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/arrayfire/forge/archive/af$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/arrayfire/forge/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/af$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd forge-af$VERSION
+cd $BASENAME-$VERSION
+# fix missing __FUNCSIG__ in src/backend/common/defines.hpp
+patch -ulbf src/backend/common/defines.hpp << EOF
+@@ -35 +35,5 @@
+-    #define __PRETTY_FUNCTION__ __FUNCSIG__
++    #ifdef __MINGW32__
++        #define __PRETTY_FUNCTION__ __func__
++    #else
++        #define __PRETTY_FUNCTION__ __FUNCSIG__
++    #endif
+EOF
+# fix sprintf_instead_use_StringCbPrintfA_or_StringCchPrintfA issue in src/backend/opengl/common.cpp
+mv src/backend/opengl/common.cpp src/backend/opengl/common.cpp.bak &&
+echo "#define STRSAFE_NO_DEPRECATE" > src/backend/opengl/common.cpp &&
+cat src/backend/opengl/common.cpp.bak >> src/backend/opengl/common.cpp
+# fix cmake issue in docs/CMakeLists.txt
+sed -i.bak -e "s/cmake -/cmake.exe -/" docs/CMakeLists.txt
+# remove invalid compiler flags from src/backend/opengl/CMakeLists.txt
+sed -i.bak -e "s?/wd[0-9]*??g" src/backend/opengl/CMakeLists.txt
+# remove invalid compiler flags (version >= 1.0.6)
+sed -i.bak -e "s?/wd[0-9]*??g" src/backend/CMakeLists.txt examples/CMakeLists.txt
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SYSTEM_FREETYPE:BOOL=ON -DFG_WITH_FREEIMAGE:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFG_WITH_FREEIMAGE:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFG_WITH_FREEIMAGE:BOOL=OFF -DFG_BUILD_EXAMPLES:BOOL=OFF -DFG_ENABLE_HUNTER:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFG_WITH_FREEIMAGE:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFG_WITH_FREEIMAGE:BOOL=OFF -DFG_BUILD_EXAMPLES:BOOL=OFF -DFG_ENABLE_HUNTER:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ for F in $INSTALLPREFIX/bin/*.dll; do
+  if [ "$(basename $F)" != "libforge.dll" ]; then
+   rm -f $F
+  fi
+ done &&
+ rm -f $INSTALLPREFIX/lib/glfw3.dll $INSTALLPREFIX/lib/libglbinding.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

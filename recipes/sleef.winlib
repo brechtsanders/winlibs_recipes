@@ -1,0 +1,123 @@
+export NAME="SLEEF"
+export STATUS=
+#export URL=http://shibatch.sourceforge.net/
+export URL=http://sleef.org/
+export BASENAME=sleef
+export DESCRIPTION="SLEEF - SIMD library for evaluating elementary functions"
+export CATEGORY=math
+export TYPE=library
+#export VERSION=3.1
+#export VERSIONDATE=20170907
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export VERSION=3.2
+#export VERSIONDATE=20180226
+#export VERSION=3.3
+#export VERSIONDATE=20180706
+#export VERSION=3.3.1
+#export VERSIONDATE=20180822
+#export VERSION=3.4.0
+#export VERSIONDATE=20190428
+####dispsse.c:133:71: error: 'Sleef_sind2_u35sse2' undeclared (first use in this function)
+#export VERSION=3.4.1
+#export VERSIONDATE=20191001
+#export VERSION=3.5.0
+#export VERSIONDATE=20200901
+export VERSION=3.5.1
+export VERSIONDATE=20200915
+wl-showstatus --package-version
+export DEPENDANCIES=gmp,mpfr
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE="Boost Software License"
+#export DOWNLOADURL="https://sourceforge.net/projects/sleef/files/"
+export DOWNLOADURL="https://github.com/shibatch/sleef/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/sleef/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/shibatch/sleef/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing flock in src/common/arraymap.c
+#patch -ulbf src/common/arraymap.c << EOF
+#@@ -15,3 +15,3 @@
+#
+#-#ifndef _MSC_VER
+#+#if !defined(_MSC_VER) && !defined(__MINGW32__)
+# #include <unistd.h>
+#EOF
+## fix missing Sleef_x86CpuID on 32-bit (version >= 3.4.1)
+#patch -ulbf build_static/include/sleef.h << EOF
+#@@ -72,3 +72,3 @@
+#
+#-#if defined(__i386__) || defined(__x86_64__) || defined(_MSC_VER)
+#+#if defined(__i386__) || defined(__x86_64__) || defined(_WIN32)
+# IMPORT void Sleef_x86CpuID(int32_t out[4], uint32_t eax, uint32_t ecx);
+#EOF
+#patch -ulbf src/common/common.c << EOF
+#@@ -59,3 +59,3 @@
+# #else
+#-#if defined(__x86_64__) || defined(__i386__)
+#+#if defined(__x86_64__) || defined(__i386__) || defined(_WIN32)
+# EXPORT void Sleef_x86CpuID(int32_t out[4], uint32_t eax, uint32_t ecx) {
+#EOF
+#wl-showstatus build &&
+# make -j1 OS=MinGW ARCH=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi) COMPILER=gcc CC=gcc &&
+# #make -j1 OS=MinGW ARCH=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi) COMPILER=gcc CC="gcc -msse -msse2 -msse2avx -mavx512f -mfma -fno-asynchronous-unwind-tables" ENABLEGNUABI=1 ENABLEAVX=1 ENABLEAVX2=1 ENABLEAVX512f=1 ENABLEFMA4=1 ENABLEFLOAT80=1 ENABLEFLOAT128=0 &&
+# mkdir -p lib/static &&
+# echo "cd lib" > makestaticlibs.sh &&
+# sed -n -e "s/^.*\$(CC).*-shared.*-o.*\.dll.*-Wl,--out-implib,\(lib[^ ]*\.a\).*-Wl,--whole-archive\(.*\)-Wl,--no-whole-archive.*$/ar cru static\/\1 \2/p" lib/Makefile >> makestaticlibs.sh &&
+# sh makestaticlibs.sh &&
+# strip lib/*.dll &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# make -j1 -Cinclude install PREFIX=$INSTALLPREFIX &&
+# cp -f lib/*.dll $INSTALLPREFIX/bin/ &&
+# for F in lib/*.a; do
+#  cp -f $F $INSTALLPREFIX/lib/$(basename $F|sed -e "s/\.a$/.dll&/")
+# done &&
+# cp -f lib/static/*.a $INSTALLPREFIX/lib/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+## fix undefined reference to Sleef_x86CpuID on 32-bit
+#sed -i.bak -e "s/^void Sleef_x86CpuID/EXPORT &/" $(grep -l "^void Sleef_x86CpuID" $(find -name '*.h'))
+# fix type backslashes issue (version >= 3.4.1)
+sed -i.bak -e "s/MSVC OR MINGW AND WIN32/MSVC AND WIN32/" src/libm/CMakeLists.txt
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,-allow-multiple-definition" -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,-allow-multiple-definition" -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,-allow-multiple-definition" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,-allow-multiple-definition" -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ #mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ mv -f build_shared/bin/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####-DSLEEF_SUPPORTED_EXTENSIONS:STRING=AVX512F;AVX2;AVX2128;FMA4;AVX;SSE4;SSE2;ADVSIMD;NEON32 -DSLEEF_SUPPORTED_GNUABI_EXTENSIONS:STRING=SSE2;AVX;AVX2;AVX512F;ADVSIMD
+####To do: build 32-bit
+
+
+

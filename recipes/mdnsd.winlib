@@ -1,0 +1,342 @@
+export NAME="mdnsd"
+export STATUS=
+export URL=https://github.com/troglobit/mdnsd
+export BASENAME=mdnsd
+export DESCRIPTION="mdnsd - embeddable Multicast DNS Daemon"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=0.10
+export VERSIONDATE=20201023
+#export VERSION=0.11
+#export VERSIONDATE=20220110
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/troglobit/mdnsd/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/troglobit/mdnsd/releases/download/v$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/arpa winfix/netinet winfix/net
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/arpa/inet.h
+echo "#include <ws2tcpip.h>" >> winfix/arpa/inet.h
+echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > winfix/netinet/in.h
+touch winfix/netdb.h winfix/net/if.h
+echo "#define in_addr_t unsigned long" > winfix/ifaddrs.h
+cat > winfix/syslog.h << EOF
+#define INTERNAL_NOPRI 0
+#define LOG_CRIT    2
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_NOTICE  5
+#define LOG_INFO    6
+#define LOG_DEBUG   7
+struct log_prio_struct {
+ int c_val;
+ const char* c_name;
+};
+static const struct log_prio_struct prioritynames[] = {
+  {2, "Critical"},
+  {3, "Error"},
+  {4, "Warning"},
+  {5, "Notice"},
+  {6, "Information"},
+  {7, "Debug"}
+};
+#define LOG_PID     0x01
+#define openlog(ident, option, facility)
+#define syslog(priority, format, ...)
+#define vsyslog(priority, format, ap)
+#define closelog()
+#define setlogmask(mask) LOG_ERR
+EOF
+# fix src/mquery.c (version >= 0.10)
+patch -ulbf src/mquery.c << EOF
+@@ -80,5 +80,14 @@
+
+-       sd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
++       sd = socket(AF_INET, SOCK_DGRAM
++#ifndef _WIN32
++                   | SOCK_NONBLOCK
++#endif
++                   , 0);
+        if (sd < 0)
+                return 0;
++#ifdef _WIN32
++       unsigned long mode = 1;
++       if (ioctlsocket(sd, FIONBIO, &mode) != 0)
++               return 0;
++#endif
+
+EOF
+# fix src/mdnsd.c (version >= 0.10)
+patch -ulbf src/mdnsd.c << EOF
+@@ -107,4 +107,8 @@
+        signal(SIGINT, done);
++#ifdef SIGHUP
+        signal(SIGHUP, reconf);
++#endif
++#ifdef SIGQUIT
+        signal(SIGQUIT, done);
++#endif
+        signal(SIGTERM, done);
+@@ -127,5 +131,14 @@
+
+-       sd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
++       sd = socket(AF_INET, SOCK_DGRAM
++#ifndef _WIN32
++                   | SOCK_NONBLOCK
++#endif
++                   , 0);
+        if (sd < 0)
+                return -1;
++#ifdef _WIN32
++       unsigned long mode = 1;
++       if (ioctlsocket(sd, FIONBIO, &mode) != 0)
++               return -1;
++#endif
+
+@@ -288,2 +301,5 @@
+        if (background) {
++#ifdef _WIN32
++               ERR("Daemonizing not supported on Windows");
++#else
+                DBG("Daemonizing ...");
+@@ -293,2 +309,3 @@
+                }
++#endif
+        }
+EOF
+# fix src/addr.c (version >= 0.10)
+patch -ulbf src/addr.c << EOF
+@@ -105,4 +105,7 @@
+ int getaddr(char *iface, struct in_addr *ina)
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        struct ifaddrs *ifaddr, *ifa;
+        char ifname[17] = { 0 };
+@@ -154,3 +157,4 @@
+
+        return 0;
++#endif
+ }
+EOF
+# fix src/conf.c (version >= 0.10)
+patch -ulbf src/conf.c << EOF
+@@ -29,3 +29,21 @@
+ #include <errno.h>
++#ifdef _WIN32
++#define HOST_NAME_MAX 255
++#include <stdlib.h>
++#include <string.h>
++static char* strsep (char** s, const char* delim)
++{
++  char* p = *s;
++  char* q = (p ? strpbrk(p, delim) : NULL);
++  if (q == NULL) {
++    *s = NULL;
++  } else {
++    *q = '\\0';
++    *s = q + 1;
++  }
++  return p;
++}
++#else
+ #include <glob.h>
++#endif
+ #include <stdio.h>
+@@ -247,2 +265,5 @@
+        if (S_ISDIR(st.st_mode)) {
++#ifdef _WIN32
++               ERR("File globbing not supported on Windows");
++#else
+                glob_t gl;
+@@ -282,2 +303,3 @@
+                globfree(&gl);
++#endif
+        } else
+EOF
+## fix src/mquery.c (version >= 0.11)
+#patch -ulbf src/mquery.c << EOF
+#@@ -43,2 +43,3 @@
+# #include <unistd.h>
+#+#include <stdint.h>
+#
+#@@ -187,5 +188,14 @@
+#
+#-       sd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+#+       sd = socket(AF_INET, SOCK_DGRAM
+#+#ifndef _WIN32
+#+                   | SOCK_NONBLOCK
+#+#endif
+#+                   , 0);
+#        if (sd < 0)
+#                return 0;
+#+#ifdef _WIN32
+#+       unsigned long mode = 1;
+#+       if (ioctlsocket(sd, FIONBIO, &mode) != 0)
+#+               return 0;
+#+#endif
+#
+#@@ -256,2 +266,5 @@
+#        unsigned char buf[MAX_PACKET_LEN];
+#+#ifndef IFNAMSIZ
+#+#define IFNAMSIZ 256
+#+#endif
+#        char default_iface[IFNAMSIZ];
+#EOF
+## fix src/mdnsd.c (version >= 0.11)
+#patch -ulbf src/mdnsd.c << EOF
+#@@ -192,4 +192,8 @@
+#        signal(SIGINT, done);
+#+#ifdef SIGHUP
+#        signal(SIGHUP, reconf);
+#+#endif
+#+#ifdef SIGQUIT
+#        signal(SIGQUIT, done);
+#+#endif
+#        signal(SIGTERM, done);
+#@@ -215,3 +219,7 @@
+#
+#-       sd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+#+        sd = socket(AF_INET, SOCK_DGRAM
+#+#ifndef _WIN32
+#+                    | SOCK_NONBLOCK
+#+#endif
+#+                    , 0);
+#        if (sd < 0) {
+#@@ -220,2 +228,9 @@
+#        }
+#+ #ifdef _WIN32
+#+        unsigned long isnonblocking = 1;
+#+        if (ioctlsocket(sd, FIONBIO, &isnonblocking) != 0) {
+#+               ERR("Failed setting UDP socket to noblocking mode: %s", strerror(errno));
+#+               return -1;
+#+       }
+#+#endif
+#
+#@@ -243,5 +258,5 @@
+# #else
+#-       if (setsockopt(sd, IPPROTO_IP, IP_MULTICAST_IF, &ina, sizeof(ina)))
+#+       if (setsockopt(sd, IPPROTO_IP, IP_MULTICAST_IF, &(iface->inaddr), sizeof(iface->inaddr)))
+#                WARN("Failed setting IP_MULTICAST_IF to %s: %s",
+#-                    inet_ntoa(ina), strerror(errno));
+#+                    inet_ntoa(iface->inaddr), strerror(errno));
+# #endif
+#@@ -251,4 +266,6 @@
+#
+#+#ifdef IP_MULTICAST_ALL
+#        flag = 0;
+#        if (setsockopt(sd, IPPROTO_IP, IP_MULTICAST_ALL, &flag, sizeof(flag)))
+#+#endif
+#                WARN("Failed disabling IP_MULTICAST_LOOP on %s: %s", iface->ifname, strerror(errno));
+#@@ -267,3 +284,5 @@
+#        /* Filter inbound traffic from anyone (ANY) to port 5353 on ifname */
+#+#ifdef SO_BINDTODEVICE
+#        if (setsockopt(sd, SOL_SOCKET, SO_BINDTODEVICE, &iface->ifname, strlen(iface->ifname)))
+#+#endif
+#                WARN("Failed setting SO_BINDTODEVICE: %s", strerror(errno));
+#@@ -388,2 +407,5 @@
+#        if (background) {
+#+#ifdef _WIN32
+#+               ERR("Daemonizing not supported on Windows");
+#+#else
+#                DBG("Daemonizing ...");
+#@@ -393,2 +415,3 @@
+#                }
+#+#endif
+#        }
+#EOF
+## fix libmdnsd/mdnsd.c (version >= 0.11)
+#patch -ulbf libmdnsd/mdnsd.c << EOF
+#@@ -1391,3 +1391,7 @@
+#
+#+#ifdef _WIN32
+#+       while ((bsize = recvfrom(sd, buf, MAX_PACKET_LEN, 0, (struct sockaddr *)&from, &ssize)) > 0) {
+#+#else
+#        while ((bsize = recvfrom(sd, buf, MAX_PACKET_LEN, MSG_DONTWAIT, (struct
+#sockaddr *)&from, &ssize)) > 0) {
+#+#endif
+#                struct message m = { 0 };
+#@@ -1432,3 +1436,7 @@
+#
+#+#ifdef _WIN32
+#+               if (sendto(sd, buf, len, 0, (struct sockaddr *)&to, sizeof(struct sockaddr_in)) != len)
+#+#else
+#                if (sendto(sd, buf, len, MSG_DONTWAIT, (struct sockaddr *)&to, sizeof(struct sockaddr_in)) != len)
+#+#endif
+#                        return 2;
+#@@ -1443,2 +1451,6 @@
+#
+#+#ifdef _WIN32
+#+       unsigned long isnonblocking = 1;
+#+       ioctlsocket(sd, FIONBIO, &isnonblocking);
+#+#endif
+#        if (in)
+#EOF
+## fix lib/utimensat.c (version >= 0.11)
+#patch -ulbf lib/utimensat.c << EOF
+#@@ -25,2 +25,9 @@
+#
+#+#ifdef _WIN32
+#+#include <windows.h>
+#+#define EPOCH_TO_FILETIME(seconds) ((11644473600LL + (seconds)) * 10000000LL)
+#+#define TIMESPEC_TO_FILETIME(ts) (EPOCH_TO_FILETIME((ts).tv_sec) + (ts).tv_nsec / 100LL)
+#+#define TIMEVAL_TO_FILETIME(ts) (EPOCH_TO_FILETIME((ts).tv_sec) + (ts).tv_nsec
+#* 10LL)
+#+#endif
+#+
+# int utimensat(int dirfd, const char *pathname, const struct timespec ts[2], int flags)
+#@@ -28,3 +35,7 @@
+#        int ret = -1;
+#+#ifdef _WIN32
+#+       HANDLE f;
+#+#else
+#        struct timeval tv[2];
+#+#endif
+#
+#@@ -35,2 +46,9 @@
+#
+#+#ifdef _WIN32
+#+       if ((f = CreateFileA(pathname, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ |
+#FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
+#+               ret = (SetFileTime(f, NULL, TIMESPEC_TO_FILETIME(ts[0]), TIMESPEC_TO_FILETIME(ts[1])) ? 0 : -1);
+#+                       ret = 0;
+#+               CloseHandle(f);
+#+       }
+#+#else
+#        TIMESPEC_TO_TIMEVAL(&tv[0], &ts[0]);
+#@@ -45,2 +63,3 @@
+#
+#+#endif
+#        return ret;
+#EOF
+## fix src/mdnsd.h (version >= 0.11)
+#patch -ulbf src/mdnsd.h << EOF
+#@@ -35,2 +35,3 @@
+# #include <net/if.h>            /* IFNAMSIZ */
+#+#include <ifaddrs.h>           /* in_addr_t */
+# #include <libmdnsd/mdnsd.h>
+#EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-systemd CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ #( make install-strip || ( make -Clibmdnsd install-strip && make install-nobase_includeHEADERS install-man )) &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

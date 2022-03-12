@@ -1,0 +1,125 @@
+export NAME="libxine"
+export STATUS=
+export URL=http://www.xine-project.org/
+export BASENAME=libxine
+export DESCRIPTION="xine is a free multimedia player. It plays back CDs, DVDs, and VCDs. It also decodes multimedia files like AVI, MOV, WMV, and MP3 from local disk drives, and displays multimedia streamed over the Internet. It interprets many of the most common multimedia formats available - and some of the most uncommon formats, too."
+export CATEGORY=audio,video
+export TYPE=library
+#export VERSION=1.1.19
+#export VERSIONDATE=20110902
+#export VERSION=1.1.20
+#export VERSIONDATE=20111113
+#export VERSION=1.2.0
+#export VERSIONDATE=20120102
+####checking type of request parameter for ioctl()... mv: cannot move `conftest.er1' to `conftest.err': Permission denied
+####configure: error: Unable to determine the type for ioctl() request parameter
+#export VERSION=1.2.1
+#export VERSIONDATE=20120204
+#export VERSION=1.2.2
+#export VERSIONDATE=20120610
+#export VERSION=1.2.3
+#export VERSIONDATE=20130529
+#export VERSION=1.2.4
+#export VERSIONDATE=20130924
+#export VERSION=1.2.5
+#export VERSIONDATE=20140408
+#export VERSION=1.2.6
+#export VERSIONDATE=20140706
+#export VERSION=1.2.8
+#export VERSIONDATE=20170228
+#export VERSION=1.2.9
+#export VERSIONDATE=20180111
+#export VERSION=1.2.10
+#export VERSIONDATE=20191214
+#export VERSION=1.2.11
+#export VERSIONDATE=20201206
+export VERSION=1.2.12
+export VERSIONDATE=20220310
+####checking type of request parameter for ioctl()... configure: error: Unable to determine the type for ioctl() request parameter
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="GPL/LGPL"
+#export DOWNLOADURL="http://www.xine-project.org/releases xine-lib-"
+export DOWNLOADURL="http://sourceforge.net/projects/xine/files/xine-lib/ xine-lib-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://sourceforge.net/projects/xine/files/xine-lib/$VERSION/xine-lib-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=http://sourceforge.net/projects/xine/files/xine-lib/$VERSION/xine-lib-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/xine-lib-$VERSION.tar.bz2
+tar xfJ $TARBALLDIR/$BASENAME/xine-lib-$VERSION.tar.xz
+cd xine-lib-$VERSION
+# fix missing files
+mkdir -p sys
+#touch sys/mman.h
+touch sys/ioctl.h
+# fix src/video_out/video_out_aa.c
+mv src/video_out/video_out_aa.c src/video_out/video_out_aa.c.bak
+sed -e "s?#include <sys/mman.h>??" src/video_out/video_out_aa.c.bak > src/video_out/video_out_aa.c
+# fix missing avcodec_decode_audio2 in src/combined/ffmpeg/ff_audio_decoder.c
+mv src/combined/ffmpeg/ff_audio_decoder.c src/combined/ffmpeg/ff_audio_decoder.c.bak
+cat > src/combined/ffmpeg/ff_audio_decoder.c << EOF
+#include <libavcodec/avcodec.h>
+inline int avcodec_decode_audio2(AVCodecContext *avctx, int16_t *samples, int *frame_size_ptr, uint8_t *buf, int buf_size)
+{
+ AVPacket avp;
+ av_init_packet(&avp);
+ avp.data = buf;
+ avp.size = buf_size;
+ return avcodec_decode_audio3(avctx, samples, frame_size_ptr, &avp);
+}
+EOF
+cat src/combined/ffmpeg/ff_audio_decoder.c.bak >> src/combined/ffmpeg/ff_audio_decoder.c
+# fix src/combined/ffmpeg/ff_video_decoder.c
+patch -ulbf src/combined/ffmpeg/ff_video_decoder.c << EOF
+--- src/combined/ffmpeg/ff_video_decoder.c  2010-03-10 20:07:16 +0100
++++ src/combined/ffmpeg/ff_video_decoder.c  2011-09-02 21:40:46 +0200
+@@ -66,2 +66,11 @@
+
++static int avcodec_decode_video (AVCodecContext* avctx, AVFrame* picture, int* got_picture_ptr, const uint8_t* buf, int buf_size)
++{
++ AVPacket pkt;
++ av_init_packet(&pkt);
++ pkt.data = buf;
++ pkt.size = buf_size;
++ return avcodec_decode_video2(avctx, picture, got_picture_ptr, &pkt);
++}
++
+ typedef struct ff_video_decoder_s ff_video_decoder_t;
+@@ -1057,3 +1066,3 @@
+     /* skip decoding b frames if too late */
+-    this->context->hurry_up = (this->skipframes > 0);
++    this->context->skip_frame = (this->skipframes > 0 ? AVDISCARD_NONKEY : AVDISCARD_DEFAULT);
+
+@@ -1114,3 +1123,3 @@
+
+-      if (this->context->hurry_up) {
++      if (this->context->skip_frame > AVDISCARD_DEFAULT) {
+         /* skipped frame, output a bad frame */
+@@ -1306,3 +1315,3 @@
+         /* skip decoding b frames if too late */
+-        this->context->hurry_up = (this->skipframes > 0);
++        this->context->skip_frame = (this->skipframes > 0 ? AVDISCARD_NONKEY : AVDISCARD_DEFAULT);
+
+EOF
+# fix undeclared S_IRGRP and S_IROTH src/audio_out/audio_file_out.c
+mv src/audio_out/audio_file_out.c src/audio_out/audio_file_out.c.bak
+sed -e "s/|S_IRGRP|S_IROTH//" src/audio_out/audio_file_out.c.bak > src/audio_out/audio_file_out.c
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-mmap --without-x --without-xcb &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#    cmake.exe . -LH; rm CMakeCache.txt &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf xine-lib-$VERSION
+
+
+

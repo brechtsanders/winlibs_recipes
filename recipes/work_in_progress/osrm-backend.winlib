@@ -1,0 +1,105 @@
+export NAME="osrm-backend"
+export STATUS=
+export URL=http://map.project-osrm.org/
+#export URL=https://github.com/Project-OSRM/osrm-backend
+export BASENAME=osrm-backend
+export DESCRIPTION="Open Source Routing Machine - C++ backend"
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=5.18.0
+#export VERSIONDATE=20180820
+#export VERSION=5.19.0
+#export VERSIONDATE=20180911
+####/include/boost/range/detail/any_iterator.hpp:131:15: error: 'postfix_increment_proxy' is not a class template
+#export VERSION=5.20.0
+#export VERSIONDATE=20181206
+#export VERSION=5.21.0
+#export VERSIONDATE=20181219
+export VERSION=5.22.0
+export VERSIONDATE=20190131
+#export VERSION=5.23.0
+#export VERSIONDATE=20201015
+#export VERSION=5.24.0
+#export VERSIONDATE=20210128
+#export VERSION=5.25.0
+#export VERSIONDATE=20210518
+#export VERSION=5.26.0
+#export VERSIONDATE=20210922
+####CMake Generate step failed.  Build files cannot be regenerated correctly.
+wl-showstatus --package-version
+export DEPENDANCIES=boost,zlib,libbz2,expat,libosmium,lua,protozero,tbb
+#export DEPENDANCIES=boost,zlib,libbz2,expat,libosmium,lua,protozero,tbb,sol2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/Project-OSRM/osrm-backend/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Project-OSRM/osrm-backend/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined M_PI
+for F in $(grep -lw M_PI $(find -name '*.[hc]pp')); do
+mv $F $F.bak
+cat > $F << EOF
+#define _USE_MATH_DEFINES 1
+#include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+EOF
+cat $F.bak >> $F
+done
+# fix ambiguity in src/storage/io_config.cpp (version >= 5.22.0)
+patch -ulbf src/storage/io_config.cpp << EOF
+@@ -17,3 +17,3 @@
+     {
+-        if (!boost::filesystem::is_regular_file({base_path.string() + fileName.string()}))
++        if (!boost::filesystem::is_regular_file((boost::filesystem::path){base_path.string() + fileName.string()}))
+         {
+EOF
+# fix third_party/sol2/sol2/sol.hpp (version >= 5.22.0)
+patch -ulbf third_party/sol2/sol2/sol.hpp << EOF
+@@ -824,2 +824,5 @@
+ #endif // C++ Mangling for Lua
++#ifndef LUA_ERRGCMM
++#define LUA_ERRGCMM 255
++#endif
+
+@@ -14377,3 +14380,3 @@
+ #else
+-                       stats = static_cast<call_status>(lua_resume(lua_state(), nullptr, static_cast<int>(argcount)));
++                       stats = static_cast<call_status>(lua_resume(lua_state(), nullptr, static_cast<int>(argcount), nullptr));
+ #endif // Lua 5.1 compat
+EOF
+# ignore MSVC error
+sed -i.bak -e "s/FATAL_ERROR\(.*CXX11_CONSTEXPR\)/WARNING\1/; s/-Wl,--hash-style=gnu\|-Werror=all\|-Werror=extra\|-Wpedantic//g; s/\(-W\)\(error=unused-variable\)/\1no-\2/" CMakeLists.txt
+# fix detection of recent Lua version
+sed -i.bak -e "s/set(LUA_VERSIONS5 /&$(lua -v | sed -ne "s/^Lua\s\([0-9]*\.[0-9]*\).*$/\1/p") /" cmake/FindLua.cmake
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_CCACHE:BOOL=OFF -DENABLE_GOLD_LINKER:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_CCACHE:BOOL=OFF -DENABLE_GOLD_LINKER:BOOL=OFF -DLUA_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_CCACHE:BOOL=OFF -DENABLE_GOLD_LINKER:BOOL=OFF -DBUILD_TOOLS:BOOL=ON -DLUA_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DTBB_LIBRARY_DEBUG:STRING="-ltbb" -DTBB_MALLOC_LIBRARY_DEBUG:STRING="-ltbbmalloc" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ echo "-Wl,--as-needed -lssp" >> build_static/CMakeFiles/osrm-datastore.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lssp" >> build_static/CMakeFiles/osrm-partition.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lssp" >> build_static/CMakeFiles/osrm-customize.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lssp" >> build_static/CMakeFiles/osrm-contract.dir/linklibs.rsp &&
+ echo "-Wl,--as-needed -lssp" >> build_static/CMakeFiles/osrm-routed.dir/linklibs.rsp &&
+ #wl-showstatus configure &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_CCACHE:BOOL=OFF -DENABLE_GOLD_LINKER:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ ##cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_CCACHE:BOOL=OFF -DENABLE_GOLD_LINKER:BOOL=OFF -DBUILD_TOOLS:BOOL=ON -DTBB_LIBRARY_DEBUG:STRING="-ltbb" -DTBB_MALLOC_LIBRARY_DEBUG:STRING="-ltbbmalloc" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ #echo "-Wl,--as-needed -lboost_filesystem -ltbb -lz" >> build_shared/CMakeFiles/osrm_guidance.dir/linklibs.rsp &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #make -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build DLL
+
+
+

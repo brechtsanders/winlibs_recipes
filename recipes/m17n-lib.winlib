@@ -1,0 +1,61 @@
+export NAME="m17n-lib"
+export STATUS=
+export URL=http://savannah.nongnu.org/projects/m17n
+export BASENAME=m17n-lib
+export DESCRIPTION="The m17n library is to support various aspects (e.g. input methods, layout engines) of multi-lingual text processing."
+export CATEGORY=internationalization
+export TYPE=library
+#export VERSION=1.6.4
+#export VERSIONDATE=20130201
+#export VERSION=1.7.0
+#export VERSIONDATE=20141212
+####src/database.c:135:18: fatal error: glob.h: No such file or directory
+export VERSION=1.8.0
+export VERSIONDATE=20180208
+wl-showstatus --package-version
+export DEPENDANCIES=freetype2,fontconfig,libotf,libgd,libthai,glib2,libiconv,gettext,unixem
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://www.m17n.org/m17n-lib-en/download.html m17n-lib-"
+export DOWNLOADURL="http://download.savannah.gnu.org/releases/m17n/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.m17n.org/m17n-lib-download/m17n-lib-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://download.savannah.gnu.org/releases/m17n/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix number of perameters to mkdir in src/database.c (version >= 1.8.0)
+patch -ulbf src/database.c << EOF
+@@ -1123,3 +1123,7 @@
+       if (stat (dir, &buf) == 0
++#ifdef _WIN32
++         || mkdir (dir) < 0
++#else
+          || mkdir (dir, 0777) < 0
++#endif
+          || ! (fp = fopen (db_info->uniq_file, "w")))
+EOF
+# skip building example
+cat > example/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads=win32 --without-x CFLAGS="-I$MINGWPREFIX/include/unixemulation" LIBS="-Wl,--as-needed -lunixem -lintl -lregex" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build &&
+ ( make || make -j1 || make LIBS="-lregex -lintl -lunixem" ) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

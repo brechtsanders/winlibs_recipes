@@ -1,0 +1,164 @@
+export NAME="check"
+export STATUS=
+#export URL=http://check.sourceforge.net/
+export URL=https://libcheck.github.io/check/
+#export URL=https://github.com/libcheck/check
+export BASENAME=check
+export DESCRIPTION="Check is a unit testing framework for C."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=0.9.8
+#export VERSION=0.9.9
+#export VERSIONDATE=20121023
+#export VERSION=0.9.10
+#export VERSIONDATE=20130418
+####lib/timer_create.c:3:5: error: conflicting types for 'timer_create'
+#export VERSION=0.9.11
+#export VERSIONDATE=20131105
+#export VERSION=0.9.12
+#export VERSIONDATE=20140121
+#export VERSION=0.9.13
+#export VERSIONDATE=20140531
+#export VERSION=0.9.14
+#export VERSIONDATE=20140727
+#export VERSION=0.10.0
+#export VERSIONDATE=20140811
+#export VERSION=0.14.0
+#export VERSIONDATE=20200407
+#export VERSION=0.15.0
+#export VERSIONDATE=20200622
+#export VERSION=0.15.1
+#export VERSIONDATE=20200723
+export VERSION=0.15.2
+export VERSIONDATE=20200809
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://sourceforge.net/projects/check/files/check/"
+export DOWNLOADURL="https://github.com/libcheck/check/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/check/check/$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/libcheck/check/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+### fix missing localtime_r
+##mv src/check_log.c src/check_log.c.bak
+##cat > src/check_log.c << EOF
+###define localtime_r(clock,result) (*(result) = *localtime(clock),result)
+##EOF
+##cat src/check_log.c.bak >> src/check_log.c
+### fix lib/putenv.c (version >= 0.9.9)
+##patch -ulbf lib/putenv.c << EOF
+##--- lib/putenv.c  2012-10-22 16:03:44 +0200
+##+++ lib/putenv.c  2012-10-23 08:07:48 +0200
+##@@ -3,3 +3,3 @@
+## int
+##-putenv (const char *string CK_ATTRIBUTE_UNUSED);
+##+putenv (const char *string CK_ATTRIBUTE_UNUSED)
+## {
+##EOF
+### fix src/check_run.c (version = 0.9.9)
+##mv src/check_run.c src/check_run.c.bak
+##cat > src/check_run.c << EOF
+###include <time.h>
+###include <windows.h>
+###ifndef __MINGW64__
+##struct timespec {
+## time_t tv_sec; /* Seconds since 00:00:00 GMT, 1 January 1970 */
+## long tv_nsec;  /* Additional nanoseconds since tv_sec */
+##} timespec_t;
+###endif
+###define CLOCK_MONOTONIC 0
+##int clock_gettime(int clock_id, struct timespec *tp)
+##{
+## LARGE_INTEGER pf, pc;
+## if (QueryPerformanceFrequency(&pf) == 0)
+##  return -1;
+## if (QueryPerformanceCounter(&pc) == 0)
+##  return -2;
+## tp->tv_sec = pc.QuadPart / pf.QuadPart;
+## tp->tv_nsec = (int) (((pc.QuadPart % pf.QuadPart) * 1000000000 + (pf.QuadPart >> 1)) / pf.QuadPart);
+## if (tp->tv_nsec >= 1000000000) {
+##  tp->tv_sec ++;
+##  tp->tv_nsec -= 1000000000;
+## }
+## return 0;
+##}
+##EOF
+### fix lib/libcompat.h (not working) (version = 0.9.10)
+##patch -ulbf lib/libcompat.h << EOF
+##--- lib/libcompat.h  2013-04-18 12:19:02 +0200
+##+++ lib/libcompat.h  2013-04-18 22:51:46 +0200
+##@@ -134,6 +134,7 @@
+##
+##+#define clock_gettime custom_clock_gettime
+## int clock_gettime(int clk_id, struct timespec *ts);
+##-int timer_create(int clockid, struct sigevent *sevp, timer_t *timerid);
+##+#define timer_create(clockid,sevp,timerid) 0
+## int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
+##-int timer_delete(timer_t timerid);
+##+#define timer_delete(timerid) 0
+## #endif /* HAVE_LIBRT */
+##EOF
+##mv lib/timer_create.c lib/timer_create.c.bak
+##touch lib/timer_create.c
+##mv lib/timer_delete.c lib/timer_delete.c.bak
+##touch lib/timer_delete.c
+##cat src/check_run.c.bak >> src/check_run.c
+## fix src/check_log.c
+#mv src/check_log.c src/check_log.c.bak
+#cat > src/check_log.c << EOF
+##include <time.h>
+##ifndef timersub
+##define timersub(a, b, result)                     \\
+#do {                                               \\
+# (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;     \\
+# (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;  \\
+# if ((result)->tv_usec < 0) {                      \\
+#  --(result)->tv_sec;                              \\
+#  (result)->tv_usec += 1000000;                    \\
+# }                                                 \\
+#} while (0)
+##endif
+##define localtime_r(clock,result) (*(result) = *localtime(clock),result)
+#EOF
+#cat src/check_log.c.bak >> src/check_log.c
+### skip making tests
+##cat > tests/Makefile.in << EOF
+##clean:
+##all:
+##install:
+##install-strip:
+##EOF
+## fix tests/check_check_log.c
+#patch -ulbf tests/check_check_log.c << EOF
+#--- tests/check_check_log.c  2012-10-22 16:03:38 +0200
+#+++ tests/check_check_log.c  2012-10-23 17:39:56 +0200
+#@@ -23,3 +23,4 @@
+#   if (old_value == NULL) {
+#-     res = unsetenv(name);
+#+     unsetenv(name);
+#+        res = 0;
+#   } else {
+#EOF
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #wl-showstatus build &&
+ ## localtime_r exists in pthread.h
+ #echo "#undef HAVE_DECL_LOCALTIME_R" >> config.h &&
+ #echo "#define HAVE_DECL_LOCALTIME_R 1" >> config.h &&
+ #mv lib/localtime_r.c lib/localtime_r.c.bak &&
+ #touch lib/localtime_r.c &&
+ make LIBS= &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

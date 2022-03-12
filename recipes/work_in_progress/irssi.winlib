@@ -1,0 +1,100 @@
+export NAME="Irssi"
+export STATUS=
+export URL=https://irssi.org/
+export BASENAME=irssi
+export DESCRIPTION="Irssi is a modular chat client that is most commonly known for its text mode user interface, but 80% of the code isn't text mode specific."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=0.8.17
+export VERSIONDATE=20211208
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/mauke/irssi/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mauke/irssi/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing win32-compat.h
+cat > win32-compat.h << EOF
+#include <winsock2.h>
+EOF
+# fix src/core/log.c (version >= 0.8.17)
+patch -ulbf src/core/log.c << EOF
+@@ -100,3 +100,5 @@
+        char *dir;
++#ifndef _WIN32
+        struct flock lock;
++#endif
+
+@@ -128,2 +130,3 @@
+        }
++#ifndef _WIN32
+         memset(&lock, 0, sizeof(lock));
+@@ -137,2 +140,3 @@
+        }
++#endif
+        lseek(log->handle, 0, SEEK_END);
+@@ -151,3 +155,5 @@
+ {
++#ifndef _WIN32
+        struct flock lock;
++#endif
+
+@@ -164,2 +170,3 @@
+
++#ifndef _WIN32
+         memset(&lock, 0, sizeof(lock));
+@@ -167,2 +174,3 @@
+        fcntl(log->handle, F_SETLK, &lock);
++#endif
+
+EOF
+# fix irssi-version.sh (version >= 0.8.17)
+patch -ulbf irssi-version.sh << EOF
+@@ -7,3 +7,3 @@
+
+-echo "#define IRSSI_VERSION_DATE \$VERSION_DATE"
+-echo "#define IRSSI_VERSION_TIME \$VERSION_TIME"
++echo "#define IRSSI_VERSION_DATE \\"\$(date +"%Y-%d-%m")\\""
++echo "#define IRSSI_VERSION_TIME \\"\$(date +"%H:%M")\\""
+EOF
+# skip building docs/help
+sed -i.bak -e "s?docs/help/Makefile\|docs/help/in/Makefile??" configure.ac
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-ssl --with-ncurses --with-socks &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

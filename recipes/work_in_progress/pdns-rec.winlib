@@ -1,0 +1,216 @@
+export NAME="PowerDNS Recursive Server"
+export STATUS=
+export URL=https://www.powerdns.com/
+#export URL=https://github.com/PowerDNS/pdns
+export BASENAME=pdns-rec
+export DESCRIPTION="PowerDNS Recursive Nameserver"
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=3.7.4
+#export VERSIONDATE=20170427
+#export VERSION=4.0.5
+#export VERSIONDATE=20170613
+#export VERSION=4.0.6
+#export VERSIONDATE=20170705
+#export VERSION=4.0.7
+#export VERSIONDATE=20171127
+#export VERSION=4.0.8
+#export VERSIONDATE=20171211
+#export VERSION=4.1.0
+#export VERSIONDATE=20171204
+#export VERSION=4.1.1
+#export VERSIONDATE=20180122
+#export VERSION=4.1.2
+#export VERSIONDATE=20180330
+#export VERSION=4.1.3
+#export VERSIONDATE=20180523
+#export VERSION=4.1.4
+#export VERSIONDATE=20180831
+#export VERSION=4.1.5
+#export VERSIONDATE=20181106
+#export VERSION=4.1.6
+#export VERSIONDATE=20181107
+#export VERSION=4.1.7
+#export VERSIONDATE=20181109
+#export VERSION=4.1.8
+#export VERSIONDATE=20181126
+#export VERSION=4.1.9
+#export VERSIONDATE=20190121
+#export VERSION=4.1.10
+#export VERSIONDATE=20190124
+#export VERSION=4.1.11
+#export VERSIONDATE=20190201
+#export VERSION=4.1.12
+#export VERSIONDATE=20190302
+#export VERSION=4.1.13
+#export VERSIONDATE=20190521
+#export VERSION=4.1.14
+#export VERSIONDATE=20190613
+#export VERSION=4.1.15
+#export VERSIONDATE=20191203
+#export VERSION=4.1.16
+#export VERSIONDATE=20200519
+#export VERSION=4.1.17
+#export VERSIONDATE=20200630
+#export VERSION=4.1.18
+#export VERSIONDATE=20201013
+#export VERSION=4.2.0
+#export VERSIONDATE=20190715
+#export VERSION=4.2.1
+#export VERSIONDATE=20191206
+#export VERSION=4.2.2
+#export VERSIONDATE=20200519
+#export VERSION=4.2.3
+#export VERSIONDATE=20200630
+#export VERSION=4.2.4
+#export VERSIONDATE=20200715
+#export VERSION=4.2.5
+#export VERSIONDATE=20201013
+#export VERSION=4.3.0
+#export VERSIONDATE=20200302
+#export VERSION=4.3.1
+#export VERSIONDATE=20200519
+#export VERSION=4.3.2
+#export VERSIONDATE=20200701
+#export VERSION=4.3.3
+#export VERSIONDATE=20200715
+#export VERSION=4.3.4
+#export VERSIONDATE=20200905
+#export VERSION=4.3.5
+#export VERSIONDATE=20201013
+#export VERSION=4.3.6
+#export VERSIONDATE=20201123
+#export VERSION=4.3.7
+#export VERSIONDATE=20210319
+#export VERSION=4.4.0
+#export VERSIONDATE=20201017
+#export VERSION=4.4.1
+#export VERSIONDATE=20201123
+#export VERSION=4.4.2
+#export VERSIONDATE=20201211
+#export VERSION=4.4.3
+#export VERSIONDATE=20210331
+#export VERSION=4.4.4
+#export VERSIONDATE=20210607
+#export VERSION=4.4.5
+#export VERSIONDATE=20210729
+#export VERSION=4.4.6
+#export VERSIONDATE=20211007
+#export VERSION=4.5.0
+#export VERSIONDATE=20210507
+#export VERSION=4.5.1
+#export VERSIONDATE=20210511
+#export VERSION=4.5.2
+#export VERSIONDATE=20210608
+#export VERSION=4.5.4
+#export VERSIONDATE=20210630
+#export VERSION=4.5.5
+#export VERSIONDATE=20210729
+#export VERSION=4.5.6
+#export VERSIONDATE=20211009
+export VERSION=4.6.0
+export VERSIONDATE=20220122
+####pdns/utility.hh:34:23: fatal error: arpa/inet.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=sqlite3,mariadb-client,postgresql,mman-win32,syslog-win32,libdl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/PowerDNS/pdns/releases rec-"
+export DOWNLOADURL="https://github.com/PowerDNS/pdns/tags rec-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/PowerDNS/pdns/archive/rec-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/PowerDNS/pdns/archive/refs/tags/rec-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/rec-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing strptime
+cat > win_strptime.hh << EOF
+#ifndef _POSIX_THREAD_SAFE_FUNCTIONS
+#define _POSIX_THREAD_SAFE_FUNCTIONS 1
+#endif
+#include <time.h>
+#include <iomanip>
+#include <sstream>
+extern "C" inline char* strptime(const char* s, const char* f, struct tm* tm)
+{
+  std::istringstream input(s);
+  input.imbue(std::locale(setlocale(LC_ALL, nullptr)));
+  input >> std::get_time(tm, f);
+  return (input.fail() ? nullptr : (char*)(s + input.tellg()));
+}
+#define HAVE_GMTIME_R 1
+#define HAVE_LOCALTIME_R 1
+EOF
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h winfix/netdb.h winfix/sys/uio.h winfix/sys/wait.h
+# fix pdns/arguments.hh (version >= 4.4.6)
+patch -ulbf pdns/arguments.hh << EOF
+@@ -31,4 +31,9 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#define uid_t int
++#define gid_t int
++#else
+ #include <pwd.h>
+ #include <grp.h>
++#endif
+
+EOF
+# fix pdns/dynlistener.hh (version >= 4.4.6)
+patch -ulbf pdns/dynlistener.hh << EOF
+@@ -31,3 +31,5 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <sys/un.h>
++#endif
+ #include <dlfcn.h>
+EOF
+wl-showstatus configure &&
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/syslog-win32" LDFLAGS="-Wl,--as-needed -lmman -lsyslog" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM PYTHON=$PYDIR/python.exe CFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" CXXFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS -I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/syslog-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lmman -lsyslog -ldl" &&
+ # fix missing strptime
+ echo "#include \"win_strptime.hh\"" >> config.h &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+#mkdir -p build_test; cd build_test; cmake.exe -G"MSYS Makefiles" . -LH && echo OK; cd ..; rm -rf build_test
+#rm -f CMakeCache.txt; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+#export BUILDDEPENDANCIES=cmake
+#wl-showstatus configure &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build-install &&
+# make install/strip &&
+#    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

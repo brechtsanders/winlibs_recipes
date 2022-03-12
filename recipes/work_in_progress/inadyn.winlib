@@ -1,0 +1,148 @@
+export NAME="inadyn"
+export STATUS=
+export URL=https://github.com/troglobit/inadyn
+export BASENAME=inadyn
+export DESCRIPTION="Dynamic DNS client with SSL/TLS support"
+export CATEGORY=network
+export TYPE=application
+#export VERSION=2.2
+#export VERSIONDATE=20170914
+#export VERSION=2.2.1
+#export VERSIONDATE=20171007
+#export VERSION=2.3
+#export VERSIONDATE=20180105
+#export VERSION=2.3.1
+#export VERSIONDATE=20180212
+#export VERSION=2.4
+#export VERSIONDATE=20180818
+#export VERSION=2.5
+#export VERSIONDATE=20181001
+#export VERSION=2.6
+#export VERSIONDATE=20200223
+#export VERSION=2.7
+#export VERSIONDATE=20200323
+#export VERSION=2.8.1
+#export VERSIONDATE=20210201
+#export VERSION=2.9.0
+#export VERSIONDATE=20211121
+export VERSION=2.9.1
+export VERSIONDATE=20211210
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/troglobit/inadyn/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/troglobit/inadyn/releases/download/v$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa winfix/net
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h winfix/netdb.h winfix/arpa/nameser.h winfix/net/if.h winfix/sys/wait.h
+cat > winfix/pwd.h << EOF
+#ifndef getuid
+typedef int uid_t;
+#define getuid() 0
+//#define geteuid() 0
+#define setuid(uid) 0
+#define getpwnam(username) NULL
+struct passwd {
+ int pw_uid;
+ int pw_gid;
+ char *pw_name;
+ //char* pw_passwd;
+ //char *pw_dir;
+ //char *pw_gecos;
+ //char *pw_shell;
+};
+#endif
+EOF
+cat > winfix/grp.h << EOF
+#ifndef getgid
+typedef int gid_t;
+#define getgid() 0
+#define setgid(gid) 0
+#define getgrnam(groupname) NULL
+struct group {
+ int gr_gid;
+};
+#endif
+EOF
+cat > winfix/syslog.h << EOF
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_NOTICE  5
+#define LOG_INFO    6
+#define LOG_DEBUG   7
+#define openlog(...)
+#define closelog()
+#define vsyslog(...)
+EOF
+# fix missing MIN in include/compat.h
+mv include/compat.h include/compat.h.bak
+cat > include/compat.h << EOF
+#ifndef MIN
+#define MIN(x,y) ((x)<(y)?(x):(y))
+#endif
+EOF
+cat include/compat.h.bak >> include/compat.h
+# fix include/ddns.h
+mv include/ddns.h include/ddns.h.bak
+cat > include/ddns.h << EOF
+#include <pwd.h>
+#include <grp.h>
+EOF
+cat include/ddns.h.bak >> include/ddns.h
+# fix too many parameters to mkdir() in src/main.c
+sed -i.bak -e "s/\(mkdir\s*([^,)]*\),[^,)]*\()\)/\1\2/; s/daemon(0, 0)/-1/" src/main.c
+# fix OS detection in aux/config.guess (version >= 2.6)
+patch -ulbf aux/config.guess << EOF
+@@ -855,10 +855,5 @@
+        exit ;;
+-    *:MINGW64*:*)
+-       echo "\$UNAME_MACHINE"-pc-mingw64
+-       exit ;;
+     *:MINGW*:*)
+-       echo "\$UNAME_MACHINE"-pc-mingw32
+-       exit ;;
+     *:MSYS*:*)
+-       echo "\$UNAME_MACHINE"-pc-msys
++       echo "\$UNAME_MACHINE"-w64-mingw64
+        exit ;;
+EOF
+wl-showstatus configure &&
+ # mkdir -p m4 &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --disable-static CFLAGS="-I$(pwd)/winfix" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig && echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,255 @@
+export NAME="XDispatch"
+export STATUS=
+export URL=http://opensource.mlba-team.de/xdispatch/docs/current/
+export BASENAME=xdispatch
+export DESCRIPTION="XDispatch provides the power of Grand Central Dispatch not only on Mac OS 10.6+ but also on Windows and Linux."
+export CATEGORY=system
+export TYPE=library
+export VERSION=0.7.2
+export VERSIONDATE=20130308
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+#export OPTIONALDEPENDANCIES=qt
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="http://opensource.mlba-team.de/xdispatch/files/ xdispatch_ _src.tar.gz"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://opensource.mlba-team.de/xdispatch/files/xdispatch_$VERSION\_src.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/xdispatch_$VERSION\_src.tar.gz
+cd xdispatch_$VERSION
+# fix libkqueue/include/sys/event.h for 64-bit
+patch -ulbf libkqueue/include/sys/event.h << EOF
+@@ -181,2 +181,3 @@
+
++#ifndef __MINGW64_VERSION_MAJOR
+ struct timespec {
+@@ -185,2 +186,3 @@
+ };
++#endif
+
+EOF
+# fix libkqueue/src/windows/platform.h for 64-bit
+patch -ulbf libkqueue/src/windows/platform.h << EOF
+@@ -20,2 +20,4 @@
+ /* Require Windows XP or later */
++#undef WINVER
++#undef _WIN32_WINNT
+ #define WINVER 0x0501
+@@ -137,3 +139,5 @@
+ typedef int sigset_t;
++#ifndef __MINGW64_VERSION_MAJOR
+ typedef int pid_t;
++#endif
+
+EOF
+# fix libpthread_workqueue/src/windows/times.h for 64-bit
+patch -ulbf libpthread_workqueue/src/windows/times.h << EOF
+@@ -5,2 +5,3 @@
+
++#ifndef __MINGW64_VERSION_MAJOR
+ // some date functions
+@@ -19,2 +20,3 @@
+ #endif
++#endif
+
+EOF
+# fix libpthread_workqueue/src/windows/platform.h for 64-bit
+patch -ulbf libpthread_workqueue/src/windows/platform.h << EOF
+@@ -10,2 +10,3 @@
+
++#undef _WIN32_WINNT
+ #ifdef PROVIDE_LEGACY_XP_SUPPORT
+EOF
+# fix libpthread_workqueue/src/private.h for 64-bit
+patch -ulbf libpthread_workqueue/src/private.h << EOF
+@@ -69,3 +69,3 @@
+
+-#if __GNUC__
++#if __GNUC__ && !defined(__MINGW32__)
+ #define fastpath(x)     ((__typeof__(x))__builtin_expect((long)(x), ~0l))
+EOF
+# fix redefinition of struct timezone in core/platform/windows/times.h for 64-bit
+patch -ulbf core/platform/windows/times.h << EOF
+@@ -6,2 +6,3 @@
+
++#ifndef __MINGW64_VERSION_MAJOR
+ // some date functions
+@@ -20,2 +21,3 @@
+ #endif
++#endif
+
+EOF
+# fix building on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+patch -ulbf core/src/debug.h << EOF
+@@ -51,3 +51,3 @@
+         if (__builtin_constant_p(e)) { \\
+-            char __compile_time_assert__[(bool)(e) ? 1 : -1] __attribute__((unused));  \\
++            char __compile_time_assert__[(bool)(intptr_t)(e) ? 1 : -1] __attribute__((unused));        \\
+         } else {       \\
+@@ -55,3 +55,3 @@
+             if (DISPATCH_DEBUG && !_e) {       \\
+-                _dispatch_abort(__LINE__, (long)_e);   \\
++                _dispatch_abort(__LINE__, (intptr_t)_e);       \\
+             }  \\
+@@ -66,3 +66,3 @@
+             if (DISPATCH_DEBUG && _e) {        \\
+-                _dispatch_abort(__LINE__, (long)_e);   \\
++                _dispatch_abort(__LINE__, (intptr_t)_e);       \\
+             }  \\
+@@ -84,3 +84,3 @@
+             }  \\
+-            _dispatch_bug(__LINE__, (long)_e); \\
++            _dispatch_bug(__LINE__, (intptr_t)_e);     \\
+         }      \\
+EOF
+patch -ulbf core/src/queue.c << EOF
+@@ -407,6 +407,6 @@
+        // This generates better assembly.
+-       if ((long)DO_CAST(dou)->do_vtable & DISPATCH_OBJ_ASYNC_BIT) {
++       if ((intptr_t)DO_CAST(dou)->do_vtable & DISPATCH_OBJ_ASYNC_BIT) {
+                _dispatch_continuation_free(dc);
+        }
+-       if ((long)DO_CAST(dou)->do_vtable & DISPATCH_OBJ_GROUP_BIT) {
++       if ((intptr_t)DO_CAST(dou)->do_vtable & DISPATCH_OBJ_GROUP_BIT) {
+                dg = dc->dc_group;
+@@ -1621,3 +1621,3 @@
+                                _dispatch_workitem_inc();
+-                       } else if ((long)dc->do_vtable & DISPATCH_OBJ_BARRIER_BIT) {
++                       } else if ((intptr_t)dc->do_vtable & DISPATCH_OBJ_BARRIER_BIT) {
+                                if (dq->dq_running > 1) {
+EOF
+patch -ulbf core/src/queue_internal.h << EOF
+@@ -38,3 +38,3 @@
+ // vtables are pointers far away from the low page in memory
+-#define DISPATCH_OBJ_IS_VTABLE(x)      ((unsigned long)(x)->do_vtable > 127ul)
++#define DISPATCH_OBJ_IS_VTABLE(x)      ((uintptr_t)(x)->do_vtable > 127ul)
+
+EOF
+fi
+# fix core/src/object.c for 64-bit Windows
+patch -ulbf core/src/object.c << EOF
+@@ -230,3 +230,7 @@
+ #ifdef __x86_64__
++# ifdef __MINGW64__
++        return snprintf(buf, bufsiz, "refcnt = 0x%I64x, suspend_cnt = 0x%I64x, ",
++# else
+         return snprintf(buf, bufsiz, "refcnt = 0x%lx, suspend_cnt = 0x%lx, ",
++# endif
+ #else
+EOF
+# fix core/src/semaphore.c for 64-bit Windows
+patch -ulbf core/src/semaphore.c << EOF
+@@ -738,3 +738,7 @@
+ #ifdef __x86_64__
++# ifdef __MINGW64__
++            "value = %I64d, orig = %I64d }", dsema->dsema_value, dsema->dsema_orig);
++# else
+             "value = %ld, orig = %ld }", dsema->dsema_value, dsema->dsema_orig);
++# endif
+ #else
+EOF
+# fix core/src/source.c for 64-bit Windows
+patch -ulbf core/src/source.c << EOF
+@@ -271,3 +271,7 @@
+ #ifdef __x86_64__
++# ifdef __MINGW64__
++            "target = %s[%p], pending_data = 0x%I64x, pending_data_mask = 0x%I64x, ",
++# else
+             "target = %s[%p], pending_data = 0x%lx, pending_data_mask = 0x%lx, ",
++# endif
+ #else
+EOF
+# fix indentation issues
+for F in $(grep -l '\t' $(find . -name *.c -or -name *.cpp)); do
+ mv $F $F.bak &&
+ sed -e "s/\t/    /g; s/return (0);/{&}/" $F.bak > $F
+done
+# fix redefinitions in core/platform/windows/pthread_mutex.h
+mv core/platform/windows/pthread_mutex.h core/platform/windows/pthread_mutex.h.bak
+cat > core/platform/windows/pthread_mutex.h << EOF
+#undef PTHREAD_MUTEX_INITIALIZER
+#undef PTHREAD_MUTEX_DEFAULT
+#undef PTHREAD_MUTEX_SHARED
+EOF
+cat core/platform/windows/pthread_mutex.h.bak >> core/platform/windows/pthread_mutex.h
+# fix redefinitions in core/platform/windows/pthread_create.h
+mv core/platform/windows/pthread_create.h core/platform/windows/pthread_create.h.bak
+cat > core/platform/windows/pthread_create.h << EOF
+#undef PTHREAD_CANCELED
+#undef PTHREAD_RWLOCK_INITIALIZER
+#undef PTHREAD_COND_INITIALIZER
+#undef PTHREAD_SPINLOCK_INITIALIZER
+#undef PTHREAD_PROCESS_SHARED
+#undef PTHREAD_PROCESS_PRIVATE
+#undef pthread_cleanup_push
+#undef pthread_cleanup_pop
+EOF
+cat core/platform/windows/pthread_create.h.bak >> core/platform/windows/pthread_create.h
+# fix redefinitions in core/platform/windows/threads.h
+mv core/platform/windows/threads.h core/platform/windows/threads.h.bak
+cat > core/platform/windows/threads.h << EOF
+#undef NSIG
+EOF
+cat core/platform/windows/threads.h.bak >> core/platform/windows/threads.h
+# fix CMakeLists.txt for 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+patch -ulbf CMakeLists.txt << EOF
+@@ -83,7 +83,2 @@
+
+-# currently there's a bug in mingw causing the
+-# builtin atomic opts not to work without this
+-if(MINGW AND MZ_32BIT)
+-       mz_add_flag(GCC -march=i486)
+-endif()
+EOF
+fi
+# fix strncat error in libkqueue/src/common/kevent.c (version >= 0.7.2)
+patch -ulbf libkqueue/src/common/kevent.c << EOF
+@@ -65 +65 @@
+-        strncat((char *) &buf[0], " ", 1);
++        strcat((char *)buf, " ");
+EOF
+## use system pthreads in core/platform/windows/platform.h (version >= 0.7.2)
+#patch -ulbf core/platform/windows/platform.h << EOF
+#@@ -37,3 +37,7 @@
+# #include "posix.h"
+#+#ifdef __MINGW32__
+#+#include <pthread.h>
+#+#else
+# #include "threads.h"
+#+#endif
+# #include "queue.h"
+#EOF
+# fix building on 64-bit
+mv libkqueue/CMakeLists.txt libkqueue/CMakeLists.txt.bak &&
+sed -e "s/-march=i486//" libkqueue/CMakeLists.txt.bak > libkqueue/CMakeLists.txt
+# fix missing docs/docgen.cmake
+mv CMakeLists.txt CMakeLists.txt.bak
+grep -v docs/docgen CMakeLists.txt.bak > CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-fcommon" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-fcommon -Wno-error=array-bounds -Wno-error=format=" -S. -Bbuild_win &&
+ #PATH=$MINGWPREFIX/qt/bin:$PATH QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-DDISPATCH_MAKEDLL -DXDISPATCH_MAKEDLL" -DCMAKE_CXX_FLAGS:STRING="-DDISPATCH_MAKEDLL -DXDISPATCH_MAKEDLL" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-I$(pwd)/include -I$(pwd)/include/xdispatch -DDISPATCH_MAKEDLL -DXDISPATCH_MAKEDLL" -DCMAKE_CXX_FLAGS:STRING="-I$(pwd)/include -I$(pwd)/include/xdispatch -DDISPATCH_MAKEDLL -DXDISPATCH_MAKEDLL" -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-fcommon -I$(pwd)/include -I$(pwd)/include/xdispatch -DDISPATCH_MAKEDLL -DXDISPATCH_MAKEDLL" -DCMAKE_CXX_FLAGS:STRING="-Wno-error=deprecated-declarations -fpermissive -I$(pwd)/include -I$(pwd)/include/xdispatch -DDISPATCH_MAKEDLL -DXDISPATCH_MAKEDLL" -S. -Bbuild_win &&
+ ## fix obsolete Doxygen tags SHOW_DIRECTORIES/HTML_ALIGN_MEMBERS
+ #doxygen -u Doxyfile &&
+ wl-showstatus build-install &&
+ #( make -Cbuild_win install/strip || make -Cbuild_win install ) &&
+ make -Cbuild_win install &&
+ #make -Cbuild_win install CXX="g++ -Wno-error=deprecated-declarations -fpermissive" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xdispatch_$VERSION
+####../bin/libkqueue.a(map.c.obj):map.c:(.text+0x7d): undefined reference to `___sync_val_compare_and_swap_4'
+####To do: build with QT support
+####To do: build on 64-bit
+
+

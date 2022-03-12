@@ -1,0 +1,89 @@
+export NAME="FAUST"
+export STATUS=
+export URL=http://faust.grame.fr/
+#export URL=https://github.com/grame-cncm/faust
+export BASENAME=faust
+export DESCRIPTION="Faust (Functional Audio Stream) is a functional programming language for sound synthesis and audio processing with a strong focus on the design of synthesizers, musical instruments, audio effects, etc. Faust targets high-performance signal processing applications and audio plug-ins for a variety of platforms and standards."
+export CATEGORY=audio
+export TYPE=library,application
+#export VERSION=2.20.2
+#export VERSIONDATE=20200305
+#export VERSION=2.27.1
+#export VERSIONDATE=20200722
+#export VERSION=2.27.2
+#export VERSIONDATE=20200804
+#export VERSION=2.30.5
+#export VERSIONDATE=20210123
+#export VERSION=2.33.1
+#export VERSIONDATE=20210721
+export VERSION=2.37.3
+export VERSIONDATE=20211030
+wl-showstatus --package-version
+export DEPENDANCIES=libmicrohttpd
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=COPYING.txt
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/grame-cncm/faust/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/grame-cncm/faust/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/grame-cncm/faust/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix architecture/httpdlib/src/httpd/HTTPDServer.cpp (version = 2.27.1)
+#patch -ulbf architecture/httpdlib/src/httpd/HTTPDServer.cpp << EOF
+#@@ -51,3 +51,3 @@
+# //--------------------------------------------------------------------------
+#-static int _answer_to_connection (void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version,
+#+static MHD_Result _answer_to_connection (void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version,
+#                           const char *upload_data, size_t *upload_data_size, void **con_cls)
+#@@ -55,3 +55,3 @@
+#        HTTPDServer* server = (HTTPDServer*)cls;
+#-       return server->answer(connection, url, method, version, upload_data, upload_data_size, con_cls);
+#+       return (MHD_Result)server->answer(connection, url, method, version, upload_data, upload_data_size, con_cls);
+# }
+#@@ -89,3 +89,3 @@
+# // fonct(ion appelée par libmicrohttpd pour tous les parametres de la requète (soit GET soit POST)
+#-static int _get_params (void *cls, enum MHD_ValueKind kind, const char *key, const char *value)
+#+static MHD_Result _get_params (void *cls, enum MHD_ValueKind kind, const char *key, const char *value)
+# {
+#EOF
+# fix for GCC 11 in architecture/faust/gui/jsonui.h (version >= 2.30.5)
+mv architecture/faust/gui/jsonui.h architecture/faust/gui/jsonui.h.bak &&
+echo "#include <limits>" > architecture/faust/gui/jsonui.h &&
+cat architecture/faust/gui/jsonui.h.bak >> architecture/faust/gui/jsonui.h
+# don't distribute MSVC stuff
+patch -ulbf build/CMakeLists.txt << EOF
+@@ -75,3 +75,3 @@
+ include (misc/llvm.cmake)
+-if (INCLUDE_LLVM )
++if (FALSE)
+        if(USE_LLVM_CONFIG)
+@@ -380,3 +380,3 @@
+ # install VS redistributables
+-if (WIN32)
++if (MSVC)
+ if (\${CMAKE_GENERATOR} STREQUAL "Visual Studio 14 2015 Win64")
+EOF
+## fix calling CMake using cmake.exe (calling cmake fails if there is a cmake folder next to cmake.exe)
+#sed -i.bak "s/\(cmake\)\( [-.]\)/\1.exe\2/g" build/Makefile
+#wl-showstatus build &&
+# PKG_CONFIG= make PREFIX=$INSTALLPREFIX LLVM_VERSION= CMAKEOPT="-DCMAKE_BUILD_TYPE:STRING=Release -DWORKLET:BOOL=ON -DINCLUDE_EXECUTABLE:BOOL=ON -DINCLUDE_STATIC:BOOL=ON -DINCLUDE_DYNAMIC:BOOL=ON -DINCLUDE_OSC:BOOL=ON -DINCLUDE_HTTP:BOOL=ON -DINCLUDE_ITP:BOOL=ON" &&
+#    echo OK
+mkdir -p winbuild &&
+ wl-showstatus configure &&
+ PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DINCLUDE_STATIC:BOOL=ON -DINCLUDE_DYNAMIC:BOOL=ON -DLLVM_BACKEND:BOOL=OFF -DUSE_LLVM_CONFIG:BOOL=OFF -DINCLUDE_EXECUTABLE:BOOL=ON -DWORKLET:BOOL=ON-DINCLUDE_OSC:BOOL=ON -DINCLUDE_HTTP:BOOL=ON -DINCLUDE_ITP:BOOL=OFF -DITPDYNAMIC:BOOL=OFF -Sbuild -Bwinbuild &&
+ wl-showstatus build-install &&
+ make -Cwinbuild install/strip &&
+ #make -Cwinbuild install/strip LLVM_VERSION= &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ strip $INSTALLPREFIX/bin/*.{dll,exe} &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

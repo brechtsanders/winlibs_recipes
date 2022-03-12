@@ -1,0 +1,155 @@
+export NAME="IBus"
+export STATUS=
+#export URL=http://code.google.com/p/ibus/
+export URL=https://github.com/ibus/ibus/wiki
+export BASENAME=ibus
+export DESCRIPTION="IBus - Intelligent Input Bus for Linux / Unix OS"
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.5.1
+#export VERSIONDATE=20130111
+#export VERSION=1.5.2
+#export VERSIONDATE=20130417
+#export VERSION=1.5.3
+#export VERSIONDATE=20130726
+#export VERSION=1.5.4
+#export VERSIONDATE=20130921
+####bus/main.c:116:5: warning: implicit declaration of function 'sysconf' [-Wimplicit-function-declaration]
+####bus/main.c:116:28: error: '_SC_OPEN_MAX' undeclared (first use in this function)
+####bus/main.c:126:5: warning: implicit declaration of function 'fork' [-Wimplicit-function-declaration]
+#export VERSION=1.5.5
+#export VERSIONDATE=20140114
+#export VERSION=1.5.22
+#export VERSIONDATE=20200812
+#export VERSION=1.5.23
+#export VERSIONDATE=20200929
+#export VERSION=1.5.24
+#export VERSIONDATE=20210222
+export VERSION=1.5.25
+export VERSIONDATE=20210820
+####bus/main.c:189:17: error: 'SIGUSR2' undeclared (first use in this function)
+####ui/gtk3/keybindingmanager.c:15:22: fatal error: gdk/gdkx.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,gtk3,dbus,dconf,gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://code.google.com/p/ibus/downloads/list"
+export DOWNLOADURL="https://github.com/ibus/ibus/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ibus.googlecode.com/files/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/ibus/ibus/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/ibus/ibus/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# create missing files
+mkdir -p winfix/sys
+touch winfix/sys/wait.h
+cat > winfix/pwd.h << EOF
+EOF
+# fix src/ibusshare.c
+mv src/ibusshare.c src/ibusshare.c.bak
+cat > src/ibusshare.c << EOF
+#define getuid() 0
+#define kill(pid, sig) -1
+#define localtime_r(clock,result) (*(result) = *localtime((clock)), (result))
+EOF
+cat src/ibusshare.c.bak >> src/ibusshare.c
+# fix src/ibusbus.c
+mv src/ibusbus.c src/ibusbus.c.bak
+cat > src/ibusbus.c << EOF
+#define getuid() 0
+EOF
+cat src/ibusbus.c.bak >> src/ibusbus.c
+# fix bus/component.c
+mv bus/component.c bus/component.c.bak
+cat > bus/component.c << EOF
+#define kill(pid, sig) -1
+EOF
+cat bus/component.c.bak >> bus/component.c
+# fix bus/ibusimpl.c
+mv bus/ibusimpl.c bus/ibusimpl.c.bak
+cat > bus/ibusimpl.c << EOF
+#define kill(pid, sig) -1
+#define waitpid(pid,status,options) -1
+#define WNOHANG 0
+EOF
+cat bus/ibusimpl.c.bak >> bus/ibusimpl.c
+# fix bus/server.c
+mv bus/server.c bus/server.c.bak
+cat > bus/server.c << EOF
+#define _SC_OPEN_MAX 4
+EOF
+cat bus/server.c.bak >> bus/server.c
+# fix missing index in src/gencomposetable.c (version >= 1.5.5)
+mv src/gencomposetable.c src/gencomposetable.c.bak &&
+echo "#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})" > src/gencomposetable.c &&
+cat src/gencomposetable.c.bak >> src/gencomposetable.c
+# fix missing index in src/ibuscomposetable.c (version >= 1.5.5)
+mv src/ibuscomposetable.c src/ibuscomposetable.c.bak &&
+echo "#define index(haystack,needle) strstr(haystack,(char[2]){needle,0})" > src/ibuscomposetable.c &&
+cat src/ibuscomposetable.c.bak >> src/ibuscomposetable.c
+# fix missing getuid() in src/ibusbus.c (version >= 1.5.22)
+sed -i.bak -e "s/buf\.st_uid \!= getuid ()/1/" src/ibusbus.c
+# fix src/ibusbus.c (version >= 1.5.25)
+patch -ulbf src/ibusbus.c << EOF
+@@ -568,2 +568,3 @@
+     errno = 0;
++#ifndef _WIN32
+     if ((fd = open (path, O_RDONLY | O_DIRECTORY, S_IRWXU)) == -1) {
+@@ -577,3 +578,3 @@
+     if (fstat (fd, &buf) == 0) {
+-        if (buf.st_uid != getuid ()) {
++        if (1) {
+             g_warning ("The owner of %s is not %s!",
+@@ -592,2 +593,3 @@
+     close (fd);
++#endif
+     g_free (path);
+EOF
+## fix missing gio-unix (version >= 1.5.22 <= 1.5.24)
+#sed -i.bak -e "s/gio-unix/gio-windows/" configure
+# fix missing gio-unix (version >= 1.5.25)
+sed -i.bak -e "s/gio-unix/gio-windows/" configure.ac
+# fix docs/reference/ibus/Makefile.am (version >= 1.5.25)
+patch -ulbf docs/reference/ibus/Makefile.am << EOF
+@@ -121,3 +121,3 @@
+ # e.g. EXTRA_DIST += version.xml.in
+-EXTRA_DIST += trim.sed
++EXTRA_DIST = trim.sed
+
+@@ -149,3 +149,3 @@
+
+-CLEANFILES+= *actions *.stamp
++CLEANFILES = *actions *.stamp
+
+EOF
+# fix missing files (version >= 1.5.25)
+touch gtk-doc.make ChangeLog
+wl-showstatus configure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no --disable-ui --disable-setup --disable-xim LDFLAGS="-Wl,-no-undefined" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no --disable-ui --disable-setup --disable-xim --disable-dconf LDFLAGS="-Wl,-no-undefined" &&
+ #PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no --disable-ui --disable-setup --disable-xim --disable-dconf LDFLAGS="-Wl,-no-undefined" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-introspection=no --disable-ui --disable-setup --disable-xim --disable-dconf CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined" &&
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe PYTHONPATH=$(dirname $(ls -1d $MINGWPREFIX/lib/python*/site-packages/gi|sort -V|tail -n1)) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-engine --disable-introspection --disable-ui --disable-setup --disable-xim --disable-dconf --disable-unicode-dict --disable-emoji-dict --disable-python2 --disable-python-library --disable-schemas-compile --disable-gtk-doc CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined" &&
+ PKG_CONFIG=$(which pkg-config.exe) INTLTOOL_PERL="$PERLDIR/bin/perl.exe" PERL="$PERLDIR/bin/perl.exe" PYTHON=$PYDIR/python.exe PYTHONPATH=$(dirname $(ls -1d $MINGWPREFIX/lib/python*/site-packages/gi|sort -V|tail -n1)) ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-engine --enable-introspection --disable-ui --disable-setup --disable-xim --disable-dconf --disable-unicode-dict --disable-emoji-dict --disable-python2 --disable-python-library --disable-schemas-compile --disable-gtk-doc --disable-tests CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #make install-strip &&
+ #PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/lib:$PYTHONPATH make install-strip &&
+ PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/lib:$PYTHONPATH make -Csrc install-strip &&
+ PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/lib:$PYTHONPATH make -i install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####NOTE: probably not functional
+####TO DO: also build daemon?
+
+
+

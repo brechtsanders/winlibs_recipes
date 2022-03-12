@@ -1,0 +1,138 @@
+export NAME="Cscope"
+export STATUS=
+export URL=http://cscope.sourceforge.net/
+export BASENAME=cscope
+export DESCRIPTION="Cscope Cscope is a developer's tool for browsing source code."
+export CATEGORY=development
+export TYPE=application
+export VERSION=15.9
+export VERSIONDATE=20190617
+wl-showstatus --package-version
+#export DEPENDANCIES=pcre,pdcurses
+export DEPENDANCIES=pcre,ncurses
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="https://sourceforge.net/projects/cscope/files/cscope/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://download.sourceforge.net/project/cscope/cscope/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/exec.c
+patch -ulbf src/exec.c << EOF
+@@ -40,3 +40,5 @@
+ #include <stdarg.h>
++#ifndef __MINGW32__
+ #include <sys/wait.h>
++#endif
+ #include <sys/types.h>      /* pid_t */
+@@ -50,2 +52,6 @@
+ #endif
++#ifdef __MINGW32__
++#define __MSDOS__
++#define mkdir(p,m) _mkdir(p)
++#endif
+
+EOF
+# fix src/main.c
+patch -ulbf src/main.c << EOF
+@@ -58,2 +58,6 @@
+ #endif
++#ifdef __MINGW32__
++//#define __MSDOS__
++#define mkdir(p,m) mkdir(p)
++#endif
+
+@@ -126,3 +130,3 @@
+
+-#if defined(KEY_RESIZE) && !defined(__DJGPP__)
++#if defined(KEY_RESIZE) && !defined(__DJGPP__) && !defined(__MINGW32__)
+ void
+@@ -299,3 +303,3 @@
+     struct stat        stat_buf;
+-#if defined(KEY_RESIZE) && !defined(__DJGPP__)
++#if defined(KEY_RESIZE) && !defined(__DJGPP__) && !defined(__MINGW32__)
+     struct sigaction winch_action;
+@@ -491,3 +495,7 @@
+     lineflagafterfile = getenv("CSCOPE_LINEFLAG_AFTER_FILE") ? 1 : 0;
++#ifdef _WIN32
++    tmpdir = mygetenv("TEMP", TMPDIR);
++#else
+     tmpdir = mygetenv("TMPDIR", TMPDIR);
++#endif
+
+@@ -529,2 +537,5 @@
+        signal(SIGINT, myexit);
++#ifndef SIGQUIT
++#define        SIGQUIT SIGABRT
++#endif
+        signal(SIGQUIT, myexit);
+@@ -532,3 +543,5 @@
+     /* cleanup on the hangup signal */
++#ifdef SIGHUP
+     signal(SIGHUP, myexit);
++#endif
+
+@@ -541,3 +554,5 @@
+      */
++#ifdef SIGPIPE
+     signal(SIGPIPE, SIG_IGN);
++#endif
+
+@@ -565,3 +580,3 @@
+
+-#if defined(KEY_RESIZE) && !defined(__DJGPP__)
++#if defined(KEY_RESIZE) && !defined(__DJGPP__) && !defined(__MINGW32__)
+        winch_action.sa_sigaction = sigwinch_handler;
+EOF
+patch -ulbf src/mypopen.c << EOF
+@@ -36,3 +36,5 @@
+ #include <sys/types.h>
++#ifndef __MINGW32__
+ #include <sys/wait.h>
++#endif
+ #include "global.h"    /* pid_t, shell, and mybasename() */
+@@ -75,3 +77,3 @@
+
+-#ifdef __DJGPP__               /* FIXME: test feature, not platform */
++#if defined(__DJGPP__) || defined(__MINGW32__)         /* FIXME: test feature, not platform */
+     /* HBB 20010312: DOS GCC doesn't have FD_CLOEXEC (yet), so it
+@@ -80,5 +82,6 @@
+        return(fd);
+-#endif
++#else
+     if(fd != -1 && (fcntl(fd, F_SETFD, CLOSE_ON_EXEC) != -1))
+        return(fd);
++#endif
+
+@@ -112,3 +115,3 @@
+
+-#ifdef __DJGPP__ /* FIXME: test feature, not platform */
++#if defined(__DJGPP__) || defined(__MINGW32__) /* FIXME: test feature, not platform */
+     /* HBB 20010312: DOS GCC doesn't have FD_CLOEXEC (yet), so it
+@@ -135,2 +138,4 @@
+        return (popen)(cmd, mode);
++#elif defined(__MINGW32__)
++       return _popen(cmd, mode);
+ #else
+@@ -184,2 +189,4 @@
+        return (pclose)(ptr);
++#elif defined(__MINGW32__)
++       return _pclose(ptr);
+ #else
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/ncurses" LDFLAGS="-Wl,--as-needed -lncurses" &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lregex -lncurses" ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

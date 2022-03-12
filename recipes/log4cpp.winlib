@@ -1,0 +1,78 @@
+export NAME="Log for C++"
+export STATUS=
+export URL=http://log4cpp.sourceforge.net/
+export BASENAME=log4cpp
+export DESCRIPTION="Log4cpp is library of C++ classes for flexible logging to files, syslog, IDSA and other destinations. It is modeled after the Log4j Java library, staying as close to their API as is reasonable."
+export CATEGORY=
+export TYPE=library
+export VERSION=1.1
+export VERSIONDATE=20130112
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=pthreads
+#export BUILDDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://sourceforge.net/projects/log4cpp/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/log4cpp/log4cpp-1.1.x%20%28new%29/log4cpp-1.1/log4cpp-1.1.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/log4cpp
+# fix type issues with long long long
+mv include/log4cpp/Portability.hh include/log4cpp/Portability.hh.bak
+echo "#include <stdint.h>" > include/log4cpp/Portability.hh
+cat include/log4cpp/Portability.hh.bak >> include/log4cpp/Portability.hh
+# fix type issues in tests/Clock.hh on 64-bit
+mv tests/Clock.hh tests/Clock.hh.bak
+echo "#include <stdint.h>" > tests/Clock.hh
+cat tests/Clock.hh.bak >> tests/Clock.hh
+# fix redefinition of int64_t in include/log4cpp/config-MinGW32.h
+sed -i.bak -e "s?^#define int64_t __int64?#include <stdint.h> //&?" include/log4cpp/config-MinGW32.h
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+## remove -pedantic linker option
+#sed -i.bak -e "s/-pedantic//" configure
+#wl-showstatus configure &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-doxygen --disable-html-docs LDFLAGS="-Wl,--as-needed -lws2_32" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-doxygen --disable-html-docs CXXFLAGS="-std=c++11" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# fix flags
+sed -i.bak -e "s?^\(\s*\)\(SET_TARGET_PROPERTIES(.*/NODEFAULTLIB:msvcrt\).*?\1#\2\n\1SET_TARGET_PROPERTIES(\${LOG4CPP_LIBRARY_NAME} PROPERTIES COMPILE_FLAGS \"-DWIN32 -DLOG4CPP_BUILD_DLL\")?" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-std=c++11" -S. -Bbuild_static &&
+ #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-std=c++11 -DLOG4CPP_HAS_DLL" -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/liblog4cpp.dll &&
+ rm -f $INSTALLPREFIX/include/log4cpp/*.bak &&
+ mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/aclocal &&
+ cp -f build_shared/liblog4cpp.dll $INSTALLPREFIX/bin/ && 
+ sed -e "s?@prefix@?$INSTALLPREFIX?; s?@exec_prefix@?\${prefix}?; s?@libdir@?\${exec_prefix}/lib?; s?@includedir@?\${prefix}/include?; s?@PACKAGE@?$BASENAME?; s?@VERSION@?$VERSION?; s?@log4cpp_libs@?-llog4cpp?; s?@log4cpp_cflags@?-DLOG4CPP_HAS_DLL?" log4cpp.pc.in > $INSTALLPREFIX/lib/pkgconfig/log4cpp.pc &&
+ sed -e "s?@PACKAGE@?$BASENAME?; s?@prefix@?\$(dirname \$0)/..?; s?@exec_prefix@?\${prefix}?; s?@bindir@?\${exec_prefix}/bin?; s?@sbindir@?\${exec_prefix}/sbin?; s?@libexecdir@?\${exec_prefix}/libexec?; s?@datadir@?\${prefix}/share?; s?@sysconfdir@?\${prefix}/etc?; s?@sharedstatedir@?\${prefix}/com?; s?@localstatedir@?\${prefix}/var?; s?@libdir@?\${exec_prefix}/lib?; s?@infodir@?\${prefix}/share/info?; s?@mandir@?\${prefix}/share/man?; s?@includedir@?\${prefix}/include?; s?@target@??; s?@host@?$RUNPLATFORM?; s?@build@?$BUILDPLATFORM?; s?@log4cpp_cflags@?-DLOG4CPP_HAS_DLL?; s?@log4cpp_libs@?-llog4cpp?; s?@LOG4CPP_VERSION@?$VERSION?" log4cpp-config.in > $INSTALLPREFIX/bin/log4cpp-config &&
+ cp -f log4cpp.m4 $INSTALLPREFIX/share/aclocal/log4cpp.m4 &&
+ echo '#include "config-MinGW32.h"' > $INSTALLPREFIX/include/log4cpp/config.h &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,598 @@
+#export NAME="xen"
+#export STATUS=
+#export URL=http://www.xen.org/
+#export BASENAME=libxen
+#export DESCRIPTION="The Xen hypervisor, the powerful open source industry standard for virtualization, offers a powerful, efficient, and secure feature set for virtualization of x86, x86_64, IA64, PowerPC, and other CPU architectures."
+#export CATEGORY=virtualization
+#export TYPE=library
+##export VERSION=3.2.0
+##export VERSION=3.2.1
+##export VERSION=3.3.0
+#export VERSION=3.3.1
+##export VERSION=3.4.0
+##export VERSION=3.4.1
+##export VERSION=3.4.2
+##export VERSION=4.0.0
+##export VERSION=4.0.1
+##export VERSIONDATE=
+##export VERSION=4.1.0
+##export VERSIONDATE=20110325
+##export VERSION=4.1.1
+##export VERSIONDATE=20110616
+##export VERSION=4.1.2
+##export VERSIONDATE=20111021
+##export VERSION=4.2.1
+##export VERSIONDATE=20130218
+##export VERSION=4.2.3
+##export VERSIONDATE=20131103
+##export VERSION=4.3.1
+##export VERSIONDATE=20131103
+#wl-showstatus --package-version
+#export DEPENDANCIES=libxml2
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+##export DOWNLOADURL="http://www.xen.org/download/ xen-"
+#export DOWNLOADURL="http://www.xen.org/products/xen_source.html xen-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://bits.xensource.com/oss-xen/release/$VERSION/xen-$VERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/xen-$VERSION.tar.gz
+#cd xen-$VERSION
+#echo 'include $(XEN_ROOT)/config/StdGNU.mk' > config/`uname -s`.mk
+#echo "DESTDIR=$INSTALLPREFIX" >> config/`uname -s`.mk
+## work around strptime error (to do: make this work! now the date will be incorrect...)
+#mv tools/libxen/src/xen_common.c tools/libxen/src/xen_common.c.bak
+#sed -e "s?strptime?//strptime?" tools/libxen/src/xen_common.c.bak > tools/libxen/src/xen_common.c
+## fix for building on win32
+#mv tools/libxen/Makefile tools/libxen/Makefile.bak
+#sed -e "s/-fPIC//; s/\(-Wl,libxenapi\.so.*\)/\1 -lxml2/; s/\.so/\.dll/g; s/-Wmissing-prototypes//" tools/libxen/Makefile.bak > tools/libxen/Makefile
+#mv tools/xenstore/Makefile tools/xenstore/Makefile.bak
+#sed -e "s/-fPIC//" tools/xenstore/Makefile.bak > tools/xenstore/Makefile
+#mv tools/Rules.mk tools/Rules.mk.bak
+#sed -e "s/-fPIC//" tools/Rules.mk.bak > tools/Rules.mk
+#PYTHON=$PYDIR/python.exe make -C tools/libxen/ install LDFLAGS="-Wl,--enable-auto-import" &&
+#    echo OK
+#
+##mkdir tools/xenstore/sys
+##touch tools/xenstore/sys/uio.h
+##touch tools/xenstore/sys/socket.h
+##touch tools/xenstore/sys/un.h
+#
+## workaround missing EISCONN
+#mv xen/include/public/io/xs_wire.h xen/include/public/io/xs_wire.h.bak
+#cat > xen/include/public/io/xs_wire.h << EOF
+##ifndef EISCONN
+##include <winsock2.h>
+##define EISCONN WSAEISCONN
+##include <windows.h>
+##define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+##endif
+#EOF
+#cat xen/include/public/io/xs_wire.h.bak >> xen/include/public/io/xs_wire.h
+#cp xen/include/public/io/xs_wire.h /include/xen/io/xs_wire.h
+#
+## modify tools/xenstore/xs.c so it compiles
+#patch -ulbf tools/xenstore/xs.c << EOF
+#--- tools/xenstore/xs.c Mon Jan  5 12:26:59 2009
+#+++ tools/xenstore/xs.c Fri Feb  6 15:06:03 2009
+#@@ -87,5 +87,7 @@
+# #define condvar_wait(c,m,hnd)  pthread_cond_wait(c,m)
+# 
+#+#ifndef __MINGW32__
+# static void *read_thread(void *arg);
+#+#endif
+# 
+# #else /* !defined(USE_PTHREAD) */
+#@@ -106,5 +108,9 @@
+# #endif
+# 
+#+#ifndef __MINGW32__
+# static int read_message(struct xs_handle *h);
+#+#else
+#+#define read_message(h) (-1)
+#+#endif
+# 
+# int xs_fileno(struct xs_handle *h)
+#@@ -126,4 +132,5 @@
+# }
+# 
+#+#ifndef __MINGW32__
+# static int get_socket(const char *connect_to)
+# {
+#@@ -155,4 +162,5 @@
+#        return -1;
+# }
+#+#endif
+# 
+# static int get_dev(const char *connect_to)
+#@@ -170,7 +178,9 @@
+#                return NULL;
+# 
+#+#ifndef __MINGW32__
+#        if (S_ISSOCK(buf.st_mode))
+#                fd = get_socket(connect_to);
+#        else
+#+#endif
+#                fd = get_dev(connect_to);
+# 
+#@@ -264,4 +274,5 @@
+# }
+# 
+#+#ifndef __MINGW32__
+# static bool read_all(int fd, void *data, unsigned int len)
+# {
+#@@ -404,4 +415,5 @@
+#        return NULL;
+# }
+#+#endif
+#
+#
+# /* free(), but don't change errno. */
+#@@ -419,4 +431,5 @@
+#                       unsigned int *len)
+# {
+#+#ifndef __MINGW32__
+#        struct iovec iovec;
+# 
+#@@ -424,4 +437,7 @@
+#        iovec.iov_len = strlen(string) + 1;
+#        return xs_talkv(h, t, type, &iovec, 1, len);
+#+#else
+#+       return NULL;
+#+#endif
+# }
+# 
+#@@ -478,4 +494,5 @@
+#              const char *path, const void *data, unsigned int len)
+# {
+#+#ifndef __MINGW32__
+#        struct iovec iovec[2];
+# 
+#@@ -487,4 +504,7 @@
+#        return xs_bool(xs_talkv(h, t, XS_WRITE, iovec,
+#                                ARRAY_SIZE(iovec), NULL));
+#+#else
+#+       return false;
+#+#endif
+# }
+# 
+#@@ -550,4 +570,5 @@
+#                        unsigned int num_perms)
+# {
+#+#ifndef __MINGW32__
+#        unsigned int i;
+#        struct iovec iov[1+num_perms];
+#@@ -578,4 +599,5 @@
+#        for (i = 0; i < num_perms; i++)
+#                free_no_errno(iov[i+1].iov_base);
+#+#endif
+#        return false;
+# }
+#@@ -588,4 +610,5 @@
+# bool xs_watch(struct xs_handle *h, const char *path, const char *token)
+# {
+#+#ifndef __MINGW32__
+#        struct iovec iov[2];
+# 
+#@@ -610,4 +633,7 @@
+#        return xs_bool(xs_talkv(h, XBT_NULL, XS_WATCH, iov,
+#                                ARRAY_SIZE(iov), NULL));
+#+#else
+#+       return false;
+#+#endif
+# }
+# 
+#@@ -668,4 +694,5 @@
+# bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
+# {
+#+#ifndef __MINGW32__
+#        struct iovec iov[2];
+# 
+#@@ -677,4 +704,7 @@
+#        return xs_bool(xs_talkv(h, XBT_NULL, XS_UNWATCH, iov,
+#                                ARRAY_SIZE(iov), NULL));
+#+#else
+#+       return false;
+#+#endif
+# }
+# 
+#@@ -724,4 +754,5 @@
+#                         unsigned int eventchn)
+# {
+#+#ifndef __MINGW32__
+#        char domid_str[MAX_STRLEN(domid)];
+#        char mfn_str[MAX_STRLEN(mfn)];
+#@@ -742,4 +773,8 @@
+#        return xs_bool(xs_talkv(h, XBT_NULL, XS_INTRODUCE, iov,
+#                                ARRAY_SIZE(iov), NULL));
+#+#else
+#+       return false;
+#+#endif
+#+                               
+# }
+# 
+#@@ -747,4 +782,5 @@
+#                         unsigned int domid, unsigned int target)
+# {
+#+#ifndef __MINGW32__
+#        char domid_str[MAX_STRLEN(domid)];
+#        char target_str[MAX_STRLEN(target)];
+#@@ -761,4 +797,7 @@
+#        return xs_bool(xs_talkv(h, XBT_NULL, XS_SET_TARGET, iov,
+#                                ARRAY_SIZE(iov), NULL));
+#+#else
+#+       return false;
+#+#endif
+# }
+# 
+#@@ -807,4 +846,5 @@
+#                       void *data, unsigned int len)
+# {
+#+#ifndef __MINGW32__
+#        struct iovec iov[2];
+# 
+#@@ -816,6 +856,10 @@
+#        return xs_talkv(h, XBT_NULL, XS_DEBUG, iov,
+#                        ARRAY_SIZE(iov), NULL);
+#+#else
+#+       return NULL;
+#+#endif
+# }
+# 
+#+#ifndef __MINGW32__
+# static int read_message(struct xs_handle *h)
+# {
+#@@ -888,4 +932,5 @@
+#        return NULL;
+# }
+#+#endif
+# #endif
+#EOF
+#
+### fix missing architecture files
+##mkdir -p tools/include/xen/foreign
+##cp xen/include/public/arch-x86/xen-x86_32.h tools/include/xen/foreign/x86_32.h
+##cp xen/include/public/arch-x86/xen-x86_64.h tools/include/xen/foreign/x86_64.h
+#
+## fix tools/include/xen-foreign/checker.c (version >= 4.0.1)
+#mv tools/include/xen-foreign/checker.c tools/include/xen-foreign/checker.c.bak
+#sed -e "s/%8zd/%i/g" tools/include/xen-foreign/checker.c.bak > tools/include/xen-foreign/checker.c
+#
+## fix xen/tools/symbols.c for 64-bit
+#patch -ulbf xen/tools/symbols.c << EOF
+#--- xen/tools/symbols.c  2009-01-05 12:27:02 +0100
+#+++ xen/tools/symbols.c  2012-04-29 20:50:34 +0200
+#@@ -79,3 +79,7 @@
+#
+#+#ifdef __MINGW64__
+#+       rc = fscanf(in, "%I64x %c %499s\\n", &s->addr, &stype, str);
+#+#else
+#        rc = fscanf(in, "%llx %c %499s\\n", &s->addr, &stype, str);
+#+#endif
+#        if (rc != 3) {
+#@@ -266,3 +270,7 @@
+#        for (i = 0; i < table_cnt; i++) {
+#+#ifdef __MINGW64__
+#+               printf("\\tPTR\\t%#I64x\\n", table[i].addr);
+#+#else
+#                printf("\\tPTR\\t%#llx\\n", table[i].addr);
+#+#endif
+#        }
+#EOF
+#
+#patch -ulbf tools/include/xen-foreign/Makefile << EOF
+#--- tools/include/xen-foreign/Makefile  Mon Jan  5 12:26:59 2009
+#+++ tools/include/xen-foreign/Makefile  Fri Feb  6 15:22:15 2009
+#@@ -20,5 +20,5 @@
+# check-headers: checker
+#        ./checker > tmp.size
+#-       diff -u reference.size tmp.size
+#+`printf "\\t"`diff -u reference.size tmp.size || true
+#        rm tmp.size
+#EOF
+#
+#PYTHON=$PYDIR/python.exe PATH=$PATH:$PYDIR make -C tools/include/xen-foreign
+#
+##patch -ulbf tools/include/Makefile << EOF
+##--- tools/include/Makefile  Mon Jan  5 12:26:59 2009
+##+++ tools/include/Makefile  Fri Feb  6 15:39:04 2009
+##@@ -12,9 +12,9 @@
+##        @rm -rf xen
+##        mkdir xen
+##-       ln -sf ../\$(XEN_ROOT)/xen/include/public/COPYING xen
+##-       ln -sf \$(addprefix ../,\$(wildcard \$(XEN_ROOT)/xen/include/public/*.h)) xen
+##-       ln -sf \$(addprefix ../\$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
+##-       ln -sf ../xen-sys/\$(XEN_OS) xen/sys
+##-       ln -s ../xen-foreign xen/foreign
+##+       ln -sf \$(XEN_ROOT)/xen/include/public/COPYING xen
+##+       ln -sf \$(addprefix ,\$(wildcard \$(XEN_ROOT)/xen/include/public/*.h)) xen
+##+       ln -sf \$(addprefix \$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
+##+       ln -sf xen-sys/NetBSD xen/sys
+##+       ln -s xen-foreign xen/foreign
+##        touch \$@
+## 
+##@@ -30,5 +30,5 @@
+##        \$(INSTALL_DIR) \$(DESTDIR)\$(INCLUDEDIR)/xen/sys
+##        \$(INSTALL_DIR) \$(DESTDIR)\$(INCLUDEDIR)/xen/xsm
+##-       \$(INSTALL_DATA) xen/COPYING \$(DESTDIR)\$(INCLUDEDIR)/xen
+##+       #\$(INSTALL_DATA) xen/COPYING \$(DESTDIR)\$(INCLUDEDIR)/xen
+##        \$(INSTALL_DATA) xen/*.h \$(DESTDIR)\$(INCLUDEDIR)/xen
+##        \$(INSTALL_DATA) xen/arch-ia64/*.h \$(DESTDIR)\$(INCLUDEDIR)/xen/arch-ia64
+##EOF
+#patch -ulbf tools/include/Makefile << EOF
+#--- tools/include/Makefile  2010-08-25 12:22:10 +0200
+#+++ tools/include/Makefile  2010-10-30 18:16:32 +0200
+#@@ -13,8 +13,8 @@
+#  mkdir -p xen/libelf
+#- ln -sf ../\$(XEN_ROOT)/xen/include/public/COPYING xen
+#- ln -sf \$(addprefix ../,\$(wildcard \$(XEN_ROOT)/xen/include/public/*.h)) xen
+#- ln -sf \$(addprefix ../\$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
+#- ln -sf ../xen-sys/\$(XEN_OS) xen/sys
+#- ln -sf \$(addprefix ../../\$(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
+#- ln -s ../xen-foreign xen/foreign
+#+`printf "\\t"`cp -f \$(XEN_ROOT)/xen/include/public/COPYING xen
+#+`printf "\\t"`cp -f \$(addprefix ,\$(wildcard \$(XEN_ROOT)/xen/include/public/*.h)) xen
+#+`printf "\\t"`cp -rf \$(addprefix \$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
+#+`printf "\\t"`cp -rf ../xen-sys/\$(XEN_OS) xen/sys
+#+`printf "\\t"`cp -rf \$(addprefix \$(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
+#+`printf "\\t"`cp -rf xen-foreign xen/foreign
+#  touch \$@
+#EOF
+## fix missing files
+#touch tools/include/xen/COPYING
+#mkdir -p tools/xen-sys/`uname -s`
+#cp -rfp tools/include/xen-sys/NetBSD/* tools/xen-sys/`uname -s`/
+#
+#
+#PYTHON=$PYDIR/python.exe PATH=$PATH:$PYDIR make -C tools/include &&
+#    echo OK
+#
+#
+##make -C tools/xenstore/ install
+#####xs.c:116: warning: implicit declaration of function `pipe'
+#####xs.c: In function `get_socket':
+#####xs.c:130: error: storage size of 'addr' isn't known
+#
+#mv $INSTALLPREFIX/usr/* $INSTALLPREFIX/ &&
+# rmdir $INSTALLPREFIX/usr &&
+# cp -rfp xen/include/public/* $INSTALLPREFIX/include/xen/ &&
+# mkdir $INSTALLPREFIX/include/xen/sys &&
+# #cp -rfp tools/include/NetBSD/* $INSTALLPREFIX/include/xen/sys/ &&
+# cp -rfp tools/include/xen-sys/NetBSD/* $INSTALLPREFIX/include/xen/sys/ &&
+# mkdir $INSTALLPREFIX/bin &&
+# mv $INSTALLPREFIX/lib/libxenapi.dll $INSTALLPREFIX/bin/ &&
+# rm $INSTALLPREFIX/lib/libxenapi.dll[\.1-9]* &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf xen-$VERSION
+#
+#./autogen.sh &&
+# PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include PATH=$PATH:$PYDIR ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+# make install-strip &&
+#    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+#
+#
+#
+##BUILDDEPENDANCIES=dev86,acpica,pexports
+## work around strptime error (to do: make this work! now the date will be incorrect...)
+#mv tools/libxen/src/xen_common.c tools/libxen/src/xen_common.c.bak
+#sed -e "s?strptime?//strptime?" tools/libxen/src/xen_common.c.bak > tools/libxen/src/xen_common.c
+#cp -f config/x86_$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo 32; else echo 64; fi).mk config/$(uname -s).mk
+#cd tools
+##make -j1 -C libxen
+##mkdir -p winfix
+##touch winfix/None
+##autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+## fix detection of Python and invalid -pthread in configure
+#mv configure configure.bak
+#sed -e "s/print distutils.sysconfig.get_config_var(\"\(CFLAGS\|LIBS\|SYSLIBS\|LINKFORSHARED\|LDFLAGS\)\")//; s/-pthread/-lpthread/; s/^  \(pthread_\)/  \/\/\1/; s/^as_fn_error\(.*Unable to find library for openpty and login_tty\)/as_fn_warning\1/" configure.bak > configure
+##PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-xenapi CFLAGS="-I$PYDIR/include -I`pwd`/winfix" CPPFLAGS="-I$PYDIR/include -I`pwd`/winfix" LDFLAGS="-L$PYDIR/libs" &&
+##PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-xenapi CFLAGS="-I$PYDIR/include -I`pwd`/winfix" CPPFLAGS="-I$PYDIR/include -I`pwd`/winfix" LDFLAGS="-L$PYDIR/libs" PREPEND_INCLUDES= APPEND_INCLUDES= glib_CFLAGS= &&
+##PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-xenapi &&
+#PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-monitors --disable-xenapi --disable-rombios --disable-seabios --disable-debug CFLAGS="-I$MINGWPREFIX/include/libxml2" LDFLAGS="-L$PYDIR/libs" &&
+# mv libxen/Makefile libxen/Makefile.bak &&
+# sed -e "s/-Wl,[^ ]*//g" libxen/Makefile.bak > libxen/Makefile &&
+# PATH=$PYDIR:$PATH make -Clibxen CC=gcc XML2_CONFIG=$(which xml2-config) CURL_CONFIG=$(which curl-config) APPEND_LDFLAGS="-Wl,--as-needed -lxml2 -shared" &&
+# #PATH=$PYDIR:$PATH make -Clibxen CC=gcc XML2_CONFIG=$(which xml2-config) CURL_CONFIG=$(which curl-config) APPEND_LDFLAGS="-Wl,--as-needed -lxml2 -shared" CONFIG_X86=y CONFIG_X86_$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo 32; else echo 64; fi)=y &&
+# #PATH=$PYDIR:$PATH make -Clibxen install CC=gcc DESTDIR=$INSTALLPREFIX INSTALL_DIR="mkdir -p" INSTALL_PROG="cp -f" INSTALL_DATA="cp -f" &&
+# mkdir -p $INSTALLPREFIX/include/xen/api $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp -f libxen/include/xen/api/*.h $INSTALLPREFIX/include/xen/api/ &&
+# cp -f libxen/*.a $INSTALLPREFIX/lib/ &&
+# cp -f libxen/libxenapi.so $INSTALLPREFIX/bin/xenapi.dll &&
+# strip $INSTALLPREFIX/bin/xenapi.dll &&
+# pexports $INSTALLPREFIX/bin/xenapi.dll | sed -e "s/^\(LIBRARY \).*$/\1xenapi.dll/" > xenapi.def &&
+# dlltool -d xenapi.def -D $INSTALLPREFIX/bin/xenapi.dll -l $INSTALLPREFIX/lib/libxenapi.dll.a &&
+# cd .. &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf xen-$VERSION
+
+
+
+export NAME="xen"
+export STATUS=
+export URL=http://www.xen.org/
+export BASENAME=libxen
+export DESCRIPTION="The Xen hypervisor, the powerful open source industry standard for virtualization, offers a powerful, efficient, and secure feature set for virtualization of x86, x86_64, IA64, PowerPC, and other CPU architectures."
+export CATEGORY=virtualization
+export TYPE=library
+#export VERSION=4.3.1
+#export VERSIONDATE=20131103
+export VERSION=4.4.4
+export VERSIONDATE=20160404
+#export VERSION=4.5.0
+#export VERSIONDATE=20150329
+#export VERSION=4.5.2
+#export VERSIONDATE=20151104
+#export VERSION=4.5.3
+#export VERSIONDATE=20160406
+#export VERSION=4.5.5
+#export VERSIONDATE=20160921
+####make: *** tools/libxen: No such file or directory.  Stop.
+#export VERSION=4.6.0
+#export VERSIONDATE=20151103
+#export VERSION=4.6.1
+#export VERSIONDATE=20160404
+#export VERSION=4.6.3
+#export VERSIONDATE=20160621
+#export VERSION=4.6.4
+#export VERSIONDATE=20161108
+#export VERSION=4.6.5
+#export VERSIONDATE=20170308
+#export VERSION=4.6.6
+#export VERSIONDATE=20170708
+#export VERSION=4.7.0
+#export VERSIONDATE=20160621
+#export VERSION=4.7.1
+#export VERSIONDATE=20161108
+#export VERSION=4.7.2
+#export VERSIONDATE=20170308
+#export VERSION=4.7.3
+#export VERSIONDATE=20170708
+#export VERSION=4.7.4
+#export VERSIONDATE=20171123
+#export VERSION=4.7.5
+#export VERSIONDATE=20180404
+#export VERSION=4.7.6
+#export VERSIONDATE=20180710
+#export VERSION=4.8.1
+#export VERSIONDATE=20170411
+#export VERSION=4.8.2
+#export VERSIONDATE=20170907
+#export VERSION=4.8.3
+#export VERSIONDATE=20180125
+#export VERSION=4.8.4
+#export VERSIONDATE=20180712
+#export VERSION=4.9.0
+#export VERSIONDATE=20170708
+#export VERSION=4.9.1
+#export VERSIONDATE=20171123
+#export VERSION=4.9.2
+#export VERSIONDATE=20180404
+#export VERSION=4.9.3
+#export VERSIONDATE=20180926
+#export VERSION=4.10.1
+#export VERSIONDATE=20180710
+#export VERSION=4.10.2
+#export VERSIONDATE=20180926
+#export VERSION=4.10.4
+#export VERSIONDATE=20190704
+#export VERSION=4.11.0
+#export VERSIONDATE=20180710
+#export VERSION=4.11.1
+#export VERSIONDATE=20190220
+#export VERSION=4.11.2
+#export VERSIONDATE=20190625
+#export VERSION=4.11.3
+#export VERSIONDATE=20191129
+#export VERSION=4.11.4
+#export VERSIONDATE=20200420
+#export VERSION=4.12.0
+#export VERSIONDATE=20190401
+#export VERSION=4.12.1
+#export VERSIONDATE=20190809
+#export VERSION=4.12.3
+#export VERSIONDATE=20200519
+#export VERSION=4.12.4
+#export VERSIONDATE=20201102
+#export VERSION=4.13.0
+#export VERSIONDATE=20191218
+#export VERSION=4.13.1
+#export VERSIONDATE=20200519
+#export VERSION=4.13.2
+#export VERSIONDATE=20201030
+#export VERSION=4.13.3
+#export VERSIONDATE=20210323
+#export VERSION=4.14.0
+#export VERSIONDATE=20200724
+#export VERSION=4.14.1
+#export VERSIONDATE=20201218
+#export VERSION=4.14.2
+#export VERSIONDATE=20210428
+#export VERSION=4.15.0
+#export VERSIONDATE=20210408
+#export VERSION=4.15.1
+#export VERSIONDATE=20210911
+#export VERSION=4.16.0
+#export VERSIONDATE=20211202
+####configure: error: Unable to find Python development headers
+wl-showstatus --package-version
+export DEPENDANCIES=libxml2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=pexports
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.xen.org/download/ xen-"
+#export DOWNLOADURL="http://www.xen.org/products/xen_source.html xen-"
+#export DOWNLOADURL="http://xenproject.org/developers/teams/hypervisor.html xen- .html"
+#export DOWNLOADURL="https://xenproject.org/xen-project-archives/ xen-project-"
+export DOWNLOADURL="https://downloads.xenproject.org/release/xen/ xen-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://bits.xensource.com/oss-xen/release/$VERSION/xen-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://downloads.xenproject.org/release/xen/$VERSION/xen-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/xen-$VERSION.tar.gz
+cd xen-$VERSION
+# work around strptime error (to do: make this work! now the date will be incorrect...)
+mv tools/libxen/src/xen_common.c tools/libxen/src/xen_common.c.bak
+sed -e "s?strptime?//strptime?" tools/libxen/src/xen_common.c.bak > tools/libxen/src/xen_common.c
+# fix xen/tools/symbols.c (version >= 4.4.4)
+patch -ulbf xen/tools/symbols.c << EOF
+@@ -79,3 +79,7 @@
+
++#ifdef __MINGW32__
++    rc = fscanf(in, "%I64x %c %499s\\n", &s->addr, &stype, str);
++#else
+        rc = fscanf(in, "%llx %c %499s\\n", &s->addr, &stype, str);
++#endif
+        if (rc != 3) {
+@@ -247,3 +251,7 @@
+        for (i = 0; i < table_cnt; i++) {
++#ifdef __MINGW32__
++               printf("\\tPTR\\t%#I64x - SYMBOLS_ORIGIN\\n", table[i].addr);
++#else
+                printf("\\tPTR\\t%#llx - SYMBOLS_ORIGIN\\n", table[i].addr);
++#endif
+        }
+EOF
+# avoid -fPIC (useless on Windows and not supported by clang)
+sed -i.bak2 -e "s/-fPIC//i" $(grep -li "\-fPIC" $(find -name Makefile -or -name '*.mk'))
+# create configuration files
+cp -f config/x86_$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo 32; else echo 64; fi).mk config/$(uname -s).mk
+echo 'include $(XEN_ROOT)/config/StdGNU.mk' > config/`uname -s`.mk
+echo "DESTDIR=$INSTALLPREFIX" >> config/`uname -s`.mk
+touch config/Tools.mk
+# remove compiler options -m32 -march=i686 to fix 64-bit build
+mv config/x86_32.mk config/x86_32.mk.bak
+sed -e "s/-m32 -march=i686//" config/x86_32.mk.bak > config/x86_32.mk
+wl-showstatus build &&
+ #PATH=$PYDIR:$PATH make -Ctools/libxen CC=gcc XML2_CONFIG=$(which xml2-config) CURL_CONFIG=$(which curl-config) APPEND_LDFLAGS="-Wl,--as-needed -lxml2 -shared" &&
+ PATH=$PYDIR:$PATH make -Ctools/libxen CC=gcc XEN_TARGET_ARCH=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "x86_32"; fi) XML2_CONFIG=$(which xml2-config) CURL_CONFIG=$(which curl-config) APPEND_LDFLAGS="-Wl,--as-needed -lxml2 -shared" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/xen/api $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f tools/libxen/include/xen/api/*.h $INSTALLPREFIX/include/xen/api/ &&
+ cp -f tools/libxen/*.a $INSTALLPREFIX/lib/ &&
+ cp -f tools/libxen/libxenapi.so $INSTALLPREFIX/bin/xenapi.dll &&
+ strip $INSTALLPREFIX/bin/xenapi.dll &&
+ pexports $INSTALLPREFIX/bin/xenapi.dll | sed -e "s/^\(LIBRARY \).*$/\1xenapi.dll/" > tools/libxen/xenapi.def &&
+ dlltool -d tools/libxen/xenapi.def -D $INSTALLPREFIX/bin/xenapi.dll -l $INSTALLPREFIX/lib/libxenapi.dll.a &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xen-$VERSION
+####PATH=$PYDIR:$PATH C_INCLUDE_PATH=$PYDIR/include:$C_INCLUDE_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM PYTHON=$PYDIR/python.exe APPEND_INCLUDES="$PYDIR/include" CFLAGS="-I$PYDIR/include" && make && echo OK
+####PATH=$PYDIR:$PATH C_INCLUDE_PATH=$PYDIR/include:$C_INCLUDE_PATH CC=gcc ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-tools --disable-stubdom && make && echo OK
+
+
+
+
+#export BUILDDEPENDANCIES=dev86
+#PATH=$MINGWPREFIX/share/dev86/bin:$PYDIR:$PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-xen --disable-stubdom PYTHON=$PYDIR/python.exe PREPEND_INCLUDES=$PYDIR/includes &&
+##PATH=$MINGWPREFIX/share/dev86/bin:$PYDIR:$PATH C_INCLUDE_PATH=$PYDIR/include:$C_INCLUDE_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-xen --disable-stubdom &&
+# ## fix building DLLs
+# #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# ## fix detection of shared libraries
+# #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+# #wl-showstatus build &&
+# #make &&
+# wl-showstatus build-install &&
+# make install-strip &&
+#    echo OK

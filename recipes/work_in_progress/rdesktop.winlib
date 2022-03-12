@@ -1,0 +1,605 @@
+export NAME="rdesktop"
+export STATUS=
+export URL=http://www.rdesktop.org/
+export BASENAME=rdesktop
+export DESCRIPTION="rdesktop is an open source client for Windows Terminal Services, capable of natively speaking Remote Desktop Protocol (RDP) in order to present the user's Windows desktop."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.6.0
+#export VERSION=1.7.0
+#export VERSIONDATE=20110418
+#export VERSION=1.7.1
+#export VERSIONDATE=20120127
+#export VERSION=1.8.0
+#export VERSIONDATE=20130810
+####CredSPP support requires libggsglue, install the dependency or disable the feature using --disable-credssp.
+####checking for socklen_t equivalent... configure: error: Cannot find a type to use in place of socklen_t
+#export VERSION=1.8.1
+#export VERSIONDATE=20131118
+####ERROR: Could not find X Window System headers/libraries.
+####To specify paths manually, use the options --x-includes and --x-libraries.
+#export VERSION=1.8.2
+#export VERSIONDATE=20140520
+####rdesktop.c:1060:36: error: 'CODESET' undeclared (first use in this function)
+#export VERSION=1.8.3
+#export VERSIONDATE=20141031
+#export VERSION=1.8.4
+#export VERSIONDATE=20190102
+#export VERSION=1.8.5
+#export VERSIONDATE=20190508
+####ctrl.c:186:21: error: storage size of 'saun' isn't known  struct sockaddr_un saun;
+#export VERSION=1.8.6
+#export VERSIONDATE=20190521
+export VERSION=1.9.0
+export VERSIONDATE=20191011
+####configure: error: Selected sound system is not available.
+wl-showstatus --package-version
+export DEPENDANCIES=libx11,openssl,libao,libvncserver
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://sourceforge.net/project/showfiles.php?group_id=24366&package_id=16601"
+#export DOWNLOADURL="http://sourceforge.net/projects/rdesktop/files/rdesktop/"
+export DOWNLOADURL="https://github.com/rdesktop/rdesktop/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://prdownloads.sourceforge.net/rdesktop/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/rdesktop/rdesktop/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing socklen_t
+mkdir -p winfix/sys
+cat > winfix/sys/socket.h << EOF
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#ifndef SHUT_RDWR
+#define SHUT_RDWR 2
+#endif
+EOF
+touch winfix/pwd.h
+touch winfix/termios.h
+touch winfix/sys/times.h
+touch winfix/sys/un.h
+# fix missing fnmatch.h
+#touch winfix/fnmatch.h
+cat > winfix/fnmatch.h << EOF
+#include <shlwapi.h>
+#define FNM_NOMATCH 1
+#define fnmatch(p,s,f) (PathMatchSpec(s,p) ? 0 : FNM_NOMATCH)
+EOF
+# fix rdesktop.c (version <= 1.8.3)
+patch -ulbf rdesktop.c << EOF
+--- rdesktop.c  2011-11-25 11:03:04 +0100
++++ rdesktop.c  2012-12-18 15:47:38 +0100
+@@ -49,4 +49,36 @@
+ #endif
+
++#ifdef __MINGW32__
++#undef EGD_SOCKET
++#include <windows.h>
++//#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++//#define fork() -1
++struct passwd {
++  //char *pw_dir;
++  char *pw_name;
++};
++#define getuid() 0
++#define getpwuid(uid) NULL
++#define getgid() 0
++#define getppid() 0
++//#define F_SETLK  1
++//#define F_WRLCK  3
++struct sigaction {
++  void* sa_handler;
++  void* sa_mask;
++  int sa_flags;
++};
++#define sigemptyset(p) (*p=0)
++#define sigaction(a,b,c) 0
++#include <winsock2.h>
++struct sockaddr_un
++{
++  short          sun_family;
++  unsigned short sun_port;
++  struct         in_addr sun_addr;
++  char           sun_path[108-2-4];
++};
++#endif
++
+ #include "ssl.h"
+
+@@ -375,9 +407,12 @@
+ read_password(char *password, int size)
+ {
++#ifndef __MINGW32__
+        struct termios tios;
+-       RD_BOOL ret = False;
+        int istty = 0;
++#endif
++       RD_BOOL ret = False;
+        char *p;
+
++#ifndef __MINGW32__
+        if (tcgetattr(STDIN_FILENO, &tios) == 0)
+        {
+@@ -387,4 +422,5 @@
+                istty = 1;
+        }
++#endif
+
+        if (fgets(password, size, stdin) != NULL)
+@@ -398,4 +434,5 @@
+        }
+
++#ifndef __MINGW32__
+        if (istty)
+        {
+@@ -404,4 +441,5 @@
+                fprintf(stderr, "\n");
+        }
++#endif
+
+        return ret;
+@@ -1097,4 +1135,11 @@
+ generate_random(uint8 * random)
+ {
++#ifdef __MINGW32__
++       int i;
++       srand(time(NULL));
++
++       for (i = 0; i < 32; i++)
++               random[i] = (unsigned int)rand() % 8;
++#else
+        struct stat st;
+        struct tms tmsbuf;
+@@ -1136,4 +1181,5 @@
+        ssl_md5_update(&md5, random + 16, 16);
+        ssl_md5_final(&md5, random + 16);
++#endif
+ }
+
+@@ -1418,4 +1464,8 @@
+ subprocess(char *const argv[], str_handle_lines_t linehandler, void *data)
+ {
++#ifdef __MINGW32__
++       perror("subprocesses not supported on Windows");
++       return False;
++#else
+        pid_t child;
+        int fd[2];
+@@ -1463,4 +1513,5 @@
+
+        return True;
++#endif
+ }
+
+@@ -1510,5 +1561,9 @@
+        res = stat(path, &st);
+        if (res == -1 )
++#ifdef __MINGW32__
++               return mkdir(path);
++#else
+                return mkdir(path, mask);
++#endif
+
+        if (!S_ISDIR(st.st_mode))
+@@ -1673,5 +1728,9 @@
+        sprintf(bmpcache_dir, "%s/%s", home, ".rdesktop");
+
++#ifdef __MINGW32__
++       if ((mkdir(bmpcache_dir) == -1) && errno != EEXIST)
++#else
+        if ((mkdir(bmpcache_dir, S_IRWXU) == -1) && errno != EEXIST)
++#endif
+        {
+                perror(bmpcache_dir);
+@@ -1681,5 +1740,9 @@
+        sprintf(bmpcache_dir, "%s/%s", home, ".rdesktop/cache");
+
++#ifdef __MINGW32__
++       if ((mkdir(bmpcache_dir) == -1) && errno != EEXIST)
++#else
+        if ((mkdir(bmpcache_dir, S_IRWXU) == -1) && errno != EEXIST)
++#endif
+        {
+                perror(bmpcache_dir);
+@@ -1740,4 +1803,7 @@
+ rd_lock_file(int fd, int start, int len)
+ {
++#ifdef __MINGW32__
++       return False;
++#else
+        struct flock lock;
+
+@@ -1749,3 +1815,4 @@
+                return False;
+        return True;
++#endif
+ }
+
+EOF
+## fix rdesktop.c (version >= 1.8.4)
+#patch -ulbf rdesktop.c << EOF
+#@@ -49,4 +49,36 @@
+# #endif
+# 
+#+#ifdef __MINGW32__
+#+#undef EGD_SOCKET
+#+#include <windows.h>
+#+//#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+#+//#define fork() -1
+#+struct passwd {
+#+  //char *pw_dir;
+#+  char *pw_name;
+#+};
+#+#define getuid() 0
+#+#define getpwuid(uid) NULL
+#+#define getgid() 0
+#+#define getppid() 0
+#+//#define F_SETLK  1
+#+//#define F_WRLCK  3
+#+struct sigaction {
+#+  void* sa_handler;
+#+  void* sa_mask;
+#+  int sa_flags;
+#+};
+#+#define sigemptyset(p) (*p=0)
+#+#define sigaction(a,b,c) 0
+#+#include <winsock2.h>
+#+struct sockaddr_un
+#+{
+#+  short          sun_family;
+#+  unsigned short sun_port;
+#+  struct         in_addr sun_addr;
+#+  char           sun_path[108-2-4];
+#+};
+#+#endif
+#+
+# #include "ssl.h"
+# 
+#@@ -436,9 +468,12 @@
+# read_password(char *password, int size)
+# {
+#+#ifndef __MINGW32__
+#         struct termios tios;
+#-        RD_BOOL ret = False;
+#         int istty = 0;
+#+#endif
+#+       RD_BOOL ret = False;
+#         char *p;
+# 
+#+#ifndef __MINGW32__
+#         if (tcgetattr(STDIN_FILENO, &tios) == 0)
+#         {
+#@@ -448,4 +483,5 @@
+#                 istty = 1;
+#         }
+#+#endif
+# 
+#         if (fgets(password, size, stdin) != NULL)
+#@@ -459,4 +495,5 @@
+#         }
+# 
+#+#ifndef __MINGW32__
+#         if (istty)
+#         {
+#@@ -465,4 +502,5 @@
+#                 fprintf(stderr, "\\n");
+#         }
+#+#endif
+# 
+#         return ret;
+#@@ -1026,4 +1064,5 @@
+#         if (g_codepage[0] == 0)
+#         {
+#+#ifndef __MINGW32__
+#                 if (setlocale(LC_CTYPE, ""))
+#                 {
+#@@ -1031,4 +1070,5 @@
+#                 }
+#                 else
+#+#endif
+#                 {
+#                         STRNCPY(g_codepage, DEFAULT_CODEPAGE, sizeof(g_codepage));
+#@@ -1270,4 +1310,11 @@
+# generate_random(uint8 * random)
+# {
+#+#ifdef __MINGW32__
+#+       int i;
+#+       srand(time(NULL));
+#+
+#+       for (i = 0; i < 32; i++)
+#+               random[i] = (unsigned int)rand() % 8;
+#+#else
+#         struct stat st;
+#         struct tms tmsbuf;
+#@@ -1309,4 +1356,5 @@
+#         rdssl_md5_update(&md5, random + 16, 16);
+#         rdssl_md5_final(&md5, random + 16);
+#+#endif
+# }
+# 
+#@@ -1591,4 +1639,8 @@
+# subprocess(char *const argv[], str_handle_lines_t linehandler, void *data)
+# {
+#+#ifdef __MINGW32__
+#+       perror("subprocesses not supported on Windows");
+#+       return False;
+#+#else
+#         pid_t child;
+#         int fd[2];
+#@@ -1636,4 +1688,5 @@
+# 
+#         return True;
+#+#endif
+# }
+# 
+#@@ -1796,5 +1849,9 @@
+#         sprintf(bmpcache_dir, "%s/%s", home, ".rdesktop");
+# 
+#+#ifdef __MINGW32__
+#+       if ((mkdir(bmpcache_dir) == -1) && errno != EEXIST)
+#+#else
+#         if ((mkdir(bmpcache_dir, S_IRWXU) == -1) && errno != EEXIST)
+#+#endif
+#         {
+#                 perror(bmpcache_dir);
+#@@ -1804,5 +1861,9 @@
+#         sprintf(bmpcache_dir, "%s/%s", home, ".rdesktop/cache");
+# 
+#+#ifdef __MINGW32__
+#+       if ((mkdir(bmpcache_dir) == -1) && errno != EEXIST)
+#+#else
+#         if ((mkdir(bmpcache_dir, S_IRWXU) == -1) && errno != EEXIST)
+#+#endif
+#         {
+#                 perror(bmpcache_dir);
+#@@ -1863,4 +1924,7 @@
+# rd_lock_file(int fd, int start, int len)
+# {
+#+#ifdef __MINGW32__
+#+       return False;
+#+#else
+#         struct flock lock;
+# 
+#@@ -1872,3 +1936,4 @@
+#                 return False;
+#         return True;
+#+#endif
+# }
+#
+#EOF
+# fix xkeymap.c
+mv xkeymap.c xkeymap.c.bak
+cat > xkeymap.c << EOF
+#ifdef __MINGW32__
+#define XK_XKB_KEYS
+#include <rfb/keysym.h>
+#endif
+EOF
+cat xkeymap.c.bak >> xkeymap.c
+# fix serial.c
+patch -ulbf serial.c << EOF
+--- serial.c  2011-09-22 14:30:40 +0200
++++ serial.c  2012-12-18 16:02:04 +0100
+@@ -22,3 +22,5 @@
+ #include <strings.h>
++#ifndef __MINGW32__
+ #include <sys/ioctl.h>
++#endif
+
+@@ -166,2 +168,5 @@
+ {
++#ifdef __MINGW32__
++       return False;
++#else
+        speed_t speed;
+@@ -313,2 +318,3 @@
+        return True;
++#endif
+ }
+@@ -318,2 +324,3 @@
+ {
++#ifndef __MINGW32__
+        speed_t speed;
+@@ -506,2 +513,3 @@
+        tcsetattr(serial_fd, TCSANOW, ptermios);
++#endif
+ }
+@@ -516,2 +524,5 @@
+ {
++#ifdef __MINGW32__
++       return 0;
++#else
+        SERIAL_DEVICE *pser_inf;
+@@ -551,2 +562,3 @@
+        return count;
++#endif
+ }
+@@ -557,2 +569,5 @@
+ {
++#ifdef __MINGW32__
++       return False;
++#else
+        RD_NTHANDLE serial_fd;
+@@ -608,2 +623,3 @@
+        return RD_STATUS_SUCCESS;
++#endif
+ }
+@@ -625,2 +641,5 @@
+ {
++#ifdef __MINGW32__
++       return False;
++#else
+        long timeout;
+@@ -679,2 +698,3 @@
+        return RD_STATUS_SUCCESS;
++#endif
+ }
+@@ -701,2 +721,5 @@
+ {
++#ifdef __MINGW32__
++       return RD_STATUS_INVALID_PARAMETER;
++#else
+        int purge_mask;
+@@ -943,2 +966,3 @@
+        return RD_STATUS_SUCCESS;
++#endif
+ }
+@@ -948,2 +972,5 @@
+ {
++#ifdef __MINGW32__
++       return False;
++#else
+        int index;
+@@ -1040,2 +1067,3 @@
+        return ret;
++#endif
+ }
+
+EOF
+# fix ctrl.c
+patch -ulbf ctrl.c << EOF
+@@ -24,2 +24,7 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#define _POSIX_SOURCE
++#include <winsock2.h>
++#include <unistd.h>
++#else
+ #include <sys/socket.h>
+@@ -27,2 +32,3 @@
+ #include <sys/un.h>
++#endif
+ #include <limits.h>
+@@ -180,2 +186,7 @@
+ {
++#ifdef _WIN32
++       perror("Error creating ctrl client socket: socket()");
++       exit(1);
++       return False;
++#else
+        int s, len;
+@@ -202,2 +213,3 @@
+        return True;
++#endif
+ }
+@@ -250,2 +262,5 @@
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        struct stat st;
+@@ -321,2 +336,3 @@
+        return 0;
++#endif
+ }
+@@ -364,2 +380,3 @@
+ {
++#ifndef _WIN32
+        int ns, res, offs;
+@@ -442,2 +459,3 @@
+        }
++#endif
+ }
+@@ -451,2 +469,5 @@
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        FILE *fp;
+@@ -517,2 +538,3 @@
+        return ret;
++#endif
+ }
+EOF
+# undefine HAVE_ICONV in rdesktop.c (version >= 1.8.2)
+mv rdesktop.c rdesktop.c.bak
+echo "#undef HAVE_ICONV" > rdesktop.c
+cat rdesktop.c.bak >> rdesktop.c
+# fix disk.c (version >= 1.8.6)
+patch -ulbf disk.c << EOF
+@@ -36,3 +36,3 @@
+ #define DIRFD(a) (dirfd(a))
+-#else
++#elif DIR_FD_MEMBER_NAME
+ #define DIRFD(a) ((a)->DIR_FD_MEMBER_NAME)
+@@ -422,3 +422,7 @@
+                {
++#ifdef _WIN32
++                       mkdir(path);
++#else
+                        mkdir(path, mode);
++#endif
+                }
+@@ -444,3 +448,7 @@
+                }
++#ifdef DIRFD
+                handle = DIRFD(dirp);
++#else
++               return RD_STATUS_NOT_IMPLEMENTED;
++#endif
+        }
+@@ -490,4 +498,6 @@
+                /* all read and writes of files should be non blocking */
++#ifdef O_NONBLOCK
+                if (fcntl(handle, F_SETFL, O_NONBLOCK) == -1)
+                        perror("fcntl");
++#endif
+        }
+@@ -808,4 +818,8 @@
+
++#ifdef _WIN32
++                       return RD_STATUS_NOT_IMPLEMENTED;
++#else
+                        if (fchmod(handle, mode))
+                                return RD_STATUS_ACCESS_DENIED;
++#endif
+
+EOF
+# fix parallel.c (version >= 1.8.6)
+patch -ulbf parallel.c << EOF
+@@ -26,3 +26,5 @@
+ #include <fcntl.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <errno.h>
+@@ -90,4 +92,6 @@
+        /* all read and writes should be non blocking */
++#ifdef O_NONBLOCK
+        if (fcntl(parallel_fd, F_SETFL, O_NONBLOCK) == -1)
+                perror("fcntl");
++#endif
+
+EOF
+# fix number of parameters to mkdir() in printercache.c (version >= 1.8.6)
+sed -i.bak -e "s/\b\(mkdir\s*([^,]*\),[^)]*)/\1)/" printercache.c
+# fix number of parameters to mkdir() in utils.c (version >= 1.8.6)
+sed -i.bak -e "s/\b\(mkdir\s*([^,]*\),[^)]*)/\1)/" utils.c
+# fix missing ffs in xwin.c (version >= 1.8.6)
+mv xwin.c xwin.c.bak
+cat > xwin.c << EOF
+#ifdef __MINGW32__
+#define ffs __builtin_ffs
+#endif
+EOF
+cat xwin.c.bak >> xwin.c
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl=$MINGWPREFIX --with-sound=libao --with-libvncserver CFLAGS="-I`pwd`/winfix" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl=$MINGWPREFIX --with-sound=libao --with-libvncserver --disable-credssp CFLAGS="-I`pwd`/winfix" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl=$MINGWPREFIX --with-sound=libao --with-libvncserver --disable-credssp --disable-smartcard CFLAGS="-I`pwd`/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -lshlwapi" &&
+ wl-showstatus build-install &&
+ make install &&
+    echo OK
+####rdesktop.c:26:48: error: termios.h: No such file or directory
+####rdesktop.c:1418: warning: implicit declaration of function 'pipe'
+####rdesktop.c:1424: warning: implicit declaration of function 'fork'
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####See also: http://www.fontis.com.au/rdesktop
+
+
+

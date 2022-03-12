@@ -1,0 +1,132 @@
+export NAME="stunnel"
+export STATUS=
+export URL=http://www.stunnel.org/
+export BASENAME=stunnel
+export DESCRIPTION="Stunnel is a proxy designed to add TLS encryption functionality to existing clients and servers without any changes in the programs' code. Its architecture is optimized for security, portability, and scalability (including load-balancing), making it suitable for large deployments."
+export CATEGORY=security
+export TYPE=application
+#export VERSION=5.39
+#export VERSIONDATE=20170119
+#export VERSION=5.40
+#export VERSIONDATE=20170128
+#export VERSION=5.41
+#export VERSIONDATE=20170401
+#export VERSION=5.42
+#export VERSIONDATE=20170717
+#export VERSION=5.43
+#export VERSIONDATE=20171106
+#export VERSION=5.44
+#export VERSIONDATE=20171127
+#export VERSION=5.45
+#export VERSIONDATE=20180522
+#export VERSION=5.46
+#export VERSIONDATE=20180529
+#export VERSION=5.47
+#export VERSIONDATE=20180623
+#export VERSION=5.48
+#export VERSIONDATE=20180711
+#export VERSION=5.49
+#export VERSIONDATE=20180904
+#export VERSION=5.50
+#export VERSIONDATE=20181203
+#export VERSION=5.51
+#export VERSIONDATE=20190405
+#export VERSION=5.53
+#export VERSIONDATE=20190412
+#export VERSION=5.54
+#export VERSIONDATE=20190516
+#export VERSION=5.55
+#export VERSIONDATE=20190611
+#export VERSION=5.56
+#export VERSIONDATE=20191123
+#export VERSION=5.57
+#export VERSIONDATE=20201012
+#export VERSION=5.58
+#export VERSIONDATE=20210221
+#export VERSION=5.59
+#export VERSIONDATE=20210406
+#export VERSION=5.60
+#export VERSIONDATE=20210817
+#export VERSION=5.61
+#export VERSIONDATE=20211223
+export VERSION=5.62
+export VERSIONDATE=20220118
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,rdflib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYRIGHT.GPL
+export LICENSEFILE=COPYING.md
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://www.stunnel.org/downloads.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://www.stunnel.org/downloads/beta/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://www.stunnel.org/downloads/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/env.c for Windows
+patch -ulbf src/env.c << EOF
+--- src/env.c  2017-01-02 15:27:26.000000000 +0100
++++ src/env.c  2017-01-28 17:53:36.482934000 +0100
+@@ -40,2 +40,6 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <stdint.h>
++#include <winsock2.h>
++#else
+ #include <sys/socket.h> /* for AF_INET */
+@@ -43,2 +47,3 @@
+ #include <arpa/inet.h>  /* for inet_addr() */
++#endif
+ #include <stdlib.h>     /* for getenv() */
+@@ -47,4 +52,2 @@
+ #include <be/bone/sys/socket.h> /* for AF_INET */
+-#else
+-#include <sys/socket.h> /* for AF_INET */
+ #endif
+EOF
+# fix missing SSL_OP_BIT in src/options.c (version >= 5.60)
+patch -ulbf src/options.c << EOF
+@@ -227,3 +227,3 @@
+ #endif
+-#ifdef SSL_OP_BIT
++#if defined(SSL_OP_BIT) && OPENSSL_VERSION_NUMBER < 0x020000000L
+     {"BIT", SSL_OP_BIT},
+EOF
+# fix src/Makefile for Windows
+sed -i.bak -e "s/\$(unix_sources)/\$(win32_cli_sources)/g" src/Makefile.in
+## don't set _FORTIFY_SOURCE (version >= 5.58)
+#sed -i.bak -e "s/-D_FORTIFY_SOURCE=2/& -fstack-protector-strong/" configure src/mingw.mk
+# don't enable stack protection (version >= 5.60)
+sed -i.bak -e "s/-D_FORTIFY_SOURCE=2\|-fstack-protector//" configure src/mingw.mk
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-ssl=$MINGWPREFIX LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-ssl=$MINGWPREFIX LDFLAGS="-Wl,--as-needed -lssp -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-ssl=$MINGWPREFIX LDFLAGS="-Wl,--as-needed -lssp_nonshared -lssp -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-ssl=$MINGWPREFIX CFLAGS="-fstack-protector-strong" LDFLAGS="-fstack-protector -Wl,--as-needed -lssp -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-ssl=$MINGWPREFIX CFLAGS="-fstack-protector-strong" LDFLAGS="-fstack-protector-strong -Wl,--as-needed -lssp_nonshared -lssp -lws2_32" &&
+ echo "#undef USE_PTHREAD" >> src/config.h &&
+ echo "#undef socklen_t" >> src/config.h &&
+ echo "#undef HAVE_DEV_PTMX" >> src/config.h &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #wl-showstatus build &&
+ #make &&
+ #make -Csrc -fmingw.mak &&
+ #make -Csrc mingw$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi) win32_windres=windres &&
+ make -Csrc mingw$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi) win32_windres=windres STRIP=strip &&
+ #wl-showstatus build-install &&
+ #make install-strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ #cp -f bin/mingw$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi)/* $INSTALLPREFIX/bin/ &&
+ cp -f bin/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)/* $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

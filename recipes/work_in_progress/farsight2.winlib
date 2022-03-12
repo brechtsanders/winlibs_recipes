@@ -1,0 +1,202 @@
+export NAME="Farsight"
+export STATUS=
+export URL=http://farsight.freedesktop.org/wiki/
+export BASENAME=farsight2
+export DESCRIPTION="The Farsight project is an effort to create a framework to deal with all known audio/video conferencing protocols. On one side it offers a generic API that makes it possible to write plugins for different streaming protocols, on the other side it offers an API for clients to use those plugins."
+export CATEGORY=audio,video,communication
+export TYPE=library
+#export VERSION=0.0.21
+#export VERSIONDATE=20101021
+#export VERSION=0.0.22
+#export VERSIONDATE=20101215
+#export VERSION=0.0.25
+#export VERSIONDATE=20110220
+#export VERSION=0.0.26
+#export VERSIONDATE=20110224
+#export VERSION=0.0.27
+#export VERSIONDATE=20110504
+#export VERSION=0.0.28
+#export VERSIONDATE=20110511
+#export VERSION=0.0.29
+#export VERSIONDATE=20110613
+#export VERSION=0.0.30
+#export VERSIONDATE=20110916
+####checking whether /E/Prog/Python26-32/python.exe version >= 2.4... configure: error: too old
+export VERSION=0.0.31
+export VERSIONDATE=20111011
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gstreamer,gst-plugins-base,libnice,libxml2,gettext,zlib,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://farsight.freedesktop.org/releases/farsight/"
+export DOWNLOADURL="http://farsight.freedesktop.org/releases/farsight2/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://farsight.freedesktop.org/releases/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix gst-libs/gst/farsight/fs-interfaces.c
+#mv gst-libs/gst/farsight/fs-interfaces.c gst-libs/gst/farsight/fs-interfaces.c.bak
+#cat > gst-libs/gst/farsight/fs-interfaces.c << EOF
+##include <iphlpapi.h>
+##include <gst/gstinfo.h>
+##define MIB_IPADDR_DISCONNECTED 0
+##define MIB_IPADDR_DELETED 0
+##define IF_INDEX int
+#EOF
+#cat gst-libs/gst/farsight/fs-interfaces.c.bak >> gst-libs/gst/farsight/fs-interfaces.c
+patch -ulbf gst-libs/gst/farsight/fs-interfaces.c << EOF
+--- gst-libs/gst/farsight/fs-interfaces.c  2011-10-09 23:06:34 +0200
++++ gst-libs/gst/farsight/fs-interfaces.c  2012-04-16 22:34:54 +0200
+@@ -1 +1,5 @@
++#include <gst/gstinfo.h>
++#define MIB_IPADDR_DISCONNECTED 0
++#define MIB_IPADDR_DELETED 0
++#define IF_INDEX int
+ /*
+@@ -362,3 +366,5 @@
+ #include <winsock2.h>
+-#include <Iphlpapi.h>
++#undef IF_INDEX
++#include <iphlpapi.h>
++#define IF_INDEX int
+
+EOF
+# fix missing index function in gst/fsrtpconference/fs-rtp-codec-specific.c
+mv gst/fsrtpconference/fs-rtp-codec-specific.c gst/fsrtpconference/fs-rtp-codec-specific.c.bak
+echo "#define index(haystack,needle) g_strrstr(haystack,(char[2]){needle,0})" > gst/fsrtpconference/fs-rtp-codec-specific.c
+cat gst/fsrtpconference/fs-rtp-codec-specific.c.bak >> gst/fsrtpconference/fs-rtp-codec-specific.c
+# fix missing files
+mkdir -p arpa netinet sys
+echo "#include <winsock2.h>" > sys/socket.h
+touch arpa/inet.h netinet/in.h
+# fix socket stuff in gst/fsmsnconference/fs-msn-connection.c
+patch -ulbf gst/fsmsnconference/fs-msn-connection.c << EOF
+--- gst/fsmsnconference/fs-msn-connection.c  2010-06-03 21:30:46 +0200
++++ gst/fsmsnconference/fs-msn-connection.c  2010-10-22 23:15:06 +0200@@ -38,4 +38,10 @@
+ #include <sys/socket.h>
+ #include <unistd.h>
++#ifdef __WIN32__
++#include <ws2tcpip.h>
++#define EADDRINUSE WSAEADDRINUSE
++#define EINPROGRESS WSAEINPROGRESS
++#define strerror_r(errno,buf,buflen) strncpy(buf,strerror(errno),buflen-1);buf[buflen-1]=0;
++#endif
+
+ #include <gst/gst.h>
+@@ -446,4 +452,7 @@
+   GList *item = NULL;
+   gchar *session_id;
++#ifdef __WIN32__
++  unsigned long flags;
++#endif
+
+
+@@ -460,5 +469,10 @@
+
+   // set non-blocking mode
++#ifdef __WIN32__
++  flags = 1;
++  ioctlsocket(fd, FIONBIO, &flags);
++#else
+   fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
++#endif
+   for (;;) {
+     GST_DEBUG ("Attempting to listen on port %d.....",port);
+@@ -563,4 +577,7 @@
+   gint ret;
+   struct sockaddr_in theiraddr;
++#ifdef __WIN32__
++  unsigned long flags;
++#endif
+   memset(&theiraddr, 0, sizeof(theiraddr));
+
+@@ -576,5 +593,10 @@
+
+   // set non-blocking mode
++#ifdef __WIN32__
++  flags = 1;
++  ioctlsocket(fd, FIONBIO, &flags);
++#else
+   fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
++#endif
+
+   theiraddr.sin_family = AF_INET;
+EOF
+mv gst/fsmsnconference/fs-msn-connection.c gst/fsmsnconference/fs-msn-connection.c.bak
+cat > gst/fsmsnconference/fs-msn-connection.c << EOF
+#ifdef __WIN32__
+#include <ws2tcpip.h>
+#define EADDRINUSE WSAEADDRINUSE
+#define EINPROGRESS WSAEINPROGRESS
+#define strerror_r(errno,buf,buflen) strncpy(buf,strerror(errno),buflen-1);buf[buflen-1]=0;
+#endif
+EOF
+cat gst/fsmsnconference/fs-msn-connection.c.bak >> gst/fsmsnconference/fs-msn-connection.c
+# fix missing IP_TOS in gst/fsmsnconference/fs-msn-stream.c
+mv gst/fsmsnconference/fs-msn-stream.c gst/fsmsnconference/fs-msn-stream.c.bak
+echo "#include <ws2tcpip.h>" > gst/fsmsnconference/fs-msn-stream.c
+cat gst/fsmsnconference/fs-msn-stream.c.bak >> gst/fsmsnconference/fs-msn-stream.c
+# fix missing getaddrinfo and freeaddrinfo in transmitters/rawudp/fs-rawudp-component.c
+mv transmitters/rawudp/fs-rawudp-component.c transmitters/rawudp/fs-rawudp-component.c.bak
+cat > transmitters/rawudp/fs-rawudp-component.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+EOF
+cat transmitters/rawudp/fs-rawudp-component.c.bak >> transmitters/rawudp/fs-rawudp-component.c
+# fix missing file
+touch win32_common.h
+# fix missing getaddrinfo and freeaddrinfo in transmitters/multicast/fs-multicast-transmitter.c
+mv transmitters/multicast/fs-multicast-transmitter.c transmitters/multicast/fs-multicast-transmitter.c.bak
+cat > transmitters/multicast/fs-multicast-transmitter.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+EOF
+cat transmitters/multicast/fs-multicast-transmitter.c.bak >> transmitters/multicast/fs-multicast-transmitter.c
+# skip making examples/commandline
+cat > examples/commandline/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# skip making tests/rtp
+cat > tests/rtp/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# avoid missing mkdtemp in transmitters/shm/fs-shm-stream-transmitter.c
+patch -ulbf transmitters/shm/fs-shm-stream-transmitter.c << EOF
+--- transmitters/shm/fs-shm-stream-transmitter.c  2011-05-16 23:06:24 +0200
++++ transmitters/shm/fs-shm-stream-transmitter.c  2011-06-13 15:48:58 +0200
+@@ -551,4 +552,6 @@
+
++#ifndef __MINGW32__
+     if (mkdtemp (socket_dir) == NULL)
+       return FALSE;
++#endif
+
+EOF
+# fix dependancy on gio-unix
+sed -i.bak -e "s/gio-unix/gio-windows/g" configure
+# fix detection of newer gstreamer version
+sed -i.bak2 -e "s/^\(\s*GST_MAJORMINOR\s*=\s*\)[0-9.]*/\1$(ls -1 $MINGWPREFIX/lib/pkgconfig/gstreamer-[0-9]*|sed -ne "s/^.*gstreamer-\([0-9.]*\)\.pc$/\1/p"|sort -V|tail -n1)/g" configure
+wl-showstatus configure &&
+ #PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -liphlpapi -Wl,--enable-auto-import -Wl,--enable-stdcall-fixup" &&
+ PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -liphlpapi -Wl,--enable-auto-import -Wl,--enable-stdcall-fixup" LDFLAGS="-Wl,--as-needed -liphlpapi -Wl,-no-undefined" &&
+ #PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --disable-python LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -liphlpapi -Wl,--enable-auto-import -Wl,--enable-stdcall-fixup" &&
+ wl-showstatus build-install &&
+ #make install-strip &&
+ PATH=$PYDIR:$PATH make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####replaced by farstream
+
+
+

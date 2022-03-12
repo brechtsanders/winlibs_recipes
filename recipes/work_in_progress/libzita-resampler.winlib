@@ -1,0 +1,43 @@
+export NAME="Libzita-resampler"
+export STATUS=
+export URL=https://kokkinizita.linuxaudio.org/linuxaudio/
+export BASENAME=libzita-resampler
+export DESCRIPTION="Libzita-resampler is a C++ library for resampling audio signals. It is designed to be used within a real-time processing context, to be fast, and to provide high-quality sample rate conversion."
+export CATEGORY=audio
+export TYPE=library
+export VERSION=1.8.0
+export VERSIONDATE=20220214
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://kokkinizita.linuxaudio.org/linuxaudio/downloads/ zita-resampler- "
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://kokkinizita.linuxaudio.org/linuxaudio/downloads/zita-resampler-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/zita-resampler-$VERSION.tar.bz2
+cd zita-resampler-$VERSION
+# fix missing posix_memalign
+for F in $(grep -l posix_memalign */*.cc); do
+ mv $F $F.bak &&
+ echo "#define posix_memalign(p, a, s) (*(p) = _aligned_malloc((s), (a)))" > $F &&
+ cat $F.bak >> $F
+done
+# fix building Windows library
+sed -e "s/\.so/.dll/; s/ln -sf\|ldconfig/#&/; s/^\(\s*\)\(\$(CXX).*\)-s -Wl,-soname,\$(ZITA-RESAMPLER_MAJ)/\1\2-Wl,--out-implib,\$@.a\n\1ar cru libzita-resampler.a \$^/" source/Makefile > source/Makefile.mingw
+wl-showstatus build &&
+ make -Csource -fMakefile.mingw install PREFIX=$INSTALLPREFIX SUFFIX= ZITA-RESAMPLER_SO="libzita-resampler-\$(MINVERS).dll" ZITA-RESAMPLER_MAJ="libzita-resampler-\$(MAJVERS).dll" ZITA-RESAMPLER_MIN="libzita-resampler.dll" &&
+ make -Capps CXXFLAGS="-I$PWD/source" LDLIBS="-L$PWD/source -lzita-resampler -lsndfile" &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f source/*.a $INSTALLPREFIX/lib/ &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

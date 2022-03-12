@@ -1,0 +1,117 @@
+export NAME="NVIDIA Texture Tools"
+export STATUS=
+export URL=http://code.google.com/p/nvidia-texture-tools/
+export BASENAME=nvtt
+export DESCRIPTION="The NVIDIA Texture Tools is a collection of image processing and texture manipulation tools, designed to be integrated in game tools and asset conditioning pipelines. The primary features of the library are mipmap and normal map generation, format conversion and DXT compression."
+export CATEGORY=graphics
+export TYPE=application
+export VERSION=2.0.8-1
+export VERSIONDATE=20140530
+wl-showstatus --package-version
+export DEPENDANCIES=libjpeg,libpng,libtiff,openexr
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=NVIDIA_Texture_Tools_LICENSE.txt
+export LICENSETYPE=
+export DOWNLOADURL="http://code.google.com/p/nvidia-texture-tools/downloads/list"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://nvidia-texture-tools.googlecode.com/files/nvidia-texture-tools-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/nvidia-texture-tools/nvidia-texture-tools-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/nvidia-texture-tools-$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/nvidia-texture-tools
+# fix type issues when returning false instead of NULL in src/nvimage/ImageIO.cpp
+patch -ulbf src/nvimage/ImageIO.cpp << EOF
+@@ -137,3 +137,3 @@
+        if (stream.isError()) {
+-               return false;
++               return NULL;
+        }
+@@ -235,3 +235,3 @@
+                                nvDebug( "*** ImageIO::loadTGA: Error, only 24bit paletted images are supported.\n" );
+-                               return false;
++                               return NULL;
+                        }
+@@ -256,3 +256,3 @@
+                        nvDebug( "*** ImageIO::loadTGA: Error, unsupported image type.\n" );
+-                       return false;
++                       return NULL;
+        }
+@@ -623,3 +623,3 @@
+        //      nvDebug( "*** LoadPNG: Error allocating read buffer in file '%s'.\n", name );
+-               return false;
++               return NULL;
+        }
+@@ -631,3 +631,3 @@
+        //      nvDebug( "*** LoadPNG: Error allocating image information for '%s'.\n", name );
+-               return false;
++               return NULL;
+        }
+@@ -638,3 +638,3 @@
+        //      nvDebug( "*** LoadPNG: Error reading png file '%s'.\n", name );
+-               return false;
++               return NULL;
+        }
+EOF
+# fix src/nvimage/ImageIO.cpp for recent libpng
+patch -ulbf src/nvimage/ImageIO.cpp << EOF
+--- src/nvimage/ImageIO.cpp  2010-05-14 19:59:28 +0200
++++ src/nvimage/ImageIO.cpp  2014-05-30 17:27:52 +0200
+@@ -605,3 +605,3 @@
+
+-       Stream * s = (Stream *)png_ptr->io_ptr;
++       Stream * s = (Stream *)png_get_io_ptr(png_ptr);
+        s->serialize(data, (int)length);
+EOF
+# fix src/nvcore/poshlib/posh.h for 64-bit
+patch -ulbf src/nvcore/poshlib/posh.h << EOF
+--- src/nvcore/poshlib/posh.h  2010-05-14 19:59:28.000000000 +0200
++++ src/nvcore/poshlib/posh.h  2014-05-30 19:53:28.000000000 +0200
+@@ -396,3 +396,5 @@
+ #        define POSH_OS_WIN64 1
+-#        define POSH_OS_STRING "Win64"
++#        if !defined POSH_OS_STRING
++#           define POSH_OS_STRING "Win64"
++#        endif
+ #     else
+EOF
+# fix src/nvcore/Debug.h for 64-bit
+patch -ulbf src/nvcore/Debug.h << EOF
+--- src/nvcore/Debug.h  2010-05-14 19:59:28.000000000 +0200
++++ src/nvcore/Debug.h  2014-05-30 19:59:50.000000000 +0200
+@@ -43,2 +43,5 @@
+ #              define nvDebugBreak()           __asm__ ( "int %0" : :"I"(3) )
++#      elif defined(__MINGW64__)
++#              include <windows.h>
++#              define nvDebugBreak()           DebugBreak()
+ #      else
+EOF
+# fix src/nvtt/tools/imgdiff.cpp
+patch -ulbf src/nvtt/tools/imgdiff.cpp << EOF
+--- src/nvtt/tools/imgdiff.cpp  2010-05-14 19:59:28.000000000 +0200
++++ src/nvtt/tools/imgdiff.cpp  2014-05-30 20:02:56.000000000 +0200
+@@ -223,3 +223,3 @@
+        Error error_total;
+-       NormalError error_normal;
++       struct NormalError error_normal;
+
+EOF
+# fix missing gnuwin32/bin/libpng13.dll
+cp gnuwin32/bin/libpng12.dll gnuwin32/bin/libpng13.dll
+wl-showstatus configure
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libz.dll.a -DJPEG_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DJPEG_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libjpeg.dll.a -DPNG_LIBRARY_RELEASE:FILEPATH=$MINGWPREFIX/lib/libpng.dll.a -DPNG_PNG_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DTIFF_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DTIFF_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libtiff.dll.a . &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DNVTT_SHARED:BOOL=TRUE -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libz.dll.a -DJPEG_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DJPEG_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libjpeg.dll.a -DPNG_LIBRARY_RELEASE:FILEPATH=$MINGWPREFIX/lib/libpng.dll.a -DPNG_PNG_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DTIFF_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DTIFF_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libtiff.dll.a . &&
+ wl-showstatus build-install &&
+ ( make install/strip || make install ) &&
+ mv -f $INSTALLPREFIX/lib/static/*.a $INSTALLPREFIX/lib/ &&
+ rmdir $INSTALLPREFIX/lib/static &&
+ rm -f $INSTALLPREFIX/bin/jpeg62.dll $INSTALLPREFIX/bin/libpng13.dll $INSTALLPREFIX/bin/libtiff3.dll $INSTALLPREFIX/bin/zlib1.dll &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: build DLL
+
+
+

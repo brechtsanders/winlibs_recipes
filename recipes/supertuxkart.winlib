@@ -1,0 +1,61 @@
+export NAME="SuperTuxKart"
+export STATUS=
+export URL=https://supertuxkart.net/
+export BASENAME=supertuxkart
+export DESCRIPTION="SuperTuxKart is a 3D open-source arcade racer with a variety characters, tracks, and modes to play."
+export CATEGORY=games
+export TYPE=application
+#export VERSION=1.2
+#export VERSIONDATE=20210818
+export VERSION=1.3
+export VERSIONDATE=20210928
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,angelscript,glew,libsquish,wiiuse,freetype2,harfbuzz,sdl2,sqlite3,zlib,libjpeg,libpng,mcpp,libvorbis,libcurl
+#enet
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/supertuxkart/stk-code/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/supertuxkart/stk-code/releases/download/$VERSION/SuperTuxKart-$VERSION-src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/SuperTuxKart-$VERSION-src.tar.xz
+cd SuperTuxKart-$VERSION-src
+# fix assertion failure in src/input/gamepad_config.cpp
+sed -i.bak -e "s?^static_assert?//&?" src/input/gamepad_config.cpp
+# fix missing folder
+mkdir -p dependencies dependencies-64bit
+# fix dependencies in CMakeLists.txt (version >= 1.2)
+patch -ulbf CMakeLists.txt << EOF
+@@ -573,6 +573,2 @@
+     target_link_libraries(supertuxkart \${PROJECT_SOURCE_DIR}/\${DEPENDENCIES}/lib/libeay32.lib)
+-elseif(MINGW)
+-    set(USE_CRYPTO_OPENSSL ON)
+-    target_link_libraries(supertuxkart \${PROJECT_SOURCE_DIR}/\${DEPENDENCIES}/lib/libcurl.dll)
+-    target_link_libraries(supertuxkart \${PROJECT_SOURCE_DIR}/\${DEPENDENCIES}/lib/libeay32.dll)
+ else()
+EOF
+# fix CMakeLists.txt (version >= 1.3)
+patch -ulbf CMakeLists.txt << EOF
+@@ -159,3 +159,3 @@
+     ADD_DEFINITIONS(-D_UNICODE)
+-    if(NOT IS_DIRECTORY "\${PROJECT_SOURCE_DIR}/\${DEPENDENCIES}")
++    if(MSVC AND NOT IS_DIRECTORY "\${PROJECT_SOURCE_DIR}/\${DEPENDENCIES}")
+         message(FATAL_ERROR "Dependencies directory not found, make sure dependencies-win-(arch) exists inside stk-code directory.")
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/games/SuperTuxKart -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_RECORDER:BOOL=OFF -DUSE_CRYPTO_OPENSSL:BOOL=ON -DUSE_IPV6:BOOL=ON -DUSE_SYSTEM_ANGELSCRIPT:BOOL=ON -DUSE_SYSTEM_ENET:BOOL=ON -DUSE_SYSTEM_GLEW:BOOL=ON -DUSE_SYSTEM_SQUISH:BOOL=ON -DUSE_SYSTEM_WIIUSE:BOOL=ON -DFREETYPE_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/freetype2 -DBUILD_EXAMPLE:BOOL=OFF -DBUILD_EXAMPLE_SDL:BOOL=OFF -DINSTALL_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
+ # fix linking issues
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcurl/; s/POST_BUILD\s*=.*cmake.* -E copy_directory .*dependencies.*/POST_BUILD = cd ./" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf SuperTuxKart-$VERSION-src
+####SUPERTUXKART_DATADIR=$MINGWPREFIX/games/SuperTuxKart/share/supertuxkart $MINGWPREFIX/games/SuperTuxKart/bin/supertuxkart.exe
+
+
+

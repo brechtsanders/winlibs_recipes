@@ -1,0 +1,57 @@
+export NAME="libautoupdate"
+export STATUS=
+export URL=https://github.com/pmq20/libautoupdate
+export BASENAME=libautoupdate
+export DESCRIPTION="Cross-platform C library that enables your application to auto-update itself in place."
+export CATEGORY=development,communication
+export TYPE=library
+export VERSION=0.2.0
+export VERSIONDATE=20180527
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/pmq20/libautoupdate/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/pmq20/libautoupdate/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix __pragma pack issue in src/autoupdate_internal.h
+patch -ulbf src/autoupdate_internal.h << EOF
+@@ -15,3 +15,7 @@
+
++#ifdef __MINGW32__
++#define PACK( __Declaration__ ) __Declaration__ __attribute__((packed, aligned(1)))
++#else
+ #define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop) )
++#endif
+
+EOF
+# fix missing SHGetKnownFolderPath in src/utils.c
+mv src/utils.c src/utils.c.bak &&
+echo "#define NTDDI_VERSION 0x06000000" > src/utils.c &&
+cat src/utils.c.bak >> src/utils.c
+## fix for building DLL
+#sed -i.bak -e "s/^\(\s*ADD_LIBRARY\s*(\)\([^ ]*\)\( *.*\)$/\1\2 SHARED\3\n\1\2_static STATIC\3\nSET_TARGET_PROPERTIES(\2_static PROPERTIES OUTPUT_NAME \2)/" CMakeLists.txt
+wl-showstatus configure &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTS:BOOL=OFF . &&
+ #echo "-Wl,--as-needed -lws2_32 -lshlwapi -lz" >> CMakeFiles/autoupdate.dir/linklibs.rsp &&
+ wl-showstatus build &&
+ make &&
+ ( echo "EXPORTS" && echo "autoupdate" ) > autoupdate.def &&
+ gcc -shared -s -mwindows -def autoupdate.def -o autoupdate.dll libautoupdate.a -Wl,--out-implib,libautoupdate.dll.a -Wl,--as-needed -lws2_32 -lshlwapi -lole32 -luuid -lz &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f include/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

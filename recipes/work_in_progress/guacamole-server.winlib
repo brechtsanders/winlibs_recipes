@@ -1,0 +1,117 @@
+export NAME="guacamole-server"
+export STATUS=
+export URL=http://guac-dev.org/
+export BASENAME=guacamole-server
+export DESCRIPTION="Guacamole is an HTML5 web application that provides access to desktop environments using remote desktop protocols such as VNC or RDP. A centralized server acts as a tunnel and proxy, allowing access to multiple desktops through a web browser. No plugins are needed: the client requires nothing more than a web browser supporting HTML5 and AJAX."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.8.3
+#export VERSIONDATE=20140104
+#export VERSION=0.8.4
+#export VERSIONDATE=20140524
+#export VERSION=0.9.0
+#export VERSIONDATE=20140330
+#export VERSION=0.9.1
+#export VERSIONDATE=20140524
+#export VERSION=0.9.2
+#export VERSIONDATE=20140722
+#export VERSION=0.9.3
+#export VERSIONDATE=20140930
+#export VERSION=0.9.4
+#export VERSIONDATE=20150108
+####src/guacd/daemon.c:285:5: error: implicit declaration of function 'fork' [-Werror=implicit-function-declaration]
+#export VERSION=0.9.5
+#export VERSIONDATE=20150217
+#export VERSION=0.9.6
+#export VERSIONDATE=20150331
+####src/libguac/socket.c:2:32: error: expected declaration specifiers or '...' before '(' token
+#export VERSION=0.9.7
+#export VERSIONDATE=20150611
+#export VERSION=0.9.8
+#export VERSIONDATE=20150909
+####src/guacd/socket-ssl.c:28:24: fatal error: sys/select.h: No such file or directory
+#export VERSION=0.9.9
+#export VERSIONDATE=20151219
+####src/guacd/daemon.c:424:5: error: implicit declaration of function 'fork' [-Werror=implicit-function-declaration]
+#export VERSION=0.9.14
+#export VERSIONDATE=20180125
+#export VERSION=1.2.0
+#export VERSIONDATE=20201029
+####src/common-ssh/ssh.c:428:12: error: variable 'hints' has initializer but incomplete type
+export VERSION=1.3.0
+export VERSIONDATE=20210103
+####Unable to find FreeRDP (libfreerdp2 / libfreerdp-client2 / libwinpr2) RDP will be disabled.
+wl-showstatus --package-version
+export DEPENDANCIES=sys_wait_h
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MPL
+#export DOWNLOADURL="http://sourceforge.net/projects/guacamole/files/current/source/"
+export DOWNLOADURL="http://guacamole.apache.org/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/guacamole/current/source/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://downloads.apache.org/guacamole/$VERSION/source/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+#echo "#define _WIN32_WINNT 0x0501" > winfix/sys/socket.h
+#echo "#include <winsock2.h>" >> winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+touch winfix/netdb.h winfix/netinet/in.h winfix/arpa/inet.h
+cat > winfix/syslog.h << EOF
+#define LOG_ERR 3
+#define LOG_WARNING 4
+#define LOG_INFO 6
+#define LOG_DEBUG 7
+#define LOG_DAEMON (3<<3)
+#define LOG_PID     0x01
+#define openlog(ident,option,facility)
+#define syslog(priority,format,...)
+EOF
+## fix missing nanosleep in src/libguac/socket.c (version >= 0.9.2 <= 0.9.5)
+#mv src/libguac/socket.c src/libguac/socket.c.bak
+#cat > src/libguac/socket.c << EOF
+#include <windows.h>
+#define nanosleep(ts,p) (Sleep((ts)->tv_sec * 1000 + (ts)->tv_nsec / 1000000000), 0)
+EOF
+cat src/libguac/socket.c.bak >> src/libguac/socket.c
+# fix missing inet_pton in src/libguac/wol.c (version >= 1.3.0)
+mv src/libguac/wol.c src/libguac/wol.c.bak
+cat > src/libguac/wol.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat src/libguac/wol.c.bak >> src/libguac/wol.c
+# fix src/common-ssh/ssh.c (version >= 1.3.0)
+patch -ulbf src/common-ssh/ssh.c << EOF
+@@ -37,3 +37,5 @@
+ #include <pthread.h>
++#ifndef _WIN32
+ #include <pwd.h>
++#endif
+ #include <stddef.h>
+EOF
+# don't abort build on warnings
+sed -i.bak -e "s/-Werror -Wall -pedantic//" src/libguac/Makefile.in
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --disable-guacd --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include" LDFLAGS="-Wl,-no-undefined" &&
+ #--without-terminal
+ #LDFLAGS="-Wl,--as-needed -lws2_32" 
+ wl-showstatus build-install &&
+ make -Csrc/libguac install-strip &&
+ make install-strip &&
+    echo OK && ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+####Missing wcwidth see: https://www.cl.cam.ac.uk/~mgk25/ucs/
+####To do: build
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+

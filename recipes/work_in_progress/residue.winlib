@@ -1,0 +1,139 @@
+export NAME="Residue"
+export STATUS=
+export URL=https://muflihun.github.io/residue/
+#export URL=https://github.com/muflihun/residue
+export BASENAME=residue
+export DESCRIPTION="Residue is a real-time logging server. It is an effort to standardize application logging using simple API, simple configurations, build-in log rotations, simple way to format your log messages according to need of your application. It is fully configurable and supports high-level security, compression and asyncronous operations. It uses Easylogging++ under the hood, that itself is a feature-rich library."
+export CATEGORY=logging
+export TYPE=application
+#export VERSION=1.3.2
+#export VERSIONDATE=20180210
+#export VERSION=1.4.1
+#export VERSIONDATE=20180211
+#export VERSION=1.4.2
+#export VERSIONDATE=20180214
+#export VERSION=1.4.3
+#export VERSIONDATE=20180217
+#export VERSION=1.4.4
+#export VERSIONDATE=20180221
+#export VERSION=1.4.5
+#export VERSIONDATE=20180222
+#export VERSION=1.5.0
+#export VERSIONDATE=20180223
+#export VERSION=1.6.0
+#export VERSIONDATE=20180227
+#export VERSION=1.6.1
+#export VERSIONDATE=20180228
+#export VERSION=2.0.0
+#export VERSIONDATE=20180301
+#export VERSION=2.1.0
+#export VERSIONDATE=20180307
+#export VERSION=2.2.1
+#export VERSIONDATE=20180319
+#export VERSION=2.3.0
+#export VERSIONDATE=20180323
+#export VERSION=2.3.1
+#export VERSIONDATE=20180325
+#export VERSION=2.3.2
+#export VERSIONDATE=20180328
+#export VERSION=2.3.3
+#export VERSIONDATE=20180331
+#export VERSION=2.3.4
+#export VERSIONDATE=20180401
+#export VERSION=2.3.5
+#export VERSIONDATE=20180907
+export VERSION=2.3.6
+export VERSIONDATE=20181124
+####deps/linenoise/linenoise.c:106:10: fatal error: termios.h: No such file or directory
+wl-showstatus --package-version
+#export DEPENDANCIES=cryptopp,easyloggingpp
+export DEPENDANCIES=cryptopp-pem,easyloggingpp
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/muflihun/residue/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/muflihun/residue/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing S_IRUSR/S_IWUSR/S_IXUSR/S_IRGRP/S_IXGRP/S_IROTH/S_IXOTH in src/utils/utils.h
+patch -ulbf src/utils/utils.h << EOF
+@@ -27,2 +27,3 @@
+ #include <chrono>
++#include <sys/stat.h>
+ #include "logging/log.h"
+EOF
+# fix winsock error in deps/asio/detail/socket_types.hpp
+patch -ulbf deps/asio/detail/socket_types.hpp << EOF
+@@ -22,3 +22,3 @@
+ #elif defined(ASIO_WINDOWS) || defined(__CYGWIN__)
+-# if defined(_WINSOCKAPI_) && !defined(_WINSOCK2API_)
++# if defined(_WINSOCKAPI_) && !defined(_WINSOCK2API_) && !defined(__MINGW32__)
+ #  error WinSock.h has already been included
+EOF
+# fix src/core/configuration.cc
+patch -ulbf src/core/configuration.cc << EOF
+@@ -25,3 +25,8 @@
+ #include <sys/stat.h>
++#ifdef _WIN32
++#define getpwnam(n) nullptr
++#define endpwent()
++#else
+ #include <pwd.h>
++#endif
+
+EOF
+# fix src/utils/tar.cc
+patch -ulbf src/utils/tar.cc << EOF
+@@ -57,8 +57,10 @@
+     std::sprintf(header->mtime, "%011lo", time(NULL));
+     std::sprintf(header->mode, "%07o", 0644);
++#ifndef _WIN32
+     char* s = ::getlogin();
+     if (s != nullptr) {
+         std::snprintf(header->uname, 32, "%s", s);
+     }
++#endif
+     std::sprintf(header->gname, "%s", "users");
+ }
+EOF
+# fix src/utils/utils.cc
+patch -ulbf src/utils/utils.cc << EOF
+@@ -24,3 +24,11 @@
+
++#ifdef _WIN32
++#include <sys/stat.h>
++#define mkdir(d,m) _mkdir(d)
++#define chown(p,u,g) -1
++#define getpwnam(n) nullptr
++#define endpwent()
++#else
+ #include <pwd.h>
++#endif
+ #include <sys/stat.h>
+@@ -179,2 +187,3 @@
+     const std::string fileUser = conf->findLoggerUser(logger->id());
++#ifndef _WIN32
+     if (!fileUser.empty()) {
+@@ -194,3 +203,5 @@
+         }
+-    } else {
++    } else
++#endif
++    {
+         RVLOG_IF(id != RESIDUE_LOGGER_ID, RV_INFO) << "No config user found for [" << path << "]; logger ["
+EOF
+wl-showstatus configure &&
+cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dproduction:BOOL=ON -Denable_extensions:BOOL=ON -Dtest:BOOL=OFF . &&
+ wl-showstatus build-install &&
+ make install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

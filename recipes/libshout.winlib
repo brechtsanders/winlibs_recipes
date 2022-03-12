@@ -1,0 +1,83 @@
+export NAME="libshout"
+export STATUS=
+export URL=http://directory.fsf.org/project/libshout/
+export BASENAME=libshout
+export DESCRIPTION="libshout allows applications to easily communicate and broadcast to an Icecast streaming media server. It handles the socket connections, metadata communication, and data streaming for the calling application, and lets developers focus on feature sets instead of implementation details."
+export CATEGORY=audio,communication
+export TYPE=library
+#export VERSION=2.2.2
+#export VERSIONDATE=
+#export VERSION=2.3.0
+#export VERSIONDATE=20120516
+#export VERSION=2.3.1
+#export VERSIONDATE=20120702
+#export VERSION=2.4.0
+#export VERSIONDATE=20121117
+#export VERSION=2.4.1
+#export VERSIONDATE=20121127
+#export VERSION=2.4.2
+#export VERSIONDATE=20190430
+#export VERSION=2.4.3
+#export VERSIONDATE=20190607
+#export VERSION=2.4.4
+#export VERSIONDATE=20201003
+export VERSION=2.4.5
+export VERSIONDATE=20201229
+wl-showstatus --package-version
+export DEPENDANCIES=libogg,libvorbis,libtheora,libspeex,pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://www.icecast.org/download.php"
+export DOWNLOADURL="http://downloads.xiph.org/releases/libshout/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.us.xiph.org/releases/libshout/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.xiph.org/releases/libshout/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix duplicate type definitions
+mv include/os.h include/os.h.bak
+echo "#define sleep(t) _sleep((t) * 1000)" > include/os.h
+# fix missing arpa/inet.h in src/proto_roaraudio.c (version >= 2.4.0)
+patch -ulbf src/proto_roaraudio.c << EOF
+--- src/proto_roaraudio.c  2015-11-09 12:54:12.000000000 +0100
++++ src/proto_roaraudio.c  2015-11-17 17:13:51.660427600 +0100
+@@ -30,3 +30,7 @@
+ /* for htonl(). */
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <arpa/inet.h>
++#endif
+
+EOF
+# fix missing libshout.ckport (version >= 2.4.0)
+touch libshout.ckport
+## fix missing EINPROGRESS/EALREADY in src/common/net/sock.c
+#mv src/common/net/sock.c src/common/net/sock.c.bak
+#cat  > src/common/net/sock.c << EOF
+##define EINPROGRESS WSAEINPROGRESS
+##define EALREADY WSAEALREADY
+#EOF
+#cat src/common/net/sock.c.bak >> src/common/net/sock.c
+# fix missing SSLeay_add_all_algorithms in src/tls.c on OpenSSL 1.1.0 or higher
+sed -i.bak "s?\bSSLeay_add_all_algorithms?//&?" src/tls.c
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-lspeex -no-undefined -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lspeex -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,117 @@
+export NAME="zathura"
+export STATUS=
+export URL=https://pwmt.org/projects/zathura/
+export BASENAME=zathura
+export DESCRIPTION="zathura is a highly customizable and functional document viewer. It provides a minimalistic and space saving interface as well as an easy usage that mainly focuses on keyboard interaction."
+export CATEGORY=graphics,fileformat
+export TYPE=application
+#export VERSION=0.3.7
+#export VERSIONDATE=20170327
+#export VERSION=0.3.8
+#export VERSIONDATE=20171221
+#export VERSION=0.3.8
+#export VERSIONDATE=20180318
+#export DEPENDANCIES=girara
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+####config.mk: file not recognized: File format not recognized
+#export VERSION=0.4.0
+#export VERSIONDATE=20180523
+#export VERSION=0.4.1
+#export VERSIONDATE=20180921
+####meson.build:40:0: ERROR:  Invalid version of dependency, need 'girara-gtk3' ['>=0.2.9'] found '0.2.7'.
+#export VERSION=0.4.3
+#export VERSIONDATE=20181224
+#export VERSION=0.4.4
+#export VERSIONDATE=20191219
+#export VERSION=0.4.5
+#export VERSIONDATE=20200106
+#export VERSION=0.4.6
+#export VERSIONDATE=20200728
+####Dependency girara-gtk3 found: NO found '0.2.8' but need: '>=0.3.2'
+####meson.build:40:0: ERROR:  Invalid version of dependency, need 'girara-gtk3' ['>=0.3.2'] found '0.2.8'.
+#export VERSION=0.4.7
+#export VERSIONDATE=20200905
+#export VERSION=0.4.8
+#export VERSIONDATE=20210721
+####zathura/main.c:233:25: error: implicit declaration of function 'fork' [-Werror=implicit-function-declaration]
+export VERSION=0.4.9
+export VERSIONDATE=20220214
+wl-showstatus --package-version
+export DEPENDANCIES=girara
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://pwmt.org/projects/zathura/download/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://pwmt.org/projects/zathura/download/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://pwmt.org/projects/zathura/download/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix file locking in zathura/database-plain.c
+patch -ulbf zathura/database-plain.c << EOF
+@@ -35,3 +35,5 @@
+
+-#ifdef __GNU__
++#if defined(_WIN32)
++#define file_lock_set(fd, cmd) //TO DO: proper locking for Windows
++#elif defined(__GNU__)
+ #include <sys/file.h>
+EOF
+# fix zathura/main.c (version >= 0.4.7)
+patch -ulbf zathura/main.c << EOF
+@@ -138,3 +138,5 @@
+   gchar* search_string  = NULL;
++#ifndef _WIN32
+   bool   forkback       = false;
++#endif
+   bool   print_version  = false;
+@@ -150,3 +152,5 @@
+     { "plugins-dir",            'p',  0, G_OPTION_ARG_STRING,   &plugin_path,
+  _("Path to the directories containing plugins"),        "path" },
++#ifndef _WIN32
+     { "fork",                   '\\0', 0, G_OPTION_ARG_NONE,     &forkback,
+   _("Fork into the background"),                          NULL },
++#endif
+     { "password",               'w',  0, G_OPTION_ARG_STRING,   &password,
+  _("Document password"),                                 "password" },
+@@ -229,2 +233,3 @@
+   int file_idx = argc > file_idx_base ? file_idx_base : 0;
++#ifndef _WIN32
+   /* Fork instances for other files. */
+@@ -270,2 +275,3 @@
+   }
++#endif
+
+EOF
+## remove -rdynamic from config.mk
+#mv config.mk config.mk.bak &&
+#sed -e "s/-rdynamic//" config.mk.bak > config.mk
+#cd $BASENAME-$VERSION
+#wl-showstatus build &&
+# make CC="gcc -I$(pwd)/zathura" &&
+#    echo OK
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dsqlite=enabled -Dmagic=enabled -Dtests=disabled . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib GETTEXTDATADIR=$MINGWPREFIX/share/gettext ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

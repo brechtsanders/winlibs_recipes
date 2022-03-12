@@ -1,0 +1,86 @@
+export NAME="libkeccak"
+export STATUS=
+export URL=https://github.com/maandree/libkeccak
+export BASENAME=libkeccak
+export DESCRIPTION="Keccak-family hashing library"
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.1.4
+#export VERSIONDATE=20180709
+#export VERSION=1.1.5
+#export VERSIONDATE=20190210
+#export VERSION=1.2
+#export VERSIONDATE=20190212
+#export VERSION=1.2.1
+#export VERSIONDATE=20210730
+#export VERSION=1.2.2
+#export VERSIONDATE=20210731
+#export VERSION=1.3
+#export VERSIONDATE=20220122
+#export VERSION=1.3.1
+#export VERSIONDATE=20220205
+export VERSION=1.3.1.2
+export VERSIONDATE=20220220
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=ISC
+#export DOWNLOADURL="https://github.com/maandree/libkeccak/releases"
+export DOWNLOADURL="https://github.com/maandree/libkeccak/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/maandree/libkeccak/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/maandree/libkeccak/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix missing alloca.h in libkeccak/files.c (version <= 1.1.5)
+#sed -i.bak -e "s/alloca\.h/malloc.h/" libkeccak/files.c
+# fix missing alloca.h in common.h (version >= 1.2)
+sed -i.bak -e "s/alloca\.h/malloc.h/" common.h
+## fix missing blksize in libkeccak/files.c (version <= 1.1.5)
+#patch -ulbf libkeccak/files.c << EOF
+#@@ -36,2 +36,3 @@
+#
+#+#ifndef _WIN32
+#        if (fstat(fd, &attr) == 0)
+#@@ -39,2 +40,3 @@
+#                        blksize = (size_t)(attr.st_blksize);
+#+#endif
+#
+#EOF
+## fix missing blksize in libkeccak_generalised_sum_fd.c (version >= 1.2 <= 1.2.2)
+#patch -ulbf libkeccak_generalised_sum_fd.c << EOF
+#@@ -28,2 +28,3 @@
+#
+#+#ifndef _WIN32
+#        if (fstat(fd, &attr) == 0)
+#@@ -31,2 +32,3 @@
+#                        blksize = (size_t)attr.st_blksize;
+#+#endif
+#
+#EOF
+## fix Makefile (version <= 1.1.4)
+#sed -e "s/\(LIBEXT\s*=\s*\).*$/\1dll/; s/-Wl,-soname,\([^ .]*\)[^ ]*/-Wl,--out-implib,\1.dll.a -s/; s/ln -s/#&/" Makefile > Makefile.mingw
+# fix Makefile (version >= 1.1.5)
+sed -i.bak -e "s/\(LIBEXT\s*=\s*\).*$/\1dll/; s/-Wl,-soname,\([^ .]*\)[^ ]*/-Wl,--out-implib,\1.dll.a -s/" linux.mk
+sed -e "s/ln -s/#&/; s/cp .*\$(LIBMINOREXT)/#&/" Makefile > Makefile.mingw
+# avoid -fPIC (useless on Windows and not supported by clang) in Makefile.mingw
+sed -i.bak -e "s/-fPIC//" Makefile.mingw
+wl-showstatus build &&
+ #make -fMakefile.mingw CC=gcc &&
+ ( make -fMakefile.mingw CC=gcc || make -fMakefile.mingw CC=gcc LDFLAGS="-lpthread" ) &&
+ wl-showstatus install &&
+ make -fMakefile.mingw install PREFIX=$INSTALLPREFIX &&
+ rm -f $INSTALLPREFIX/lib/*.dll.* &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

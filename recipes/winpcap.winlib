@@ -1,0 +1,182 @@
+#export NAME="winpcap"
+#export STATUS=
+#export URL=http://www.winpcap.org/
+#export BASENAME=winpcap
+#export DESCRIPTION="WinPcap is the industry-standard tool for link-layer network access in Windows environments: it allows applications to capture and transmit network packets bypassing the protocol stack, and has additional useful features, including kernel-level packet filtering, a network statistics engine and support for remote packet capture. Note: requires separate download and installation from http://www.winpcap.org/install/"
+#export CATEGORY=hardware,communication
+#export TYPE=library
+##export VERSION=4.0.2
+##export VERSION=4.1.1
+##export VERSIONDATE=
+#export VERSION=4.1.2
+#export VERSIONDATE=20120828
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=
+#export LICENSETYPE=BSD
+#export DOWNLOADURL="http://www.winpcap.org/devel.htm WpdPack_ .zip"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.winpcap.org/install/bin/WpdPack_`echo $VERSION|sed -e "s/\./_/g"`.zip
+##export DOWNLOADSOURCEURL=http://www.winpcap.org/install/bin/WinPcap_`echo $VERSION|sed -e "s/\./_/g"`.exe
+##export DOWNLOADSOURCEURL=http://www.winpcap.org/install/bin/WpcapSrc_`echo $VERSION|sed -e "s/\./_/g"`.zip
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#mkdir $INSTALLPREFIX $INSTALLPREFIX/include $INSTALLPREFIX/lib
+#unzip -oq -d $INSTALLPREFIX/include -j $TARBALLDIR/$BASENAME/WpdPack_`echo $VERSION|sed -e "s/\./_/g"`.zip WpdPack/Include/*
+#unzip -oq -d $INSTALLPREFIX/lib -j $TARBALLDIR/$BASENAME/WpdPack_`echo $VERSION|sed -e "s/\./_/g"`.zip WpdPack/Lib/*.a
+#cp $INSTALLPREFIX/lib/libwpcap.a $INSTALLPREFIX/lib/libpcap.a && 
+# mv $INSTALLPREFIX/include/pcap-bpf.h $INSTALLPREFIX/include/pcap-bpf.h.bak && 
+# echo "#include <winsock2.h>" > $INSTALLPREFIX/include/pcap-bpf.h && 
+# cat $INSTALLPREFIX/include/pcap-bpf.h.bak >> $INSTALLPREFIX/include/pcap-bpf.h && 
+# rm $INSTALLPREFIX/include/pcap-bpf.h.bak && 
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION
+
+
+
+export NAME="winpcap"
+export STATUS=
+export URL=http://www.winpcap.org/
+export BASENAME=winpcap
+export DESCRIPTION="WinPcap is the industry-standard tool for link-layer network access in Windows environments: it allows applications to capture and transmit network packets bypassing the protocol stack, and has additional useful features, including kernel-level packet filtering, a network statistics engine and support for remote packet capture. Note: requires separate download and installation from http://www.winpcap.org/install/"
+export CATEGORY=hardware,communication
+export TYPE=library
+#export VERSION=4.1.2
+#export VERSIONDATE=20120828
+export VERSION=4.1.3
+export VERSIONDATE=20160228
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://www.winpcap.org/devel.htm WpdPack_ .zip"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.winpcap.org/install/bin/WpcapSrc_$(echo $VERSION|tr . _).zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+unzip -oq -d $BASENAME-$VERSION $TARBALLDIR/$BASENAME/WpcapSrc_$(echo $VERSION|tr . _).zip
+#cd $BASENAME-$VERSION/winpcap/wpcap/libpcap
+## fix missing files
+#mkdir -p win32fix/sys win32fix/netinet win32fix/net win32fix/netinet
+#echo "#include <winsock2.h>" win32fix/sys/socket.h
+#touch win32fix/netinet/in.h win32fix/net/if.h win32fix/netinet/if_ether.h win32fix/sys/ioctl.h
+#wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX/share/winpcap --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-pcap=null CFLAGS="-I`pwd`/win32fix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+# make install-strip &&
+#    ls -l $INSTALLPREFIX/share/winpcap/lib/pkgconfig $INSTALLPREFIX/share/winpcap/share/pkgconfig
+cd $BASENAME-$VERSION/winpcap
+# fix wpcap/libpcap/inet.c
+patch -ulbf wpcap/libpcap/inet.c << EOF
+--- wpcap/libpcap/inet.c  2009-10-07 01:20:04 +0200
++++ wpcap/libpcap/inet.c  2012-08-28 21:37:20 +0200
+@@ -806,3 +806,3 @@
+                        strcpy((char*)tUstr, tAstr);
+-                       (char*)tUstr += strlen(tAstr) + 1;;
++                       tUstr += strlen(tAstr) + 1;;
+                        tAstr += strlen(tAstr) + 1;
+EOF
+# fix packetNtx/Dll/Project/GNUmakefile
+mv packetNtx/Dll/Project/GNUmakefile packetNtx/Dll/Project/GNUmakefile.bak
+sed -e "s/-mno-cygwin//" packetNtx/Dll/Project/GNUmakefile.bak > packetNtx/Dll/Project/GNUmakefile
+# fix wpcap/PRJ/GNUmakefile
+mv wpcap/PRJ/GNUmakefile wpcap/PRJ/GNUmakefile.bak
+sed -e "s/-mno-cygwin//; s/-DHAVE_AIRPCAP_API//" wpcap/PRJ/GNUmakefile.bak > wpcap/PRJ/GNUmakefile
+# fix missing ddk/ntddndis.h on 64-bit
+mkdir -p common/ddk
+echo "#include <ntddndis.h>" > common/ddk/ntddndis.h
+## fix definition of DllMain in wpcap/libpcap/pcap-win32.c
+#patch -ulbf wpcap/libpcap/pcap-win32.c << EOF
+#--- wpcap/libpcap/pcap-win32.c  2010-06-25 09:44:24 +0200
+#+++ wpcap/libpcap/pcap-win32.c  2013-11-26 23:14:18 +0100
+#@@ -89,3 +89,3 @@
+# BOOL WINAPI DllMain(
+#-  HANDLE hinstDLL,
+#+  HINSTANCE hinstDLL,
+#   DWORD dwReason,
+#EOF
+## fix definition of DllMain in packetNtx/Dll/Packet32.c
+#patch -ulbf packetNtx/Dll/Packet32.c << EOF
+#--- packetNtx/Dll/Packet32.c  2008-11-18 12:17:42 +0100
+#+++ packetNtx/Dll/Packet32.c  2013-11-26 23:18:46 +0100
+#@@ -197,3 +197,3 @@
+#
+#-BOOL APIENTRY DllMain(HANDLE DllHandle,DWORD Reason,LPVOID lpReserved)
+#+BOOL APIENTRY DllMain(HINSTANCE DllHandle,DWORD Reason,LPVOID lpReserved)
+# {
+#EOF
+# fix redefinitions between ddk/wdm.h and winnt.h in wpcap/libpcap/pcap-win32.c
+patch -ulbf wpcap/libpcap/pcap-win32.c << EOF
+--- wpcap/libpcap/pcap-win32.c  2010-06-25 09:44:24 +0200
++++ wpcap/libpcap/pcap-win32.c  2013-12-17 14:01:50 +0100
+@@ -41,3 +41,3 @@
+ #ifdef __MINGW32__
+-#include <ddk/ndis.h>
++#include <ntddndis.h>
+ #else /*__MINGW32__*/
+EOF
+# fix redefinition of getaddrinfo in wpcap/libpcap/Win32/Src/getaddrinfo.c
+mv wpcap/libpcap/Win32/Src/getaddrinfo.c wpcap/libpcap/Win32/Src/getaddrinfo.c.bak
+cat > wpcap/libpcap/Win32/Src/getaddrinfo.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+EOF
+# fix missing getaddrinfo in wpcap/libpcap/scanner.c
+mv wpcap/libpcap/scanner.c wpcap/libpcap/scanner.c.bak
+cat > wpcap/libpcap/scanner.c << EOF
+#define _WIN32_WINNT 0x0501
+#include <ws2tcpip.h>
+EOF
+cat wpcap/libpcap/scanner.c.bak >> wpcap/libpcap/scanner.c
+## fix lvalue issue in wpcap/libpcap/inet.c (version >= 4.1.2)
+#patch -ulbf wpcap/libpcap/inet.c << EOF
+#--- wpcap/libpcap/inet.c  2009-10-07 01:20:04.000000000 +0200
+#+++ wpcap/libpcap/inet.c  2014-08-11 18:04:46.000000000 +0200
+#@@ -806,3 +806,3 @@
+#                        strcpy((char*)tUstr, tAstr);
+#-                       (char*)tUstr += strlen(tAstr) + 1;;
+#+                       tUstr = (char*)tUstr + strlen(tAstr) + 1;
+#                        tAstr += strlen(tAstr) + 1;
+#EOF
+# fix missing netinet/in.h (version >= 4.1.2)
+mkdir -p wpcap/libpcap/Win32/Include/netinet
+touch wpcap/libpcap/Win32/Include/netinet/in.h
+# fix missing exports
+cat >> wpcap/PRJ/WPCAP.DEF << EOF
+ pcap_can_set_rfmon
+ pcap_set_rfmon
+ pcap_statustostr
+EOF
+wl-showstatus build &&
+ #make -CpacketNtx/Dll/Project CC="gcc -I$(ls -1 -d $MINGWDIR/*mingw32/include) -I$(ls -1 -d $MINGWDIR/*mingw32/include/ddk)" &&
+ make -CpacketNtx/Dll/Project CC=gcc &&
+ ## create static packet library
+ #gcc -shared -o packet.dll -ICommon -IpacketNtx/Dll packetNtx/Dll/Packet32.c packetNtx/Dll/AdInfo.c -lversion &&
+ #gcc -c -o packetNtx/Dll/Packet32.o packetNtx/Dll/Packet32.c -ICommon -IpacketNtx/Dll &&
+ #gcc -c -o packetNtx/Dll/AdInfo.o packetNtx/Dll/AdInfo.c -ICommon -IpacketNtx/Dll &&
+ #ar cru packetNtx/Dll/libpacket.a packetNtx/Dll/Packet32.o packetNtx/Dll/AdInfo.o &&
+ ## create shared packet library
+ #dlltool -d packetNtx/Dll/Packet.def -l packetNtx/Dll/libpacket.dll.a -D packetNtx/Dll/packet.dll packetNtx/Dll/libpacket.a &&
+ ##ranlib packetNtx/Dll/libpacket.dll.a && 
+ #gcc -shared -s -mwindows -def packetNtx/Dll/Packet.def -o packetNtx/Dll/packet.dll packetNtx/Dll/libpacket.a -lversion &&
+ #make -Cwpcap/PRJ CC="gcc -I$(ls -1 -d $MINGWDIR/*mingw32/include) -I$(ls -1 -d $MINGWDIR/*mingw32/include/ddk)" &&
+ ( make -Cwpcap/PRJ CC=gcc || make -Cwpcap/PRJ CC="gcc -I$(ls -1 -d $MINGWDIR/*mingw32/include/ddk)" ) &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/share/winpcap/include/pcap $INSTALLPREFIX/share/winpcap/lib $INSTALLPREFIX/share/winpcap/bin &&
+ cp -f wpcap/libpcap/pcap.h $INSTALLPREFIX/share/winpcap/include/ &&
+ cp -f wpcap/libpcap/pcap/*.h wpcap/libpcap/pcap-stdinc.h wpcap/libpcap/Win32/Include/bittypes.h wpcap/Win32-Extensions/*.h wpcap/libpcap/remote-ext.h Common/*.h $INSTALLPREFIX/share/winpcap/include/pcap/ &&
+ ( ls -1 $INSTALLPREFIX/share/winpcap/include/pcap/pcap-namedb.h &> /dev/null || echo "#include <pcap/namedb.h>" > $INSTALLPREFIX/share/winpcap/include/pcap/pcap-namedb.h ) &&
+ cp -f packetNtx/Dll/Project/libpacket.a $INSTALLPREFIX/share/winpcap/lib/libpacket.dll.a &&
+ cp -f wpcap/lib/*.a $INSTALLPREFIX/share/winpcap/lib/ &&
+ cp -f $INSTALLPREFIX/share/winpcap/lib/libwpcap.a $INSTALLPREFIX/share/winpcap/lib/libpcap.dll.a &&
+ cp -f packetNtx/Dll/Project/*.dll wpcap/PRJ/*.dll $INSTALLPREFIX/share/winpcap/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####64-bit: /lib/gcc/x86_64-w64-mingw32/4.6.2/../../../../x86_64-w64-mingw32/include/ddk/ntddk.h:38:17: fatal error: wdm.h: No such file or directory
+####Superseded by libpcap
+
+
+

@@ -1,0 +1,278 @@
+#export NAME="zchunk"
+#export STATUS=
+#export URL=https://github.com/zchunk/zchunk
+#export BASENAME=zchunk
+#export DESCRIPTION="A file format designed for highly efficient deltas while maintaining good compression"
+#export CATEGORY=fileformat
+#export TYPE=library
+##export VERSION=0.9.15
+##export VERSIONDATE=20181208
+#####src/lib/index/index_read.c:31:10: fatal error: endian.h: No such file or directory
+##export DEPENDANCIES=pcre,argp-standalone,libcurl,zstd,openssl
+##export OPTIONALDEPENDANCIES=
+##export BUILDDEPENDANCIES=meson
+##export VERSION=0.9.17
+##export VERSIONDATE=20181210
+##export VERSION=1.0.0
+##export VERSIONDATE=20181223
+#####src/zck_gen_zdict.c:37:10: fatal error: sys/wait.h: No such file or directory
+##export VERSION=1.0.1
+##export VERSIONDATE=20181229
+##export VERSION=1.0.3
+##export VERSIONDATE=20190125
+##export VERSION=1.0.4
+##export VERSIONDATE=20190317
+##export VERSION=1.1.0
+##export VERSIONDATE=20190324
+##export VERSION=1.1.1
+##export VERSIONDATE=20190415
+##export VERSION=1.1.2
+##export VERSIONDATE=20190520
+#####zck_gen_zdict.c:(.text+0x27a): undefined reference to `mkdtemp'
+##export VERSION=1.1.3
+##export VERSIONDATE=20190808
+##export VERSION=1.1.4
+##export VERSIONDATE=20191114
+##export VERSION=1.1.5
+##export VERSIONDATE=20200119
+##export VERSION=1.1.6
+##export VERSIONDATE=20200315
+##export VERSION=1.1.7
+##export VERSIONDATE=20200927
+##export VERSION=1.1.8
+##export VERSIONDATE=20201209
+##export VERSION=1.1.9
+##export VERSIONDATE=20201231
+##export VERSION=1.1.11
+##export VERSIONDATE=20210502
+##export VERSION=1.1.12
+##export VERSIONDATE=20210516
+##export VERSION=1.1.14
+##export VERSIONDATE=20210521
+#####src/25a6634@@zck_gen_zdict@exe/zck_gen_zdict.c.obj:zck_gen_zdict.c:(.text.startup+0x2de): undefined reference to `dprintf'
+##export VERSION=1.1.15
+##export VERSIONDATE=20210602
+#export VERSION=1.1.16
+#export VERSIONDATE=20210615
+#wl-showstatus --package-version
+##export DEPENDANCIES=pcre2,argp-standalone,libcurl,zstd,openssl
+#export DEPENDANCIES=pcre,pcre2,argp-standalone,libcurl,zstd,openssl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=meson
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=BSD
+##export DOWNLOADURL="https://github.com/zchunk/zchunk/releases"
+#export DOWNLOADURL="https://github.com/zchunk/zchunk/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=https://github.com/zchunk/zchunk/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/zchunk/zchunk/archive/refs/tags/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix src/lib/index/index_read.c
+#patch -ulbf src/lib/index/index_read.c << EOF
+#@@ -30,3 +30,5 @@
+# #include <string.h>
+#+#ifndef _WIN32
+# #include <endian.h>
+#+#endif
+# #include <zck.h>
+#EOF
+## fix already defined stdout in src/unzck.c
+#sed -i.bak -e "s/stdout/std_out/g" src/unzck.c
+### fix missing dprintf (version <= 1.1.2)
+##echo "#define dprintf(args...)" >> src/lib/zck_private.h
+##echo "#define vdprintf(args...)" >> src/lib/zck_private.h
+##mv src/zck.c src/zck.c.bak &&
+##echo "#define dprintf(args...)" > src/zck.c &&
+##cat src/zck.c.bak >> src/zck.c
+##mv src/zck_dl.c src/zck_dl.c.bak &&
+##echo "#define dprintf(args...)" > src/zck_dl.c &&
+##cat src/zck_dl.c.bak >> src/zck_dl.c
+##mv src/zck_read_header.c src/zck_read_header.c.bak &&
+##echo "#define dprintf(args...)" > src/zck_read_header.c &&
+##cat src/zck_read_header.c.bak >> src/zck_read_header.c
+##mv src/zck_delta_size.c src/zck_delta_size.c.bak &&
+##echo "#define dprintf(args...)" > src/zck_delta_size.c &&
+##cat src/zck_delta_size.c.bak >> src/zck_delta_size.c
+##mv src/unzck.c src/unzck.c.bak &&
+##echo "#define dprintf(args...)" > src/unzck.c &&
+##cat src/unzck.c.bak >> src/unzck.c
+## fix missing dprintf (version >= 1.1.3)
+#sed -i.bak -e "s/dprintf(STDERR_FILENO/fprintf(stderr/g" src/unzck.c src/zck.c src/zck_delta_size.c src/zck_dl.c src/zck_gen_zdict.c src/zck_read_header.c
+#patch -ulbf src/lib/log.c << EOF
+#@@ -51,2 +51,9 @@
+#
+#+#ifdef _WIN32
+#+    FILE *log_file = fdopen(log_fd, "wa");
+#+    fprintf(log_file, "%s: ", function);
+#+    vfprintf(log_file, format, args);
+#+    fprintf(log_file, "\n");
+#+    fclose(log_file);
+#+#else
+#     dprintf(log_fd, "%s: ", function);
+#@@ -54,2 +61,3 @@
+#     dprintf(log_fd, "\n");
+#+#endif
+# }
+#EOF
+## fix missing sys/wait.h in test/shacheck.c
+#patch -ulbf test/shacheck.c << EOF
+#@@ -36,3 +36,5 @@
+# #include <zck.h>
+#+#ifndef _WIN32
+# #include <sys/wait.h>
+#+#endif
+# #include "zck_private.h"
+#EOF
+### fix missing sys/wait.h in src/zck_gen_zdict.c (version >= 0.9.17)
+##patch -ulbf src/zck_gen_zdict.c << EOF
+##@@ -36,3 +36,5 @@
+## #include <sys/stat.h>
+##+#ifndef _WIN32
+## #include <sys/wait.h>
+##+#endif
+## #include <fcntl.h>
+##@@ -63,3 +65,3 @@
+##   zck_log_type log_level;
+##-  bool stdout;
+##+  bool std_out;
+##   bool exit;
+##EOF
+### don't include sys/wait.h in src/zck_gen_zdict.c (version >= 1.0.0 <= 1.0.2)
+##sed -i.bak -e "s?#include <sys/wait.h>?//&?" src/zck_gen_zdict.c
+### don't use already defined stdout in src/zck_gen_zdict.c (version >= 1.0.1)
+##sed -i.bak -e "s/\([ >]\)\(stdout\)\b/\1use\2/" src/zck_gen_zdict.c
+### fix src/zck_gen_zdict.c (version >= 1.0.3 <= 1.1.2)
+##patch -ulbf src/zck_gen_zdict.c << EOF
+##@@ -36,3 +36,8 @@
+## #include <sys/stat.h>
+##+#ifdef _WIN32
+##+#define mkdtemp(template) NULL
+##+#define waitpid(pid,status,options) -1
+##+#else
+## #include <sys/wait.h>
+##+#endif
+## #include <fcntl.h>
+##@@ -63,3 +68,3 @@
+##   zck_log_type log_level;
+##-  bool stdout;
+##+  bool tostdout;
+##   bool exit;
+##@@ -80,3 +85,3 @@
+##         /*case 'c':
+##-            arguments->stdout = true;
+##+            arguments->tostdout = true;
+##             break;*/
+##EOF
+## fix missing sys/wait.h in src/zck_gen_zdict.c (version >= 1.1.3)
+#patch -ulbf src/zck_gen_zdict.c << EOF
+#@@ -36,3 +36,7 @@
+# #include <sys/stat.h>
+#+#ifdef _WIN32
+#+#define mkdtemp(template) NULL
+#+#else
+# #include <sys/wait.h>
+#+#endif
+# #include <fcntl.h>
+#@@ -63,3 +67,3 @@
+#   zck_log_type log_level;
+#-  bool stdout;
+#+  /*bool stdout;*/
+#   bool exit;
+#@@ -250,2 +254,6 @@
+#     /* Create dictionary */
+#+#ifdef _WIN32
+#+#define fork() 0
+#+#define waitpid(pid,status,options) -1
+#+#endif
+#     int pid = fork();
+#EOF
+### fix printf type issues in test/read_single_comp_chunk.c (version >= 1.0.4)
+##patch -ulbf test/read_single_comp_chunk.c << EOF
+##@@ -83,3 +83,3 @@
+##             printf("chunk size didn't match expected size: %li != %li\n",
+##-                   read_size, chunk_size);
+##+                   (long)read_size, (long)chunk_size);
+##         free(data);
+##EOF
+## fix missing fork in test/shacheck.c (version >= 1.1.3)
+#mv test/shacheck.c test/shacheck.c.bak2 &&
+#echo "#define fork() 0" > test/shacheck.c &&
+#cat test/shacheck.c.bak2 >> test/shacheck.c
+## fix link errors
+#patch -ulbf meson.build << EOF
+#@@ -7,2 +7,3 @@
+#
+#+add_global_link_arguments('-Wl,--as-needed', '-lpcre2-posix', '-largp', language : 'c')
+# common_cflags = [
+#@@ -46,3 +47,2 @@
+# subdir('src')
+#-subdir('test')
+#
+#EOF
+## fix link errors
+#patch -ulbf src/meson.build << EOF
+#@@ -2,5 +2,5 @@
+# zck = executable(
+#     'zck',
+#-    ['zck.c', 'util_common.c'],
+#+    ['zck.c', 'util_common.c', 'memmem.c'],
+#     include_directories: inc,
+#     link_with: zcklib,
+#EOF
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -D with-zstd=enabled -D with-openssl=enabled -D coverity=false . build_both &&
+# # fix missing
+# sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lpcreposix\"/" build_both/build.ninja &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="zchunk"
+export STATUS=
+export URL=https://github.com/zchunk/zchunk
+export BASENAME=zchunk
+export DESCRIPTION="A file format designed for highly efficient deltas while maintaining good compression"
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=1.2.0
+export VERSIONDATE=20220221
+wl-showstatus --package-version
+export DEPENDANCIES=pcre,pcre2,argp-standalone,libcurl,zstd,openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/zchunk/zchunk/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/zchunk/zchunk/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix detection of zstd in meson.build (version >= 1.2.0)
+#patch -ulbf meson.build << EOF
+#@@ -21,3 +21,3 @@
+# # zstd dependency
+#-if build_machine.system() == 'windows'
+#+if build_machine.system() == 'windows_DISABLE'
+#     zstd_dep = dependency('zstd', modules: 'zstd::libzstd_shared', required : get_option('with-zstd'), fallback: ['zstd', 'libzstd_dep'])
+#EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwith-zstd=enabled -Dwith-openssl=enabled -Dwith-curl=enabled -Dcoverity=false . build_both &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

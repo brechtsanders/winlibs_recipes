@@ -1,0 +1,50 @@
+export NAME="sha2"
+export STATUS=
+export URL=http://www.aarongifford.com/computers/sha.html
+export BASENAME=sha2
+export DESCRIPTION="open source implementation of the SHA-1, SHA-224, SHA-256, SHA-384, and SHA-512 secure has algorithms"
+export CATEGORY=security
+export TYPE=library
+export VERSION=1.0.1
+export VERSIONDATE=20150921
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=README
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://www.aarongifford.com/computers/sha.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.aarongifford.com/computers/$BASENAME-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+cd $BASENAME-$VERSION
+# fix missing u_int8_t/u_int32_t/u_int64_t
+mv sha2.h sha2.h.bak &&
+echo "#include <stdint.h>" > sha2.h
+sed -e "s/u_\(int[0-9]*_t\)/u\1/g" sha2.h.bak >> sha2.h
+mv sha2.c sha2.c.bak &&
+sed -e "s/u_\(int[0-9]*_t\)/u\1/g" sha2.c.bak > sha2.c
+wl-showstatus build &&
+gcc -c -o sha2.o sha2.c -DSHA2_USE_INTTYPES_H -DBYTE_ORDER=LITTLE_ENDIAN &&
+ ar cr libsha2.a sha2.o &&
+ echo "LIBRARY sha2.dll" > sha2.def &&
+ echo "EXPORTS" >> sha2.def &&
+ sed -n -e "s/^.*\(SHA[^ \t]*\)(.*;.*/\1/p" sha2.h | sort | uniq >> sha2.def &&
+ #dlltool -D sha2.dll -l libsha2.dll.a -d sha2.def libsha2.a &&
+ #gcc -shared -s -mwindows -def sha2.def -o sha2.dll libsha2.a &&
+ gcc -shared -s -mwindows -def sha2.def -o sha2.dll libsha2.a -Wl,--kill-at -Wl,--out-implib,libsha2.dll.a &&
+ #gcc -o sha2speed.exe sha2speed.c -L. -lsha2.dll -DSHA2_USE_INTTYPES_H -DBYTE_ORDER=LITTLE_ENDIAN &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/sha2 $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/sha2/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ #cp -f *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

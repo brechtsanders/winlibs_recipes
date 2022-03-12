@@ -1,0 +1,121 @@
+#export NAME="libmediaart"
+#export STATUS=
+#export URL=http://github.com/GNOME/libmediaart
+#export BASENAME=libmediaart
+#export DESCRIPTION="Library tasked with managing, extracting and handling media art caches"
+#export CATEGORY=
+#export TYPE=library
+##export VERSION=0.2.0
+##export VERSIONDATE=20140305
+#####configure: error: Could not find 'gtester'
+#####libmediaart/storage.c:25:29: fatal error: gio/gunixmounts.h: No such file or directory
+##export VERSION=0.7.0
+##export VERSIONDATE=20150516
+##export VERSION=1.9.0
+##export VERSIONDATE=20141125
+##export VERSION=1.9.1
+##export VERSIONDATE=20170305
+#export VERSION=1.9.4
+#export VERSIONDATE=20170815
+#wl-showstatus --package-version
+#export DEPENDANCIES=glib2,gtk2,gdk-pixbuf
+#export OPTIONALDEPENDANCIES=vala
+#export BUILDDEPENDANCIES=gtk-doc
+#export LICENSEFILE=COPYING.LESSER
+#export LICENSETYPE="GPL/LGPL"
+#export DOWNLOADURL="http://download.gnome.org/sources/libmediaart/"
+##export DOWNLOADURL="https://github.com/GNOME/libmediaart/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://download.gnome.org/sources/libmediaart/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1/")/$BASENAME-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+## fix unix stuff in libmediaart/storage.c
+#patch -ulbf libmediaart/storage.c << EOF
+#--- libmediaart/storage.c  2014-09-03 10:28:54 +0200
+#+++ libmediaart/storage.c  2014-11-26 20:06:24 +0100
+#@@ -24,3 +24,5 @@
+# #include <gio/gio.h>
+#+#ifndef _WIN32
+# #include <gio/gunixmounts.h>
+#+#endif
+#
+#@@ -444,2 +446,5 @@
+#        } else {
+#+#ifdef _WIN32
+#+               g_debug ("  No GUnixMountEntry found, needed for detecting if optical media... :(");
+#+#else
+#                GUnixMountEntry *entry;
+#@@ -526,2 +531,3 @@
+#                g_object_unref (mount_root);
+#+#endif
+#        }
+#EOF
+## fix missing symlink in libmediaart/extract.c
+#mv libmediaart/extract.c libmediaart/extract.c.bak
+#echo "#define symlink(name1,name2) -1" > libmediaart/extract.c
+#cat libmediaart/extract.c.bak >> libmediaart/extract.c
+#wl-showstatus configure &&
+## fix missing gio-unix in configure
+#mv configure configure.bak
+#sed -e "s/gio-unix/gio-windows/g" configure.bak > configure
+### fix missing libmediaart-1 in configure
+##mv configure configure.bak2
+##sed -e "s/libmediaart-1/libmediaart-2/g" configure.bak2 > configure
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-introspection=no --enable-installed-tests --disable-always-build-tests --disable-unit-tests &&
+# wl-showstatus build &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="libmediaart"
+export STATUS=
+export URL=http://github.com/GNOME/libmediaart
+export BASENAME=libmediaart
+export DESCRIPTION="Library tasked with managing, extracting and handling media art caches"
+export CATEGORY=
+export TYPE=library
+export VERSION=1.9.5
+export VERSIONDATE=20210523
+####docs\meson.build:14:10: ERROR: Program 'gtkdoc-check' not found
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gtk2,gdk-pixbuf,vala
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja,gtk-doc
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE="GPL/LGPL"
+export DOWNLOADURL="http://download.gnome.org/sources/libmediaart/"
+#export DOWNLOADURL="https://github.com/GNOME/libmediaart/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://download.gnome.org/sources/libmediaart/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1/")/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing unlink in libmediaart/extract.c (version >= 1.9.5)
+mv libmediaart/extract.c libmediaart/extract.c.bak &&
+echo "#define symlink(src,dst) (CreateSymbolicLinkA(dst,src) ? 0 : -1)" > libmediaart/extract.c &&
+cat libmediaart/extract.c.bak >> libmediaart/extract.c
+# fix missing gio-unix
+sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+# fix building both static and shared library
+sed -i.bak -e "s/shared_\(library\)/\1/" libmediaart/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dimage_library=gdk-pixbuf -Dgtk_doc=false . build_both &&
+ wl-showstatus build-install &&
+ PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

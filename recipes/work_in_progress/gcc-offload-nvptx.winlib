@@ -1,0 +1,228 @@
+export NAME="GCC, the GNU Compiler Collection (offload engine for nVidia)"
+export STATUS=
+export URL=https://gcc.gnu.org/
+export BASENAME=gcc-offload-nvptx
+export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom. This build is for the offload engine for nVidia."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=10.2.0
+#export VERSIONDATE=20200723
+export VERSION=10.3.0
+export VERSIONDATE=20210408
+#export VERSION=11.1.0
+#export VERSIONDATE=20210427
+#export VERSION=11.2.0
+#export VERSIONDATE=20210728
+wl-showstatus --package-version
+#export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mman-win32
+export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=nvptx-tools,nvptx-gcc
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://gcc.gnu.org/releases.html gcc-"
+#export DOWNLOADURL="https://ftp.gnu.org/gnu/gcc/ gcc-"
+export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/releases/ gcc-"
+#export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/snapshots/ gcc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://ftp.mpi-sb.mpg.de/pub/gnu/mirror/gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://ftp.gnu.org/gnu/gcc/gcc-$VERSION/gcc-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/snapshots/$VERSION/gcc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/gcc $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfJlh $TARBALLDIR/gcc/gcc-$VERSION.tar.xz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/gcc-$VERSION
+# fix missing sys/wait.h fixincludes/fixincl.c (version >= 9.3.0)
+patch -ulbf fixincludes/fixincl.c << EOF
+@@ -28,4 +28,12 @@
+ #ifndef SEPARATE_FIX_PROC
++#ifdef _WIN32
++#include <Windows.h>
++#define wait(p) Sleep(0)
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#else
+ #include <sys/wait.h>
+ #endif
++#endif
+
+EOF
+# fix conflicting basename() in include/libiberty.h (version >= 10.2.0)
+patch -ulbf include/libiberty.h << EOF
+@@ -111,3 +111,3 @@
+  || defined (__DragonFly__) || defined (HAVE_DECL_BASENAME)
+-extern char *basename (const char *) ATTRIBUTE_RETURNS_NONNULL ATTRIBUTE_NONNULL(1);
++extern char *basename (char *) ATTRIBUTE_RETURNS_NONNULL ATTRIBUTE_NONNULL(1);
+ #else
+EOF
+# fix missing .exe extension of mkoffload in in gcc/lto-wrapper.c (version >= 10.2.0)
+#### bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98145
+#sed -i.bak -e "s?/mkoffload?&.exe?" gcc/lto-wrapper.c
+patch -ulbf gcc/lto-wrapper.c << EOF
+@@ -548,4 +548,10 @@
+ /* Parse STR, saving found tokens into PVALUES and return their number.
+-   Tokens are assumed to be delimited by ':'.  If APPEND is non-null,
+-   append it to every token we find.  */
++   Tokens are assumed to be delimited by ':' (or ';' on Windows).
++   If APPEND is non-null, append it to every token we find.  */
++
++#ifdef _WIN32
++#define PATH_LIST_SEPARATOR ';'
++#else
++#define PATH_LIST_SEPARATOR ':'
++#endif
+
+@@ -558,3 +564,3 @@
+
+-  curval = strchr (str, ':');
++  curval = strchr (str, PATH_LIST_SEPARATOR);
+   while (curval)
+@@ -562,3 +568,3 @@
+       num++;
+-      curval = strchr (curval + 1, ':');
++      curval = strchr (curval + 1, PATH_LIST_SEPARATOR);
+     }
+@@ -567,3 +573,3 @@
+   curval = str;
+-  nextval = strchr (curval, ':');
++  nextval = strchr (curval, PATH_LIST_SEPARATOR);
+   if (nextval == NULL)
+@@ -581,3 +587,3 @@
+       curval = nextval + 1;
+-      nextval = strchr (curval, ':');
++      nextval = strchr (curval, PATH_LIST_SEPARATOR);
+       if (nextval == NULL)
+@@ -816,2 +822,8 @@
+
++#ifdef _WIN32
++#define BIN_EXT ".exe"
++#else
++#define BIN_EXT ""
++#endif
++
+ static char *
+@@ -827,6 +839,6 @@
+   char *suffix
+-    = XALLOCAVEC (char, sizeof ("/accel//mkoffload") + strlen (target));
++    = XALLOCAVEC (char, sizeof ("/accel//mkoffload" BIN_EXT) + strlen (target));
+   strcpy (suffix, "/accel/");
+   strcat (suffix, target);
+-  strcat (suffix, "/mkoffload");
++  strcat (suffix, "/mkoffload" BIN_EXT);
+
+EOF
+# fix missing .exe extension of mkoffload in in gcc/config/nvptx/mkoffload.c (version >= 10.2.0)
+#### bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98145
+patch -ulbf gcc/config/nvptx/mkoffload.c << EOF
+@@ -160,3 +160,10 @@
+ /* Parse STR, saving found tokens into PVALUES and return their number.
+-   Tokens are assumed to be delimited by ':'.  */
++   Tokens are assumed to be delimited by ':' (or ';' on Windows).  */
++
++#ifdef _WIN32
++#define PATH_LIST_SEPARATOR ';'
++#else
++#define PATH_LIST_SEPARATOR ':'
++#endif
++
+ static unsigned
+@@ -168,3 +175,3 @@
+
+-  curval = strchr (str, ':');
++  curval = strchr (str, PATH_LIST_SEPARATOR);
+   while (curval)
+@@ -172,3 +179,3 @@
+       num++;
+-      curval = strchr (curval + 1, ':');
++      curval = strchr (curval + 1, PATH_LIST_SEPARATOR);
+     }
+@@ -177,3 +184,3 @@
+   curval = str;
+-  nextval = strchr (curval, ':');
++  nextval = strchr (curval, PATH_LIST_SEPARATOR);
+   if (nextval == NULL)
+@@ -188,3 +195,3 @@
+       curval = nextval + 1;
+-      nextval = strchr (curval, ':');
++      nextval = strchr (curval, PATH_LIST_SEPARATOR);
+       if (nextval == NULL)
+@@ -393,2 +400,8 @@
+
++#ifdef _WIN32
++#define BIN_EXT ".exe"
++#else
++#define BIN_EXT ""
++#endif
++
+ int
+@@ -413,3 +426,3 @@
+   size_t len = (strlen (gcc_path) + 1
+-               + strlen (GCC_INSTALL_NAME)
++               + strlen (GCC_INSTALL_NAME BIN_EXT)
+                + 1);
+@@ -425,3 +438,3 @@
+     driver_used = sprintf (driver, "%s/", gcc_path);
+-  sprintf (driver + driver_used, "%s", GCC_INSTALL_NAME);
++  sprintf (driver + driver_used, "%s", GCC_INSTALL_NAME BIN_EXT);
+
+@@ -442,5 +455,5 @@
+        {
+-         len = strlen (paths[i]) + 1 + strlen (GCC_INSTALL_NAME) + 1;
++         len = strlen (paths[i]) + 1 + strlen (GCC_INSTALL_NAME BIN_EXT) + 1;
+          driver = XRESIZEVEC (char, driver, len);
+-         sprintf (driver, "%s/%s", paths[i], GCC_INSTALL_NAME);
++         sprintf (driver, "%s/%s", paths[i], GCC_INSTALL_NAME BIN_EXT);
+          if (access_check (driver, X_OK) == 0)
+@@ -457,3 +470,3 @@
+                 "offload compiler %s not found (consider using %<-B%>)",
+-                GCC_INSTALL_NAME);
++                GCC_INSTALL_NAME BIN_EXT);
+
+EOF
+## fix issue with nul input
+#sed -i.bak -e "s?\(-nostdinc \)\$(DEVNULL)?\1$(pwd)/empty?" gcc/Makefile.in
+mkdir -p build_win_offload-nvptx &&
+ wl-showstatus configure &&
+ cd build_win_offload-nvptx &&
+ #PATH=$MINGWPREFIX/share/nvptx-tools/bin:$MINGWPREFIX/share/nvptx-gcc/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id} --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #PATH=$MINGWPREFIX/share/nvptx-tools/bin:$MINGWPREFIX/share/nvptx-gcc/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #PATH=$MINGWPREFIX/share/nvptx-tools/bin:$MINGWPREFIX/share/nvptx-gcc/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CFLAGS="-I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #PATH=$MINGWPREFIX/share/nvptx-tools/bin:$MINGWPREFIX/share/nvptx-gcc/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" &&
+ PATH=$MINGWPREFIX/share/nvptx-tools/bin:$MINGWPREFIX/share/nvptx-gcc/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CXXFLAGS="-fpermissive" &&
+ #PATH=$MINGWPREFIX/share/nvptx-tools/bin:$MINGWPREFIX/share/nvptx-gcc/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=nvptx-none --enable-as-accelerator-for=$RUNPLATFORM --with-pkgversion="built by Brecht Sanders" --with-build-time-tools=$MINGWPREFIX/share/nvptx-tools/nvptx-none/bin --with-gnu-as --with-gnu-ld --disable-serial-configure --enable-checking=release --without-libbacktrace --without-included-gettext --without-cuda-driver --enable-{multiarch,newlib-io-long-long,linker-build-id,multilib} --disable-{sjlj-exceptions,libunwind-exceptions,libgomp} --enable-languages="c,c++,lto,fortran,objc,obj-c++$(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n ",d"; fi)" CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #,fortran
+ #--with-libbacktrace 
+ #--with-libatomic 
+ #LDFLAGS_FOR_TARGET="-s" 
+ cd .. &&
+ wl-showstatus build &&
+ make -Cbuild_win_offload-nvptx &&
+ wl-showstatus build-install &&
+ make -Cbuild_win_offload-nvptx install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####what about nvptx64-nvidia-cuda ?
+
+
+
+#### see also: https://github.com/pc2/OMP-Offloading
+
+##### see also: https://gitlab.uliege.be/R.Boman/math0471/blob/39b58a65407468c8f3e8fb27ad029b16607ac31d/openacc/benchmark/buildgcc-offload.sh
+##    --enable-offload-targets=nvptx-none \
+##    --with-cuda-driver-include=$cuda/include \
+##    --with-cuda-driver-lib=$cuda/lib64 \
+##    --disable-bootstrap \
+##    --disable-multilib \
+##    --enable-languages="c,c++,fortran,lto" \
+##    --prefix=$install_dir
+#### see also: https://gist.github.com/resetnow/1b55beed32f3eb3f90513896565ef5c0
+
+#### see also: https://github.com/tschwinge/gcc-playground/tree/big-offload/master
+
+
+
+####GCC 11.1.0 bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100293

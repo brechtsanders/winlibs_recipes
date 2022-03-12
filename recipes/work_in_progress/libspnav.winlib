@@ -1,0 +1,80 @@
+export NAME="libspnav"
+export STATUS=
+export URL=http://spacenav.sourceforge.net/
+#export URL=https://github.com/FreeSpacenav/libspnav/
+export BASENAME=libspnav
+export DESCRIPTION="Library for communicating with spacenavd or 3dxsrv to get input from 6-dof devices."
+export CATEGORY=hardware
+export TYPE=library
+#export VERSION=0.2.3
+#export VERSIONDATE=20210605
+export VERSION=0.3
+export VERSIONDATE=20220206
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/FreeSpacenav/libspnav/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/FreeSpacenav/libspnav/releases/download/libspnav-$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/FreeSpacenav/libspnav/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix spnav.c (version >= 0.3)
+patch -ulbf spnav.c << EOF
+@@ -33,7 +33,11 @@
+ #include <sys/types.h>
+ #include <sys/time.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+ #include <sys/un.h>
+ #include <sys/select.h>
++#endif
+ #include "spnav.h"
+
+@@ -74,4 +78,7 @@
+ static int connect_afunix(int s, const char *path)
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        struct sockaddr_un addr = {0};
+
+@@ -80,8 +87,12 @@
+
+        return connect(s, (struct sockaddr*)&addr, sizeof addr);
++#endif
+ }
+
+ int spnav_open(void)
+ {
++#ifdef _WIN32
++       return -1;
++#else
+        int s;
+        char *path;
+@@ -137,4 +148,5 @@
+        sock = s;
+        return 0;
++#endif
+ }
+
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --disable-x11 --enable-opt --disable-debug &&
+ wl-showstatus build-install &&
+ make install user_ldflags="-Wl,--as-needed -lws2_32" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Not functional since it depends on UNIX sockets
+
+
+

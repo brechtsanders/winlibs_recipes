@@ -1,0 +1,173 @@
+export NAME="GNU Radius"
+export STATUS=
+export URL=http://www.gnu.org/software/radius/
+export BASENAME=gnuradius
+export DESCRIPTION="GNU Radius is a suite of programs for performing user authentication and accounting services using RADIUS protocol."
+export CATEGORY=security
+export TYPE=application
+#export VERSION=1.5
+export VERSION=1.6.1
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=libiconv
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL3
+export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/radius/ radius-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/radius/radius-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/radius-$VERSION.tar.bz2
+cd radius-$VERSION
+# fix for missing files
+mkdir sys netinet arpa net
+touch sys/socket.h sys/wait.h netinet/in.h arpa/inet.h net/if.h
+# fix for missing F_SETLKW, F_WRLCK and F_UNLCK
+cat > netdb.h << EOF
+#define F_SETLKW 0
+#define F_SETLK  1
+#define F_RDLCK  2
+#define F_WRLCK  3
+#define F_UNLCK  4
+EOF
+# fix for missing grp.h
+touch grp.h
+mv lib/getgr.c lib/getgr.c.bak
+touch lib/getgr.c
+mv lib/getpw_r.c lib/getpw_r.c.bak
+touch lib/getpw_r.c
+# fix missing pwd.h
+cat > pwd.h << EOF
+#ifndef INCLUDED_PWD_H
+#define INCLUDED_PWD_H
+#define geteuid() 0
+#define getpwuid(uid) NULL
+struct passwd {
+ char *pw_dir;
+ char *pw_gecos;
+};
+#endif
+EOF
+# fix for missing definitions of S_IROTH and S_IRGRP
+mv lib/client.c lib/client.c.bak
+sed -e "s?\(|S_IROTH|S_IRGRP\)?//\1?" lib/client.c.bak > lib/client.c
+## fix for setting socket in non-blocking mode
+#patch -ulbf lib/sysdep.c << EOF
+#--- lib/sysdep.c.bak    Wed Jun 27 14:54:21 2007
+#+++ lib/sysdep.c        Wed Jun 25 09:54:13 2008
+#@@ -40,10 +40,2 @@
+# 
+#-#if defined(O_NONBLOCK)
+#-# define FCNTL_NONBLOCK O_NONBLOCK
+#-#elif defined(O_NDELAY)
+#-# define FCNTL_NONBLOCK O_NDELAY
+#-#else
+#-# error "Neither O_NONBLOCK nor O_NDELAY are defined"
+#-#endif
+#-
+# /*
+#@@ -54,13 +46,4 @@
+# {
+#-        int flags;
+#-
+#-        if ((flags = fcntl(fd, F_GETFL, 0)) < 0) {
+#-                grad_log(L_ERR|L_PERROR, "F_GETFL");
+#-                return -1;
+#-        }
+#-        if (fcntl(fd, F_SETFL, flags | FCNTL_NONBLOCK) < 0) {
+#-                grad_log(L_ERR|L_PERROR, "F_SETFL");
+#-                return -1;
+#-        }
+#-        return 0;
+#+        unsigned long flags = 0;
+#+        return ioctlsocket(fd, FIONBIO, &flags);
+# }
+#EOF
+patch -ulbf lib/sysdep.c << EOF
+--- lib/sysdep.c  Mon Dec 15 09:03:24 2008
++++ lib/sysdep.c  Wed Apr  1 10:05:59 2009
+@@ -41,2 +41,3 @@
+ 
++#ifndef __MINGW32__
+ #if defined(O_NONBLOCK)
+@@ -48,2 +49,3 @@
+ #endif
++#endif
+ 
+@@ -55,2 +57,3 @@
+ {
++#ifndef __MINGW32__
+         int flags;
+@@ -65,2 +68,6 @@
+         }
++#else
++        unsigned long flags = 1;
++        return ioctlsocket(fd, FIONBIO, &flags);
++#endif
+         return 0;
+EOF
+# work around missing struct flock by not doing the file locking
+mv lib/util.c lib/util.c.bak
+sed -e "s/^\( *\)\(.*fl[;.)].*\)$/\1\/\/\2/" lib/util.c.bak > lib/util.c
+# fix missing definition of u_short
+echo "#include <winsock2.h>" >> config.h.in
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-server --disable-client --disable-debug --with-log-dir=/log/radius --with-mysql --with-postgres LDFLAGS="-lws2_32"
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-server --disable-debug --with-log-dir=/log/radius LDFLAGS="-lws2_32"
+
+# skip making radwho
+cat > radwho/Makefile << EOF
+all:
+depend:
+links:
+generate:
+install:
+EOF
+
+# skip making radzap
+cat > radzap/Makefile << EOF
+all:
+depend:
+links:
+generate:
+install:
+EOF
+
+# skip making radlast
+cat > radlast/Makefile << EOF
+all:
+depend:
+links:
+generate:
+install:
+EOF
+
+# skip making radtest
+cat > radtest/Makefile << EOF
+all:
+depend:
+links:
+generate:
+install:
+EOF
+
+# skip making doc
+cat > doc/Makefile << EOF
+all:
+depend:
+links:
+generate:
+install:
+EOF
+
+wl-showstatus build-install &&
+make install &&
+    echo OK
+#wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION
+cd ..
+
+
+

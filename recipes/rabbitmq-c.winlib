@@ -1,0 +1,156 @@
+export NAME="RabbitMQ C AMQP client library"
+export STATUS=
+export URL=http://alanxz.github.io/rabbitmq-c/
+#export URL=https://github.com/alanxz/rabbitmq-c
+export BASENAME=rabbitmq-c
+export DESCRIPTION="C-language AMQP client library"
+export CATEGORY=communications
+export TYPE=library
+#export VERSION=0.7.1
+#export VERSIONDATE=20160111
+#export VERSION=0.8.0
+#export VERSIONDATE=20160410
+####configure: error: select one of shared [--enable-shared] or static [--enable-static].
+####configure: error: cannot find name resolution library (library with getaddrinfo symbol)
+#export DEPENDANCIES=pthreads,openssl,popt
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=xmlto
+#export VERSION=0.9.0
+#export VERSIONDATE=20180508
+#export VERSION=0.10.0
+#export VERSIONDATE=20191202
+export VERSION=0.11.0
+export VERSIONDATE=20210401
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,openssl,popt
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=doxygen
+export LICENSEFILE=LICENSE-MIT
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/alanxz/rabbitmq-c/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/alanxz/rabbitmq-c/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/alanxz/rabbitmq-c/archive/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## remove librabbitmq/win32/msinttypes/stdint.h
+#mv librabbitmq/win32/msinttypes/stdint.h librabbitmq/win32/msinttypes/stdint.h.bak
+## fix exporting shared variables
+#patch -ulbf librabbitmq/amqp.h << EOF
+#@@ -93,3 +93,3 @@
+# #  if !defined(AMQP_STATIC)
+#-#   define AMQP_PUBLIC_VARIABLE __declspec(dllimport) extern
+#+#   define AMQP_PUBLIC_VARIABLE extern
+# #  else
+#EOF
+#mv librabbitmq/amqp_api.c librabbitmq/amqp_api.c.bak &&
+#sed -e "s/^const amqp_/__declspec(dllexport) &/" librabbitmq/amqp_api.c.bak > librabbitmq/amqp_api.c
+### fix missing getaddrinfo and freeaddrinfo in librabbitmq/amqp_socket.c
+##mv librabbitmq/amqp_socket.c librabbitmq/amqp_socket.c.bak
+##cat > librabbitmq/amqp_socket.c << EOF
+###define _WIN32_WINNT 0x0501
+###include <ws2tcpip.h>
+##EOF
+##cat librabbitmq/amqp_socket.c.bak >> librabbitmq/amqp_socket.c
+### fix missing strtok_r in tools/consume.c
+##mv tools/consume.c tools/consume.c.bak
+##echo "#define strtok_r(_s,_sep,_lasts) (*(_lasts)=strtok((_s),(_sep)))" > tools/consume.c
+##cat tools/consume.c.bak >> tools/consume.c
+## Makefile.am
+#patch -ulbf Makefile.am << EOF
+#@@ -281,4 +281,4 @@
+# tools_amqp_publish_LDADD = \\
+#-       \$(POPT_LIBS) \\
+#        tools/libcommon.la \\
+#+       \$(POPT_LIBS) \\
+#        librabbitmq/librabbitmq.la
+#@@ -292,4 +292,4 @@
+# tools_amqp_get_LDADD = \\
+#-       \$(POPT_LIBS) \\
+#        tools/libcommon.la \\
+#+       \$(POPT_LIBS) \\
+#        librabbitmq/librabbitmq.la
+#@@ -303,4 +303,4 @@
+# tools_amqp_consume_LDADD = \\
+#-       \$(POPT_LIBS) \\
+#        tools/libcommon.la \\
+#+       \$(POPT_LIBS) \\
+#        librabbitmq/librabbitmq.la
+#@@ -314,4 +314,4 @@
+# tools_amqp_declare_queue_LDADD = \\
+#-       \$(POPT_LIBS) \\
+#        tools/libcommon.la \\
+#+       \$(POPT_LIBS) \\
+#        librabbitmq/librabbitmq.la
+#@@ -325,4 +325,4 @@
+# tools_amqp_delete_queue_LDADD = \\
+#-       \$(POPT_LIBS) \\
+#        tools/libcommon.la \\
+#+       \$(POPT_LIBS) \\
+#        librabbitmq/librabbitmq.la
+#EOF
+## fix configure.ac
+#patch -ulbf configure.ac << EOF
+#@@ -85,3 +85,2 @@
+#              [AS_IF([test "x\$enable_shared" = "xyes"],
+#-                    [AC_MSG_ERROR([select one of shared @<:@--enable-shared@:>@ or static @<:@--enable-static@:>@.])],
+#                     [AC_DEFINE([AMQP_STATIC], [1],
+#@@ -95,4 +94,4 @@
+#                [AC_CHECK_LIB([getaddrinfo], [socket],
+#-                             [LIBS="-lsocket -lnsl \$LIBS"],
+#-                             [AC_MSG_ERROR([cannot find name resolution library (library with getaddrinfo symbol)])],
+#+                             [LIBS="-lsocket -lnsl -lws2_32 \$LIBS"],
+#+                             [],
+#                              [-lnsl])])
+#@@ -100,4 +99,4 @@
+#                [AC_CHECK_LIB([socket], [socket],
+#-                             [LIBS="-lsocket -lnsl \$LIBS"],
+#-                             [AC_MSG_ERROR([cannot find socket library (library with socket symbol)])],
+#+                             [LIBS="-lsocket -lnsl lws2_32 \$LIBS"],
+#+                             [],
+#                              [-lnsl])])
+#@@ -129,3 +128,3 @@
+#   AX_HAVE_SELECT([AC_DEFINE([HAVE_SELECT], [], ["Have select()"])],
+#-        [AC_MSG_ERROR([rabbitmq-c needs poll() or select()])]))
+#+        []))
+#
+#EOF
+#wl-showstatus configure &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --disable-examples --with-ssl=openssl CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32" &&
+# echo "#define HAVE_SELECT 1" >> config.h &&
+# # fix building DLLs
+# mv libtool libtool.bak &&
+# sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+# #wl-showstatus build &&
+# #make &&
+# wl-showstatus build-install &&
+# ( make install-strip || (
+#  # avoid problems making man files
+#  ####I don't know how to convert docbook into man.
+#  for F in amqp-publish amqp-consume amqp-get amqp-declare-queue amqp-delete-queue; do
+#   touch tools/doc/$F.1
+#  done &&
+#  touch tools/doc/librabbitmq-tools.7 &&
+#  make install-strip XMLTO=true &&
+#  rm -rf $INSTALLPREFIX/share/man
+# )) &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# fix missing InitializeSRWLock librabbitmq/win32/threads.c (version >= 0.9.0)
+mv librabbitmq/win32/threads.c librabbitmq/win32/threads.c.bak &&
+echo "#define _WIN32_WINNT 0x0600" > librabbitmq/win32/threads.c &&
+cat librabbitmq/win32/threads.c.bak >> librabbitmq/win32/threads.c
+wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIBS:BOOL=ON -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_SSL_SUPPORT:BOOL=ON -DBUILD_TOOLS:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTS:BOOL=OFF . &&
+ wl-showstatus build-install &&
+ make install/strip &&
+ cp -f $INSTALLPREFIX/lib/liblibrabbitmq.[0-9]*.a $INSTALLPREFIX/lib/librabbitmq.a &&
+ cp -f $INSTALLPREFIX/lib/librabbitmq.[0-9]*.dll.a $INSTALLPREFIX/lib/librabbitmq.dll.a &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

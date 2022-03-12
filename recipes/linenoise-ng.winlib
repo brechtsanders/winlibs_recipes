@@ -1,0 +1,65 @@
+export NAME="linenoise-ng"
+export STATUS=
+export URL=https://github.com/arangodb/linenoise-ng
+export BASENAME=linenoise-ng
+export DESCRIPTION="A small self-contained alternative to readline and libedit that supports UTF-8 and Windows and is BSD licensed."
+export CATEGORY=console
+export TYPE=library
+#export VERSION=1.0.0
+#export VERSIONDATE=20170318
+export VERSION=1.0.1
+export VERSIONDATE=20170424
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/arangodb/linenoise-ng/releases"
+export DOWNLOADURL="https://github.com/arangodb/linenoise-ng/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/arangodb/linenoise-ng/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/arangodb/linenoise-ng/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix tst/example.c (version >= 1.0.1)
+patch -ulbf tst/example.c << EOF
+@@ -48,3 +48,4 @@
+       /* Display the current history. */
+-      for (int index = 0; ; ++index) {
++      int index;
++      for (index = 0; ; ++index) {
+         char* hist = linenoiseHistoryLine(index);
+EOF
+## fix missing stuff
+#for F in */*.cpp; do
+# mv $F $F.bak &&
+# echo "#undef __STRICT_ANSI__" > $F
+# cat $F.bak >> $F
+#done
+wl-showstatus configure &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ( make -Cbuild_win install/strip || (
+  mv src/linenoise.cpp src/linenoise.cpp.bak &&
+  sed -e "s?^#define snprintf _snprintf?//&?" src/linenoise.cpp.bak > src/linenoise.cpp && 
+  make -Cbuild_win install/strip
+ )) &&
+ echo "LIBRARY linenoise-ng.dll" > liblinenoise.def &&
+ echo "EXPORTS" >> liblinenoise.def &&
+ nm -f posix --defined-only -p build_win/liblinenoise.a | sed -n "s/^_*\(linenoise[^ ]*\).*$/\1/p" | grep -v "\." >> liblinenoise.def &&
+ #dlltool -D linenoise-ng.dll -l liblinenoise.dll.a -d liblinenoise.def build_win/liblinenoise.a &&
+ g++ -shared -s -mwindows -def liblinenoise.def -o linenoise-ng.dll  -Wl,--out-implib,liblinenoise.dll.a build_win/liblinenoise.a &&
+ cp -f liblinenoise.dll.a $INSTALLPREFIX/lib/ &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f linenoise-ng.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

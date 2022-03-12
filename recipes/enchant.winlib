@@ -1,0 +1,55 @@
+export NAME="Enchant"
+export STATUS=
+export URL=http://www.abisource.com/projects/enchant/
+export BASENAME=enchant
+export DESCRIPTION="On the surface, Enchant appears to be a generic spell checking library. You can request dictionaries from it, ask if a word is correctly spelled, get corrections for a misspelled word, etc... Beneath the surface, Enchant is a whole lot more - and less - than that. You'll see that Enchant isn't really a spell checking library at all."
+export CATEGORY=language
+export TYPE=library
+export VERSION=1.6.0
+export VERSIONDATE=20101013
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,gettext,hunspell
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://www.abisource.com/downloads/enchant/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.abisource.com/downloads/enchant/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix conflicting definition of DllMain in src/enchant-provider.h
+patch -ulbf src/enchant-provider.h << EOF
+--- src/enchant-provider.h  2010-04-01 22:53:38 +0200
++++ src/enchant-provider.h  2013-11-19 23:25:06 +0100
+@@ -51,3 +51,3 @@
+ #ifdef _WIN32
+-#define ENCHANT_PLUGIN_DECLARE(name) static HANDLE s_hModule = (HANDLE)(NULL); BOOL APIENTRY DllMain( HANDLE hModule, DWORD ul_reason_for_call, LPVOID lpReserved ) { s_hModule = hModule; return TRUE; }
++#define ENCHANT_PLUGIN_DECLARE(name) static HANDLE s_hModule = (HANDLE)(NULL); BOOL APIENTRY DllMain( HINSTANCE hModule, DWORD ul_reason_for_call, LPVOID lpReserved ) { s_hModule = hModule; return TRUE; }
+ #else
+EOF
+# skip making tests
+cat > tests/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

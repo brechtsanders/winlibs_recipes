@@ -1,0 +1,84 @@
+export NAME="MauiKit"
+export STATUS=
+export URL=https://mauikit.org/
+export BASENAME=mauikit
+export DESCRIPTION="MauiKit is a set of templated controls and tools based on QQC2 and Kirigami shared among the Maui set of applications. MauiKit helps to quickly build UIs that follow the Maui HIG and bring ready-to-go tools for different platforms, such as Android and Linux."
+export CATEGORY=
+export TYPE=library
+#export VERSION=2.0.1
+#export VERSIONDATE=20210914
+#export VERSION=2.0.2
+#export VERSIONDATE=20210918
+#export VERSION=2.1.0
+#export VERSIONDATE=20211106
+export VERSION=2.1.1
+export VERSIONDATE=20220205
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,qt,libkf5i18n,libkf5coreaddons,libkf5notifications
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=extra-cmake-modules,cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://download.kde.org/stable/maui/mauikit/"
+#export DOWNLOADURL="https://invent.kde.org/maui/mauikit/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://download.kde.org/stable/maui/mauikit/$VERSION/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://invent.kde.org/maui/mauikit/-/archive/v$VERSION/mauikit-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+#cd $BASENAME-$VERSION
+tar xfj $TARBALLDIR/$BASENAME/mauikit-v$VERSION.tar.bz2
+cd mauikit-v$VERSION
+# fix src/mauikit.cpp (version >= 2.0.2)
+patch -ulbf src/mauikit.cpp << EOF
+@@ -37,4 +37,6 @@
+
++#if defined Q_OS_LINUX || defined Q_OS_LINUX
+ #include "shadowhelper/windowshadow.h"
+ #include "blurhelper/windowblur.h"
++#endif
+
+@@ -201,4 +203,6 @@
+
++#if defined Q_OS_LINUX || defined Q_OS_LINUX
+     qmlRegisterType<WindowShadow>(uri, 1, 0, "WindowShadow");
+     qmlRegisterType<WindowBlur>(uri, 1, 0, "WindowBlur");
++#endif
+
+EOF
+# fix missing darkModeEnabled() in src/platforms/windows/mauiwindows.h (version >= 2.1.1)
+patch -ulbf src/platforms/windows/mauiwindows.h << EOF
+@@ -18,2 +18,3 @@
+     void notify(const QString &title, const QString &message, const QString &icon, const QString &imageUrl) override final;
++    bool darkModeEnabled();
+ };
+EOF
+# fix missing darkModeEnabled() in src/platforms/windows/mauiwindows.cpp (version >= 2.1.1)
+patch -ulbf src/platforms/windows/mauiwindows.cpp << EOF
+@@ -29 +29,6 @@
+ }
++
++bool MAUIWindows::darkModeEnabled()
++{
++    return false;
++}
+EOF
+# fix to also build static library
+sed -i.bak "s/^\s*SHARED\s*$//" src/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mauikit-v$VERSION
+
+
+

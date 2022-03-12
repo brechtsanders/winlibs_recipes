@@ -1,0 +1,135 @@
+export NAME="xfconf"
+export STATUS=
+export URL=https://gitlab.xfce.org/xfce/xfconf
+#export URL=https://github.com/xfce-mirror/xfconf
+export BASENAME=xfconf
+export DESCRIPTION="D-Bus-based configuration storage system"
+export CATEGORY=
+export TYPE=library
+export VERSION=4.16.0
+export VERSIONDATE=20201223
+wl-showstatus --package-version
+export DEPENDANCIES=libxfce4util,glib2
+#export DEPENDANCIES=libxfce4util,glib2,gobject-introspection,vala
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://gitlab.xfce.org/xfce/xfconf/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.xfce.org/xfce/xfconf/-/archive/xfconf-$VERSION/xfconf-xfconf-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/xfconf-xfconf-$VERSION.tar.bz2
+cd xfconf-xfconf-$VERSION
+# fix undefined uint in common/xfconf-gvaluefuncs.c (version >= 4.16.0)
+patch -ulbf common/xfconf-gvaluefuncs.c << EOF
+@@ -524,3 +524,3 @@
+             GVariantBuilder arr_builder;
+-            uint i;
++            unsigned int i;
+
+@@ -578,3 +578,3 @@
+     GPtrArray *retArr;
+-    uint i;
++    unsigned int i;
+
+EOF
+# fix missing signals support in xfconfd/main.c (version >= 4.16.0)
+patch -ulbf xfconfd/main.c << EOF
+@@ -69,2 +69,3 @@
+
++#ifndef _WIN32
+ static void
+@@ -87,2 +88,3 @@
+ }
++#endif
+
+@@ -139,3 +141,5 @@
+     GError *error = NULL;
++#ifndef _WIN32
+     struct sigaction act;
++#endif
+     GIOChannel *signal_io;
+@@ -160,2 +164,3 @@
+
++#ifndef _WIN32
+     memset(&act, 0, sizeof(act));
+@@ -172,2 +177,3 @@
+     sigaction(SIGPIPE, &act, NULL);
++#endif
+
+@@ -198,3 +204,6 @@
+     mloop = g_main_loop_new(NULL, FALSE);
+-
++
++#ifdef _WIN32
++    g_warning("No signal support on Windows.  Signals will be ignored.");
++#else
+     if(pipe(signal_pipe))
+@@ -218,2 +227,3 @@
+     }
++#endif
+
+@@ -245,2 +255,6 @@
+
++#ifdef _WIN32
++        g_printerr("No fork() on Windows\\n");
++        return 1;
++#else
+         child_pid = fork();
+@@ -253,2 +267,3 @@
+         }
++#endif
+
+EOF
+# disable user/group stuff in xfconfd/xfconf-locking-utils.c (version >= 4.16.0)
+patch -ulbf xfconfd/xfconf-locking-utils.c << EOF
+@@ -49,2 +49,3 @@
+ {
++#ifndef _WIN32
+     gboolean needs_rebuild = FALSE;
+@@ -85,2 +86,3 @@
+     }
++#endif
+ }
+@@ -91,2 +93,5 @@
+ {
++#ifdef _WIN32
++    return FALSE;
++#else
+     GHashTable *members;
+@@ -101,2 +106,3 @@
+     return g_hash_table_lookup(members, user) ? TRUE : FALSE;
++#endif
+ }
+EOF
+# fix missing sync() in xfconfd/xfconf-backend-perchannel-xml.c (version >= 4.16.0)
+patch -ulbf xfconfd/xfconf-backend-perchannel-xml.c << EOF
+@@ -1941,3 +1941,3 @@
+         goto out;
+-#else
++#elif !defined(_WIN32)
+     sync();
+EOF
+# fix docs/reference/Makefile.am
+sed -i.bak -e "s/\(EXTRA_DIST\s*\)+=/\1=/" docs/reference/Makefile.am
+# fix missing files
+touch gtk-doc.make
+cp configure.ac.in configure.ac
+# fix missing gio-unix
+sed -i.bak -e "s/gio-unix/gio-windows/" configure.ac
+wl-showstatus configure &&
+ # fix missing po/Makefile.in.in
+ intltoolize -f -c &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --disable-nls --disable-introspection --disable-vala &&
+ wl-showstatus build-install &&
+ ( PATH=$PYDIR:$PATH make install-strip || PATH=$PYDIR:$PATH make install-strip POFILES=en_GB.po GMOFILES=en_GB.gmo CATALOGS=en_GB.gmo ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xfconf-xfconf-$VERSION
+####Note: probably not functional due to missing fork() and signals
+
+
+

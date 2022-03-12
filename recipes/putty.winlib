@@ -1,0 +1,106 @@
+export NAME="PuTTY"
+export STATUS=
+export URL=http://www.chiark.greenend.org.uk/~sgtatham/putty/
+export BASENAME=putty
+export DESCRIPTION="PuTTY is a free implementation of Telnet and SSH for Windows and Unix platforms, along with an xterm terminal emulator."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=0.61
+#export VERSIONDATE=20110925
+#export VERSION=0.62
+#export VERSIONDATE=20111210
+#export VERSION=0.63
+#export VERSIONDATE=20130807
+#export VERSION=0.64
+#export VERSIONDATE=20150228
+####ldiscucs.c:54:10: error: 'HIGH_SURROGATE_START' undeclared (first use in this function)
+####ldiscucs.c:54:10: error: 'LOW_SURROGATE_END' undeclared (first use in this function)
+#export VERSION=0.65
+#export VERSIONDATE=20150726
+#export VERSION=0.66
+#export VERSIONDATE=20151107
+#export VERSION=0.67
+#export VERSIONDATE=20160406
+#export VERSION=0.70
+#export VERSIONDATE=20170821
+#export VERSION=0.71
+#export VERSIONDATE=20190316
+#export VERSION=0.72
+#export VERSIONDATE=20190720
+#export VERSION=0.73
+#export VERSIONDATE=20190930
+#export VERSION=0.74
+#export VERSIONDATE=20200627
+#export VERSION=0.75
+#export VERSIONDATE=20210508
+export VERSION=0.76
+export VERSIONDATE=20210717
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENCE
+export LICENSETYPE=
+#export DOWNLOADURL="http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html"
+export DOWNLOADURL="http://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://the.earth.li/~sgtatham/putty/latest/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix for 64-bit
+#sed -e "s/-mno-cygwin//; s/^\(CFLAGS *= *\)/\1-DSECURITY_WIN32 /" windows/Makefile.cyg > windows/Makefile.mingw
+## fix for 64-bit (except on MinGW-W64)
+#if ! gcc --version|grep -q "MinGW-W64"; then
+# mv windows/winjump.c windows/winjump.c.bak
+# sed -e "s/PROPERTYKEY/PROPERTY_KEY/g" windows/winjump.c.bak > windows/winjump.c
+#fi
+## fix missing HIGH_SURROGATE_START/LOW_SURROGATE_END in putty.h (version >= 0.63)
+#patch -ulbf putty.h << EOF
+#--- putty.h  2013-07-19 19:44:28 +0200
+#+++ putty.h  2013-08-07 10:15:06 +0200
+#@@ -1404,3 +1404,3 @@
+# /* SURROGATE PAIR */
+#-#ifndef IS_HIGH_SURROGATE
+#+#if 1
+# #define HIGH_SURROGATE_START 0xd800
+#EOF
+## fix missing CRYPTPROTECTMEMORY_BLOCK_SIZE/CRYPTPROTECTMEMORY_CROSS_PROCESS in windows/winshare.c (version >= 0.64)
+#mv windows/winshare.c windows/winshare.c.bak
+#echo "#define COVERITY" > windows/winshare.c
+#cat windows/winshare.c.bak >> windows/winshare.c
+## fix missing __uint64_t in sshbn.h (version >= 0.65)
+#mv sshbn.h sshbn.h.bak
+#cat > sshbn.h << EOF
+##include <stdint.h>
+##define __uint64_t uint64_t
+#EOF
+#cat sshbn.h.bak >> sshbn.h
+# fix missing has_embedded_chm in misc.c (version >= 0.71)
+patch -ulbf misc.c << EOF
+@@ -273,5 +273,5 @@
+     }
+ #endif
+-#if defined _WINDOWS
++#if defined _WINDOWS && !defined __MINGW32__
+     {
+         int echm = has_embedded_chm();
+EOF
+## don't build debug version
+#sed -i.bak -e "s/-DDEBUG//" windows/Makefile.mgw
+# don't build debug version and fix multiple definition when building with GCC 10 (version >= 0.73)
+sed -i.bak -e "s/-DDEBUG//; s/-D_WINDOWS/-fcommon &/" windows/Makefile.mgw
+wl-showstatus build &&
+ #make -Cwindows -f Makefile.mingw VER=-DRELEASE=$VERSION RCFL=-DNO_MANIFESTS &&
+ #make -Cwindows -f Makefile.mgw COMPAT="-DWINSOCK_TWO -DNO_MANIFESTS" &&
+ make -Cwindows -f Makefile.mgw COMPAT="-DWINSOCK_TWO -DNO_MANIFESTS -DNO_MULTIMON -DNO_HTMLHELP" &&
+ #make -C doc &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp windows/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

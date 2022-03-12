@@ -1,0 +1,300 @@
+#export NAME="HDF5"
+#export STATUS=
+#export URL=http://www.hdfgroup.org/HDF5/
+#export BASENAME=hdf5
+#export DESCRIPTION="HDF5 is a data model, library, and file format for storing and managing data. It supports an unlimited variety of datatypes, and is designed for flexible and efficient I/O and for high volume and complex data. HDF5 is portable and is extensible, allowing applications to evolve in their use of HDF5. The HDF5 Technology suite includes tools and applications for managing, manipulating, viewing, and analyzing data in the HDF5 format."
+#export CATEGORY=dataprocessing
+#export TYPE=library
+##export VERSION=1.8.10
+##export VERSIONDATE=20121228
+##export VERSION=1.8.11
+##export VERSIONDATE=20130509
+##export VERSION=1.8.12
+##export VERSIONDATE=20131107
+##export VERSION=1.8.13
+##export VERSIONDATE=20140508
+##export VERSION=1.8.14
+##export VERSIONDATE=20141111
+#####src/H5.c:859:1: error: conflicting types for 'DllMain'
+##export VERSION=1.8.16
+##export VERSIONDATE=20151107
+##export VERSION=1.8.17
+##export VERSIONDATE=20161103
+##export VERSION=1.8.18
+##export VERSIONDATE=20170627
+##export VERSION=1.8.19
+##export VERSIONDATE=20170616
+##export VERSION=1.8.20
+##export VERSIONDATE=20171129
+##export VERSION=1.8.21
+##export VERSIONDATE=20180602
+##export VERSION=1.8.22
+##export VERSIONDATE=20201219
+##export VERSION=1.10.1
+##export VERSIONDATE=20170428
+##export VERSION=1.10.2
+##export VERSIONDATE=20180331
+##export VERSION=1.10.3
+##export VERSIONDATE=20180823
+##export VERSION=1.10.4
+##export VERSIONDATE=20181010
+##export VERSION=1.10.5
+##export VERSIONDATE=20190227
+##export VERSION=1.10.6
+##export VERSIONDATE=20191224
+#####CMake 3.10 or higher is required.  You are running version 3.5.2
+##export VERSION=1.10.7
+##export VERSIONDATE=20200912
+#####H5detect.exe crashes
+#wl-showstatus --package-version
+#export DEPENDANCIES=zlib
+#export OPTIONALDEPENDANCIES=libsz
+#export BUILDDEPENDANCIES=cmake,pexports
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+#export DOWNLOADURL="http://www.hdfgroup.org/ftp/HDF5/releases/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-$VERSION/src/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/hdf5-$VERSION/src/hdf5-$VERSION.tar.bz2
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#cd $BASENAME-$VERSION
+### fix missing gethostname in src/H5detect.c on 64-bit
+##mv src/H5detect.c src/H5detect.c.bak
+##echo "#include <winsock2.h>" > src/H5detect.c
+##cat src/H5detect.c.bak >> src/H5detect.c
+## fix undefined H5_HAVE_RANDOM in src/H5private.h (version 1.8.12)
+#mv src/H5private.h src/H5private.h.bak
+#sed -e "s/if H5_HAVE_RANDOM/if defined(H5_HAVE_RANDOM)/" src/H5private.h.bak > src/H5private.h
+## fix missing setenv in src/H5private.h (version >= 1.8.17)
+#mv src/H5private.h src/H5private.h.bak2
+#cat > src/H5private.h << EOF
+##ifndef _H5private_H
+##include <stdlib.h>
+##include <stdio.h>
+##include <string.h>
+#static inline int setenv(const char *name, const char *value, int overwrite)
+#{
+#  char* setexpr = (char*)malloc(strlen(name) + strlen(value) + 2);
+#  sprintf(setexpr, "%s=%s", name, value);
+#  putenv(setexpr);
+#  free(setexpr);
+#  return 0;
+#}
+##endif
+#EOF
+#cat src/H5private.h.bak2 >> src/H5private.h
+## fix missing definition of _In_ in src/H5.c (version >= 1.8.13)
+#####src/H5.c:857:9: error: unknown type name '_In_'
+#mv src/H5.c src/H5.c.bak
+#cat > src/H5.c << EOF
+##include <windows.h>
+##ifndef _In_
+##define _In_
+##endif
+#EOF
+#cat src/H5.c.bak >> src/H5.c
+## fix already defined grp1 in c++/test/tobject.cpp (version >= 1.8.16)
+#mv c++/test/tobject.cpp c++/test/tobject.cpp.bak
+#cat > c++/test/tobject.cpp << EOF
+##include <winsock2.h>
+##include <windows.h>
+##undef grp1
+##undef grp2
+#EOF
+#cat c++/test/tobject.cpp.bak >> c++/test/tobject.cpp
+## fix __VA_ARGS__ issue in definition of HDopen in src/H5win32defs.h (version >= 1.10.2)
+#mv src/H5win32defs.h src/H5win32defs.h.bak &&
+#sed -e "s/ \(__VA_ARGS__\)/ ##\1/" src/H5win32defs.h.bak > src/H5win32defs.h
+## fix src/H5detect.c for GCC 8.1
+#####error: attributes should be specified before the declarator in a function definition
+#sed -i.bak -e "s/\b\([^ ]*\)\(\s*(.*\)\(HDF_NO_UBSAN\)\s*$/\3 \1\2/" src/H5detect.c
+## fix missing DBL_EPSILON in src/H5private.h (version >= 1.10.5)
+#sed -i.bak3 -e "s/\bDBL_EPSILON\b/__&__/g" src/H5private.h
+## remove -std=c99 from CMakeLists.txt to fix missing off64_t/off_t
+#mv CMakeLists.txt CMakeLists.txt.bak
+#sed -e "s/-std=c99//" CMakeLists.txt.bak > CMakeLists.txt
+### fix configure
+##mv configure configure.bak
+##sed -e "s/MINGW\*/&|MSYS*/" configure.bak > configure
+##./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-cxx --enable-hl --enable-deprecated-symbols &&
+## make install-strip &&
+##    echo OK &&
+##mkdir -p build_static build_shared &&
+## wl-showstatus configure &&
+## #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ALLOW_EXTERNAL_SUPPORT:STRING="TGZ" -DTGZ_PATH:STRING="$TARBALLDIR/$BASENAME" -DZLIB_TGZ_NAME:STRING="zlib-1.2.7.tar.gz" -DSZIP_TGZ_NAME:STRING="szip-2.1.tar.gz" -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -DZLIB_USE_EXTERNAL:BOOL=ON -DZLIB_INCLUDE_DIRS:STRING=$MINGWPREFIX/include -DZLIB_LIBRARIES:STRING=z -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=ON -DSZIP_USE_EXTERNAL:BOOL=ON -S. -Bbuild_static &&
+## #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" -S. -Bbuild_static &&
+## cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -S. -Bbuild_static &&
+## # fix missing gethostname on 64-bit
+## if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+##  echo "#undef H5_HAVE_GETHOSTNAME" >> build_static/H5pubconf.h
+## fi &&
+## wl-showstatus configure &&
+## cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -S. -Bbuild_shared &&
+## # fix missing gethostname on 64-bit
+## if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+##  echo "#undef H5_HAVE_GETHOSTNAME" >> build_shared/H5pubconf.h
+## fi &&
+## wl-showstatus build-install &&
+## ( make -Cbuild_static install/strip || make -Cbuild_static install ) &&
+## wl-showstatus build-install &&
+## ( make -Cbuild_shared install/strip || make -Cbuild_shared install ) &&
+## ## create proper .dll.a libraries instead of .lib files (version <= 1.8.10)
+## #for F in $INSTALLPREFIX/bin/*dll.dll; do pexports -o $F > input_def.def && dlltool -d input_def.def -D $F -l $INSTALLPREFIX/lib/$(echo $F|sed -e "s/^.*\/\([^\/]*\)dll\.dll$/lib\1.dll.a/") && rm -f input_def.def; done &&
+## # create proper .dll.a libraries instead of .lib files (version >= 1.8.11)
+## for F in $INSTALLPREFIX/bin/*.dll; do pexports -o $F > input_def.def && dlltool -d input_def.def -D $F -l $INSTALLPREFIX/lib/$(echo $F|sed -e "s/^.*\/\([^\/]*\)\.dll$/lib\1.dll.a/") && rm -f input_def.def; done &&
+## # rename liblib*.a files (version >= 1.8.11)
+## ( ( ls -1 $INSTALLPREFIX/lib/liblib*.a &>/dev/null && for F in $INSTALLPREFIX/lib/liblib*.a; do echo mv -f $F `echo $F|sed -e "s/lib\(lib[^\/]*\.a\)$/\1/"`; done ) || true ) &&
+## # get rid of .lib files (version >= 1.8.11)
+## rm -f $INSTALLPREFIX/lib/*.lib &&
+## # clean up text files in root
+## rm -f $INSTALLPREFIX/*.txt $INSTALLPREFIX/COPYING &&
+## ## fix invalid hdf5.lib in cmake/hdf5-targets-release.cmake (version <= 1.10.1)
+## #sed -i -e "s/\(lib\/\)\([^ ]*\)\.lib/\1lib\2.dll.a/g" $INSTALLPREFIX/cmake/hdf5-targets-release.cmake &&
+## # fix invalid hdf5.lib in cmake/hdf5-targets-release.cmake (version >= 1.10.6)
+## sed -i -e "s/\(lib\/\)\([^ ]*\)\.lib/\1lib\2.dll.a/g" $INSTALLPREFIX/cmake/hdf5/hdf5-targets-release.cmake &&
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -S. -Bbuild_static &&
+# # fix missing gethostname on 64-bit
+# if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#  echo "#undef H5_HAVE_GETHOSTNAME" >> build_static/H5pubconf.h
+# fi &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -S. -Bbuild_shared &&
+# # fix missing gethostname on 64-bit
+# if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#  echo "#undef H5_HAVE_GETHOSTNAME" >> build_shared/H5pubconf.h
+# fi &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+# ## create proper .dll.a libraries instead of .lib files (version <= 1.8.10)
+# #for F in $INSTALLPREFIX/bin/*dll.dll; do pexports -o $F > input_def.def && dlltool -d input_def.def -D $F -l $INSTALLPREFIX/lib/$(echo $F|sed -e "s/^.*\/\([^\/]*\)dll\.dll$/lib\1.dll.a/") && rm -f input_def.def; done &&
+# # create proper .dll.a libraries instead of .lib files (version >= 1.8.11)
+# for F in $INSTALLPREFIX/bin/*.dll; do pexports -o $F > input_def.def && dlltool -d input_def.def -D $F -l $INSTALLPREFIX/lib/$(echo $F|sed -e "s/^.*\/\([^\/]*\)\.dll$/lib\1.dll.a/") && rm -f input_def.def; done &&
+# # rename liblib*.a files (version >= 1.8.11)
+# ( ( ls -1 $INSTALLPREFIX/lib/liblib*.a &>/dev/null && for F in $INSTALLPREFIX/lib/liblib*.a; do echo mv -f $F `echo $F|sed -e "s/lib\(lib[^\/]*\.a\)$/\1/"`; done ) || true ) &&
+# # get rid of .lib files (version >= 1.8.11)
+# rm -f $INSTALLPREFIX/lib/*.lib &&
+# # clean up text files in root
+# rm -f $INSTALLPREFIX/*.txt $INSTALLPREFIX/COPYING &&
+# ## fix invalid hdf5.lib in cmake/hdf5-targets-release.cmake (version <= 1.10.1)
+# #sed -i -e "s/\(lib\/\)\([^ ]*\)\.lib/\1lib\2.dll.a/g" $INSTALLPREFIX/cmake/hdf5-targets-release.cmake &&
+# # fix invalid hdf5.lib in cmake/hdf5-targets-release.cmake (version >= 1.10.6)
+# sed -i -e "s/\(lib\/\)\([^ ]*\)\.lib/\1lib\2.dll.a/g" $INSTALLPREFIX/cmake/hdf5/hdf5-targets-release.cmake &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+export NAME="HDF5"
+export STATUS=
+export URL=http://www.hdfgroup.org/HDF5/
+export BASENAME=hdf5
+export DESCRIPTION="HDF5 is a data model, library, and file format for storing and managing data. It supports an unlimited variety of datatypes, and is designed for flexible and efficient I/O and for high volume and complex data. HDF5 is portable and is extensible, allowing applications to evolve in their use of HDF5. The HDF5 Technology suite includes tools and applications for managing, manipulating, viewing, and analyzing data in the HDF5 format."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=1.10.7
+#export VERSIONDATE=20200912
+#export DEPENDANCIES=zlib
+#export OPTIONALDEPENDANCIES=libsz
+#export BUILDDEPENDANCIES=cmake,pexports
+#export VERSION=1.10.8
+#export VERSIONDATE=20211030
+#export VERSION=1.12.0
+#export VERSIONDATE=20210423
+#export VERSION=1.12.1
+#export VERSIONDATE=20210708
+#export VERSION=1.13.0
+#export VERSIONDATE=20211204
+export VERSION=1.13.1
+export VERSIONDATE=20220304
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=zlib,libjxl,libsz
+export BUILDDEPENDANCIES=cmake,pexports
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://www.hdfgroup.org/ftp/HDF5/releases/"
+#export DOWNLOADURL="https://github.com/HDFGroup/hdf5/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/hdf5-$VERSION/src/hdf5-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=https://github.com/HDFGroup/hdf5/archive/refs/heads/develop.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+## fix missing _MSC_VER in src/H5win32defs.h (version >= 1.12.0)
+#patch -ulbf src/H5win32defs.h << EOF
+#@@ -44,3 +44,3 @@
+# /* The isnan function needs underscore in VS2012 and earlier */
+#-#if (_MSC_VER <= 1700)
+#+#if defined(_MSC_VER) && (_MSC_VER <= 1700)
+#   #define HDisnan(X)      _isnan(X)
+#EOF
+# fix src/H5detect.c (version >= 1.12.1)
+patch -ulbf src/H5detect.c << EOF
+@@ -1672,3 +1672,3 @@
+
+-#if defined(H5SETJMP) && defined(H5_HAVE_SIGNAL)
++#if defined(H5SETJMP) && defined(H5_HAVE_SIGNAL) && !defined(__MINGW32__)
+     /* verify the SIGBUS and SIGSEGV handlers work properly */
+EOF
+# fix src/H5private.h (version >= 1.13.0)
+patch -ulbf src/H5private.h << EOF
+@@ -50,4 +50,6 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <sys/wait.h>
+ #endif
++#endif
+
+EOF
+# fix config/cmake_ext_mod/HDFMacros.cmake (version >= 1.10.7)
+patch -ulbf config/cmake_ext_mod/HDFMacros.cmake << EOF
+@@ -145,10 +145,2 @@
+
+-  #----- Use MSVC Naming conventions for Shared Libraries
+-  if (MINGW AND \${libtype} MATCHES "SHARED")
+-    set_target_properties (\${libtarget} PROPERTIES
+-        IMPORT_SUFFIX ".lib"
+-        IMPORT_PREFIX ""
+-        PREFIX ""
+-    )
+-  endif ()
+ endmacro ()
+EOF
+# fix config/cmake/ConfigureChecks.cmake (version >= 1.12.1)
+patch -ulbf config/cmake/ConfigureChecks.cmake << EOF
+@@ -328,3 +328,3 @@
+ #define C_LDBL_DIG LDBL_DIG\\n\\
+-#endif\\n\\nint main() {\\nFILE *pFile = fopen(\\"pac_Cconftest.out\\",\\"w\\")\\\\\\;\\nfprintf(pFile, \\"\\\\%d\\\\\\;\\\\%d\\\\\\;\\", C_LDBL_DIG, C_FLT128_DIG)\\\\\\;\\n\\nreturn 0\\\\\\;\\n}\\n
++#endif\\n\\nint main() {\\nFILE *pFile = fopen(\\"\${RUN_OUTPUT_PATH_DEFAULT}/pac_Cconftest.out\\",\\"w\\")\\\\\\;\\nfprintf(pFile, \\"\\\\%d\\\\\\;\\\\%d\\\\\\;\\", C_LDBL_DIG, C_FLT128_DIG)\\\\\\;\\n\\nreturn 0\\\\\\;\\n}\\n
+      "
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC_LIBS:BOOL=ON -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -DHDF5_GENERATE_HEADERS:BOOL=ON -DHDF5_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC_LIBS:BOOL=ON -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DFETCHCONTENT_UPDATES_DISCONNECTED:BOOL=ON -DHDF5_BUILD_CPP_LIB:BOOL=ON -DHDF5_BUILD_HL_LIB:BOOL=ON -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON -DHDF5_GENERATE_HEADERS:BOOL=ON -DHDF5_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ #-DHDF5_ENABLE_THREADSAFE:BOOL=ON 
+ #-DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DFETCHCONTENT_UPDATES_DISCONNECTED:BOOL=ON 
+ #-DBUILD_USER_DEFINED_LIBS:BOOL=ON 
+ #-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=OFF -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF 
+ #-DHDF5_USE_PREGEN:BOOL=ON 
+ ## fix crash in H5detect.exe (version <= 1.10.7)
+ #echo "#undef H5_HAVE_SIGSETJMP" >> build_win/H5pubconf.h &&
+ #echo "#undef H5_HAVE_SIGLONGJMP" >> build_win/H5pubconf.h &&
+ #echo "#undef H5_HAVE_LONGJMP" >> build_win/H5pubconf.h &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ # clean up text files in root
+ rm -f $INSTALLPREFIX/*.txt $INSTALLPREFIX/COPYING &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

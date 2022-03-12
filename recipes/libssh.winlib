@@ -1,0 +1,236 @@
+export NAME="libssh"
+export STATUS=
+export URL=http://www.libssh.org/
+export BASENAME=libssh
+export DESCRIPTION="libssh is a mulitplatform C library implementing the SSHv2 and SSHv1 protocol on client and server side. With libssh, you can remotely execute programs, transfer files, use a secure and transparent tunnel for your remote applications."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.5.2
+#export VERSIONDATE=20120524
+#export VERSION=0.5.3
+#export VERSIONDATE=20121213
+#export VERSION=0.6.4
+#export VERSIONDATE=20150304
+#export VERSION=0.7.4
+#export VERSIONDATE=20180701
+#export VERSION=0.7.5
+#export VERSIONDATE=20180626
+#export VERSION=0.7.6
+#export VERSIONDATE=20181016
+#export VERSION=0.7.7
+#export VERSIONDATE=20181029
+#wl-showstatus --package-version
+#export DEPENDANCIES=pthreads,zlib,libgcrypt
+#export DEPENDANCIES=pthreads,zlib,openssl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=doxygen,cmake
+#export VERSION=0.8.0
+#export VERSIONDATE=20180810
+####AttributeError: 'module' object has no attribute 'samefile'
+#export VERSION=0.8.1
+#export VERSIONDATE=20180814
+####Map generation failed
+#export VERSION=0.8.2
+#export VERSIONDATE=20180830
+#export VERSION=0.8.3
+#export VERSIONDATE=20180921
+#export VERSION=0.8.4
+#export VERSIONDATE=20181016
+#export VERSION=0.8.5
+#export VERSIONDATE=20181029
+#export VERSION=0.8.6
+#export VERSIONDATE=20181224
+#export VERSION=0.8.7
+#export VERSIONDATE=20190225
+#export VERSION=0.8.8
+#export VERSIONDATE=20191211
+#export VERSION=0.8.9
+#export VERSIONDATE=20200409
+#export VERSION=0.9.0
+#export VERSIONDATE=20190628
+#export VERSION=0.9.1
+#export VERSIONDATE=20191026
+#export VERSION=0.9.2
+#export VERSIONDATE=20191108
+#export VERSION=0.9.3
+#export VERSIONDATE=20191112
+#export VERSION=0.9.4
+#export VERSIONDATE=20200409
+#export VERSION=0.9.5
+#export VERSIONDATE=20200910
+export VERSION=0.9.6
+export VERSIONDATE=20210826
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,zlib,openssl,libgssapi
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=doxygen,cmake,abimap
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="http://www.libssh.org/files/"
+export DOWNLOADURL="https://www.libssh.org/files/"
+#export DOWNLOADURL="https://red.libssh.org/projects/libssh/files"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.libssh.org/files/`echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/'`/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://www.libssh.org/files/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/$BASENAME-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://git.libssh.org/projects/libssh.git/snapshot/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## fix conflicting definition of ssh_socket_set_connecting in src/socket.c (version = 0.5.3)
+#patch -ulbf src/socket.c << EOF
+#--- src/socket.c  2012-11-20 12:41:50 +0100
+#+++ src/socket.c  2012-12-13 22:10:12 +0100
+#@@ -711,3 +711,3 @@
+#
+#-void ssh_socket_set_connecting(ssh_socket s, int fd){
+#+void ssh_socket_set_connecting(ssh_socket s, socket_t fd){
+#        ssh_socket_set_fd(s,fd);
+#EOF
+## fix missing EINPROGRESS in src/connect.c (version >= 0.6.4)
+#mv src/connect.c src/connect.c.bak &&
+#echo "#define EINPROGRESS WSAEINPROGRESS" > src/connect.c &&
+#cat src/connect.c.bak >> src/connect.c
+## fix pthreads issue in src/threads/pthread.c
+#if grep -q builtin $MINGWPREFIX/var/lib/packages/pthreads/version; then
+#patch -ulbf src/threads/pthread.c << EOF
+#--- src/threads/pthread.c  2014-12-17 19:45:23.000000000 +0100
+#+++ src/threads/pthread.c  2017-02-15 20:29:24.361305400 +0100
+#@@ -77,7 +77,3 @@
+# static unsigned long ssh_pthread_thread_id (void){
+#-#if _WIN32
+#-    return (unsigned long) pthread_self().p;
+#-#else
+#     return (unsigned long) pthread_self();
+#-#endif
+# }
+#EOF
+#fi
+# fix missing ssh_userauth_agent() in include/libssh/libssh.h (version >= 0.9.4)
+patch -ulbf include/libssh/libssh.h << EOF
+@@ -766,3 +766,3 @@
+                                       const ssh_key privkey);
+-#ifndef _WIN32
++#if !defined(_WIN32) || defined(__MINGW32__)
+ LIBSSH_API int ssh_userauth_agent(ssh_session session,
+EOF
+# fix missing ssh_userauth_agent() in src/auth.c (version >= 0.9.4)
+patch -ulbf src/auth.c << EOF
+@@ -724,3 +724,3 @@
+
+-#ifndef _WIN32
++#if !defined(_WIN32) || defined(__MINGW32__)
+ static int ssh_userauth_agent_publickey(ssh_session session,
+EOF
+# fix include/libssh/agent.h (version >= 0.9.4)
+patch -ulbf include/libssh/agent.h << EOF
+@@ -79,3 +79,3 @@
+
+-#ifndef _WIN32
++#if !defined(_WIN32) || defined(__MINGW32__)
+ /* agent.c */
+EOF
+# fix src/agent.c (version >= 0.9.4)
+patch -ulbf src/agent.c << EOF
+@@ -35,3 +35,3 @@
+
+-#ifndef _WIN32
++#if !defined(_WIN32) || defined(__MINGW32__)
+
+@@ -48,4 +48,8 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
++#endif
+
+@@ -209,2 +213,3 @@
+ static int agent_connect(ssh_session session) {
++#ifndef _WIN32
+   const char *auth_sock = NULL;
+@@ -226,2 +231,3 @@
+   }
++#endif
+
+EOF
+# fix missing ssh_pki_do_sign_agent in src/pki.c (version >= 0.9.4)
+patch -ulbf src/pki.c << EOF
+@@ -2374,3 +2374,3 @@
+
+-#ifndef _WIN32
++#if !defined(_WIN32) || defined(__MINGW32__)
+ ssh_string ssh_pki_do_sign_agent(ssh_session session,
+EOF
+## fix missing check_include_files in ConfigureChecks.cmake (version >= 0.6.4)
+#patch -ulbf ConfigureChecks.cmake << EOF
+#@@ -56,3 +56,3 @@
+# if (WIN32)
+#-  check_include_files("winsock2.h;ws2tcpip.h;wspiapi.h" HAVE_WSPIAPI_H)
+#+  check_include_file("wspiapi.h" HAVE_WSPIAPI_H)
+#   if (NOT HAVE_WSPIAPI_H)
+#@@ -60,3 +60,3 @@
+#   endif (NOT HAVE_WSPIAPI_H)
+#-  check_include_files("winsock2.h;ws2tcpip.h" HAVE_WS2TCPIP_H)
+#+  check_include_file("ws2tcpip.h" HAVE_WS2TCPIP_H)
+# endif (WIN32)
+#EOF
+# fix missing check_include_files in ConfigureChecks.cmake (version >= 0.9.4)
+patch -ulbf ConfigureChecks.cmake << EOF
+@@ -68,3 +68,3 @@
+
+-  check_include_files("winsock2.h;ws2tcpip.h;wspiapi.h" HAVE_WSPIAPI_H)
++  check_include_file("wspiapi.h" HAVE_WSPIAPI_H)
+   if (NOT HAVE_WSPIAPI_H)
+@@ -72,3 +72,3 @@
+   endif (NOT HAVE_WSPIAPI_H)
+-  check_include_files("winsock2.h;ws2tcpip.h" HAVE_WS2TCPIP_H)
++  check_include_file("ws2tcpip.h" HAVE_WS2TCPIP_H)
+ endif (WIN32)
+EOF
+# fix installing .pc files (version >= 0.7.5)
+sed -i.bak "s/UNIX/TRUE/" CMakeLists.txt
+#mkdir -p build &&
+# wl-showstatus configure &&
+# cd build &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_STATIC_LIB:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_GCRYPT:BOOL=ON -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF .. &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_STATIC_LIB:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF .. &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_STATIC_LIB:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF .. &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_STATIC_LIB:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DWITH_EXAMPLES:BOOL=OFF .. &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_STATIC_LIB:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DGSSAPI_LIBRARIES:PATH=$MINGWPREFIX/lib -DWITH_ABI_BREAK:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYPATH/python.exe -DABIMAP_EXECUTABLE:FILEPATH="$MINGWPREFIX/python/Scripts/abimap.exe" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/gssglue" .. &&
+# #echo "-Wl,--as-needed -lgss" > src/CMakeFiles/ssh_shared.dir/linklibs.rsp &&
+# cd .. &&
+# wl-showstatus build-install &&
+# make -Cbuild install/strip &&
+# #PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages:$MINGWPREFIX/python/Scripts:$PYTHONPATH make -Cbuild install/strip &&
+# ## fix DLL path in libssh-config.cmake (version <= 0.9.0)
+# #sed -i -e "s?/lib\(/[^ ]*\.dll\)?/bin\1?" $INSTALLPREFIX/CMake/libssh/libssh-config.cmake &&
+# # fix DLL path in libssh-config.cmake (version >= 0.9.1)
+# sed -i -e "s?/lib\(/[^ ]*\.dll\)?/bin\1?" $INSTALLPREFIX/lib/cmake/libssh/libssh-config-release.cmake &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DWITH_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DGSSAPI_INCLUDE_DIR:PATH=$MINGWPREFIX/include/gssglue -DGSSAPI_LIBRARIES:STRING=-lgssapi -DWITH_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DGSSAPI_LIBRARIES:PATH=$MINGWPREFIX/lib -DWITH_ABI_BREAK:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYPATH/python.exe -DABIMAP_EXECUTABLE:FILEPATH="$MINGWPREFIX/python/Scripts/abimap.exe" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/gssglue" -DWITH_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DWITH_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DGSSAPI_INCLUDE_DIR:PATH=$MINGWPREFIX/include/gssglue -DGSSAPI_LIBRARIES:STRING=-lgssapi -DWITH_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITH_SSH1:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DWITH_EXAMPLES:BOOL=OFF -DGSSAPI_LIBRARIES:PATH=$MINGWPREFIX/lib -DWITH_ABI_BREAK:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYPATH/python.exe -DABIMAP_EXECUTABLE:FILEPATH="$MINGWPREFIX/python/Scripts/abimap.exe" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/gssglue" -S. -Bbuild_shared &&
+ #wl-showstatus build &&
+ #make -Cbuild_static &&
+ #wl-showstatus build &&
+ #make -Cbuild_shared &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ ## fix DLL path in libssh-config.cmake (version = 0.9.1)
+ #sed -i -e "s?/lib\(/[^ ]*\.dll\)?/bin\1?" $INSTALLPREFIX/lib/cmake/libssh/libssh-config-release.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,334 @@
+export NAME="PlibC"
+export STATUS=
+export URL=http://plibc.sourceforge.net/
+export BASENAME=plibc
+export DESCRIPTION="PlibC (re)implements typical C functions as defined in the POSIX standard and the Single Unix Specification to extend the MS C runtime library without loosing the integration into Windows."
+export CATEGORY=portability
+export TYPE=library
+#export VERSION=0.1.3
+#export VERSION=0.1.4
+#export VERSION=0.1.5
+#export VERSIONDATE=20091105
+#export VERSION=0.1.6
+#export VERSIONDATE=20111125
+export VERSION=0.1.7
+export VERSIONDATE=20120506
+wl-showstatus --package-version
+export DEPENDANCIES=gettext
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL2
+#export DOWNLOADURL="http://sourceforge.net/projects/plibc/files/ plibc- -src.zip"
+export DOWNLOADURL="http://sourceforge.net/projects/plibc/files/plibc/ plibc- -src.zip"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/plibc/$BASENAME-$VERSION-src.zip
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/plibc/plibc/$VERSION/PlibC-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/plibc/plibc/$VERSION/$BASENAME-$VERSION-src.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#unzip -oq $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-src.zip
+#tar xfz $TARBALLDIR/$BASENAME/PlibC-$VERSION.tar.gz
+#cd PlibC-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-src.tar.gz
+cd $BASENAME-$VERSION
+## fix warning "linker path does not have real file for library -luuid" which causes dynamic library not to be built (version <= 0.1.4)
+#mv src/Makefile.in src/Makefile.in.bak
+#sed -e "s/-luuid//" src/Makefile.in.bak > src/Makefile.in
+#patch -ulbf src/shortcut.cc << EOF
+#--- src/shortcut.cc Tue Mar 31 11:28:29 2009
+#+++ src/shortcut.cc     Tue Mar 31 11:38:38 2009
+#@@ -24,2 +24,9 @@
+#
+#+#ifdef __MINGW32__
+#+//define windows UUID manually because -luuid has no shared library (.DLL)
+#+#define INITGUID
+#+#include <basetyps.h>
+#+DEFINE_OLEGUID(IID_IPersistFile, 0x0000010BL, 0, 0);
+#+#endif
+#+
+# #include "plibc_private.h"
+#EOF
+## fix missing IID_IShellLink in src/shortcut.c for 64-bit (version <= 0.1.6)
+#mv src/shortcut.c src/shortcut.c.bak
+#cat > src/shortcut.c << EOF
+##include <windows.h>
+##include <shlguid.h>
+#EOF
+#cat src/shortcut.c.bak >> src/shortcut.c
+## fix src/include/plibc.h (version <= 0.1.6)
+#patch -ulbf src/include/plibc.h << EOF
+#--- src/include/plibc.h  2009-09-24 22:15:16 +0200
+#+++ src/include/plibc.h  2011-08-07 23:34:56 +0200
+#@@ -78,2 +78,3 @@
+#
+#+#ifndef __MINGW64__
+# struct stat64
+#@@ -92,2 +93,3 @@
+# };
+#+#endif
+#
+#@@ -200,3 +202,5 @@
+# #define EWOULDBLOCK EAGAIN     /* Operation would block */
+#+#ifndef EOVERFLOW
+# #define EOVERFLOW 139 /* Value too large for defined data type */
+#+#endif
+#
+#@@ -449,4 +453,8 @@
+#
+#+#ifndef strcasecmp
+# #define strcasecmp(a, b) stricmp(a, b)
+#+#endif
+#+#ifndef strncasecmp
+# #define strncasecmp(a, b, c) strnicmp(a, b, c)
+#+#endif
+#
+#EOF
+## fix src/resolv_ms.c (version <= 0.1.6)
+#patch -ulbf src/resolv_ms.c << EOF
+#--- src/resolv_ms.c  2008-03-10 23:14:10 +0100
+#+++ src/resolv_ms.c  2011-08-07 23:37:56 +0200
+#@@ -950,6 +950,7 @@
+#
+#
+#
+#+#ifndef __MINGW64__
+# __inline
+# int
+# getnameinfo (
+#@@ -968,6 +969,7 @@
+#     return ((*pfGetNameInfo)
+#             (sa, salen, host, hostlen, serv, servlen, flags));
+# }
+#+#endif
+#
+#
+#
+#EOF
+## fix src/shortcut.cc (version <= 0.1.6)
+#mv src/shortcut.cc src/shortcut.cc.bak
+#cat > src/shortcut.cc << EOF
+##include <winsock2.h>
+##include <windows.h>
+##include <shlguid.h>
+#EOF
+#cat src/shortcut.cc.bak >> src/shortcut.cc
+## fix src/include/plibc.h (version >= 0.1.7)
+#patch -ulbf src/include/plibc.h << EOF
+#--- src/include/plibc.h  2012-05-05 22:39:12 +0200
+#+++ src/include/plibc.h  2013-09-12 10:40:04 +0200
+#@@ -71,4 +71,5 @@
+# #define Li2Double(x) ((double)((x).HighPart) * 4.294967296E9 + \\
+#   (double)((x).LowPart))
+#+/*
+# #ifndef __MINGW64__
+# struct stat64
+#@@ -87,4 +88,5 @@
+# };
+# #endif
+#+*/
+# typedef unsigned int sa_family_t;
+#
+#@@ -146,5 +148,7 @@
+# #define ESRMNT 69      /* Srmount error */
+# #define ECOMM 70       /* Communication error on send */
+#+#ifndef EPROTO
+# #define EPROTO 71      /* Protocol error */
+#+#endif
+# #define EMULTIHOP 74   /* Multihop attempted */
+# #define ELBIN 75       /* Inode is remote (not really error) */
+#@@ -169,34 +173,80 @@
+#        #define ENAMETOOLONG 91 /* File or path name too long */
+# #endif
+#+#ifndef ELOOP
+# #define ELOOP 92       /* Too many symbolic links */
+#+#endif
+#+#ifndef EOPNOTSUPP
+# #define EOPNOTSUPP 95  /* Operation not supported on transport endpoint */
+#+#endif
+# #define EPFNOSUPPORT 96 /* Protocol family not supported */
+#+#ifndef ECONNRESET
+# #define ECONNRESET 104  /* Connection reset by peer */
+#+#endif
+#+#ifndef ENOBUFS
+# #define ENOBUFS 105    /* No buffer space available */
+#+#endif
+#+#ifndef EAFNOSUPPORT
+# #define EAFNOSUPPORT 106 /* Address family not supported by protocol family */
+#+#endif
+#+#ifndef EPROTOTYPE
+# #define EPROTOTYPE 107 /* Protocol wrong type for socket */
+#+#endif
+#+#ifndef ENOTSOCK
+# #define ENOTSOCK 108   /* Socket operation on non-socket */
+#+#endif
+#+#ifndef ENOPROTOOPT
+# #define ENOPROTOOPT 109        /* Protocol not available */
+#+#endif
+# #define ESHUTDOWN 110  /* Can't send after socket shutdown */
+#+#ifndef ECONNREFUSED
+# #define ECONNREFUSED 111       /* Connection refused */
+#+#endif
+#+#ifndef EADDRINUSE
+# #define EADDRINUSE 112         /* Address already in use */
+#+#endif
+#+#ifndef ECONNABORTED
+# #define ECONNABORTED 113       /* Connection aborted */
+#+#endif
+#+#ifndef ENETUNREACH
+# #define ENETUNREACH 114                /* Network is unreachable */
+#+#endif
+#+#ifndef ENETDOWN
+# #define ENETDOWN 115           /* Network interface is not configured */
+#+#endif
+# #ifndef  ETIMEDOUT
+#        #define ETIMEDOUT 116           /* Connection timed out */
+# #endif
+# #define EHOSTDOWN 117          /* Host is down */
+#+#ifndef EHOSTUNREACH
+# #define EHOSTUNREACH 118       /* Host is unreachable */
+#+#endif
+#+#ifndef EINPROGRESS
+# #define EINPROGRESS 119                /* Connection already in progress */
+#+#endif
+#+#ifndef EALREADY
+# #define EALREADY 120           /* Socket already connected */
+#+#endif
+#+#ifndef EDESTADDRREQ
+# #define EDESTADDRREQ 121       /* Destination address required */
+#+#endif
+#+#ifndef EMSGSIZE
+# #define EMSGSIZE 122           /* Message too long */
+#+#endif
+#+#ifndef EPROTONOSUPPORT
+# #define EPROTONOSUPPORT 123    /* Unknown protocol */
+#+#endif
+# #define ESOCKTNOSUPPORT 124    /* Socket type not supported */
+#+#ifndef EADDRNOTAVAIL
+# #define EADDRNOTAVAIL 125      /* Address not available */
+#+#endif
+#+#ifndef ENETRESET
+# #define ENETRESET 126          /* Connection aborted by network */
+#+#endif
+#+#ifndef EISCONN
+# #define EISCONN 127                /* Socket is already connected */
+#+#endif
+#+#ifndef ENOTCONN
+# #define ENOTCONN 128           /* Socket is not connected */
+#+#endif
+# #define ETOOMANYREFS 129       /* Too many references: cannot splice */
+# #define EPROCLIM 130           /* Too many processes */
+#@@ -210,6 +260,10 @@
+# #define ENOSHARE 136        /* No such host or network path */
+# #define ECASECLASH 137      /* Filename exists with different case */
+#+#ifndef EWOULDBLOCK
+# #define EWOULDBLOCK EAGAIN     /* Operation would block */
+#+#endif
+#+#ifndef EOVERFLOW
+# #define EOVERFLOW 139 /* Value too large for defined data type */
+#+#endif
+#
+# #undef HOST_NOT_FOUND
+#@@ -472,7 +526,11 @@
+# char *strcasestr(const char *haystack_start, const char *needle_start);
+# #ifndef __MINGW64__
+#+#ifndef strcasecmp
+# #define strcasecmp(a, b) stricmp(a, b)
+#+#endif
+#+#ifndef strncasecmp
+# #define strncasecmp(a, b, c) strnicmp(a, b, c)
+# #endif
+#+#endif
+# #endif /* WINDOWS */
+#EOF
+# fix duplicate case in src/strerror.c
+patch -ulbf src/strerror.c << EOF
+--- src/strerror.c  2008-06-12 21:31:52 +0200
++++ src/strerror.c  2013-04-29 14:24:34 +0200
+@@ -613,3 +613,3 @@
+ #endif
+-#ifdef ETOOMANYREFS
++#if defined(ETOOMANYREFS) && ETOOMANYREFS != ENOTSUP
+     case ETOOMANYREFS:
+EOF
+## fix for mingw-w64
+#patch -ulbf src/resolv_ms.c << EOF
+#--- src/resolv_ms.c
+#+++ src/resolv_ms.c
+#@@ -932,7 +932,7 @@ Return Value
+# }
+# 
+# 
+#-
+#+#ifndef HAVE_DECL_GETADDRINFO
+# __inline
+# int
+# getaddrinfo(
+#@@ -948,6 +948,7 @@ getaddrinfo(
+#     return ((*pfGetAddrInfo)
+#             (nodename, servname, hints, res));
+# }
+#+#endif
+# 
+# 
+# #ifndef HAVE_DECL_GETNAMEINFO
+#@@ -972,6 +973,7 @@ getnameinfo (
+# #endif
+# 
+# 
+#+#ifndef HAVE_DECL_FREEADDRINFO
+# __inline
+# void
+# freeaddrinfo (
+#@@ -983,3 +985,4 @@ freeaddrinfo (
+#         pfFreeAddrInfo  = (WSPIAPI_PFREEADDRINFO) WspiapiLoad(2);
+#     (*pfFreeAddrInfo)(ai);
+# }
+#+#endif
+#
+#EOF
+## fix for mingw-w64
+#patch -ulbf src/include/plibc.h << EOF
+#--- src/include/plibc.h
+#+++ src/include/plibc.h
+#@@ -355,7 +355,9 @@ int inet_pton4(const char *src, u_char *dst, int pton);
+# #if USE_IPV6
+# int inet_pton6(const char *src, u_char *dst);
+# #endif
+#+#ifndef FTRUNCATE_DEFINED
+# int truncate(const char *fname, int distance);
+#+#endif
+# int statfs(const char *path, struct statfs *buf);
+# const char *hstrerror(int err);
+# int mkstemp(char *tmplate);
+#EOF
+# fix building DLLs on 64-bit
+if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+#mv src/Makefile src/Makefile.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" src/Makefile.bak > src/Makefile &&
+# compile with g++ instead of gcc to avoid these errors: undefined reference to `__gxx_personality_v0'
+wl-showstatus configure &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-mconsole" LDFLAGS="-Wl,--allow-multiple-definition" CXX="g++" &&
+#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-mconsole" LDFLAGS="-Wl,--as-needed -luuid -Wl,-no-undefined" &&
+./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-mconsole" LDFLAGS="-Wl,--as-needed -Wl,-luuid -Wl,-no-undefined" &&
+ # fix building DLLs
+ mv libtool libtool.bak &&
+ sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix missing libuuid.dll.a (64-bit)
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  sed -i.bak "s/-luuid//g" $(grep -l "luuid" `find . -iname Makefile`)
+ fi &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf PlibC-$VERSION
+####To do: build DLL
+
+
+

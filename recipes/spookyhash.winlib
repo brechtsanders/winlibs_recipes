@@ -1,0 +1,60 @@
+export NAME="spookyhash"
+export STATUS=
+export URL=http://burtleburtle.net/bob/hash/spooky.html
+#export URL=https://github.com/k0dai/spookyhash
+export BASENAME=spookyhash
+export DESCRIPTION="SpookyHash is a very fast non cryptographic hash function, designed by Bob Jenkins."
+export CATEGORY=security
+export TYPE=library
+export VERSION=1.0.6
+export VERSIONDATE=20210827
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=premake5
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/k0dai/spookyhash/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/k0dai/spookyhash/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd spookyhash-spookyhash-$VERSION
+## fix build/premake5.lua (version >= 1.0.6)
+#patch -ulbf build/premake5.lua << EOF
+#@@ -36,6 +36,2 @@
+#
+#-if os.execute("git --version") > 0 then
+#-       io.write("Please install Git, it is required to update submodules.")
+#-       os.exit(0)
+#-end
+#
+#EOF
+#wl-showstatus configure &&
+# premake5 gmake2 --file=build/premake5.lua --os=windows --cc=gcc &&
+# wl-showstatus build &&
+# make -Cbuild CC=gcc &&
+#    echo OK
+wl-showstatus build &&
+ touch SUCCESS &&
+ for F in src/*.c; do
+  echo CC $F
+  gcc -c -o $F.o $F -Isrc -O3 || rm -f SUCCESS
+ done &&
+ ls -1 SUCCESS &> /dev/null &&
+ ar cru libspookyhash.a src/*.o &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libspookyhash.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > spookyhash.def &&
+ gcc -shared -s -mwindows -def spookyhash.def -o spookyhash.dll libspookyhash.a -Wl,--out-implib,libspookyhash.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f src/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf spookyhash-spookyhash-$VERSION
+
+
+

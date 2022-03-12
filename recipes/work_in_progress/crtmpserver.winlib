@@ -1,0 +1,71 @@
+export NAME="crtmpserver"
+export STATUS=
+export URL=https://github.com/shiretu/crtmpserver
+export BASENAME=crtmpserver
+export DESCRIPTION="high performance streaming platform written on C++"
+export CATEGORY=multimedia
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20180401
+wl-showstatus --package-version
+export DEPENDANCIES=openssl,lua,tinyxml
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/shiretu/crtmpserver/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/shiretu/crtmpserver/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix library detection problems
+sed -i.bak "s/\bNO_DEFAULT_PATH\b//" builders/cmake/cmake_find_modules/*.cmake
+# fix error: INSTALL Library TARGETS given no DESTINATION
+for F in $(grep -rl " LIBRARY DESTINATION " builders/cmake/*/CMakeLists.txt builders/cmake/*/*/CMakeLists.txt); do
+ sed -i.bak -e "s/\( LIBRARY DESTINATION \)\([^ )]*\)/\1\2 RUNTIME DESTINATION \2/" $F
+done
+# fix unsupported Windows
+patch -ulbf builders/cmake/CMakeLists.txt << EOF
+@@ -142,3 +142,3 @@
+
+-SET(GENERIC_FLAGS "-Wall -Werror")
++#SET(GENERIC_FLAGS "-Wall -Werror")
+
+@@ -196,2 +196,4 @@
+        SET(CMAKE_EXE_LINK_STATIC_CXX_FLAGS "\${CMAKE_EXE_LINK_STATIC_CXX_FLAGS} -Wl,--gc-sections")
++ELSEIF(CMAKE_SYSTEM_NAME MATCHES "Windows")
++       ADD_DEFINITIONS(-DWIN32)
+ ELSE(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+EOF
+patch -ulbf builders/cmake/lua/CMakeLists.txt << EOF
+@@ -13,2 +13,4 @@
+     ADD_DEFINITIONS(-DLUA_USE_DLOPEN)
++ELSEIF(CMAKE_SYSTEM_NAME MATCHES "Windows")
++    ADD_DEFINITIONS(-DLUA_USE_WINDOWS)
+ ELSE(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+EOF
+## avoid -Winvalid-pch
+#sed -i.bak -e "s/-Winvalid-pch//" builders/cmake/cmake_find_modules/pch_support.cmake
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ COMPILE_STATIC=1 cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCOMPILE_STATIC=BOOL:ON ../builders/cmake &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ COMPILE_STATIC=0 cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCOMPILE_STATIC=BOOL:OFF ../builders/cmake &&
+ cd .. &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####See also: rtmpd
+
+
+

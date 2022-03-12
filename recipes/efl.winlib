@@ -1,0 +1,221 @@
+export NAME="EFL"
+export STATUS=
+export URL=https://www.enlightenment.org/about-efl
+export BASENAME=efl
+export DESCRIPTION="EFL is made up of quite a few libraries that build on top of each other in layers, steadily becoming higher-level, yet allowing access to each level as they go. The higher up you go, the less you have to do yourself. Elementary is about as high up as you get, while you still access layers below it for day to day things as there is no need for it to wrap things that work perfectly well as-is."
+export CATEGORY=graphics,framework
+export TYPE=library
+#export VERSION=1.20.6
+#export VERSIONDATE=20171128
+#export VERSION=1.20.7
+#export VERSIONDATE=20180301
+#export VERSION=1.21.0
+#export VERSIONDATE=20180818
+#export VERSION=1.21.1
+#export VERSIONDATE=20180914
+#export VERSION=1.22.0
+#export VERSIONDATE=20190406
+#export VERSION=1.22.1
+#export VERSIONDATE=20190418
+#export VERSION=1.22.2
+#export VERSIONDATE=20190502
+#export VERSION=1.22.3
+#export VERSIONDATE=20190824
+#export VERSION=1.22.4
+#export VERSIONDATE=20190905
+#export VERSION=1.22.5
+#export VERSIONDATE=20190919
+####mv: cannot stat 'src/lib/ecore_con/efl_net_socket_windows.eo.c': No such file or directory
+export VERSION=1.22.6
+export VERSIONDATE=20191005
+#export VERSION=1.23.0
+#export VERSIONDATE=20191001
+#export VERSION=1.23.1
+#export VERSIONDATE=20191012
+#export VERSION=1.23.2
+#export VERSIONDATE=20191101
+#export VERSION=1.23.3
+#export VERSIONDATE=20191128
+#export VERSION=1.24.0
+#export VERSIONDATE=20200429
+#export VERSION=1.24.1
+#export VERSIONDATE=20200512
+#export VERSION=1.24.2
+#export VERSIONDATE=20200525
+#export VERSION=1.24.3
+#export VERSIONDATE=20200617
+#export VERSION=1.24.4
+#export VERSIONDATE=20200928
+#export VERSION=1.25.0
+#export VERSIONDATE=20200923
+#export VERSION=1.25.1
+#export VERSIONDATE=20201009
+####header_checks\meson.build:213:3: ERROR: C header 'fnmatch.h' not found
+#export VERSION=1.26.0
+#export VERSIONDATE=20211226
+#export VERSION=1.26.1
+#export VERSIONDATE=20220103
+#export VERSION=1.26.2
+#export VERSIONDATE=20220208
+####src/modules/ethumb/emotion/meson.build:8:2: ERROR: Program 'R:\\winlibs64-11.2.0ucrt\\efl-1.26.0\\build_both\\src/bin/edje\\edje_cc.exe' not found
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libiconv,glib2,gettext,gnutls,libgcrypt,luajit,bullet,dbus,zlib,liblz4,mman-win32,libjpeg,libpng,giflib,libtiff,libwebp,libopenjpeg,freetype2,fontconfig,harfbuzz,fribidi,gst-plugins-base,pulseaudio
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export DEPENDANCIES=pthreads,libiconv,glib2,gettext,gnutls,libgcrypt,luajit,bullet,dbus,zlib,liblz4,mman-win32,libjpeg,libpng,giflib,libtiff,libwebp,libopenjpeg,freetype2,fontconfig,harfbuzz,fribidi,gst-plugins-base,pulseaudio,libudev-stub,libvncserver
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+#export DOWNLOADURL="https://www.enlightenment.org/download"
+export DOWNLOADURL="https://download.enlightenment.org/rel/libs/efl/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://download.enlightenment.org/rel/libs/efl/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix missing .eo files
+ls -1 src/lib/ecore_con/efl_net_socket_windows.eo &> /dev/null || cat src/lib/ecore_con/efl_net_socket_unix.eo | sed -e "s/Unix/Windows/g" > src/lib/ecore_con/efl_net_socket_windows.eo
+ls -1 src/lib/ecore_con/efl_net_dialer_windows.eo &> /dev/null || cat src/lib/ecore_con/efl_net_dialer_unix.eo | sed -e "s/Unix/Windows/g" > src/lib/ecore_con/efl_net_dialer_windows.eo
+ls -1 src/lib/ecore_con/efl_net_server_windows.eo &> /dev/null || cat src/lib/ecore_con/efl_net_server_unix.eo | sed -e "s/Unix/Windows/g" > src/lib/ecore_con/efl_net_server_windows.eo
+# fix missing DLL exports
+sed -i.bak -e "s/^EOLIAN\b/EAPI/" src/lib/ecore_con/efl_net_socket_windows.c
+sed -i.bak -e "s/^EOLIAN\b/EAPI/" src/lib/ecore_con/efl_net_dialer_windows.c
+sed -i.bak -e "s/^EOLIAN\b/EAPI/" src/lib/ecore_con/efl_net_server_windows.c
+# fix missing ESHUTDOWN in src/lib/ecore_audio/ecore_audio_pulse_ml.c
+patch -ulbf src/lib/ecore_audio/ecore_audio_pulse_ml.c << EOF
+@@ -61 +61,5 @@
+-             if (errno == ESHUTDOWN || errno == ECONNRESET || errno == ECONNABORTED || errno == ENETRESET)
++             if (
++#ifdef ESHUTDOWN
++                 errno == ESHUTDOWN ||
++#endif
++                 errno == ECONNRESET || errno == ECONNABORTED || errno == ENETRESET)
+EOF
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+# fix no DLL_EXPORT error in src/lib/elementary/elm_priv.h (version >= 1.21.0)
+sed -i.bak -e "s/error\(.*no DLL_EXPORT\)/warning\1/" src/lib/elementary/elm_priv.h
+# fix src/lib/evil/evil_macro.h
+patch -ulbf src/lib/evil/evil_macro.h << EOF
+@@ -4,3 +4,5 @@
+ #if _WIN32_WINNT < 0x0600
+-# error Windows XP not supported anymore
++# warning Windows XP not supported anymore
++# undef _WIN32_WINNT
++# define _WIN32_WINNT 0x0600
+ #endif
+EOF
+# fix errors casting pointers to integers in src/bin/efreet/efreet_mime_cache_create.c (version >= 1.21.0)
+sed -i.bak -e "s/(long)/(intptr_t)/g" src/bin/efreet/efreet_mime_cache_create.c
+# fix error casting pointer to integer in src/generic/evas/common/timeout.c
+sed -i.bak -e "s/int s (int)arg/int s = *(int*)arg/" src/generic/evas/common/timeout.c (version >= 1.21.0)
+# fix missing src/lib/ecore_con/efl_net_socket_windows.eo.c (version >= 1.22.0)
+cp -u src/lib/ecore_con/efl_net_socket_windows.eo src/lib/ecore_con/efl_net_socket_windows.eo.c
+# fix data/ethumb/frames/default.edc (version >= 1.22.0)
+mv data/ethumb/frames/default.edc data/ethumb/frames/default.edc.bak &&
+echo "efl_version: 1 22;" > data/ethumb/frames/default.edc &&
+cat data/ethumb/frames/default.edc.bak >> data/ethumb/frames/default.edc
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+# fix configure for Windows threads
+sed -i.bak -e "s/as_fn_error\(.*Threads are required\)/echo\1/" configure
+# fix missing evas_image_loader.gst, case conflict with Eldbus_Model.eo.hh and avoid soft links (version >= 1.22.0)
+sed -i.bak -e "s/ln -sf/cp -pR/; s/\(cp -pR \)\(evas_image_loader\.gst\)/\1generic\/evas\/gst\/\2\$(EXEEXT)/; s/Eldbus_Model\.eo\.hh/U_&/" src/Makefile.in
+# fix configure to avoid soft links (version >= 1.22.0)
+sed -i.bak2 -e "s/ as_ln_s='ln -s'/as_ln_s='cp -pR'/" configure
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX/efl --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-liblz4 --enable-vnc-server --disable-systemd --enable-threads=win32 --enable-harfbuzz --enable-image-loader-webp --disable-image-loader-xpm --with-crypto=gnutls --with-windows-version=xp --without-x --with-x11=none --with-tests=none CFLAGS="-I$(pwd)/winfix" &&
+ #./configure --prefix=$INSTALLPREFIX/efl --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-liblz4 --enable-vnc-server --disable-systemd --enable-threads=win32 --enable-harfbuzz --enable-image-loader-webp --disable-image-loader-xpm --with-crypto=gnutls --with-windows-version=vista --without-x --with-x11=none --with-tests=none CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ #./configure --prefix=$INSTALLPREFIX/efl --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-liblz4 --enable-vnc-server --disable-systemd --enable-threads=win32 --enable-harfbuzz --enable-image-loader-webp --disable-image-loader-xpm --with-crypto=gnutls --with-windows-version=vista --without-x --with-x11=none --with-tests=none CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman -lksguid" &&
+ #./configure --prefix=$INSTALLPREFIX/efl --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-liblz4 --enable-vnc-server --disable-systemd --enable-threads=win32 --enable-harfbuzz --enable-image-loader-webp --disable-image-loader-xpm --with-crypto=gnutls --with-windows-version=vista --without-x --with-x11=none --with-tests=none CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/bullet" LDFLAGS="-Wl,--as-needed -lmman -lksguid" &&
+ ./configure --prefix=$INSTALLPREFIX/efl --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-liblz4 --enable-vnc-server --disable-systemd --enable-threads=win32 --enable-harfbuzz --enable-image-loader-webp --disable-image-loader-xpm --with-crypto=gnutls --with-windows-version=vista --without-x --with-x11=none --with-tests=none CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" CFLAGS="-fcommon -I$(pwd)/winfix" CXXFLAGS="-fcommon -I$MINGWPREFIX/include/bullet" LDFLAGS="-Wl,--as-needed -lmman -lksguid" &&
+ ## fix building DLLs
+ #mv libtool libtool.bak &&
+ #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ # fix missing _efl_net_socket_windows_efl_loop_fd_fd_set in src/lib/ecore_con/efl_net_socket_windows.eo.c (version >= 1.21.0)
+ mv src/lib/ecore_con/efl_net_socket_windows.eo.c src/lib/ecore_con/efl_net_socket_windows.eo.c.bak &&
+ echo "#include \"Ecore_Con.h\"" > src/lib/ecore_con/efl_net_socket_windows.eo.c &&
+ echo "EAPI" >> src/lib/ecore_con/efl_net_socket_windows.eo.c &&
+ cat src/lib/ecore_con/efl_net_socket_windows.eo.c.bak >> src/lib/ecore_con/efl_net_socket_windows.eo.c &&
+ ## fix missing _efl_net_dialer_windows_efl_object_constructor in src/lib/ecore_con/efl_net_dialer_windows.eo.c (version >= 1.21.0)
+ #mv src/lib/ecore_con/efl_net_dialer_windows.eo.c src/lib/ecore_con/efl_net_dialer_windows.eo.c.bak &&
+ #echo "#include \"Ecore_Con.h\"" > src/lib/ecore_con/efl_net_dialer_windows.eo.c &&
+ #sed -e "s/^[^ ].* \**_efl_net_dialer_windows_efl_/EAPI &/" src/lib/ecore_con/efl_net_dialer_windows.eo.c.bak >> src/lib/ecore_con/efl_net_dialer_windows.eo.c &&
+ ## fix missing _efl_net_server_windows_unlink_before_bind_set in src/lib/ecore_con/efl_net_server_windows.eo.c (version >= 1.21.0)
+ #mv src/lib/ecore_con/efl_net_server_windows.eo.c src/lib/ecore_con/efl_net_server_windows.eo.c.bak &&
+ #echo "#include \"Ecore_Con.h\"" > src/lib/ecore_con/efl_net_server_windows.eo.c &&
+ #sed -e "s/^[^ ].* \**_efl_net_server_windows_/EAPI &/" src/lib/ecore_con/efl_net_server_windows.eo.c.bak >> src/lib/ecore_con/efl_net_server_windows.eo.c &&
+ #wl-showstatus build &&
+ #make &&
+ #PATH=$(pwd)/src/lib/evil/.libs:$PATH make CC="gcc -I$(pwd)/src/lib/evil" &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ mkdir -p $INSTALLPREFIX/efl/lib/pkgconfig &&
+ cp -f pc/*.pc $INSTALLPREFIX/efl/lib/pkgconfig/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####XDG_DATA_DIRS=$XDG_DATA_DIRS:$MINGWPREFIX/efl/share
+####cp -u src/lib/ecore_con/efl_net_socket_windows.eo src/lib/ecore_con/efl_net_socket_windows.eo.c
+####cp src/generic/evas/gst/evas_image_loader.gst.exe src/ &&
+####/bin/install -c -m 644 lib/eldbus/eldbus_model_connection.eo.hh lib/eldbus/eldbus_model_object.eo.hh lib/eldbus/eldbus_model_proxy.eo.hh lib/eldbus/eldbus_model_method.eo.hh lib/eldbus/eldbus_model_arguments.eo.hh lib/eldbus/eldbus_model_signal.eo.hh lib/eldbus/eldbus_model.eo.hh lib/eldbus/eldbus_model_connection.eo.impl.hh lib/eldbus/eldbus_model_object.eo.impl.hh lib/eldbus/eldbus_model_proxy.eo.impl.hh lib/eldbus/eldbus_model_method.eo.impl.hh lib/eldbus/eldbus_model_arguments.eo.impl.hh lib/eldbus/eldbus_model_signal.eo.impl.hh lib/eldbus/eldbus_model.eo.impl.hh lib/eldbus/Eldbus_Model.eo.hh '/R/x86_64-7.2.0-release-posix-seh-rt_v6-rev0/inst_efl-1.22.0/efl/include/eldbus_cxx-1'
+####/bin/install: will not overwrite just-created '/R/x86_64-7.2.0-release-posix-seh-rt_v6-rev0/inst_efl-1.22.0/efl/include/eldbus_cxx-1/Eldbus_Model.eo.hh' with 'lib/eldbus/Eldbus_Model.eo.hh'
+
+
+
+## fix missing ESHUTDOWN in src/lib/ecore_audio/ecore_audio_pulse_ml.c
+#patch -ulbf src/lib/ecore_audio/ecore_audio_pulse_ml.c << EOF
+#@@ -61 +61,5 @@
+#-             if (errno == ESHUTDOWN || errno == ECONNRESET || errno == ECONNABORTED || errno == ENETRESET)
+#+             if (
+#+#ifdef ESHUTDOWN
+#+                 errno == ESHUTDOWN ||
+#+#endif
+#+                 errno == ECONNRESET || errno == ECONNABORTED || errno == ENETRESET)
+#EOF
+## fix missing munmap() in src/modules/evas/engines/software_generic/evas_native_dmabuf.c (version >= 1.25.1)
+#patch -ulbf src/modules/evas/engines/software_generic/evas_native_dmabuf.c << EOF
+#@@ -14,2 +14,4 @@
+# # include <sys/mman.h>
+#+#elif defined(__MINGW32__)
+#+# include <mman-win32/sys/mman.h>
+# #endif
+#EOF
+## fix missing files
+#mkdir -p winfix/sys
+#echo "#include <winsock2.h>" > winfix/sys/socket.h
+#cat > winfix/fnmatch.h << EOF
+##include <shlwapi.h>
+##define FNM_NOMATCH 1
+##define fnmatch(p,s,f) (PathMatchSpec(s,p) ? 0 : FNM_NOMATCH)
+#EOF
+## fix already defined interface
+#for F in $(grep -lw interface $(find -name '*.h' -or -name '*.c*')); do
+# mv $F $F.bak &&
+# echo "#include <windows.h>" > $F &&
+# echo "#undef interface" >> $F &&
+# cat $F.bak >> $F
+#done
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Devas-modules=static -Dwindows-version=win7 -Dcrypto=gnutls -Daudio=true -Dsystemd=false -Dnetwork-backend=none -Dopengl=full -Davahi=false -Dx11=false -Dsdl=true -Dbuffer=false -Dfb=false -Dwl=false -Ddrm=false -Dpixman=true -Dvnc-server=true -Dv4l2=false -Deeze=false -Dembedded-lz4=false -Dlibmount=false -Deina-magic-debug=false -Ddebug-threads=false -Dbuild-examples=false -Dbuild-tests=false -Dc_args="-I$(pwd)/winfix" . build_both &&
+# PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwindows-version=win7 -Dcrypto=gnutls -Daudio=true -Dsystemd=false -Dnetwork-backend=none -Dopengl=full -Davahi=false -Dx11=false -Dsdl=true -Dbuffer=false -Dfb=false -Dwl=false -Ddrm=false -Dpixman=true -Dinput=false -Dvnc-server=true -Dv4l2=false -Dembedded-lz4=false -Dlibmount=false -Deina-magic-debug=false -Ddebug-threads=false -Dbuild-examples=false -Dbuild-tests=false -Dc_args="-I$(pwd)/winfix" . build_both &&
+# #PKG_CONFIG= PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwindows-version=win7 -Dcrypto=gnutls -Daudio=true -Dsystemd=false -Dnetwork-backend=none -Dopengl=full -Davahi=false -Dx11=false -Dsdl=true -Dbuffer=false -Dfb=false -Dwl=false -Ddrm=false -Dpixman=true -Dinput=false -Dvnc-server=true -Dv4l2=false -Dembedded-lz4=false -Dlibmount=false -Deina-magic-debug=false -Ddebug-threads=false -Dbuild-examples=false -Dbuild-tests=false -Dc_args="-I$(pwd)/winfix -I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman -lshlwapi" . build_both &&
+# # fix missing FNM_FILE_NAME
+# echo "#ifndef FNM_FILE_NAME" >> build_both/config.h &&
+# echo "#define FNM_FILE_NAME FNM_PATHNAME" >> build_both/config.h &&
+# echo "#endif" >> build_both/config.h &&
+# ## fix slash/backslash path issue when calling Python from Ninja
+# #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+# ## fix Python path issues in meson_exe
+# #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=$PYTHONPATH:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+#    echo OK && find . -name '*.a'
+
+
+

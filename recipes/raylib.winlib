@@ -1,0 +1,95 @@
+export NAME="raylib"
+export STATUS=
+export URL=https://www.raylib.com/
+export BASENAME=raylib
+export DESCRIPTION="raylib is a simple and easy-to-use library to enjoy videogames programming"
+export CATEGORY=games
+export TYPE=library
+#export VERSION=3.0.0
+#export VERSIONDATE=20200812
+#export VERSION=3.5.0
+#export VERSIONDATE=20201225
+#export VERSION=3.7.0
+#export VERSIONDATE=20210427
+export VERSION=4.0.0
+export VERSIONDATE=20211105
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=zlib
+export DOWNLOADURL="https://github.com/raysan5/raylib/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/raysan5/raylib/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+#mkdir -p build_win build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSHARED:BOOL=ON -DSTATIC:BOOL=ON -DBUILD_GAMES:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# ## manually compile resource files
+# #windres src/raylib.rc -O coff src/raylib.rc.data &&
+# #windres src/raylib.dll.rc -O coff src/raylib.dll.rc.data &&
+# ninja -Cbuild_win install/strip &&
+# ## manually copy static library without _static suffix (version <= 3.0.0)
+# #cp -u $INSTALLPREFIX/lib/libraylib_static.a $INSTALLPREFIX/lib/libraylib.a &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+## fix already defined QueryPerformanceFrequency/QueryPerformanceCounter in src/gestures.h (version >= 3.7.0)
+#patch -ulbf src/gestures.h << EOF
+#@@ -142,3 +142,5 @@
+#
+#-#if defined(_WIN32)
+#+#if defined(__MINGW32__)
+#+    #include <profileapi.h>
+#+#elif defined(_WIN32)
+#     // Functions required to query time on Windows
+#@@ -522,3 +524,7 @@
+# #if defined(_WIN32)
+#+#if defined(__MINGW32__)
+#+    LARGE_INTEGER clockFrequency, currentTime;
+#+#else
+#     unsigned long long int clockFrequency, currentTime;
+#+#endif
+#
+#@@ -527,4 +533,8 @@
+#
+#+#if defined(__MINGW32__)
+#+    time = (double)currentTime.QuadPart/clockFrequency.QuadPart*1000.0f;  // Time in miliseconds
+#+#else
+#     time = (double)currentTime/clockFrequency*1000.0f;  // Time in miliseconds
+# #endif
+#+#endif
+#
+#EOF
+## fix already defined Rectangle in src/raylib.h (version >= 3.7.0)
+#patch -ulbf src/raylib.h << EOF
+#@@ -220,2 +220,3 @@
+# // Rectangle type
+#+#define Rectangle RAYLIB_Rectangle
+# typedef struct Rectangle {
+#EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_GAMES:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+ #-DUSE_EXTERNAL_GLFW:STRING=ON 
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_GAMES:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

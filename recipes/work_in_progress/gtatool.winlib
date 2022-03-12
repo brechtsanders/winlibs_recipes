@@ -1,0 +1,89 @@
+export NAME="gtatool"
+export STATUS=
+export URL=http://gta.nongnu.org/libgta.html
+export BASENAME=gtatool
+export DESCRIPTION="Gtatool is a command line tool to manipulate GTAs. GTAs can store any kind of data in multidimensional arrays, optionally with simple tags to store rich metadata. GTAs are streamable and support mupltiple compression methods. Uncompressed GTAs allow easy out-of-core data access for very large arrays."
+export CATEGORY=fileformat,dataprocessing
+export TYPE=application
+#export VERSION=1.5.2
+#export VERSIONDATE=20130513
+#export VERSION=2.0.0
+#export VERSIONDATE=20140924
+#export VERSION=2.1.0
+#export VERSIONDATE=20141221
+export VERSION=2.2.0
+export VERSIONDATE=20160126
+wl-showstatus --package-version
+#export DEPENDANCIES=libdl,libgta,libiconv,openexr,ffmpeg3,gdal,imagemagick,libjpeg,netcdf,libsndfile
+export DEPENDANCIES=libdl,libgta,libiconv,openexr,libav,gdal,imagemagick,libjpeg,netcdf,libsndfile
+export OPTIONALDEPENDANCIES=qt,netpbm,pfstools
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://gta.nongnu.org/download.html"
+export DOWNLOADURL="http://download.savannah.nongnu.org/releases/gta/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.savannah.nongnu.org/releases/gta/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+## fix mkdir issues in src/base/fio.cpp (version >= 2.0.0 <= 2.1.0)
+#patch -ulbf src/base/fio.cpp << EOF
+#--- src/base/fio.cpp  2014-02-19 06:16:48.000000000 +0100
+#+++ src/base/fio.cpp  2014-09-27 21:13:58.000000000 +0200
+#@@ -243,6 +243,8 @@
+# /* W32 lacks a mkdir() function with a mode argument */
+#-static int mkdir(const char *pathname, mode_t)
+#+static int win_mkdir(const char *pathname, mode_t)
+# {
+#-    return _mkdir(pathname);
+#+    return mkdir(pathname);
+# }
+#+static int _mkdir(const char *pathname) { return mkdir(pathname); }
+#+#define mkdir win_mkdir
+# #endif
+#EOF
+## fix missing std::set_unexpected/std::set_terminate in src/base/dbg.cpp (version >= 2.2.0)
+#patch -ulbf src/base/dbg.cpp << EOF
+#@@ -24,2 +24,3 @@
+# #include <new>
+#+#include <eh.h>
+# #if HAVE_BACKTRACE
+#@@ -76,4 +77,4 @@
+# #endif
+#-        std::set_unexpected(exception_crash);
+#-        std::set_terminate(exception_crash);
+#+        ::set_unexpected(exception_crash);
+#+        ::set_terminate(exception_crash);
+#         std::set_new_handler(oom_abort);
+#EOF
+# fix missing std::set_unexpected/std::set_terminate in src/base/dbg.cpp (version >= 2.2.0)
+patch -ulbf src/base/dbg.cpp << EOF
+@@ -76,4 +76,2 @@
+ #endif
+-        std::set_unexpected(exception_crash);
+-        std::set_terminate(exception_crash);
+         std::set_new_handler(oom_abort);
+EOF
+# fix missing enum PixelFormat and PIX_FMT_ defines in src/conv-ffmpeg/media_object.cpp
+sed -i.bak -e "s/\bPixelFormat/AV&/g; s/\bPIX_FMT_/AV_&/g" src/conv-ffmpeg/media_object.cpp
+wl-showstatus configure &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --without-netcdf LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --without-netcdf LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --without-exr CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ wl-showstatus build-install &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+####To do: build shared version
+
+
+

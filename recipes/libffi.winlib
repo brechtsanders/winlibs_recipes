@@ -1,0 +1,84 @@
+export NAME="libffi"
+export STATUS=
+export URL=http://sourceware.org/libffi/
+export BASENAME=libffi
+export DESCRIPTION="The libffi library provides a portable, high level programming interface to various calling conventions. This allows a programmer to call any function specified by a call interface description at run-time."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=3.0.8
+#export VERSIONDATE=20091125
+#export VERSION=3.0.9
+#export VERSIONDATE=20091231
+#export VERSION=3.0.10
+#export VERSIONDATE=20110824
+#export VERSION=3.0.11
+#export VERSIONDATE=20120412
+#export VERSION=3.0.12
+#export VERSIONDATE=20130212
+#export VERSION=3.0.13
+#export VERSIONDATE=20130318
+#export VERSION=3.1
+#export VERSIONDATE=20140520
+#export VERSION=3.2
+#export VERSIONDATE=20141111
+#export VERSION=3.2.1
+#export VERSIONDATE=20141112
+#export VERSION=3.3
+#export VERSIONDATE=20191124
+export VERSION=3.4.2
+export VERSIONDATE=20210629
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="http://sourceware.org/libffi/"
+export DOWNLOADURL="https://github.com/libffi/libffi/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=ftp://sourceware.org/pub/libffi/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/libffi/libffi/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix dllimport in include/ffi.h.in
+patch -ulbf include/ffi.h.in << EOF
+@@ -176,3 +176,3 @@
+ /* *know* they are going to link with the static library. */
+-#if defined _MSC_VER && !defined FFI_BUILDING
++#if defined _MSC_VER && !defined FFI_BUILDING && defined DLL_EXPORT
+ #define FFI_EXTERN extern __declspec(dllimport)
+EOF
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+#make check
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lgcc" &&
+ ## fix error: undefined reference to LC11
+ ##### bug reported here: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=97618
+ #sed -i.bak -e "s/-O3/-O2/" $(find -name Makefile) &&
+ ## avoid -Wl,--version-script (not supported by clang)
+ #sed -i.bak -e "s/-Wl,--version-script,[^ ]*//" Makefile */Makefile &&
+ wl-showstatus build-install &&
+ # fix building DLLs on 64-bit
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" $BUILDPLATFORM/libtool
+ fi &&
+ make install-strip &&
+ if [ ! -d $INSTALLPREFIX/include ]; then
+  mkdir -p $INSTALLPREFIX/include &&
+  cp -f *mingw*/include/*.h $INSTALLPREFIX/include/
+ fi &&
+ sed -i -e "s?/lib/../lib?/lib?" $INSTALLPREFIX/lib/libffi.la $INSTALLPREFIX/lib/pkgconfig/libffi.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+

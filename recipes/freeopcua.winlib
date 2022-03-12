@@ -1,0 +1,81 @@
+export NAME="FreeOpcUa"
+export STATUS=
+export URL=http://freeopcua.github.io/
+#export URL=https://github.com/FreeOpcUa/freeopcua
+export BASENAME=freeopcua
+export DESCRIPTION="Open Source C++ OPC-UA Server and Client Library"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20210330
+wl-showstatus --package-version
+export DEPENDANCIES=boost,mbedtls
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/FreeOpcUa/freeopcua/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/FreeOpcUa/freeopcua/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing u_int16_t in src/client/client.cpp
+sed -i.bak -e "s/u_int16_t/uint16_t/" src/client/client.cpp
+# fix use of closesocket() instead of close() on Windows in src/core/socket_channel.cpp
+patch -ulbf src/core/socket_channel.cpp << EOF
+@@ -52,3 +52,7 @@
+ {
++#ifdef _WIN32
++  closesocket(Socket);
++#else
+   close(Socket);
++#endif
+ }
+EOF
+# fix undefined SHUT_RDWR in src/server/tcp_server.cpp
+patch -ulbf src/server/tcp_server.cpp << EOF
+@@ -38,2 +38,4 @@
+ #ifdef _WIN32
++#define _POSIX_SOURCE
++#include <unistd.h>
+ #else
+EOF
+# fix Uri::Initialize() in src/core/common/uri_facade_win.cpp (version >= master)
+patch -ulbf src/core/common/uri_facade_win.cpp << EOF
+@@ -21,3 +21,3 @@
+
+-void Uri::Initialize(const char * uriString, std::size_t size)
++void Uri::Initialize(const std::string & uriString)
+ {
+@@ -33,3 +33,3 @@
+   // TODO http://msdn.microsoft.com/en-us/library/windows/desktop/aa384376(v=vs.85).aspx
+-  if (!InternetCrackUrl(uriString, size, options, &url))
++  if (!InternetCrackUrl(uriString.c_str(), 0, options, &url))
+     {
+EOF
+# fix library install location
+sed -i.bak -e "s?\(ARCHIVE DESTINATION \${CMAKE_INSTALL_LIBDIR}\)/static?\1?g" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_CLIENT:BOOL=ON -DBUILD_SERVER:BOOL=ON -DSSL_SUPPORT_MBEDTLS:BOOL=ON -DBUILD_PYTHON:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_CLIENT:BOOL=ON -DBUILD_SERVER:BOOL=ON -DSSL_SUPPORT_MBEDTLS:BOOL=ON -DBUILD_PYTHON:BOOL=ON -DPYTHON_INCLUDE_DIRS:PATH=$PYDIR/include -DPYTHON_LIBRARIES:PATH=$PYDIR/libs -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DBUILD_PYTHON:BOOL=ON -DPYTHON_INCLUDE_DIRS:PATH=$PYDIR/include -DPYTHON_LIBRARIES:STRING="-L$PYDIR/libs $(ls -1 $PYDIR/libs/*.a|tail -n1|sort -r|sed -e "s/.*\/lib\(python[0-9.]*\)\(\.dll\)*\.a$/-l\1/")" 
+ wl-showstatus configure &&
+ PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_CLIENT:BOOL=ON -DBUILD_SERVER:BOOL=ON -DSSL_SUPPORT_MBEDTLS:BOOL=ON -DBUILD_PYTHON:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ #PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_CLIENT:BOOL=ON -DBUILD_SERVER:BOOL=ON -DSSL_SUPPORT_MBEDTLS:BOOL=ON -DBUILD_PYTHON:BOOL=ON -DPYTHON_INCLUDE_DIRS:PATH=$PYDIR/include -DPYTHON_LIBRARIES:PATH=$PYDIR/libs -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/bin/*.dll build_shared/bin/opcua*.exe &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_shared/bin/*.dll $INSTALLPREFIX/bin/ &&
+ cp -u build_shared/bin/opcua*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

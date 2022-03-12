@@ -1,0 +1,54 @@
+export NAME="wxIA"
+export STATUS=
+export URL=https://github.com/versable/wxia
+export BASENAME=wxia
+export DESCRIPTION="SANE / TWAIN Add-on class library for wxWidgets."
+export CATEGORY=graphics,hardware
+export TYPE=library
+export VERSION=0.0.3
+export VERSIONDATE=20170426
+wl-showstatus --package-version
+export DEPENDANCIES=wxwidgets
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE="wxWindows Library Licence"
+export LICENSEFILE=COPYING.LIB
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/versable/wxia/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/versable/wxia/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# create dummy wx-config which supports --version and uses UNIX-style paths
+cat > wx-config.sh << EOF
+#!/bin/sh
+if echo " \$* "|grep -q " --version "; then
+ shift
+ wx-config.exe --release \$* | grep -v "wx-config Error:" | sed -e "s/^\\([0-9]*\\.[0-9]*\\)\$/\\1.0/"
+else
+ wx-config.exe --static=\$WX_STATIC --unicode=yes --debug=no --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?/\\1/?g; s?\\\\\\\\?/?g"
+fi
+EOF
+#wl-showstatus configure &&
+#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+for WX_STATIC in yes; do
+#for WX_STATIC in no yes; do
+ mkdir -p build_$WX_STATIC &&
+ wl-showstatus configure &&
+ cd build_$WX_STATIC &&
+ ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-metadata --enable-dynamic_load --enable-load_extension $(if [ "$WX_STATIC" == "no" ]; then echo -n --disable-static --enable-shared; else echo -n --enable-static --disable-shared; fi) --with-wx-config="$(pwd)/../wx-config.sh" .. &&
+ cd .. &&
+ wl-showstatus build-install &&
+ #( PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH make -Cbuild_$WX_STATIC install-strip || PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH make -Cbuild_$WX_STATIC install-strip LIBS="-Wl,--as-needed -lversion -lshlwapi" )
+ ( PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH make -Cbuild_$WX_STATIC install-strip || PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH make -Cbuild_$WX_STATIC install-strip LIBS="-Wl,--as-needed -lversion -lshlwapi" || PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH make -Cbuild_$WX_STATIC install-strip LIBS="-Wl,--as-needed -lversion -lshlwapi -luxtheme -loleacc" )
+done &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####To do: build DLL
+
+
+

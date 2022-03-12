@@ -1,0 +1,121 @@
+export NAME="argp-standalone"
+export STATUS=
+export URL=http://www.lysator.liu.se/~nisse/misc/
+export BASENAME=argp-standalone
+export DESCRIPTION="standalone version of argp - part of glibc library"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=1.3
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="http://www.lysator.liu.se/~nisse/misc/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.lysator.liu.se/~nisse/misc/argp-standalone-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/argp-standalone-$VERSION.tar.gz
+cd argp-standalone-$VERSION
+# workaround missing EX_USAGE
+echo "#define EX_USAGE 0x7F" > sysexits.h
+# fix missing sleep
+mv argp-parse.c argp-parse.c.bak
+cat > argp-parse.c << EOF
+#include <malloc.h>
+#define sleep(t) _sleep((t) * 1000)
+EOF
+cat argp-parse.c.bak >> argp-parse.c
+# work around prototype mismatch errors
+mv argp.h argp.h.bak
+sed -e "s/int __argc, char \*\*__restrict __argv,/int argc, char \*\*__restrict argv,/" argp.h.bak > argp.h
+# replace random with rand
+mv argp-test.c argp-test.c.bak
+sed -e "s/random/rand/" argp-test.c.bak > argp-test.c
+# fix redefinition issue in argp-fmtstream.h (version >= 1.3)
+####argp-namefrob.h:62:32: error: redefinition of 'argp_fmtstream_write'
+patch -ulbf argp-fmtstream.h << EOF
+--- argp-fmtstream.h  2003-12-11 09:37:05.000000000 +0100
++++ argp-fmtstream.h  2015-06-27 12:42:29.132058400 +0200
+@@ -194,3 +194,3 @@
+
+
+-#ifdef __OPTIMIZE__
++#if defined(__OPTIMIZE__) && !defined(__MINGW32__)
+ /* Inline versions of above routines.  */
+
+EOF
+#make check
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ ( echo EXPORTS; gcc -E argp.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\b\(_\{0,1\}argp[^ *]*\).*/\1/p" ) > argp.def &&
+ gcc -shared -s -mwindows -def argp.def -o argp.dll libargp.a -Wl,--out-implib,libargp.dll.a &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp argp.h $INSTALLPREFIX/include/ &&
+ cp *.a $INSTALLPREFIX/lib/ &&
+ cp *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf argp-standalone-$VERSION
+
+
+
+#export NAME="argp-standalone"
+#export STATUS=
+#export URL=http://www.lysator.liu.se/~nisse/misc/
+#export BASENAME=argp-standalone
+#export DESCRIPTION="standalone version of argp - part of glibc library"
+#export CATEGORY=dataprocessing
+#export TYPE=library
+#export VERSION=1.4.1
+#export VERSIONDATE=20211110
+#wl-showstatus --package-version
+#export DEPENDANCIES=
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=
+#export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/ericonr/argp-standalone/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/ericonr/argp-standalone/archive/refs/tags/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+##tar xfz $TARBALLDIR/$BASENAME/argp-standalone-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd argp-standalone-$VERSION
+## fix argp-eexst.c (version >= 1.4.1)
+#patch -ulbf argp-eexst.c << EOF
+#@@ -23,3 +23,9 @@
+#
+#+#ifdef _WIN32
+#+#ifndef EX_USAGE
+#+#define EX_USAGE 64
+#+#endif
+#+#else
+# #include <sysexits.h>
+#+#endif
+#
+#EOF
+#wl-showstatus configure &&
+# mkdir -p m4 &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# ( echo EXPORTS; gcc -E argp.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\b\(_\{0,1\}argp[^ *]*\).*/\1/p" ) > argp.def &&
+# gcc -shared -s -mwindows -def argp.def -o argp.dll libargp.a -Wl,--out-implib,libargp.dll.a &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp argp.h $INSTALLPREFIX/include/ &&
+# cp *.a $INSTALLPREFIX/lib/ &&
+# cp *.dll $INSTALLPREFIX/bin/ &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf argp-standalone-$VERSION
+#####See also: https://github.com/tom42/argp-standalone
+
+
+

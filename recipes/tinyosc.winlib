@@ -1,0 +1,42 @@
+export NAME="TinyOSC"
+export STATUS=
+export URL=https://github.com/mhroth/tinyosc
+export BASENAME=tinyosc
+export DESCRIPTION="A minimal Open Sound Control (OSC) library written in vanilla C."
+export CATEGORY=audio
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20210607
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=ISC
+export DOWNLOADURL="https://github.com/mhroth/tinyosc/releases/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mhroth/tinyosc/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing ntohll/htonll in tinyosc.c
+sed -i.bak -e "s/\bntohll\b/_byteswap_uint64/; s/\bhtonll\b/_byteswap_uint64/" tinyosc.c
+wl-showstatus build &&
+ gcc -c -o tinyosc.o tinyosc.c -I. -O3 &&
+ ar cru libtinyosc.a tinyosc.o &&
+ #( echo "EXPORTS"; sed -n -e "s/^.* \**\(tinyosc_.*\) *(.*$/\1/p" tinyosc.h ) > tinyosc.def &&
+ #( echo "EXPORTS"; gcc -E tinyosc.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(tinyosc_[^ *]*\).*/\1/p" ) > tinyosc.def &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libtinyosc.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > tinyosc.def &&
+ gcc -shared -s -mwindows -def tinyosc.def -o tinyosc.dll libtinyosc.a -Wl,--out-implib,libtinyosc.dll.a -lws2_32 &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

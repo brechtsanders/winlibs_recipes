@@ -1,0 +1,72 @@
+export NAME="Brian Gladman's SHA implementation"
+export STATUS=
+export URL=https://github.com/BrianGladman/sha
+export BASENAME=sha_gladman
+export DESCRIPTION="SHA1/SHA2/HMAC library"
+export CATEGORY=security
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20210227
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmakeconverter,cmake,ninja
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/users/BrianGladman/packages?repo_name=sha"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/BrianGladman/sha/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd sha-$VERSION
+## fix missing file
+#touch hmac/ClassDiagram1.cd  
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/lib/site-packages:$PYDIR/Lib/site-packages:$PYTHONPATH $MINGWPREFIX/python/Scripts/cmake-converter-script.py -s sha.sln &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMSVC_RUNTIME_LIBRARY_STR:STRING=" " CMAKE_EXE_LINKER_FLAGS:STRING="-mconsole" -S. -Bbuild_win &&
+# wl-showstatus build &&
+# ninja -Cbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
+cat > template.pc.in << EOF
+prefix=$INSTALLPREFIX
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: $BASENAME
+Description: $DESCRIPTION
+Version: $VERSION
+Libs: -L\${libdir} -l<LIBNAME>
+Cflags: -I\${includedir}/gladman
+EOF
+# fix building DLLs
+sed -i.bak -e "s/DLL_EXPORT/BUILDING_SHA_DLL/" brg_types.h
+wl-showstatus build &&
+ for F in sha1.c sha2.c hmac.c; do
+  echo CC $F &&
+  (
+   B=$(basename -s.c $F)
+   gcc -c -o $F.o $F -O3 -I. -DBUILDING_SHA_DLL &&
+   ar cr lib$B\_gladman.a $F.o &&
+   gcc -shared -s -mwindows -def -o $B\_gladman.dll $F.o -Wl,--out-implib,lib$B\_gladman.dll.a -Wl,--output-def,$B\_gladman.def $(if [ "$F" == "hmac.c" ]; then echo "libsha1_gladman.dll.a libsha2_gladman.dll.a"; fi) &&
+   sed -e "s/<LIBNAME>/$B\_gladman/" template.pc.in > $B\_gladman.pc
+  ) || break
+ done &&
+ if [ $(ls -1 *.dll | wc -l) -ne 3 ]; then false; fi &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/gladman $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/gladman/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf sha-$VERSION
+####TO DO: check if possible to use optimized/assembler code
+
+
+

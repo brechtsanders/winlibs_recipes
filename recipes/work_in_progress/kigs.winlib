@@ -1,0 +1,145 @@
+export NAME="Kigs framework"
+export STATUS=
+export URL=https://kigs-framework.org/
+#export URL=https://github.com/Kigs-framework/kigs/
+export BASENAME=kigs
+export DESCRIPTION="Kigs framework is a C++ modular multipurpose cross platform framework."
+export CATEGORY=framework
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20200502
+####framework/Core/Headers/CoreSTLAllocator.h:203:10: fatal error: xmemory: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/Kigs-framework/kigs/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Kigs-framework/kigs/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix scripts/CMakeLists.txt (version >= master)
+patch -ulbf scripts/CMakeLists.txt << EOF
+@@ -8,7 +8,7 @@
+
+-set(KIGS_ROOT "\${CMAKE_SOURCE_DIR}/../../")
+-set(KIGS_FRAMEWORK "\${KIGS_ROOT}/kigs/framework/")
+-set(KIGS_PRIVATE_FRAMEWORK "\${KIGS_ROOT}/private/framework/")
+-set(KIGS_EXTERN_LIBS "\${KIGS_ROOT}/kigs/libs/")
+-set(KIGS_PRIVATE_EXTERN_LIBS "\${KIGS_ROOT}/kigs/libs/")
++set(KIGS_ROOT "$(pwd)/")
++set(KIGS_FRAMEWORK "\${KIGS_ROOT}/framework/")
++set(KIGS_PRIVATE_FRAMEWORK "\${KIGS_ROOT}/framework/")
++set(KIGS_EXTERN_LIBS "\${KIGS_ROOT}/libs/")
++set(KIGS_PRIVATE_EXTERN_LIBS "\${KIGS_ROOT}/libs/")
+ set(KIGS_SIDEPROJECTS "\${KIGS_ROOT}/sideProjects/")
+@@ -36,3 +36,5 @@
+        if(\${KIGS_PLATFORM} STREQUAL "WUP" OR \${KIGS_PLATFORM} STREQUAL "Windows")
++           if(MSVC)
+                target_compile_options(\${ARGV0} INTERFACE "/wd4018" "/wd4244")
++           endif()
+        endif()
+@@ -86,3 +88,3 @@
+
+-if(WIN32)
++if(MSVC)
+        string (REPLACE "/DWIN32" "" CMAKE_CXX_FLAGS \${CMAKE_CXX_FLAGS}) # no WIN32
+@@ -128,3 +130,7 @@
+        if(\${CMAKE_SYSTEM_NAME} MATCHES WindowsStore)
++               if(MSVC)
+                target_compile_options(Base INTERFACE /std:c++17)
++               else()
++               target_compile_options(Base INTERFACE -std=c++17)
++               endif()
+                target_compile_definitions(Base INTERFACE WUP _CRT_SECURE_NO_WARNINGS NOMINMAX)
+@@ -138,7 +144,13 @@
+
++               if(MSVC)
+                target_compile_options(Base INTERFACE /await)
++               endif()
+                set(CMAKE_EXE_LINKER_FLAGS_STATICRELEASE "\${CMAKE_EXE_LINKER_FLAGS_STATICRELEASE}")
++               if(MSVC)
+                set(CMAKE_EXE_LINKER_FLAGS_STATICRELEASETOOLS "\${CMAKE_EXE_LINKER_FLAGS_STATICRELEASETOOLS} /DEBUG:FULL")
++               endif()
+                set(CMAKE_SHARED_LINKER_FLAGS_STATICRELEASE "\${CMAKE_SHARED_LINKER_FLAGS_STATICRELEASE}")
++               if(MSVC)
+                set(CMAKE_SHARED_LINKER_FLAGS_STATICRELEASETOOLS "\${CMAKE_SHARED_LINKER_FLAGS_STATICRELEASETOOLS} /DEBUG:FULL")
++               endif()
+                set(KIGS_PLATFORM WUP)
+@@ -176,3 +188,5 @@
+        elseif(KIGS_SWITCH)
++               if(MSVC)
+                set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} /MP")
++               endif()
+                target_compile_definitions(Base INTERFACE NN_PLATFORM_NX)
+@@ -183,5 +197,10 @@
+        else()
++               if(MSVC)
+                set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} /MP")
+                target_compile_options(Base INTERFACE /std:c++17)
++               else()
++               target_compile_options(Base INTERFACE -std=c++17)
++               endif()
+                target_compile_definitions(Base INTERFACE WIN32 _WINDOWS NOMINMAX _CRT_SECURE_NO_WARNINGS)
++               if(MSVC)
+                set(CMAKE_EXE_LINKER_FLAGS_STATICDEBUG "\${CMAKE_EXE_LINKER_FLAGS_STATICDEBUG} /SAFESEH:NO /DEBUG:FULL")
+@@ -192,2 +211,3 @@
+                set(CMAKE_SHARED_LINKER_FLAGS_STATICRELEASETOOLS "\${CMAKE_SHARED_LINKER_FLAGS_STATICRELEASETOOLS} /DEBUG:FULL /SAFESEH:NO")
++               endif()
+                set(KIGS_PLATFORM Windows)
+@@ -206,3 +226,7 @@
+                endif()
++               if(MSVC)
+                target_compile_options(Base INTERFACE /permissive-)
++               else()
++               target_compile_options(Base INTERFACE -fpermissive)
++               endif()
+                target_link_libraries(Base INTERFACE Wininet Comctl32)
+@@ -213,3 +237,5 @@
+                target_compile_options(Base INTERFACE \$<\$<CONFIG:StaticDebug>:/Zi>)
++               if(MSVC)
+                target_compile_options(Base INTERFACE -bigobj)
++               endif()
+        endif()
+EOF
+# fix missing add_kigs_module in framework/CMakeLists.txt
+mv framework/CMakeLists.txt framework/CMakeLists.txt.bak &&
+echo "include(../scripts/CMakeLists.txt)" > framework/CMakeLists.txt &&
+cat framework/CMakeLists.txt.bak >> framework/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DKIGS_PLATFORM:STRING=Windows -DKIGS_ROOT:PATH=$(pwd) -DZSTD_BUILD_CONTRIB:BOOL=OFF -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

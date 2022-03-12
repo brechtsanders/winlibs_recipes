@@ -1,0 +1,127 @@
+export NAME="ilmbase"
+export STATUS=
+export URL=http://www.openexr.com/downloads.html
+export BASENAME=ilmbase
+export DESCRIPTION="ILM Base libraries have following four libraries: * Half is a class that encapsulates ILM's 16-bit floating-point format. * IlmThread is a thread abstraction library for use with OpenEXR and other software packages. * Imath implements 2D and 3D vectors, 3x3 and 4x4 matrices, quaternions and other useful 2D and 3D math functions. * Iex is an exception-handling library."
+export CATEGORY=portability
+export TYPE=library
+#export VERSION=1.0.1
+#export VERSIONDATE=20101206
+#export VERSION=1.0.2
+#export VERSIONDATE=20101206
+#export VERSION=2.0.0
+#export VERSIONDATE=20130314
+#export VERSION=2.0.1
+#export VERSIONDATE=20130711
+#export VERSION=2.1.0
+#export VERSIONDATE=20131119
+####IlmThread/IlmThreadPosix.cpp:83:17: error: '::pthread_join' has not been declared
+#export VERSION=2.2.0
+#export VERSIONDATE=20140810
+#export VERSION=2.2.1
+#export VERSIONDATE=20171129
+#export VERSION=2.2.2
+#export VERSIONDATE=20200512
+export VERSION=2.3.0
+export VERSIONDATE=20200202
+####IexMath/IexMathFpu.cpp:276:10: fatal error: asm/sigcontext.h: No such file or directory
+#export VERSION=2.4.1
+#export VERSIONDATE=20200221
+#export VERSION=2.4.2
+#export VERSIONDATE=20200616
+#export VERSION=2.5.1
+#export VERSIONDATE=20200512
+#export VERSION=2.5.2
+#export VERSIONDATE=20200616
+#export VERSION=2.5.4
+#export VERSIONDATE=20210110
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="MPL-style"
+#export DOWNLOADURL="http://download.savannah.nongnu.org/releases/openexr/"
+export DOWNLOADURL="http://www.openexr.com/downloads.html"
+#export DOWNLOADURL="https://github.com/AcademySoftwareFoundation/openexr/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://download.savannah.nongnu.org/releases/openexr/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/openexr/openexr/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/AcademySoftwareFoundation/openexr/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix for building with windows threads
+cp -f IlmThread/IlmThreadWin32.cpp IlmThread/IlmThreadPosix.cpp
+cp -f IlmThread/IlmThreadMutexWin32.cpp IlmThread/IlmThreadMutexPosix.cpp
+cp -f IlmThread/IlmThreadSemaphoreWin32.cpp IlmThread/IlmThreadSemaphorePosix.cpp
+mv IlmThread/IlmThreadSemaphorePosixCompat.cpp IlmThread/IlmThreadSemaphorePosixCompat.cpp.bak
+touch IlmThread/IlmThreadSemaphorePosixCompat.cpp
+# fix Iex/IexThrowErrnoExc.cpp for 64-bit
+patch -ulbf Iex/IexThrowErrnoExc.cpp << EOF
+--- Iex/IexThrowErrnoExc.cpp  2010-01-16 01:52:36 +0100
++++ Iex/IexThrowErrnoExc.cpp  2011-12-12 23:05:06 +0100
+@@ -412,3 +412,3 @@
+
+-      #if defined (EOVERFLOW)
++      #if defined (EOVERFLOW) && (!defined(E2BIG) || (EOVERFLOW != E2BIG))
+          case EOVERFLOW:
+EOF
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
+## remove dependancy on dynamic libstdc++ (GCC 4)
+#mv libtool libtool.bak &&
+#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX/share/ilmbase --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading &&
+ make install-strip &&
+ ## make static generator files to avoid them crashing
+ #g++ -static -o Half/eLut.exe Half/eLut.cpp &&
+ #g++ -static -o Half/toFloat.exe Half/toFloat.cpp &&
+ #make -j1 install-strip LDFLAGS="-L$(pwd)/Iex/.libs" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: Conflicts with imath/openexr => moved to separate folder
+
+
+
+#wl-showstatus configure
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON . &&
+# wl-showstatus build &&
+# make install/strip &&
+#    echo OK
+####64-bit: No .DLL file specified in libImath.la
+
+
+
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+#export BUILDDEPENDANCIES=cmake,ninja
+## fix CMakeLists.txt (version >= 2.3.0)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -175,3 +175,3 @@
+#
+#-IF ( NOT WIN32 )
+#+IF ( NOT MSVC )
+#   FILE ( WRITE \${CMAKE_BINARY_DIR}/IlmBase.pc "prefix=\${CMAKE_INSTALL_PREFIX}\\n" )
+#EOF
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_TESTS:BOOL=ON -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_TESTS:BOOL=ON -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK

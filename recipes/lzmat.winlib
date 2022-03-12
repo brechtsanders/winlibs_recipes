@@ -1,0 +1,59 @@
+export NAME="LZMAT"
+export STATUS=
+export URL=http://www.matcode.com/lzmat.htm
+export BASENAME=lzmat
+export DESCRIPTION="LZMAT is an extremely fast real-time lossless data compression library"
+export CATEGORY=compression
+export TYPE=library
+export VERSION=1.0
+export VERSIONDATE=20170926
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL.TXT
+#export DOWNLOADURL="http://www.matcode.com/lzmat.htm"
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.matcode.com/lzmat_lib.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+unzip -oq $TARBALLDIR/$BASENAME/lzmat_lib.zip -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION
+# fix lzmat.h
+mv lzmat.h lzmat.h.bak &&
+echo "#include <stdint.h>" > lzmat.h &&
+sed -e "s/_WINDOWS/_WIN32/g" lzmat.h.bak >> lzmat.h
+# fix lzmat_enc.c
+patch -ulbf lzmat_enc.c << EOF
+@@ -426 +426 @@
+-                       if ( (MP_U32)pOut >= (MP_U32)pEndOut )
++                       if ( (uintptr_t)pOut >= (uintptr_t)pEndOut )
+@@ -463 +463 @@
+-       *pcbOut = ((MP_U32)pOut - (MP_U32)pbOut)+cur_nib;
++       *pcbOut = ((uintptr_t)pOut - (uintptr_t)pbOut)+cur_nib;
+EOF
+wl-showstatus build &&
+ for F in lzmat_*.c; do
+  gcc -c -O3 -I. $F -o $F.o -D_WINDOWS -DWIN32
+ done &&
+ ar cru liblzmat.a *.o &&
+ echo "EXPORTS" > liblzmat.def &&
+ nm -f posix --defined-only -p liblzmat.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" | grep "^lzmat" >> liblzmat.def &&
+ gcc -shared -s -mwindows -def liblzmat.def -o liblzmat.dll liblzmat.a -Wl,--out-implib,liblzmat.dll.a &&
+ #gcc -s -O3 -I. test_lzmat.c -L. -llzmat -o test_lzmat.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ #./test_lzmat e lzmat_enc.c _.lzmat &&
+ #./test_lzmat d lzmat_enc.lzmat _ &&
+ #diff lzmat_enc.c _ && echo OK &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

@@ -1,0 +1,58 @@
+export NAME="Open CASCADE Community Edition"
+export STATUS=
+export URL=https://github.com/tpaviot/oce
+export BASENAME=oce
+export DESCRIPTION="Open CASCADE Community Edition: patches/improvements/experiments contributed by users over the official Open CASCADE library. OCE is a C++ 3D modeling library. It can be used to develop CAD/CAM softwares, for instance FreeCad or IfcOpenShell."
+export CATEGORY=graphics
+export TYPE=library
+#export VERSION=0.17.2
+#export VERSIONDATE=20161126
+#export VERSION=0.17.3
+#export VERSIONDATE=20170302
+#export VERSION=0.18
+#export VERSIONDATE=20170113
+#export VERSION=0.18.1
+#export VERSIONDATE=20170510
+#export VERSION=0.18.2
+#export VERSIONDATE=20170816
+export VERSION=0.18.3
+export VERSIONDATE=20180214
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,freetype2
+export OPTIONALDEPENDANCIES=freeimage
+export BUILDDEPENDANCIES=cmake
+export LICENSEFILE=LICENSE_LGPL_21.txt
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/tpaviot/oce/releases OCE-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/tpaviot/oce/archive/OCE-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/OCE-$VERSION.tar.gz
+cd oce-OCE-$VERSION
+# fix redefinition of INFINITE in src/Message/Message_ProgressScale.cxx
+mv src/Message/Message_ProgressScale.cxx src/Message/Message_ProgressScale.cxx.bak &&
+sed -e "s/INFINITE/my&/g" src/Message/Message_ProgressScale.cxx.bak > src/Message/Message_ProgressScale.cxx
+# fix src/AdvApp2Var/AdvApp2Var_ApproxF2var.cxx
+mv src/AdvApp2Var/AdvApp2Var_ApproxF2var.cxx src/AdvApp2Var/AdvApp2Var_ApproxF2var.cxx.bak &&
+echo "#include <windows.h>" > src/AdvApp2Var/AdvApp2Var_ApproxF2var.cxx &&
+cat src/AdvApp2Var/AdvApp2Var_ApproxF2var.cxx.bak >> src/AdvApp2Var/AdvApp2Var_ApproxF2var.cxx
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOCE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/oce -DOCE_BUILD_SHARED_LIB:BOOL=OFF -DOCE_WITH_FREEIMAGE:BOOL=$(if [ -f $MINGWPREFIX/lib/libFreeImage.a ]; then echo ON; else echo OFF; fi) -DOCE_DISABLE_X11:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DOCE_TESTING:BOOL=OFF .. &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOCE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/oce -DOCE_BUILD_SHARED_LIB:BOOL=ON -DOCE_WITH_FREEIMAGE:BOOL=$(if [ -f $MINGWPREFIX/lib/libFreeImage.dll.a ]; then echo ON; else echo OFF; fi) -DOCE_DISABLE_X11:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DOCE_TESTING:BOOL=OFF .. &&
+ cd .. &&
+ wl-showstatus build-install &&
+ make -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ make -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf oce-OCE-$VERSION
+
+
+

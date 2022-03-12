@@ -1,0 +1,119 @@
+export NAME="Janus WebRTC Server"
+export STATUS=
+export URL=https://janus.conf.meetecho.com/
+#export URL=https://github.com/meetecho/janus-gateway
+export BASENAME=janus-gateway
+export DESCRIPTION="Janus is an open source, general purpose, WebRTC server designed and developed by Meetecho. This version of the server is tailored for Linux systems, although it can be compiled for, and installed on, MacOS machines as well. Windows is not supported, but if that's a requirement, Janus is known to work in the \"Windows Subsystem for Linux\" on Windows 10."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=0.9.2
+#export VERSIONDATE=20200329
+#export VERSION=0.9.3
+#export VERSIONDATE=20200422
+#export VERSION=0.9.4
+#export VERSIONDATE=20200504
+#export VERSION=0.9.5
+#export VERSIONDATE=20200518
+#export VERSION=0.10.0
+#export VERSIONDATE=20200601
+#export VERSION=0.10.1
+#export VERSIONDATE=20200611
+#export VERSION=0.10.2
+#export VERSIONDATE=20200617
+#export VERSION=0.10.3
+#export VERSIONDATE=20200710
+#export VERSION=0.10.4
+#export VERSIONDATE=20200807
+#export VERSION=0.10.5
+#export VERSIONDATE=20200910
+#export VERSION=0.10.6
+#export VERSIONDATE=20201005
+#export VERSION=0.10.7
+#export VERSIONDATE=20201030
+#export VERSION=0.10.8
+#export VERSIONDATE=20201123
+#export VERSION=0.10.9
+#export VERSIONDATE=20201223
+#export VERSION=0.10.10
+#export VERSIONDATE=20210209
+#export VERSION=0.11.1
+#export VERSIONDATE=20210406
+#export VERSION=0.11.2
+#export VERSIONDATE=20210503
+####ice.c:3432:50: error: dereferencing pointer to incomplete type 'struct ifaddrs'
+#export VERSION=0.11.3
+#export VERSIONDATE=20210615
+#export VERSION=0.11.4
+#export VERSIONDATE=20210906
+#export VERSION=0.11.5
+#export VERSIONDATE=20211020
+#export VERSION=0.11.6
+#export VERSIONDATE=20220122
+#export VERSION=0.11.7
+#export VERSIONDATE=20220125
+#export VERSION=0.11.8
+#export VERSIONDATE=20220211
+#export VERSION=0.12.0
+#export VERSIONDATE=20220304
+export VERSION=1.0.0
+export VERSIONDATE=20220304
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libdl,glib2,libconfig,libnice,libjansson,openssl,libmicrohttpd,libwebsockets,rabbitmq-c,nanomsg
+export OPTIONALDEPENDANCIES=paho-mqtt
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/meetecho/janus-gateway/releases"
+export DOWNLOADURL="https://github.com/meetecho/janus-gateway/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/meetecho/janus-gateway/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/meetecho/janus-gateway/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/arpa winfix/netinet winfix/net
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <winsock2.h>" > winfix/arpa/inet.h
+touch winfix/netdb.h winfix/sys/select.h winfix/netinet/in.h winfix/ifaddrs.h
+cat > winfix/endian.h << EOF
+EOF
+touch winfix/poll.h winfix/net/if.h
+# fix missing mode_t in utils.h
+mv utils.h utils.h.bak &&
+echo "#include <sys/types.h>" > utils.h &&
+cat utils.h.bak >> utils.h
+sed -i.bak -e "s/\buint\b/unsigned int/g" $(grep -lw uint $(find -name '*.c' -or -name '*.h'))
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ # avoid libdl detection issue
+ sed -i.bak -e "s/as_fn_error\(.*libdl not found\)/echo\1/" configure &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --disable-unix-sockets --disable-docs CFLAGS="-I$(pwd)/winfix -D_POSIX_THREAD_SAFE_FUNCTIONS -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -ldl" &&
+ #--enable-pthread-mutex
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

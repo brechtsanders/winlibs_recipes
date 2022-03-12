@@ -1,0 +1,291 @@
+export NAME="axTLS"
+export STATUS=
+export URL=http://axtls.sourceforge.net/
+export BASENAME=axtls
+export DESCRIPTION="The axTLS embedded SSL project is a highly configurable client/server TLSv1 SSL library designed for platforms with small memory requirements. It comes with a small HTTP/HTTPS server and additional test tools."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=1.4.4
+#export VERSIONDATE=20111206
+#export VERSION=1.4.5
+#export VERSIONDATE=20120212
+#export VERSION=1.4.6
+#export VERSIONDATE=20120525
+#export VERSION=1.4.8
+#export VERSIONDATE=20120701
+#export VERSION=1.4.9
+#export VERSIONDATE=20130107
+#export VERSION=1.5.0
+#export VERSIONDATE=20141031
+#export VERSION=1.5.2
+#export VERSIONDATE=20151103
+#export VERSION=1.5.3
+#export VERSIONDATE=20150501
+#export VERSION=1.5.4
+#export VERSIONDATE=20150707
+#export VERSION=2.0.0
+#export VERSIONDATE=20160817
+#export VERSION=2.0.1
+#export VERSIONDATE=20160830
+#export VERSION=2.1.0
+#export VERSIONDATE=20161213
+#export VERSION=2.1.1
+#export VERSIONDATE=20161220
+#export VERSION=2.1.2
+#export VERSIONDATE=20161231
+#export VERSION=2.1.3
+#export VERSIONDATE=20170219
+#export VERSION=2.1.4
+#export VERSIONDATE=20170831
+export VERSION=2.1.5
+export VERSIONDATE=20190316
+wl-showstatus --package-version
+export DEPENDANCIES=pcre
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://sourceforge.net/projects/axtls/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/axtls/$VERSION/axTLS-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/ax*
+# fix missing random/srandom in scripts/config/conf.c
+echo "#define random rand" >> config/scripts/config/lkc.h
+echo "#define srandom srand" >> config/scripts/config/lkc.h
+# fix missing file
+mkdir -p config/scripts/config/sys
+touch config/scripts/config/sys/utsname.h
+# fix ssl/os_port.h
+patch -ulbf ssl/os_port.h << EOF
+--- ssl/os_port.h  2011-01-15 00:13:14 +0100
++++ ssl/os_port.h  2011-12-06 20:29:26 +0100
+@@ -113,2 +113,4 @@
+  */
++#ifdef __MINGW32__
++#else
+ #pragma comment(lib, "WS2_32.lib")
+@@ -126,4 +128,6 @@
+
+-EXP_FUNC void STDCALL gettimeofday(struct timeval* t,void* timezone);
+ EXP_FUNC int STDCALL strcasecmp(const char *s1, const char *s2);
++#endif
++
++EXP_FUNC void STDCALL gettimeofday(struct timeval* t,void* timezone);
+ EXP_FUNC int STDCALL getdomainname(char *buf, int buf_size);
+
+EOF
+# fix ssl/os_port.c
+patch -ulbf ssl/os_port.c << EOF
+--- ssl/os_port.c  2011-01-02 08:49:03.000000000 +0100
++++ ssl/os_port.c  2016-12-20 10:34:12.303667200 +0100
+@@ -56,6 +56,7 @@
+ #endif
+ }
+
++#ifndef __MINGW32__
+ /**
+  * strcasecmp() not in Win32
+  */
+@@ -71,6 +72,7 @@
+
+     return *(unsigned char *)s1 - *(unsigned char *)(s2 - 1);
+ }
++#endif
+
+
+ EXP_FUNC int STDCALL getdomainname(char *buf, int buf_size)
+EOF
+# fix crypto/os_int.h (version >= 1.4.9)
+patch -ulbf crypto/os_int.h << EOF
+--- crypto/os_int.h  2012-06-08 12:43:26 +0200
++++ crypto/os_int.h  2013-01-07 21:55:02 +0100
+@@ -43,3 +43,3 @@
+
+-#if defined(WIN32)
++#if defined(WIN32) && !defined(__MINGW32__)
+ typedef UINT8 uint8_t;
+EOF
+# fix crypto/bigint_impl.h
+patch -ulbf crypto/bigint_impl.h << EOF
+--- crypto/bigint_impl.h  2016-06-12 12:39:34.000000000 +0200
++++ crypto/bigint_impl.h  2016-12-20 22:18:46.182417400 +0100
+@@ -44,2 +44,3 @@
+ /* Architecture specific functions for big ints */
++#include <stdint.h>
+ #if defined(CONFIG_INTEGER_8BIT)
+@@ -63,3 +64,3 @@
+ #else /* regular 32 bit */
+-#ifdef WIN32
++#if defined(WIN32) && !defined(__MINGW32__)
+ #define COMP_RADIX          4294967296i64
+EOF
+# fix missing srandom and type conversion problem in libmemcached/behavior.cc (version <= 1.4.8 <= 2.1.4)
+mv libmemcached/behavior.cc libmemcached/behavior.cc.bak &&
+echo "#define srandom srand" > libmemcached/behavior.cc &&
+sed -e "s/\(&sock_size,\)/(char*)\1/" libmemcached/behavior.cc.bak >> libmemcached/behavior.cc
+## fix missing be64toh (version >= 2.1.1)
+#mv ssl/os_port.h ssl/os_port.h.bak &&
+#echo "#include <x86intrin.h>" > ssl/os_port.h &&
+#echo "#define be64toh(x) _bswap64(x)" >> ssl/os_port.h &&
+#cat ssl/os_port.h.bak >> ssl/os_port.h
+# fix missing be64toh in ssl/os_port.h (version >= 2.1.1)
+mv ssl/os_port.h ssl/os_port.h.bak
+cat > ssl/os_port.h << EOF
+#ifndef HEADER_OS_PORT_H
+/*
+#include <stdint.h>
+inline uint64_t _bswap64(uint64_t a)
+{
+  a = ((a & 0x00000000000000FFULL) << 56) | 
+      ((a & 0x000000000000FF00ULL) << 40) | 
+      ((a & 0x0000000000FF0000ULL) << 24) | 
+      ((a & 0x00000000FF000000ULL) <<  8) | 
+      ((a & 0x000000FF00000000ULL) >>  8) | 
+      ((a & 0x0000FF0000000000ULL) >> 24) | 
+      ((a & 0x00FF000000000000ULL) >> 40) | 
+      ((a & 0xFF00000000000000ULL) >> 56);
+  return a;
+}
+#define be64toh(x) _bswap64(x)
+*/
+#define be64toh(a) ( \\
+  ((a & 0x00000000000000FFULL) << 56) | \\
+  ((a & 0x000000000000FF00ULL) << 40) | \\
+  ((a & 0x0000000000FF0000ULL) << 24) | \\
+  ((a & 0x00000000FF000000ULL) <<  8) | \\
+  ((a & 0x000000FF00000000ULL) >>  8) | \\
+  ((a & 0x0000FF0000000000ULL) >> 24) | \\
+  ((a & 0x00FF000000000000ULL) >> 40) | \\
+  ((a & 0xFF00000000000000ULL) >> 56))
+#endif
+EOF
+cat ssl/os_port.h.bak >> ssl/os_port.h
+# fix missing rand_r in crypto/crypto_misc.c (version >= 2.1.1)
+mv crypto/crypto_misc.c crypto/crypto_misc.c.bak
+echo "#define rand_r(__seed) (__seed == __seed ? rand () : rand ())" > crypto/crypto_misc.c
+cat crypto/crypto_misc.c.bak >> crypto/crypto_misc.c
+# fix config/scripts/config/Makefile
+patch -ulbf config/scripts/config/Makefile << EOF
+--- config/scripts/config/Makefile  2010-04-30 13:36:06 +0200
++++ config/scripts/config/Makefile  2011-12-06 20:25:50 +0100
+@@ -52,3 +52,3 @@
+ conf: \$(CONF_OBJS) \$(SHARED_OBJS)
+-       \$(HOSTCC) \$(NATIVE_LDFLAGS) \$^ -o \$@
++`printf "\\t"`\$(HOSTCC) \$(NATIVE_LDFLAGS) \$^ -o \$@ -lregex
+
+EOF
+# fix ssl/Makefile
+patch -ulbf ssl/Makefile << EOF
+--- ssl/Makefile  2010-10-09 01:43:43.000000000 +0200
++++ ssl/Makefile  2016-12-20 11:29:35.727719100 +0100
+@@ -45,5 +45,5 @@
+ ifndef CONFIG_PLATFORM_WIN32
+ TARGET1=\$(AXTLS_HOME)/\$(STAGE)/libaxtls.a
+-BASETARGET=libaxtls.so
++BASETARGET=libaxtls.dll
+ CRYPTO_PATH=\$(AXTLS_HOME)/crypto/
+ ifdef CONFIG_PLATFORM_CYGWIN
+@@ -55,5 +55,5 @@
+ # shared library major/minor numbers
+ LIBMAJOR=\$(BASETARGET).1
+-LIBMINOR=\$(BASETARGET).1.2
++LIBMINOR=\$(BASETARGET)
+ else
+ TARGET1=\$(AXTLS_HOME)/\$(STAGE)/axtls.lib
+@@ -97,6 +97,6 @@
+ \$(TARGET2) : \$(CRYPTO_OBJ) \$(OBJ)
+ ifndef CONFIG_PLATFORM_CYGWIN
+-       \$(LD) \$(LDFLAGS) \$(LDSHARED) -Wl,-soname,\$(LIBMAJOR) -o \$(AXTLS_HOME)/\$(STAGE)/\$(LIBMINOR) \$(CRYPTO_OBJ) \$(OBJ)
+-       cd \$(AXTLS_HOME)/\$(STAGE); ln -sf \$(LIBMINOR) \$(LIBMAJOR); ln -sf \$(LIBMAJOR) \$(BASETARGET); cd -
++`printf "\\t"`\$(LD) \$(LDFLAGS) \$(LDSHARED) -shared -Wl,--out-implib=\$(AXTLS_HOME)/\$(STAGE)/libaxtls.dll.a -o \$(AXTLS_HOME)/\$(STAGE)/\$(LIBMINOR) \$(CRYPTO_OBJ) \$(OBJ) -lws2_32
++`printf "\\t"`#cd \$(AXTLS_HOME)/\$(STAGE); ln -sf \$(LIBMINOR) \$(LIBMAJOR); ln -sf \$(LIBMAJOR) \$(BASETARGET); cd -
+ else
+        \$(LD) \$(LDFLAGS) \$(LDSHARED) -o \$(AXTLS_HOME)/\$(STAGE)/cygaxtls.dll \
+
+EOF
+# configure
+#cat > answers << EOF
+#1
+#$INSTALLPREFIX
+#N
+#Y
+#
+#
+#4
+#2
+#Y
+#N
+#N
+#Y
+#Y
+#24
+#150
+#3
+#N
+#N
+#N
+#N
+#N
+#N
+#N
+#N
+#3
+#Y
+#N
+#Y
+#Y
+#N
+#1
+#EOF
+cat > answers << EOF
+1
+$INSTALLPREFIX
+N
+Y
+
+
+4
+3
+Y
+N
+N
+Y
+24
+150
+3
+N
+N
+N
+N
+N
+N
+N
+N
+3
+Y
+N
+Y
+Y
+N
+1
+EOF
+wl-showstatus configure &&
+ make -j1 config < answers &&
+ wl-showstatus build &&
+ #make -j1 CC=gcc
+ #make -j1 CC=gcc LIBS="-Wl,--as-needed -lcurses" NATIVE_LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -lpcreposix" &&
+ #make -j1 CC=gcc LIBS="-Wl,--as-needed -lcurses" CONFIG_PLATFORM_CYGWIN=1 &&
+ make -j1 CC=gcc LIBS="-Wl,--as-needed -lcurses" &&
+ wl-showstatus install &&
+ make install PREFIX=$INSTALLPREFIX &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && rm -rf $BASENAME-$VERSION
+
+
+
