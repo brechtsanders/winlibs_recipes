@@ -5,11 +5,15 @@ Recipes for natively building [winlibs](https://winlibs.com/) packages from sour
 
 The primary goal of [winlibs.com](https://winlibs.com/) is to build C/C++ source code on native Windows 32-bit and 64-bit platforms using [MinGW-w64](https://www.mingw-w64.org/) [GCC](https://gcc.gnu.org/).
 
-These recipes descripy how to build each package from source into a package that can be managed with the [winlibs_tools](https://github.com/brechtsanders/winlibs_tools/).
+These recipes describe how to build each package from source into a package that can be managed with the [winlibs_tools](https://github.com/brechtsanders/winlibs_tools/).
+
+Cross compilation from other platforms is not in scope. These recipes focus on building on Windows for Windows.
 
 ## Prerequisites
 
-A Windows system wit a working [MSYS2](https://www.msys2.org/) shell and the [winlibs_tools](https://github.com/brechtsanders/winlibs_tools/) are needed to build these recipes.
+A Windows system with a working [MSYS2](https://www.msys2.org/) shell and the [winlibs_tools](https://github.com/brechtsanders/winlibs_tools/) are needed to build these recipes.
+
+MSVC does not need to be installed.
 
 ## Folders
 
