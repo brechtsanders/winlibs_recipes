@@ -86,6 +86,19 @@ cd $BASENAME-$VERSION
 #        bool prefer_ipv6 = false, run_daemon = false, test = false;
 #        const char *ua_eprm = NULL;
 #EOF
+## fix already defined interface in modules/ctrl_dbus/ctrl_dbus.c (version >= 2.0.0)
+#sed -i.bak -e "s/\binterface\b/iface/g" modules/ctrl_dbus/ctrl_dbus.c
+## fix modules/av1/decode.c (version >= 2.0.0)
+#patch -ulbf modules/av1/decode.c << EOF
+#@@ -12,2 +12,3 @@
+# #include <aom/aom_decoder.h>
+#+#include <aom/aom_encoder.h>
+# #include <aom/aomdx.h>
+#EOF
+## fix modules/ctrl_dbus/ctrl_dbus.c (version >= 2.0.0)
+#mv modules/ctrl_dbus/ctrl_dbus.c modules/ctrl_dbus/ctrl_dbus.c.bak &&
+#echo "#include <pthread.h>" > modules/ctrl_dbus/ctrl_dbus.c &&
+#cat modules/ctrl_dbus/ctrl_dbus.c.bak >> modules/ctrl_dbus/ctrl_dbus.c
 ## fix building modules (version <= 0.5.11)
 #patch -ulbf mk/modules.mk << EOF
 #--- mk/modules.mk  2016-12-23 15:43:25.000000000 +0100
@@ -121,12 +134,17 @@ patch -ulbf Makefile << EOF
 +endif
         @mkdir -p \$(DESTDIR)\$(SHARE_PATH)
 EOF
+## skip building X11 module (version >= 2.0.0)
+#sed -i.bak -e "s?^USE_X11?#&?" mk/modules.mk
+## fix missing gio-unix (version >= 2.0.0)
+#sed -i.bak -e "s/gio-unix/gio-windows/" modules/ctrl_dbus/module.mk
 mkdir -p $INSTALLPREFIX/lib/restund/modules
 wl-showstatus build-install &&
  #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="gcc -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk LIBS="-lre -lrem -lwinmm -lws2_32" PREFIX=$INSTALLPREFIX &&
  #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="gcc -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk STATIC= PREFIX=$INSTALLPREFIX &&
  #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="gcc -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
  make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="gcc -I$MINGWPREFIX/include/re -I$MINGWPREFIX/include/rem $(pkg-config --cflags gtk+-2.0)" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
+ #PATH=$PYDIR:$PATH make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="gcc -I$MINGWPREFIX/include/re -I$MINGWPREFIX/include/rem -I$MINGWPREFIX/include/gsm $(pkg-config --cflags gtk+-2.0)" LFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lfdk-aac" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
  strip $INSTALLPREFIX/bin/*.exe &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: check why baresip.exe starts with error
