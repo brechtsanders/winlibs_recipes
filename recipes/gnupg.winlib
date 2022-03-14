@@ -180,7 +180,7 @@ export VERSION=2.3.4
 export VERSIONDATE=20211221
 wl-showstatus --package-version
 export DEPENDANCIES=npth,ntbtls,libgcrypt,libassuan,libksba,libgpg-error,pcre,readline,libcurl,zlib,libbz2,sqlite3,openldap
-export OPTIONALDEPENDANCIES=
+export OPTIONALDEPENDANCIES=tpm2-tss
 export BUILDDEPENDANCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL/LPGL
@@ -261,7 +261,7 @@ patch -ulbf g13/g13.c << EOF
    int err;
 EOF
 # fix missing fseeko/ftello in kbx/keybox-search.c on 32-bit (version >= 2.1.18)
-if ! gcc --version | grep -q MinGW-W64; then
+if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
 mv kbx/keybox-search.c kbx/keybox-search.c.bak
 cat > kbx/keybox-search.c << EOF
 #define fseeko(fp,offset,whence) fseeko64(fp, offset, whence)
@@ -270,7 +270,7 @@ EOF
 cat kbx/keybox-search.c.bak >> kbx/keybox-search.c
 fi
 # fix missing HCERTSTORE in dirmngr/certcache.c (version >= 2.1.19)
-if ! gcc --version | grep -q MinGW-W64; then
+if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
 mv dirmngr/certcache.c dirmngr/certcache.c.bak
 cat > dirmngr/certcache.c << EOF
 #include <windows.h>
@@ -279,17 +279,17 @@ EOF
 cat dirmngr/certcache.c.bak >> dirmngr/certcache.c
 fi
 # fix missing EHOSTUNREACH in dirmngr/http.c (version >= 2.1.19)
-if ! gcc --version | grep -q MinGW-W64; then
+if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
 mv dirmngr/http.c dirmngr/http.c.bak &&
 sed -e "s/\bEHOSTUNREACH/WSA&/g" dirmngr/http.c.bak > dirmngr/http.c
 fi
 # fix missing error constants in dirmngr/dns.c (version >= 2.1.19)
-if ! gcc --version | grep -q MinGW-W64; then
+if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
 mv dirmngr/dns.c dirmngr/dns.c.bak &&
 sed -e "s/\b\(EPROTONOSUPPORT\|ENETDOWN\|ENETUNREACH\|EHOSTUNREACH\|ECONNREFUSED\|ETIMEDOUT\)/WSA\1/g; s/ENOTSUP/WSAEOPNOTSUPP/g; s/EOVERFLOW/ERROR_BUFFER_OVERFLOW/g" dirmngr/dns.c.bak > dirmngr/dns.c
 fi
 # fix invalid number of parameters to ldap_start_tls_s in dirmngr/ks-engine-ldap.c (version >= 2.1.19)
-if ! gcc --version | grep -q MinGW-W64; then
+if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
 patch -ulbf dirmngr/ks-engine-ldap.c << EOF
 --- dirmngr/ks-engine-ldap.c.bak        2017-03-01 14:04:33 +0100
 +++ dirmngr/ks-engine-ldap.c    2017-03-04 11:27:54 +0100
@@ -301,7 +301,7 @@ patch -ulbf dirmngr/ks-engine-ldap.c << EOF
 EOF
 fi
 # fix missing getnameinfo/getaddrinfo/freeaddrinfo function in dirmngr/dns-stuff.c (version >= 2.1.19)
-if ! gcc --version | grep -q MinGW-W64; then
+if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
 mv dirmngr/dns-stuff.c dirmngr/dns-stuff.c.bak
 cat > dirmngr/dns-stuff.c << EOF
 #define _WIN32_WINNT 0x0501
@@ -316,6 +316,17 @@ patch -ulbf g10/cpr.c << EOF
 -#ifndef HAVE_W32CE_SYSTEM
 +#if !defined(HAVE_W32CE_SYSTEM) && defined(SIGINT)
            raise (SIGINT); /* Nothing to hangup under DOS.  */
+EOF
+# fix tpm2d/tpm2.c (version >= 2.3.4)
+patch -ulbf tpm2d/tpm2.c << EOF
+@@ -29,3 +29,7 @@
+ #include <sys/stat.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <arpa/inet.h>
++#endif
+
 EOF
 # skip building doc
 cat > doc/Makefile.in << EOF
