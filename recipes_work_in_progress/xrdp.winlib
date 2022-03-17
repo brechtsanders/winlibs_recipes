@@ -43,8 +43,10 @@ export TYPE=application
 #export VERSIONDATE=20210901
 #export VERSION=0.9.18
 #export VERSIONDATE=20220111
-export VERSION=0.9.18.1
-export VERSIONDATE=20220208
+#export VERSION=0.9.18.1
+#export VERSIONDATE=20220208
+export VERSION=0.9.19
+export VERSIONDATE=20220317
 wl-showstatus --package-version
 export DEPENDANCIES=libjpeg,libopus,lame,pixman,openssl
 #export DEPENDANCIES=libjpeg,libjpeg-turbo,libopus,lame,pixman,openssl,libx11
@@ -63,10 +65,77 @@ wl-showstatus extract
 #tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix migging O_RDWR/O_CREAT/O_TRUNC/S_IRUSR/S_IWUSR in common/os_calls.c (version >= 0.9.17)
-mv common/os_calls.c common/os_calls.c.bak &&
-echo "#include <fcntl.h>" > common/os_calls.c &&
-cat common/os_calls.c.bak >> common/os_calls.c
+# fix missing files
+mkdir -p winfix/{sys,netinet,arpa}
+cat > winfix/syslog.h << EOF
+//#define LOG_EMERG   0    //system is unusable
+//#define LOG_ALERT   1    //action must be taken immediately
+#define LOG_CRIT    2    //critical conditions
+#define LOG_ERR     3    //error conditions
+#define LOG_WARNING 4    //warning conditions
+//#define LOG_NOTICE  5    //normal but significant condition
+#define LOG_INFO    6    //informational
+#define LOG_DEBUG   7    //debug-level messages
+//#define LOG_PID    0x01    //log the pid with each message
+//#define LOG_NDELAY 0x08    //don't delay open
+//#define LOG_DAEMON (3<<3)
+#define openlog(...)
+#define closelog(...)
+#define syslog(...)
+#define O_SYNC 0
+EOF
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netinet/in.h
+touch winfix/arpa/inet.h
+touch winfix/netdb.h
+## fix missing O_RDWR/O_CREAT/O_TRUNC/S_IRUSR/S_IWUSR in common/os_calls.c (version >= 0.9.17)
+#mv common/os_calls.c common/os_calls.c.bak &&
+#echo "#include <fcntl.h>" > common/os_calls.c &&
+#echo "#include <sys/stat.h>" >> common/os_calls.c &&
+#cat common/os_calls.c.bak >> common/os_calls.c
+# fix missing O_RDWR/O_CREAT/O_TRUNC/S_IRUSR/S_IWUSR/struct sockaddr_un in common/os_calls.c (version >= 0.9.19)
+patch -ulbf common/os_calls.c << EOF
+@@ -33,2 +33,7 @@
+ #include <winsock.h>
++#undef socklen_t
++#include <ws2tcpip.h>
++#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))
++#include <fcntl.h>
++#include <sys/stat.h>
+ #else
+@@ -1300,3 +1305,5 @@
+ #endif
++#if !defined(_WIN32)
+         struct sockaddr_un sock_addr_un;
++#endif
+ #if defined(XRDP_ENABLE_VSOCK)
+@@ -1406,3 +1413,5 @@
+ #endif
++#if !defined(_WIN32)
+         struct sockaddr_un sock_addr_un;
++#endif
+     } sock_info;
+@@ -1706,2 +1715,7 @@
+ {
++#ifdef _WIN32
++     unsigned long nonblocking = 1;
++     if (ioctlsocket(fd, FIONBIO, &nonblocking) == SOCKET_ERROR)
++       return 1;
++#else
+     int error;
+@@ -1724,2 +1738,3 @@
+     }
++#endif
+     return 0;
+@@ -2345,3 +2360,7 @@
+ {
++#if defined(_WIN32)
++    return -1;
++#else
+     return chown(name, uid, gid);
++#endif
+ }
+EOF
 wl-showstatus configure &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  #./autogen.sh &&
@@ -82,12 +151,18 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-pam --enable-jpeg --disable-tjpeg --enable-opus --enable-mp3lame --enable-pixman --disable-strict-locations --with-x &&
- ## fix building DLLs
- #mv libtool libtool.bak &&
- #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-pam --enable-jpeg --disable-tjpeg --enable-opus --enable-mp3lame --enable-pixman --disable-strict-locations --with-x &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-pam --enable-jpeg --disable-tjpeg --enable-opus --enable-mp3lame --enable-pixman --disable-painter --disable-rfxcodec --disable-strict-locations --with-x CFLAGS="-I$PWD/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  #wl-showstatus build &&
  #make &&
+ ( make || (
+  make -i &&
+  # fix linking with absolute .la files
+  sed -i.bak -e "s?\$MINGWPREFIX/lib/lib\([^ ]*\)\.la?-l\1?g" $(find -name '*.lai') &&
+  make
+ )) &&
  wl-showstatus build-install &&
  make install-strip &&
     ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
