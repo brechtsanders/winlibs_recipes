@@ -37,8 +37,10 @@ export TYPE=library
 #export VERSIONDATE=20211210
 #export VERSION=m99
 #export VERSIONDATE=20220121
-export VERSION=m100
-export VERSIONDATE=20220218
+#export VERSION=m100
+#export VERSIONDATE=20220218
+export VERSION=m101
+export VERSIONDATE=20220318
 ####ninja: error: '../../third_party/externals/zlib/google/compression_utils_portable.cc', needed by 'obj/third_party/externals/zlib/google/compression_utils_portable.compression_utils_portable.obj', missing and no known rule to make it
 wl-showstatus --package-version
 export DEPENDANCIES=
@@ -60,36 +62,196 @@ mkdir -p $BASENAME-$VERSION
 #tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
 tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz -C$BASENAME-$VERSION
 cd $BASENAME-$VERSION
+# avoid always_inline issue in src/opts/SkChecksum_opts.h (version >= m101)
+patch -ulbf src/opts/SkChecksum_opts.h << EOF
+@@ -18,3 +18,3 @@
+
+-#if 1 && SK_CPU_SSE_LEVEL >= SK_CPU_SSE_LEVEL_SSE42
++#if 0 && SK_CPU_SSE_LEVEL >= SK_CPU_SSE_LEVEL_SSE42
+     #include <immintrin.h>
+EOF
+# avoid always_inline issue in src/opts/Sk4px_SSE2.h (version >= m101)
+patch -ulbf src/opts/Sk4px_SSE2.h << EOF
+@@ -35,3 +35,3 @@
+
+-#if SK_CPU_SSE_LEVEL >= SK_CPU_SSE_LEVEL_SSSE3
++#if 0 && SK_CPU_SSE_LEVEL >= SK_CPU_SSE_LEVEL_SSSE3
+     inline Sk4px Sk4px::alphas() const {
+EOF
 # fix gn/BUILDCONFIG.gn (version >= m89)
 patch -ulbf gn/BUILDCONFIG.gn << EOF
-@@ -122,3 +122,3 @@
+@@ -123,3 +123,3 @@
 
 -if (target_os == "win") {
 +if (target_os == "win_MSVC_ONLY") {
    # By default we look for 2017 (Enterprise, Pro, and Community), then 2015. If MSVC is installed in a
-@@ -133,3 +133,3 @@
+@@ -134,3 +134,3 @@
 
 -if (target_os == "win") {
 +if (target_os == "win_MSVC_ONLY") {
    if (win_toolchain_version == "") {
+@@ -226,5 +226,5 @@
+   # Windows tool chain
+-  set_default_toolchain("//gn/toolchain:msvc")
+-  default_toolchain_name = "msvc"
+-  host_toolchain = "msvc"
++  set_default_toolchain("//gn/toolchain:gcc_like")
++  default_toolchain_name = "gcc_like"
++  host_toolchain = "gcc_like_host"
+ } else if (is_wasm) {
 EOF
-#gn gen out/Static --args='is_official_build=true is_debug=false text_tests_enabled=false'
-#gn gen out/Shared --args='is_official_build=true is_debug=false is_component_build=true text_tests_enabled=false'
-#gn args out/Shared --list
-#ninja -Cout/Static
-#ninja -Cout/Shared
-wl-showstatus configure &&
- cd third_party &&
- PATH=$PYDIR:$PATH gn gen build_win --args='is_official_build=true' &&
- #PATH=$PYDIR:$PATH gn gen build_win --args='target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false is_official_build=true skia_enable_pdf=false' &&
- cd .. &&
- #PATH=$PYDIR:$PATH gn gen build_win --args='is_official_build=true' &&
- PATH=$PYDIR:$PATH gn gen build_win --args='is_official_build=true skia_enable_pdf=false' &&
- #PATH=$PYDIR:$PATH gn gen out/build_win --args='os="win" target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" is_gcc=true is_clang=false is_debug=false treat_warnings_as_errors=false' &&
- #PATH=$PYDIR:$PATH gn gen build_win --args='target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false skia_enable_pdf=false' &&
+# fix BUILD.gn (version >= m101)
+patch -ulbf BUILD.gn << EOF
+@@ -183,3 +183,3 @@
+   sources = skia_opts.sse2_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_win && host_toolchain != "gcc_like_host") {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSE2" ]
+@@ -193,3 +193,3 @@
+   sources = skia_opts.ssse3_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_win && host_toolchain != "gcc_like_host") {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSSE3" ]
+@@ -203,3 +203,3 @@
+   sources = skia_opts.sse41_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_win && host_toolchain != "gcc_like_host") {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSE41" ]
+@@ -213,3 +213,3 @@
+   sources = skia_opts.sse42_sources
+-  if (!is_clang && is_win) {
++  if (!is_clang && is_win && host_toolchain != "gcc_like_host") {
+     defines = [ "SK_CPU_SSE_LEVEL=SK_CPU_SSE_LEVEL_SSE42" ]
+@@ -223,3 +223,3 @@
+   sources = skia_opts.avx_sources
+-  if (is_win) {
++  if (is_win && host_toolchain != "gcc_like_host") {
+     cflags = [ "/arch:AVX" ]
+@@ -236,3 +236,3 @@
+   sources = skia_opts.hsw_sources
+-  if (is_win) {
++  if (is_win && host_toolchain != "gcc_like_host") {
+     cflags = [ "/arch:AVX2" ]
+@@ -249,3 +249,3 @@
+   sources = skia_opts.skx_sources
+-  if (is_win) {
++  if (is_win && host_toolchain != "gcc_like_host") {
+     cflags = [ "/arch:AVX512" ]
+@@ -1641,3 +1641,3 @@
+   config("cpp17") {
+-    if (is_win) {
++    if (is_win && host_toolchain != "gcc_like_host") {
+       cflags_cc = [ "/std:c++17" ]
+@@ -2757,3 +2757,3 @@
+       ]
+-      if (is_win) {
++      if (is_win && host_toolchain != "gcc_like_host") {
+         cflags = [
+@@ -2887,3 +2887,3 @@
+     test_app("mdbviz") {
+-      if (is_win) {
++      if (is_win && host_toolchain != "gcc_like_host") {
+         # on Windows we need to disable some exception handling warnings due to the Qt headers
+EOF
+# fix gn/skia/BUILD.gn (version >= m101)
+patch -ulbf gn/skia/BUILD.gn << EOF
+@@ -61,3 +61,3 @@
+   # disabling them part of :warnings, as some targets remove :warnings.)
+-  if (is_win && !is_clang) {
++  if (is_win && !is_clang && host_toolchain != "gcc_like_host") {
+     cflags += [ "/wd5030" ]
+@@ -87,3 +87,3 @@
+
+-  if (is_win) {
++  if (is_win && host_toolchain != "gcc_like_host") {
+     if (is_clang && target_cpu == "arm64") {
+@@ -306,3 +306,3 @@
+
+-    if (is_win) {
++    if (is_win && host_toolchain != "gcc_like_host") {
+       cflags += [
+@@ -358,3 +358,3 @@
+   if (werror) {
+-    if (is_win) {
++    if (is_win && host_toolchain != "gcc_like_host") {
+       cflags += [ "/WX" ]
+@@ -365,3 +365,3 @@
+
+-  if (is_win) {
++  if (is_win && host_toolchain != "gcc_like_host") {
+     cflags += [
+@@ -567,3 +567,3 @@
+     ]
+-  } else if (is_win) {
++  } else if (is_win && host_toolchain != "gcc_like_host") {
+     cflags = [ "/Z7" ]
+@@ -582,3 +582,3 @@
+   if (sanitize != "ASAN") {  # -fsanitize=vptr requires RTTI
+-    if (is_win) {
++    if (is_win && host_toolchain != "gcc_like_host") {
+       cflags_cc = [ "/GR-" ]
+@@ -591,3 +591,3 @@
+ config("optimize") {
+-  if (is_win) {
++  if (is_win && host_toolchain != "gcc_like_host") {
+     cflags = [
+@@ -631,3 +631,3 @@
+     ]
+-  } else if (is_win) {
++  } else if (is_win && host_toolchain != "gcc_like_host") {
+     ldflags = [
+EOF
+# fix how to build .dll in gn/toolchain/BUILD.gn (version >= m101)
+patch -ulbf gn/toolchain/BUILD.gn << EOF
+@@ -324,2 +324,5 @@
+       }
++      if (is_win) {
++        rpath = "-Wl,--out-implib,\$soname.a"
++      }
+
+@@ -341,6 +344,10 @@
+
+-      command = "\$link -shared {{ldflags}} \$_start_group @\$rspfile {{frameworks}} {{solibs}} \$_end_group {{libs}} \$rpath -o {{output}}"
++      command = "\$link -shared \$_start_group @\$rspfile {{frameworks}} {{solibs}} \$_end_group {{ldflags}} {{libs}} \$rpath -o {{output}}"
+       outputs = [ "{{root_out_dir}}/\$soname" ]
+       output_prefix = "lib"
+-      default_output_extension = ".so"
++      if (is_win) {
++        default_output_extension = ".dll"
++      } else {
++        default_output_extension = ".so"
++      }
+       description = "link {{output}}"
+EOF
+#wl-showstatus configure &&
+# cd third_party &&
+# PATH=$PYDIR:$PATH gn gen build_win --args='is_official_build=true' &&
+# #PATH=$PYDIR:$PATH gn gen build_win --args='target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false is_official_build=true skia_enable_pdf=false' &&
+# cd .. &&
+# #PATH=$PYDIR:$PATH gn gen build_win --args='is_official_build=true' &&
+# PATH=$PYDIR:$PATH gn gen build_win --args='is_official_build=true skia_enable_pdf=false' &&
+# #PATH=$PYDIR:$PATH gn gen out/build_win --args='os="win" target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" is_gcc=true is_clang=false is_debug=false treat_warnings_as_errors=false' &&
+# #PATH=$PYDIR:$PATH gn gen build_win --args='target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false skia_enable_pdf=false' &&
+# wl-showstatus build &&
+# ninja -Cthird_party/build_win &&
+# ninja -Cbuild_win &&
+#    echo OK
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PATH=$PYDIR:$PATH gn gen build_static --args='target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false is_official_build=true is_component_build=true skia_enable_pdf=false skia_use_xps=false skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_enable_fontmgr_win=false skia_use_system_expat=true skia_use_system_harfbuzz=true skia_use_system_icu=true skia_use_system_libpng=true skia_use_system_libwebp=true skia_use_zlib=false text_tests_enabled=false extra_cflags=["-I'$(cygpath -m $MINGWPREFIX/include/harfbuzz)'"]' &&
+ #skia_use_system_zlib=true
+ #skia_use_system_libjpeg_turbo=true
+ #PATH=$PYDIR:$PATH gn args build_static --list
+ sed -i.bak -e "s/\(-l[^ ]*\)\.lib/\1/g" build_static/obj/skia_c_api_example.ninja &&
+ wl-showstatus configure &&
+ PATH=$PYDIR:$PATH gn gen build_shared --args='target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false is_official_build=true is_component_build=true skia_enable_pdf=false skia_use_xps=false skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_enable_fontmgr_win=false skia_use_system_expat=true skia_use_system_harfbuzz=true skia_use_system_icu=true skia_use_system_libpng=true skia_use_system_libwebp=true skia_use_zlib=false text_tests_enabled=false extra_cflags=["-I'$(cygpath -m $MINGWPREFIX/include/harfbuzz)'"]' &&
+ #PATH=$PYDIR:$PATH gn args build_shared --list
+ sed -i.bak -e "s/\(-l[^ ]*\)\.lib/\1/g" build_shared/obj/skia.ninja &&
+ sed -i.bak2 -e "s/^ *ldflags *=.*/& -Wl,--as-needed -luuid -lwindowscodecs/" build_shared/obj/skia.ninja &&
  wl-showstatus build &&
- ninja -Cthird_party/build_win &&
- ninja -Cbuild_win &&
+ PATH=$PYDIR:$PATH ninja -Cbuild_static &&
+ wl-showstatus build &&
+ PATH=$PYDIR:$PATH ninja -Cbuild_shared &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
 ####See also: https://www.programmersought.com/article/9073691401/
