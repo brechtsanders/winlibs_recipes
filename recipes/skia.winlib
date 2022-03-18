@@ -236,15 +236,17 @@ EOF
 # ninja -Cthird_party/build_win &&
 # ninja -Cbuild_win &&
 #    echo OK
+#PATH=$PYDIR:$PATH gn gen out/config --ide=json --json-ide-script=../../gn/gn_to_cmake.py --args='target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false is_official_build=true is_component_build=true skia_enable_pdf=false skia_use_xps=false skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_enable_fontmgr_win=false skia_use_system_expat=true skia_use_system_harfbuzz=true skia_use_system_icu=true skia_use_system_libpng=true skia_use_system_libwebp=true skia_use_zlib=false text_tests_enabled=false extra_cflags=["-I'$(cygpath -m $MINGWPREFIX/include/harfbuzz)'"]'
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -Sout/config -Bbuild_test -LH && echo OK; rm -rf build_test
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- PATH=$PYDIR:$PATH gn gen build_static --args='target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false is_official_build=true is_component_build=true skia_enable_pdf=false skia_use_xps=false skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_enable_fontmgr_win=false skia_use_system_expat=true skia_use_system_harfbuzz=true skia_use_system_icu=true skia_use_system_libpng=true skia_use_system_libwebp=true skia_use_zlib=false text_tests_enabled=false extra_cflags=["-I'$(cygpath -m $MINGWPREFIX/include/harfbuzz)'"]' &&
+ PATH=$PYDIR:$PATH gn gen build_static --args='target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_component_build=false is_debug=false is_official_build=true skia_enable_pdf=false skia_use_xps=false skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_enable_fontmgr_win=false skia_use_system_expat=true skia_use_system_harfbuzz=true skia_use_system_icu=true skia_use_system_libpng=true skia_use_system_libwebp=true skia_use_zlib=false text_tests_enabled=false extra_cflags=["-I'$(cygpath -m $MINGWPREFIX/include/harfbuzz)'"]' &&
  #skia_use_system_zlib=true
  #skia_use_system_libjpeg_turbo=true
  #PATH=$PYDIR:$PATH gn args build_static --list
  sed -i.bak -e "s/\(-l[^ ]*\)\.lib/\1/g" build_static/obj/skia_c_api_example.ninja &&
  wl-showstatus configure &&
- PATH=$PYDIR:$PATH gn gen build_shared --args='target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_debug=false is_official_build=true is_component_build=true skia_enable_pdf=false skia_use_xps=false skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_enable_fontmgr_win=false skia_use_system_expat=true skia_use_system_harfbuzz=true skia_use_system_icu=true skia_use_system_libpng=true skia_use_system_libwebp=true skia_use_zlib=false text_tests_enabled=false extra_cflags=["-I'$(cygpath -m $MINGWPREFIX/include/harfbuzz)'"]' &&
+ PATH=$PYDIR:$PATH gn gen build_shared --args='target_os="win" target_cpu="'$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x64"; else "x86"; fi)'" cc="gcc" cxx="g++" is_component_build=true is_debug=false is_official_build=true skia_enable_pdf=false skia_use_xps=false skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_enable_fontmgr_win=false skia_use_system_expat=true skia_use_system_harfbuzz=true skia_use_system_icu=true skia_use_system_libpng=true skia_use_system_libwebp=true skia_use_zlib=false text_tests_enabled=false extra_cflags=["-I'$(cygpath -m $MINGWPREFIX/include/harfbuzz)'"]' &&
  #PATH=$PYDIR:$PATH gn args build_shared --list
  sed -i.bak -e "s/\(-l[^ ]*\)\.lib/\1/g" build_shared/obj/skia.ninja &&
  sed -i.bak2 -e "s/^ *ldflags *=.*/& -Wl,--as-needed -luuid -lwindowscodecs/" build_shared/obj/skia.ninja &&
@@ -252,8 +254,18 @@ mkdir -p build_static build_shared &&
  PATH=$PYDIR:$PATH ninja -Cbuild_static &&
  wl-showstatus build &&
  PATH=$PYDIR:$PATH ninja -Cbuild_shared &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+ strip build_shared/*.dll &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/skia $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ for F in include/*; do
+  if [ -d $F ] && [ $F != include/third_party ] && [ $F != include/private ] && [ $F != include/android ]; then
+   cp -rf $F $INSTALLPREFIX/include//skia
+  fi
+ done &&
+ cp -f build_static/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
 ####See also: https://www.programmersought.com/article/9073691401/
 ####See also: https://skia.org/docs/user/build/
 
