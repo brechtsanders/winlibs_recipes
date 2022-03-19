@@ -70,6 +70,29 @@ tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd LightGBM-$VERSION
 # fix missing dependancy includes in include/LightGBM/utils/common.h
 sed -i.bak -e "s?../../../external_libs/fmt/include/??; s?../../../external_libs/fast_double_parser/include/??" include/LightGBM/utils/common.h
+## fix redefinition of inet_pton in src/network/socket_wrapper.hpp (version >= 3.3.2)
+#patch -ulbf src/network/socket_wrapper.hpp << EOF
+#@@ -21,2 +21,6 @@
+#
+#+#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0600
+#+#undef _WIN32_WINNT
+#+#define _WIN32_WINNT 0x0600
+#+#endif
+# #include <winsock2.h>
+#@@ -62,3 +66,3 @@
+# #ifdef _WIN32
+#-#ifndef _UCRT
+#+#if !defined(_UCRT) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0600)
+# // Recent MinGW has inet_pton, which then causes compiler error in
+#EOF
+# fix src/network/socket_wrapper.hpp (version >= 3.3.2)
+patch -ulbf src/network/socket_wrapper.hpp << EOF
+@@ -244,3 +244,3 @@
+     std::memset(&addr, 0, sizeof(sockaddr_in));
+-    inet_pton(AF_INET, url, &addr.sin_addr);
++    ::inet_pton(AF_INET, url, &addr.sin_addr);
+     addr.sin_family = AF_INET;
+EOF
 ## support OpenCL in CMakeIntegratedOpenCL.cmake (version = 3.1.2)
 #patch -ulbf CMakeIntegratedOpenCL.cmake << EOF
 #@@ -33,3 +33,3 @@
@@ -81,13 +104,19 @@ sed -i.bak -e "s?../../../external_libs/fmt/include/??; s?../../../external_libs
 # else()
 #-  message(FATAL_ERROR "Integrated OpenCL build is not yet available for MinGW") endif()
 #EOF
-mkdir -p build_win &&
+mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=ON -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=OFF -S. -Bbuild_win &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=ON -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/eigen3" -S. -Bbuild_win &&
- #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=ON -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=ON -DOPENCL_ICD_LOADER_HEADERS_DIR:PATH=$MINGWPREFIX/include -DOpenCL_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/eigen3" -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=ON -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=ON -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/eigen3" -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=ON -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=ON -DOPENCL_ICD_LOADER_HEADERS_DIR:PATH=$MINGWPREFIX/include -DOpenCL_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/eigen3" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=OFF -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=OFF -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/eigen3" -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIB:BOOL=OFF -DUSE_GPU:BOOL=ON -DUSE_OPENMP:BOOL=ON -D__INTEGRATE_OPENCL:BOOL=ON -DOPENCL_ICD_LOADER_HEADERS_DIR:PATH=$MINGWPREFIX/include -DOpenCL_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/eigen3" -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- ninja -Cbuild_win install/strip &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf LightGBM-$VERSION
 
 

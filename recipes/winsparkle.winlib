@@ -13,7 +13,8 @@ export VERSIONDATE=20200607
 wl-showstatus --package-version
 export DEPENDANCIES=expat,wxwidgets
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=COPYING
 export LICENSETYPE=MIT
 export DOWNLOADURL="https://github.com/vslavik/winsparkle/releases"
@@ -70,28 +71,43 @@ EOF
 # wl-showstatus build-install &&
 # LIBRARY_PATH=$MINGWPREFIX/wx/lib/gcc_dll${LIBRARY_PATH:+:$LIBRARY_PATH} make install/strip &&
 #    echo OK
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=no --unicode=yes --debug=no --cflags)" ../cmake &&
+# echo "-Wl,--as-needed -lcrypto" >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+# wx-config --static=no --unicode=yes --debug=no --libs >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+# cd .. &&
+# wl-showstatus build-install &&
+# LIBRARY_PATH=$MINGWPREFIX/wx/lib/gcc_dll${LIBRARY_PATH:+:$LIBRARY_PATH} make -Cbuild_shared install/strip &&
+# wl-showstatus configure &&
+# sed -i.shared.bak -e "s/SHARED/STATIC/" cmake/CMakeLists.txt &&
+# cd build_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=yes --unicode=yes --debug=no --cflags)" ../cmake &&
+# echo "-Wl,--as-needed -lcrypto" >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+# wx-config --static=yes --unicode=yes --debug=no --libs >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
+# cd .. &&
+# wl-showstatus build &&
+# LIBRARY_PATH=$MINGWPREFIX/wx/lib/gcc_lib${LIBRARY_PATH:+:$LIBRARY_PATH} make -Cbuild_static &&
+# wl-showstatus install &&
+# cp -f build_static/lib/*.a $INSTALLPREFIX/lib/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf WinSparkle-$VERSION-src
+#####TO DO: check if static version is usable (since only shared version is installed in lib\cmake\WinSparkle)
+# also allowed building static library
+sed -i.shared.bak -e "s/\(add_library(.*\) SHARED/\1/" cmake/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cd build_shared &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=no --unicode=yes --debug=no --cflags)" ../cmake &&
- echo "-Wl,--as-needed -lcrypto" >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
- wx-config --static=no --unicode=yes --debug=no --libs >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
- cd .. &&
- wl-showstatus build-install &&
- LIBRARY_PATH=$MINGWPREFIX/wx/lib/gcc_dll${LIBRARY_PATH:+:$LIBRARY_PATH} make -Cbuild_shared install/strip &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=yes --unicode=yes --debug=no --cflags)" -Scmake -Bbuild_static &&
  wl-showstatus configure &&
- sed -i.shared.bak -e "s/SHARED/STATIC/" cmake/CMakeLists.txt &&
- cd build_static &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=yes --unicode=yes --debug=no --cflags)" ../cmake &&
- echo "-Wl,--as-needed -lcrypto" >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
- wx-config --static=yes --unicode=yes --debug=no --libs >> CMakeFiles/WinSparkle.dir/linklibs.rsp &&
- cd .. &&
- wl-showstatus build &&
- LIBRARY_PATH=$MINGWPREFIX/wx/lib/gcc_lib${LIBRARY_PATH:+:$LIBRARY_PATH} make -Cbuild_static &&
- wl-showstatus install &&
- cp -f build_static/lib/*.a $INSTALLPREFIX/lib/ &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="$(wx-config --static=yes --unicode=yes --debug=no --cflags)" -Scmake -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s?^\s*LINK_LIBRARIES\s*=.*-ladvapi32?& -Wl,--as-needed -lcrypto -L$(cygpath -m $MINGWPREFIX/wx/lib/gcc_dll) $(wx-config --static=yes --unicode=yes --debug=no --libs | tr '\\' '/')?" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ cp -u $INSTALLPREFIX/lib/WinSparkle.a $INSTALLPREFIX/lib/libWinSparkle.a &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf WinSparkle-$VERSION-src
-####TO DO: check if static version is usable (since only shared version is installed in lib\cmake\WinSparkle)
 
 
 
