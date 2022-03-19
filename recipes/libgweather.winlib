@@ -284,10 +284,10 @@ export BASENAME=libgweather
 export DESCRIPTION="libgweather is the location/timezone/weather library/database used by the GNOME panel clock and by the gweather applet."
 export CATEGORY=communication
 export TYPE=library
-export VERSION=40.0
-export VERSIONDATE=20210325
-#export VERSION=4.0.0
-#export VERSIONDATE=20220319
+#export VERSION=40.0
+#export VERSIONDATE=20210325
+export VERSION=4.0.0
+export VERSIONDATE=20220319
 wl-showstatus --package-version
 export DEPENDANCIES=zoneinfo,glib2,gconf,gtk3,gdk-pixbuf,gettext,pcre,libsoup-2.4,libxml2,geocode-glib,gobject-introspection,pygobject,vala
 export OPTIONALDEPENDANCIES=
@@ -304,15 +304,57 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
-## fix missing langinfo.h (version >= 40.0)
-#sed -i.bak -e "s?^#include <langinfo\.h>?//&?" libgweather/gweather-weather.c libgweather/weather-owm.c
-# fix already define _timezone in libgweather/gweather-private.h (version >= 40.0)
+# fix missing langinfo.h (version >= 40.0)
+sed -i.bak -e "s/#include <langinfo\.h>/#ifndef _WIN32\n&\n#endif/" libgweather/weather-owm.c libgweather/gweather-weather.c libgweather/gweather-info.c
+## fix already define _timezone in libgweather/gweather-private.h (version = 40.0)
+#patch -ulbf libgweather/gweather-private.h << EOF
+#@@ -63,2 +63,3 @@
+#     GWeatherLocation *_parent, **_children;
+#+#define _timezone GWEATHER_timezone
+#     GWeatherTimezone *_timezone;
+#EOF
+# fix libgweather/gweather-private.h (version >= 4.0.0)
 patch -ulbf libgweather/gweather-private.h << EOF
-@@ -63,2 +63,3 @@
-     GWeatherLocation *_parent, **_children;
+@@ -57,2 +57,4 @@
+
++#undef _timezone
 +#define _timezone GWEATHER_timezone
-     GWeatherTimezone *_timezone;
+     GTimeZone *_timezone;
 EOF
+# fix missing strptime in libgweather/weather-metno.c (version >= 4.0.0)
+patch -ulbf libgweather/weather-metno.c << EOF
+@@ -110,3 +110,7 @@
+
++#ifdef _WIN32
++    after = NULL;
++#else
+     after = strptime ((const char *) str, "%Y-%m-%dT%T", &time);
++#endif
+     if (after == NULL) {
+EOF
+# fix missing strptime in libgweather/weather-owm.c (version >= 4.0.0)
+patch -ulbf libgweather/weather-owm.c << EOF
+@@ -123,3 +125,7 @@
+
++#ifdef _WIN32
++    after = NULL;
++#else
+     after = strptime ((const char *) str, "%Y-%m-%dT%T", &time);
++#endif
+     if (after == NULL) {
+EOF
+# fix missing localtime_r in libgweather/weather-iwin.c (version >= 4.0.0)
+mv libgweather/weather-iwin.c libgweather/weather-iwin.c.bak &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > libgweather/weather-iwin.c &&
+cat libgweather/weather-iwin.c.bak >> libgweather/weather-iwin.c
+# fix missing localtime_r in libgweather/weather-metar.c (version >= 4.0.0)
+mv libgweather/weather-metar.c libgweather/weather-metar.c.bak &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > libgweather/weather-metar.c &&
+cat libgweather/weather-metar.c.bak >> libgweather/weather-metar.c
+# fix missing localtime_r in libgweather/weather-sun.c (version >= 4.0.0)
+mv libgweather/weather-sun.c libgweather/weather-sun.c.bak &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > libgweather/weather-sun.c &&
+cat libgweather/weather-sun.c.bak >> libgweather/weather-sun.c
 # fix detection of Python (version >= 4.0.0)
 sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build subprojects/gi-docgen/meson.build
 mkdir -p build_win &&
