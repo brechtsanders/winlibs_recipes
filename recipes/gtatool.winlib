@@ -1,6 +1,7 @@
 export NAME="gtatool"
 export STATUS=
-export URL=http://gta.nongnu.org/libgta.html
+#export URL=http://gta.nongnu.org/libgta.html
+export URL=https://marlam.de/gta/
 export BASENAME=gtatool
 export DESCRIPTION="Gtatool is a command line tool to manipulate GTAs. GTAs can store any kind of data in multidimensional arrays, optionally with simple tags to store rich metadata. GTAs are streamable and support mupltiple compression methods. Uncompressed GTAs allow easy out-of-core data access for very large arrays."
 export CATEGORY=fileformat,dataprocessing
@@ -11,19 +12,23 @@ export TYPE=application
 #export VERSIONDATE=20140924
 #export VERSION=2.1.0
 #export VERSIONDATE=20141221
-export VERSION=2.2.0
-export VERSIONDATE=20160126
+#export VERSION=2.2.0
+#export VERSIONDATE=20160126
+export VERSION=2.4.0
+export VERSIONDATE=20220319
 wl-showstatus --package-version
-#export DEPENDANCIES=libdl,libgta,libiconv,openexr,ffmpeg3,gdal,imagemagick,libjpeg,netcdf,libsndfile
-export DEPENDANCIES=libdl,libgta,libiconv,openexr,libav,gdal,imagemagick,libjpeg,netcdf,libsndfile
+export DEPENDANCIES=libdl,libgta,libiconv,libav,gdal,imagemagick,libjpeg,netcdf,libsndfile
+#export DEPENDANCIES=libdl,libgta,libiconv,libav,gdal,imagemagick,libjpeg,netcdf,libsndfile,openexr
 export OPTIONALDEPENDANCIES=qt,netpbm,pfstools
 export BUILDDEPENDANCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
 #export DOWNLOADURL="http://gta.nongnu.org/download.html"
-export DOWNLOADURL="http://download.savannah.nongnu.org/releases/gta/"
+#export DOWNLOADURL="http://download.savannah.nongnu.org/releases/gta/"
+export DOWNLOADURL="https://marlam.de/gta/download/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=http://download.savannah.nongnu.org/releases/gta/$BASENAME-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=http://download.savannah.nongnu.org/releases/gta/$BASENAME-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://marlam.de/gta/releases/$BASENAME-$VERSION.tar.xz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
@@ -67,8 +72,17 @@ patch -ulbf src/base/dbg.cpp << EOF
 -        std::set_terminate(exception_crash);
          std::set_new_handler(oom_abort);
 EOF
-# fix missing enum PixelFormat and PIX_FMT_ defines in src/conv-ffmpeg/media_object.cpp
-sed -i.bak -e "s/\bPixelFormat/AV&/g; s/\bPIX_FMT_/AV_&/g" src/conv-ffmpeg/media_object.cpp
+# fix missing drand48() in src/component/component-compute.cpp (versio >= 2.4.0)
+mv src/component/component-compute.cpp src/component/component-compute.cpp.bak
+cat > src/component/component-compute.cpp << EOF
+#include <stdlib.h>
+static void srand48 (long int seedval) { srand(seedval); }
+static double drand48 () { return (double)rand() / (double)RAND_MAX; }
+static double erand48 (unsigned short xsubi[3]) { return drand48(); }
+EOF
+cat src/component/component-compute.cpp.bak >> src/component/component-compute.cpp
+## fix missing enum PixelFormat and PIX_FMT_ defines in src/conv-ffmpeg/media_object.cpp (version <= 2.2.0)
+#sed -i.bak -e "s/\bPixelFormat/AV&/g; s/\bPIX_FMT_/AV_&/g" src/conv-ffmpeg/media_object.cpp
 wl-showstatus configure &&
  #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
@@ -76,7 +90,8 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --without-netcdf LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
  #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
- PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
+ PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --without-exr CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
  #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig:$PKG_CONFIG_PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --without-exr CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32" CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lgta -Wl,-no-undefined" &&
  wl-showstatus build-install &&
  # fix building DLLs
