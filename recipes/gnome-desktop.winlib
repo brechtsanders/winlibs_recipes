@@ -674,8 +674,8 @@ export TYPE=library
 #export VERSIONDATE=20211103
 #export VERSION=40.6
 #export VERSIONDATE=20211206
-export VERSION=40.7
-export VERSIONDATE=20220111
+#export VERSION=40.7
+#export VERSIONDATE=20220111
 #export VERSION=41.0
 #export VERSIONDATE=20210819
 #export VERSION=41.1
@@ -686,9 +686,9 @@ export VERSIONDATE=20220111
 #export VERSIONDATE=20220112
 #export VERSION=41.4
 #export VERSIONDATE=20220321
-#export VERSION=42.0
-#export VERSIONDATE=20220321
 ####libgnome-desktop/gnome-gettext-portable.c:36:1: error: unknown type name 'locale_t'
+export VERSION=42.0
+export VERSIONDATE=20220321
 wl-showstatus --package-version
 export DEPENDANCIES=gtk3,gsettings-desktop-schemas,libx11,libxrandr,xkeyboard-config,iso-codes,gobject-introspection
 export OPTIONALDEPENDANCIES=
@@ -736,6 +736,10 @@ patch -ulbf libgnome-desktop/gnome-desktop-thumbnail-script.c << EOF
 +#endif
  }
 EOF
+# fix missing realpath in libgnome-desktop/gnome-desktop-thumbnail-script.c (version >= 42.0)
+mv libgnome-desktop/gnome-desktop-thumbnail-script.c libgnome-desktop/gnome-desktop-thumbnail-script.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > libgnome-desktop/gnome-desktop-thumbnail-script.c &&
+cat libgnome-desktop/gnome-desktop-thumbnail-script.c.bak >> libgnome-desktop/gnome-desktop-thumbnail-script.c
 # fix libgnome-desktop/gnome-idle-monitor.c (version >= 3.38.3)
 patch -ulbf libgnome-desktop/gnome-idle-monitor.c << EOF
 @@ -36,3 +36,2 @@
@@ -743,93 +747,122 @@ patch -ulbf libgnome-desktop/gnome-idle-monitor.c << EOF
 -G_STATIC_ASSERT(sizeof(unsigned long) == sizeof(gpointer));
 
 EOF
-# fix libgnome-desktop/gnome-languages.c (version >= 3.38.3)
+## fix libgnome-desktop/gnome-languages.c (version >= 3.38.3)
+#patch -ulbf libgnome-desktop/gnome-languages.c << EOF
+#@@ -31,3 +31,8 @@
+# #include <locale.h>
+#+#ifdef _WIN32
+#+#define nl_langinfo(codeset) "UTF-8"
+#+#define locale_t _locale_t
+#+#else
+# #include <langinfo.h>
+#+#endif
+# #include <sys/stat.h>
+#@@ -41,3 +46,5 @@
+#
+#+#ifndef _WIN32
+# #include <langinfo.h>
+#+#endif
+# #ifndef __LC_LAST
+#@@ -290,2 +297,3 @@
+#
+#+#ifndef _WIN32
+#         locale = newlocale (LC_MESSAGES_MASK, language_name, (locale_t) 0);
+#@@ -295,2 +303,3 @@
+#         }
+#+#endif
+#
+#@@ -308,2 +317,8 @@
+#
+#+#ifdef _WIN32
+#+        if (pcodeset != NULL)
+#+                *pcodeset = g_strdup (language_name);
+#+        if (is_utf8 != NULL)
+#+                *is_utf8 = stricmp(language_name, "UTF-8") == 0;
+#+#else
+#         locale = newlocale (LC_CTYPE_MASK, language_name, (locale_t) 0);
+#@@ -328,2 +343,3 @@
+#         freelocale (locale);
+#+#endif
+# }
+#@@ -495,2 +511,3 @@
+#
+#+#ifndef _WIN32
+#         ndirents = scandir (LIBLOCALEDIR, &dirents, select_dirs, alphasort);
+#@@ -505,2 +522,3 @@
+#         }
+#+#endif
+#         return found_locales;
+#@@ -708,2 +726,3 @@
+#
+#+#ifndef _WIN32
+#                 if (locale != NULL) {
+#@@ -714,2 +733,3 @@
+#                 }
+#+#endif
+#
+#@@ -724,2 +744,3 @@
+#
+#+#ifndef _WIN32
+#                 if (locale != NULL) {
+#@@ -728,2 +749,3 @@
+#                 }
+#+#endif
+#         }
+#@@ -761,2 +783,3 @@
+#         name = NULL;
+#+#ifndef _WIN32
+#         if (territory != NULL) {
+#@@ -783,2 +806,3 @@
+#         }
+#+#endif
+#
+#@@ -1365,2 +1389,3 @@
+#
+#+#ifndef _WIN32
+#         if (translation != NULL) {
+#@@ -1372,2 +1397,3 @@
+#         }
+#+#endif
+#
+#@@ -1409,2 +1435,3 @@
+#
+#+#ifndef _WIN32
+#         if (translation != NULL) {
+#@@ -1413,2 +1440,3 @@
+#         }
+#+#endif
+#
+#EOF
+# fix libgnome-desktop/gnome-languages.c (version >= 42.0)
 patch -ulbf libgnome-desktop/gnome-languages.c << EOF
-@@ -31,3 +31,8 @@
- #include <locale.h>
+@@ -30,3 +30,11 @@
+ #include <dirent.h>
 +#ifdef _WIN32
 +#define nl_langinfo(codeset) "UTF-8"
 +#define locale_t _locale_t
++#define freelocale(...)
++#define newlocale(...) 0
++#define nl_langinfo_l(...) "UTF-8"
 +#else
  #include <langinfo.h>
 +#endif
  #include <sys/stat.h>
-@@ -41,3 +46,5 @@
+@@ -46,3 +54,2 @@
 
-+#ifndef _WIN32
- #include <langinfo.h>
-+#endif
+-#include <langinfo.h>
  #ifndef __LC_LAST
-@@ -290,2 +297,3 @@
-
+@@ -499,2 +506,3 @@
+         gboolean found_locales = FALSE;
 +#ifndef _WIN32
-         locale = newlocale (LC_MESSAGES_MASK, language_name, (locale_t) 0);
-@@ -295,2 +303,3 @@
-         }
-+#endif
-
-@@ -308,2 +317,8 @@
-
-+#ifdef _WIN32
-+        if (pcodeset != NULL)
-+                *pcodeset = g_strdup (language_name);
-+        if (is_utf8 != NULL)
-+                *is_utf8 = stricmp(language_name, "UTF-8") == 0;
-+#else
-         locale = newlocale (LC_CTYPE_MASK, language_name, (locale_t) 0);
-@@ -328,2 +343,3 @@
-         freelocale (locale);
-+#endif
- }
-@@ -495,2 +511,3 @@
-
-+#ifndef _WIN32
-         ndirents = scandir (LIBLOCALEDIR, &dirents, select_dirs, alphasort);
-@@ -505,2 +522,3 @@
+         struct dirent **dirents;
+@@ -513,2 +521,3 @@
          }
 +#endif
          return found_locales;
-@@ -708,2 +726,3 @@
-
-+#ifndef _WIN32
-                 if (locale != NULL) {
-@@ -714,2 +733,3 @@
-                 }
-+#endif
-
-@@ -724,2 +744,3 @@
-
-+#ifndef _WIN32
-                 if (locale != NULL) {
-@@ -728,2 +749,3 @@
-                 }
-+#endif
-         }
-@@ -761,2 +783,3 @@
-         name = NULL;
-+#ifndef _WIN32
-         if (territory != NULL) {
-@@ -783,2 +806,3 @@
-         }
-+#endif
-
-@@ -1365,2 +1389,3 @@
-
-+#ifndef _WIN32
-         if (translation != NULL) {
-@@ -1372,2 +1397,3 @@
-         }
-+#endif
-
-@@ -1409,2 +1435,3 @@
-
-+#ifndef _WIN32
-         if (translation != NULL) {
-@@ -1413,2 +1440,3 @@
-         }
-+#endif
-
 EOF
+# fix missing locale_t in libgnome-desktop/gnome-gettext-portable.c (version >= 42.0)
+sed -i.bak -e "s/locale_t/_&/" libgnome-desktop/gnome-gettext-portable.c
 ## fix libgnome-desktop/gnome-gettext-portable.c (version >= 41.0)
 #patch -ulbf libgnome-desktop/gnome-gettext-portable.c << EOF
 #@@ -22,2 +22,8 @@

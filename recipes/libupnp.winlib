@@ -462,9 +462,39 @@ EOF
 #+#if defined(_WIN32) && !defined(__MINGW32__)
 #        #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
 #EOF
-# fix upnp/src/threadutil/ThreadPool.c (version >= 1.12.0)
+## fix upnp/src/threadutil/ThreadPool.c (version >= 1.12.0)
+#patch -ulbf upnp/src/threadutil/ThreadPool.c << EOF
+#@@ -259,3 +259,10 @@
+#        int retVal = 0;
+#-#ifdef __CYGWIN__
+#+#if defined(__MINGW32__)
+#+        struct sched_param current;
+#+        int sched_result;
+#+        memset(&current, 0, sizeof(current));
+#+        current.sched_priority = sched_get_priority_min(DEFAULT_POLICY);
+#+        sched_result = sched_setscheduler(0, in, &current);
+#+        retVal = (sched_result != -1 || errno == EPERM) ? 0 : errno;
+#+#elif defined(__CYGWIN__)
+#        /* TODO not currently working... */
+#@@ -417,3 +424,3 @@
+#        gettimeofday(&t, NULL);
+#-#if defined(_WIN32)
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+#        srand((unsigned int)t.tv_usec + (unsigned int)ithread_get_current_thread_id().p);
+#@@ -421,3 +428,3 @@
+#        srand((unsigned int)t.tv_usec + (unsigned int)ithread_get_current_thread_id());
+#-#elif defined(__linux__) || defined(__sun) || defined(__CYGWIN__) || defined(__GLIBC__)
+#+#elif defined(__linux__) || defined(__sun) || defined(__CYGWIN__) || defined(__GLIBC__) || defined(__MINGW32__)
+#        srand((unsigned int)t.tv_usec + (unsigned int)ithread_get_current_thread_id());
+#@@ -1230,3 +1237,3 @@
+#
+#-#ifdef _WIN32
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+#        #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
+#EOF
+# fix upnp/src/threadutil/ThreadPool.c (version >= 1.14.12)
 patch -ulbf upnp/src/threadutil/ThreadPool.c << EOF
-@@ -259,3 +259,10 @@
+@@ -260,3 +260,10 @@
         int retVal = 0;
 -#ifdef __CYGWIN__
 +#if defined(__MINGW32__)
@@ -476,66 +506,56 @@ patch -ulbf upnp/src/threadutil/ThreadPool.c << EOF
 +        retVal = (sched_result != -1 || errno == EPERM) ? 0 : errno;
 +#elif defined(__CYGWIN__)
         /* TODO not currently working... */
-@@ -417,3 +424,3 @@
-        gettimeofday(&t, NULL);
--#if defined(_WIN32)
-+#if defined(_WIN32) && !defined(__MINGW32__)
-        srand((unsigned int)t.tv_usec + (unsigned int)ithread_get_current_thread_id().p);
-@@ -421,3 +428,3 @@
-        srand((unsigned int)t.tv_usec + (unsigned int)ithread_get_current_thread_id());
--#elif defined(__linux__) || defined(__sun) || defined(__CYGWIN__) || defined(__GLIBC__)
-+#elif defined(__linux__) || defined(__sun) || defined(__CYGWIN__) || defined(__GLIBC__) || defined(__MINGW32__)
-        srand((unsigned int)t.tv_usec + (unsigned int)ithread_get_current_thread_id());
-@@ -1230,3 +1237,3 @@
+@@ -1268,3 +1275,3 @@
 
 -#ifdef _WIN32
 +#if defined(_WIN32) && !defined(__MINGW32__)
-        #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
+ #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
 EOF
-# fix missing PIP_ADAPTER_ADDRESSES in upnp/src/api/upnpapi.c (version = 1.8.2)
-mv upnp/src/api/upnpapi.c upnp/src/api/upnpapi.c.bak &&
-echo "#define _WIN32_WINNT 0x0501" > upnp/src/api/upnpapi.c &&
-cat upnp/src/api/upnpapi.c.bak >> upnp/src/api/upnpapi.c
-# fix missing getaddrinfo/freeaddrinfo in upnp/src/genlib/net/uri/uri.c (version >= 1.8.2)
-mv upnp/src/genlib/net/uri/uri.c upnp/src/genlib/net/uri/uri.c.bak &&
-echo "#define _WIN32_WINNT 0x0501" > upnp/src/genlib/net/uri/uri.c &&
-cat upnp/src/genlib/net/uri/uri.c.bak >> upnp/src/genlib/net/uri/uri.c
-# fix missing strerror_s in upnp/src/inc/upnputil.h (version >= 1.8.3)
-if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
-patch -ulbf upnp/src/inc/upnputil.h << EOF
-@@ -133 +133 @@
--               #define strerror_r(a,b,c)       (strerror_s((b),(c),(a)))
-+               #define strerror_r(a,b,c)       (strncpy(b,strerror(a),c-1),b[c-1]=0,b)
-EOF
-fi
-# fix missing inet_aton in upnp/src/ssdp/ssdp_device.c (version >= 1.12.1)
-mv upnp/src/ssdp/ssdp_device.c upnp/src/ssdp/ssdp_device.c.bak &&
-echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > upnp/src/ssdp/ssdp_device.c &&
-cat upnp/src/ssdp/ssdp_device.c.bak >> upnp/src/ssdp/ssdp_device.c
-# fix missing inet_aton in upnp/src/ssdp/ssdp_ctrlpt.c (version >= 1.12.1)
-mv upnp/src/ssdp/ssdp_ctrlpt.c upnp/src/ssdp/ssdp_ctrlpt.c.bak &&
-echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > upnp/src/ssdp/ssdp_ctrlpt.c &&
-cat upnp/src/ssdp/ssdp_ctrlpt.c.bak >> upnp/src/ssdp/ssdp_ctrlpt.c
-# fix upnp/src/genlib/net/http/httpreadwrite.c (version >= 1.14.0)
-patch -ulbf upnp/src/genlib/net/http/httpreadwrite.c << EOF
-@@ -57,3 +57,5 @@
-
-+#ifndef _WIN32
- #include <alloca.h>
-+#endif
- #include <assert.h>
-EOF
-# fix upnp/src/genlib/miniserver/miniserver.c (version >= 1.14.6)
-patch -ulbf upnp/src/genlib/miniserver/miniserver.c << EOF
-@@ -66,3 +66,7 @@
-        #include <sys/types.h>
-+#ifdef _WIN32
-+       #define in_port_t uint16_t
-+#else
-        #include <sys/socket.h>
-+#endif
-
-EOF
+## fix missing PIP_ADAPTER_ADDRESSES in upnp/src/api/upnpapi.c (version = 1.8.2)
+#mv upnp/src/api/upnpapi.c upnp/src/api/upnpapi.c.bak &&
+#echo "#define _WIN32_WINNT 0x0501" > upnp/src/api/upnpapi.c &&
+#cat upnp/src/api/upnpapi.c.bak >> upnp/src/api/upnpapi.c
+## fix missing getaddrinfo/freeaddrinfo in upnp/src/genlib/net/uri/uri.c (version >= 1.8.2)
+#mv upnp/src/genlib/net/uri/uri.c upnp/src/genlib/net/uri/uri.c.bak &&
+#echo "#define _WIN32_WINNT 0x0501" > upnp/src/genlib/net/uri/uri.c &&
+#cat upnp/src/genlib/net/uri/uri.c.bak >> upnp/src/genlib/net/uri/uri.c
+## fix missing strerror_s in upnp/src/inc/upnputil.h (version >= 1.8.3)
+#if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
+#patch -ulbf upnp/src/inc/upnputil.h << EOF
+#@@ -133 +133 @@
+#-               #define strerror_r(a,b,c)       (strerror_s((b),(c),(a)))
+#+               #define strerror_r(a,b,c)       (strncpy(b,strerror(a),c-1),b[c-1]=0,b)
+#EOF
+#fi
+## fix missing inet_aton in upnp/src/ssdp/ssdp_device.c (version >= 1.12.1)
+#mv upnp/src/ssdp/ssdp_device.c upnp/src/ssdp/ssdp_device.c.bak &&
+#echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > upnp/src/ssdp/ssdp_device.c &&
+#cat upnp/src/ssdp/ssdp_device.c.bak >> upnp/src/ssdp/ssdp_device.c
+## fix missing inet_aton in upnp/src/ssdp/ssdp_ctrlpt.c (version >= 1.12.1)
+#mv upnp/src/ssdp/ssdp_ctrlpt.c upnp/src/ssdp/ssdp_ctrlpt.c.bak &&
+#echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > upnp/src/ssdp/ssdp_ctrlpt.c &&
+#cat upnp/src/ssdp/ssdp_ctrlpt.c.bak >> upnp/src/ssdp/ssdp_ctrlpt.c
+## fix upnp/src/genlib/net/http/httpreadwrite.c (version >= 1.14.0)
+#patch -ulbf upnp/src/genlib/net/http/httpreadwrite.c << EOF
+#@@ -57,3 +57,5 @@
+#
+#+#ifndef _WIN32
+# #include <alloca.h>
+#+#endif
+# #include <assert.h>
+#EOF
+## fix upnp/src/genlib/miniserver/miniserver.c (version >= 1.14.6)
+#patch -ulbf upnp/src/genlib/miniserver/miniserver.c << EOF
+#@@ -66,3 +66,7 @@
+#        #include <sys/types.h>
+#+#ifdef _WIN32
+#+       #define in_port_t uint16_t
+#+#else
+#        #include <sys/socket.h>
+#+#endif
+#
+#EOF
 ## skip building upnp/unittest (version >= 1.8.2)
 #cat > upnp/unittest/Makefile.am << EOF
 #clean:
@@ -569,6 +589,11 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-open_ssl --enable-ipv6 --enable-webserver --enable-device --disable-debug --disable-samples $(if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then echo "--disable-largefile"; fi) CFLAGS="-I$(pwd)" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi -lssleay32 -lxmlsec1-openssl -Wl,-no-undefined" &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix missing inet_pton/inet_pton (version >= 1.14.12)
+ echo '#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600' >> autoconfig.h &&
+ echo '#undef _WIN32_WINNT' >> autoconfig.h &&
+ echo '#define _WIN32_WINNT 0x0600' >> autoconfig.h &&
+ echo '#endif' >> autoconfig.h &&
  wl-showstatus build-install &&
  make install-strip &&
  cp -u upnp/src/threadutil/*.h $INSTALLPREFIX/include/upnp/ &&

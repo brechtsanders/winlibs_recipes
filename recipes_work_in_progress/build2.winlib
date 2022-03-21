@@ -25,11 +25,47 @@ wl-wait4deps
 wl-showstatus extract
 tar xfJ $TARBALLDIR/$BASENAME/build2-toolchain-$VERSION.tar.xz
 cd build2-toolchain-$VERSION
+# fix missing unique_ptr in libbutl/libbutl/process.cxx
+mv libbutl/libbutl/process.cxx libbutl/libbutl/process.cxx.bak &&
+echo "#include <memory>" > libbutl/libbutl/process.cxx &&
+cat libbutl/libbutl/process.cxx.bak >> libbutl/libbutl/process.cxx
+# fix build2/libbuild2/cc/gcc.cxx (version >= 0.14.0)
+patch -ulbf build2/libbuild2/cc/gcc.cxx << EOF
+@@ -3,2 +3,3 @@
+
++#include <sys/stat.h>
+ #include <libbuild2/scope.hxx>
+@@ -336,6 +337,11 @@
+       {
+-        dir_path d (l, b, (e != string::npos ? e - b : e));
++        struct stat fileinfo;
++        string entry (l, b, (e != string::npos ? e - b : e));
++        // Skip this entry if it is not an existing directory
++        if (stat(entry.c_str(), &fileinfo) == 0 && S_ISDIR(fileinfo.st_mode)) {
++          dir_path d (entry);
+
+-        if (find (r.begin (), r.end (), d.normalize ()) == r.end ())
+-          r.emplace_back (move (d));
++          if (find (r.begin (), r.end (), d.normalize ()) == r.end ())
++            r.emplace_back (move (d));
++        }
+
+EOF
+# fix missing linker flags
 sed -i.bak -e "s/-lpthread/& -Wl,--as-needed -limagehlp/" build2/bootstrap.sh
 wl-showstatus build &&
  make -Cbuild2 -f bootstrap.gmake CXX=${CXX:-g++} &&
- build2/build2/b-boot.exe config.cxx=g++ config.bin.lib=static &&
+ build2/build2/b-boot.exe config.cxx=g++ config.bin.lib=shared config.install.root=$INSTALLPREFIX configure &&
+ build2/build2/b-boot.exe config.cxx=g++ config.bin.lib=shared config.install.root=$INSTALLPREFIX dist &&
     echo OK
+
+ mkdir -p build_win &&
+ cd build_win &&
+ ../build2/build2/b-boot.exe config.cxx=g++ config.bin.lib=shared config.install.root=$INSTALLPREFIX config.install.data_root=root/stage config.bin.suffix=-stage configure &&
+    echo OK
+    
+ cd build2 &&
+ build2/b-boot.exe config.cxx=g++ config.bin.lib=shared config.install.root=$INSTALLPREFIX configure &&
 
 #$COMSPEC //C "build-mingw.bat --local --make --install-dir $(cygpath -m $INSTALLPREFIX) $(cygpath -m $(dirname $(dirname $(which gcc))))"
 $COMSPEC //C "build-mingw.bat --local --make $(cygpath -w $(which gcc.exe))"
