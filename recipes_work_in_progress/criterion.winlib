@@ -9,13 +9,17 @@ export TYPE=library
 #export VERSIONDATE=20171009
 #export VERSION=2.3.3
 #export VERSIONDATE=20181105
+#export DEPENDANCIES=gettext,nanopb,boxfort,dyncall,libcsptr,nanomsg,klib
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=cmake
 export VERSION=2.4.0
 export VERSIONDATE=20220222
 ####src/core/client.h:27:10: fatal error: khash.h: No such file or directory
 wl-showstatus --package-version
-export DEPENDANCIES=gettext,nanopb,boxfort,dyncall,libcsptr,nanomsg,klib
+export DEPENDANCIES=gettext,nanopb,boxfort,dyncall,libcsptr,nanomsg
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=meson,ninja
 export LICENSEFILE=LICENSE
 export LICENSETYPE=MIT
 export DOWNLOADURL="https://github.com/Snaipe/Criterion/releases"
@@ -34,7 +38,7 @@ mv src/CMakeLists.txt src/CMakeLists.txt.bak &&
 grep -v "dependencies/nanopb/pb" src/CMakeLists.txt.bak > src/CMakeLists.txt
 #rm -rf CMakeCache.txt CMakeFiles; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
 wl-showstatus configure &&
-cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DNANOMSG_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DNANOMSG_LIBRARY:FILEPATH="-lprotobuf-nanopb" -DBOXFORT_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBOXFORT_LIBRARY:FILEPATH="-lboxfort" . &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DNANOMSG_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DNANOMSG_LIBRARY:FILEPATH="-lprotobuf-nanopb" -DBOXFORT_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBOXFORT_LIBRARY:FILEPATH="-lboxfort" . &&
  wl-showstatus build-install &&
  make install/strip &&
     echo OK
@@ -57,3 +61,29 @@ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_
 
 
 
+#-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS
+## fix location of Perl
+#sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix detection of Python
+#sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix missing gio-unix
+##sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+#sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+## disable detection of nanopb
+#sed -i.bak -e "s/dependency('nanopb/&_DISABLE/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcxx-support=enabled -Di18n=enabled -Ddev=false -Dsamples=false -Dtests=false . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ #PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Criterion-$VERSION
