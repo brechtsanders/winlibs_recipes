@@ -7724,13 +7724,17 @@ for arch in i686 x86_64 aarch64; do
 
 
 
-# fix llvm/cmake/modules/CheckAtomic.cmake (version >= 14.0.0-rc2)
-sed -i.bak -e "s/MSVC/WIN32/" llvm/cmake/modules/CheckAtomic.cmake
+## fix llvm/cmake/modules/CheckAtomic.cmake (version >= 14.0.0-rc2)
+#sed -i.bak -e "s/MSVC/WIN32/" llvm/cmake/modules/CheckAtomic.cmake
 
 mkdir -p build_stage2 &&
  # build main LLVM suite
  wl-showstatus configure &&
  #libunwind;openmp;parallel-libs;polly;pstl;flang;libclc
+ PATH=$PWD/stage1/bin:$PATH \
+ C_INCLUDE_PATH=$PWD/stage1/include:${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} \
+ CPLUS_INCLUDE_PATH=$PWD/stage1/include:${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} \
+ LIBRARY_PATH=$PWD/stage1/lib:$PWD/stage1/$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "i686"; fi)-w64-mingw32/lib:${LIBRARY_PATH:+:$LIBRARY_PATH} \
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DLLVM_BUILD_STATIC=OFF \
@@ -7938,9 +7942,162 @@ mkdir -p build_stage2 &&
  ## fix missing link libraries
  #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -lpthread/" build/build.ninja &&
  wl-showstatus build-install &&
- ninja -Cbuild_stage2 install/strip &&
+ PATH=$PWD/stage1/bin:$PATH ninja -Cbuild_stage2 install/strip &&
     echo OK
 
 ####See also: https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html#the-cmake-try-compile-stage-fails
 ####-DCMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN:PATH=$PWD/stage1/$arch-w64-mingw32
 ####-DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL=ON 
+
+
+
+
+
+
+
+
+
+# get prebuilt version
+PREBUILT_VERSION=20220323
+PREBUILT_BASE=llvm-mingw-$PREBUILT_VERSION-$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "ucrt"; else echo -n "msvcrt"; fi)-$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "i686"; fi)
+wl-download -v -d $TARBALLDIR/$BASENAME https://github.com/mstorsjo/llvm-mingw/releases/download/$PREBUILT_VERSION/$PREBUILT_BASE.zip
+mkdir -p prebuilt
+unzip -oq $TARBALLDIR/$BASENAME/$PREBUILT_BASE.zip -dprebuilt
+echo prebuilt/$PREBUILT_BASE/bin
+
+# fix compiler-rt/cmake/config-ix.cmake (version >= 13.0.0)
+patch -ulbf compiler-rt/cmake/config-ix.cmake << EOF
+@@ -206,3 +206,3 @@
+     NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+-  message(FATAL_ERROR "Please use architecture with 4 or 8 byte pointers.")
++  message(WATNING "Please use architecture with 4 or 8 byte pointers.")
+ endif()
+EOF
+
+mkdir -p build_stage1 &&
+ # build main LLVM suite
+ wl-showstatus configure &&
+ #libunwind;openmp;parallel-libs;polly;pstl;flang
+ #;polly;mlir;pstl
+ PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH \
+ C_INCLUDE_PATH=$PWD/prebuilt/$PREBUILT_BASE/include:${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} \
+ CPLUS_INCLUDE_PATH=$PWD/prebuilt/$PREBUILT_BASE/include:${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} \
+ LIBRARY_PATH=$PWD/prebuilt/$PREBUILT_BASE/lib:$PWD/prebuilt/$PREBUILT_BASE/$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "i686"; fi)-w64-mingw32/lib:${LIBRARY_PATH:+:$LIBRARY_PATH} \
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$PWD/stage1 -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DBUILD_SHARED_LIBS:BOOL=OFF \
+  -DLLVM_BUILD_LLVM_DYLIB:BOOL=OFF \
+  -DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
+  -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi" \
+  -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64" \
+  -DLLVM_RUNTIME_TARGETS=default \
+  -DLLVM_HOST_TRIPLE:STRING=$(echo $BUILDPLATFORM|sed -e "s/-.*$//")-w64-mingw32 \
+  -DLLVM_DEFAULT_TARGET_TRIPLE=$(echo $BUILDPLATFORM|sed -e "s/-.*$//")-w64-mingw32 \
+  -DLLVM_BUILD_STATIC=OFF \
+  -DLLVM_LINK_LLVM_DYLIB:BOOL=OFF \
+  -DLLVM_CCACHE_BUILD:BOOL=OFF \
+  -DLLVM_ENABLE_MODULES:BOOL=OFF \
+  -DLLVM_ENABLE_PLUGINS:BOOL=ON \
+  -DLLVM_ENABLE_THREADS:BOOL=ON \
+  -DLLVM_ENABLE_UNWIND_TABLES:BOOL=ON \
+  -DLLVM_ENABLE_ASSERTIONS:BOOL=OFF \
+  -DLLVM_OPTIMIZED_TABLEGEN:BOOL=ON \
+  -DLLVM_ENABLE_LTO:STRING=OFF \
+  -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) \
+  -DLLVM_ENABLE_RTTI:BOOL=ON \
+  -DLLVM_ENABLE_TERMINFO:BOOL=OFF \
+  -DLLVM_ENABLE_Z3_SOLVER:BOOL=ON \
+  -DLLVM_Z3_INSTALL_DIR:STRING=$MINGWPREFIX \
+  -DLLVM_ENABLE_FFI:BOOL=OFF \
+  -DLLVM_ENABLE_LIBXML2:BOOL=ON \
+  -DLLVM_ENABLE_PIC:BOOL=OFF \
+  -DLLVM_USE_RELATIVE_PATHS_IN_DEBUG_INFO:BOOL=ON \
+  -DLLVM_USE_RELATIVE_PATHS_IN_FILES:BOOL=ON \
+  -DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=OFF \
+  -DLLVM_INSTALL_CCTOOLS_SYMLINKS:BOOL=OFF \
+  -DLLVM_ENABLE_DOXYGEN:BOOL=OFF -DDOXYGEN_DOT_EXECUTABLE:FILEPATH= -DDOXYGEN_EXECUTABLE:FILEPATH= \
+  -DLLVM_ENABLE_SPHINX=OFF \
+  -DLLVM_INCLUDE_DOCS:BOOL=OFF \
+  -DLLVM_BUILD_EXAMPLES:BOOL=OFF \
+  -DLLVM_INCLUDE_EXAMPLES:BOOL=OFF \
+  -DLLVM_INCLUDE_BENCHMARKS:BOOL=OFF \
+  -DLLVM_INCLUDE_TESTS:BOOL=OFF \
+  -DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
+  \
+  -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+  -DCOMPILER_RT_USE_BUILTINS_LIBRARY=OFF \
+  -DCOMPILER_RT_BUILD_BUILTINS:BOOL=OFF \
+  -DCOMPILER_RT_BUILD_SANITIZERS:BOOL=OFF \
+  -DCOMPILER_RT_BUILD_LIBFUZZER:BOOL=OFF \
+  -DCOMPILER_RT_INCLUDE_TESTS:BOOL=OFF \
+  -DCOMPILER_RT_CAN_EXECUTE_TESTS:BOOL=OFF \
+  -DSANITIZER_CXX_ABI=libc++ \
+  \
+  -DLIBCXX_ENABLE_SHARED:BOOL=Off \
+  -DLIBCXX_ENABLE_STATIC:BOOL=ON \
+  -DLIBCXX_USE_COMPILER_RT:BOOL=ON \
+  -DLIBCXX_HAS_WIN32_THREAD_API:BOOL=ON \
+  -DLIBCXX_HAS_PTHREAD_API:BOOL=OFF \
+  -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY:BOOL=OFF \
+  -DLIBCXX_CXX_ABI=libcxxabi \
+  -DLIBCXX_CXX_ABI_INCLUDE_PATHS=$PWD/libcxxabi/include \
+  -DLIBCXX_CXX_ABI_LIBRARY_PATH:PATH=$PWD/build_libcxxabi/lib \
+  -DLIBCXX_LIBDIR_SUFFIX="" \
+  -DLIBCXX_INCLUDE_TESTS:BOOL=OFF \
+  -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT:BOOL=OFF \
+  \
+  -DLIBCXXABI_ENABLE_SHARED:BOOL=Off \
+  -DLIBCXXABI_ENABLE_STATIC:BOOL=ON \
+  -DLIBCXXABI_USE_COMPILER_RT:BOOL=ON \
+  -DLIBCXXABI_LIBCXX_INCLUDES:PATH=$PWD/build_libcxx/include/c++/v1 \
+  -DLIBCXXABI_LIBDIR_SUFFIX="" \
+  -DLIBCXXABI_ENABLE_EXCEPTIONS:BOOL=ON \
+  -DLIBCXXABI_ENABLE_ASSERTIONS:BOOL=OFF \
+  \
+  -DLIBUNWIND_ENABLE_SHARED:BOOL=Off \
+  -DLIBUNWIND_ENABLE_STATIC:BOOL=ON \
+  -DLIBUNWIND_USE_COMPILER_RT:BOOL=ON \
+  \
+  -DLIBCLANG_BUILD_STATIC:BOOL=OFF \
+  -DCLANG_LINK_CLANG_DYLIB:BOOL=OFF \
+  -DCLANG_PLUGIN_SUPPORT:BOOL=ON \
+  -DCLANG_ENABLE_CLANGD:BOOL=ON \
+  -DCLANG_DEFAULT_RTLIB:STRING=libgcc \
+  -DCLANG_DEFAULT_CXX_STDLIB:STRING=libstdc++ \
+  -DCLANG_DEFAULT_UNWINDLIB:STRING=none \
+  -DCLANG_DEFAULT_OPENMP_RUNTIME:STRING=libgomp \
+  -DCLANG_ENABLE_PROTO_FUZZER:BOOL=OFF \
+  -DCLANG_ENABLE_STATIC_ANALYZER:BOOL=ON \
+  -DCLANG_TOOL_APINOTES_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_ARCMT_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_CLANG_IMPORT_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_C_ARCMT_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_C_INDEX_TEST_BUILD:BOOL=OFF \
+  -DCLANG_INCLUDE_DOCS:BOOL=OFF \
+  -DCLANG_BUILD_EXAMPLES:BOOL=OFF \
+  -DCLANG_INCLUDE_TESTS:BOOL=OFF \
+  \
+  -DLLDB_TOOL_LLDB_SERVER_BUILD:BOOL=ON \
+  -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=ON \
+  -DLLDB_ENABLE_LIBEDIT:BOOL=OFF \
+  -DLLDB_ENABLE_CURSES:BOOL=ON \
+  -DLLDB_ENABLE_LIBXML2:BOOL=ON \
+  -DLLDB_ENABLE_LZMA:BOOL=ON \
+  -DLLDB_ENABLE_PYTHON:BOOL=ON \
+  \
+  -DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  \
+  -DCMAKE_CXX_FLAGS:STRING="-D_WIN32_WINNT=0x0600" \
+  \
+  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+  -Sllvm -Bbuild_stage1 &&
+  #-DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $PWD/libcxx/include)" \
+ wl-showstatus build-install &&
+ PATH=$MINGWPREFIX/share/python/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH ninja -Cbuild_stage1 install/strip &&
+ strip build_stage1/bin/clang-tblgen.exe &&
+ cp -f build_stage1/bin/clang-tblgen.exe stage1/bin/ &&
+ cp -f stage1/bin/clang.exe stage1/bin/gcc_renamed_clang.exe &&
+ cp -f stage1/bin/clang++.exe stage1/bin/g++_renamed_clang++.exe &&
+    echo OK
