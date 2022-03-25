@@ -7965,6 +7965,9 @@ mkdir -p prebuilt
 unzip -oq $TARBALLDIR/$BASENAME/$PREBUILT_BASE.zip -dprebuilt
 cp -f prebuilt/$PREBUILT_BASE/bin/clang.exe prebuilt/$PREBUILT_BASE/bin/gcc_renamed_clang.exe
 cp -f prebuilt/$PREBUILT_BASE/bin/clang++.exe prebuilt/$PREBUILT_BASE/bin/g++_renamed_clang++.exe
+for F in $(find prebuilt -name '*-w64-mingw32-ld' -or -name 'ld'); do
+ mv -f $F $F.bak
+done
 
 # fix compiler-rt/cmake/config-ix.cmake (version >= 13.0.0)
 patch -ulbf compiler-rt/cmake/config-ix.cmake << EOF
@@ -8001,8 +8004,8 @@ for arch in i686 x86_64 armv7 aarch64; do
   --$(if [ "$arch" == "aarch64" ]; then echo "enable"; else echo "disable"; fi)-libarm64 \
   --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrt"; else echo "msvcrt-os"; fi) \
   --enable-wildcard \
-  CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi)" \
-  CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld" \
+  CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi)" \
+  CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang++.exe) -fuse-ld=lld" \
   AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
   LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
   DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
@@ -8037,8 +8040,8 @@ for arch in i686 x86_64 armv7 aarch64; do
    --host=$arch-w64-mingw32 \
    --with-sysroot=$PWD/../stage1 \
    --without-gnu-ld \
-   CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi) $(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" \
-   CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld -target $arch-w64-mingw32" \
+   CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi) $(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" \
+   CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang++.exe) -fuse-ld=lld -target $arch-w64-mingw32" \
    AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
    LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
    DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
@@ -8086,11 +8089,11 @@ for arch in i686 x86_64 armv7 aarch64; do
  mkdir -p build_mingw-w64-gendef &&
  wl-showstatus configure &&
  cd build_mingw-w64-gendef &&
- $MINGWPREFIX/src/mingw-w64/mingw-w64-tools/gendef/configure --prefix=$INSTALLPREFIX/share/llvm \
+ $MINGWPREFIX/src/mingw-w64/mingw-w64-tools/gendef/configure --prefix=$PWD/../stage1 \
   --build=$BUILDPLATFORM \
   --host=$RUNPLATFORM \
-   CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld" \
-   CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld" \
+   CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang.exe) -fuse-ld=lld" \
+   CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang++.exe) -fuse-ld=lld" \
    AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
    LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
    DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
@@ -8115,13 +8118,13 @@ for arch in i686 x86_64 armv7 aarch64; do
   wl-showstatus configure &&
   cd build_mingw-w64-widl-$arch &&
   PATH=$INSTALLPREFIX/share/llvm/bin:$PATH \
-  $MINGWPREFIX/src/mingw-w64/mingw-w64-tools/widl/configure --prefix=$INSTALLPREFIX/share/llvm/$arch-w64-mingw32 \
+  $MINGWPREFIX/src/mingw-w64/mingw-w64-tools/widl/configure --prefix=$PWD/../stage1/$arch-w64-mingw32 \
    --build=$BUILDPLATFORM \
    --host=$RUNPLATFORM \
    --target=$arch-w64-mingw32 \
    --with-widl-includedir=../include \
-    CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi) $(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" \
-    CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld -target $arch-w64-mingw32" \
+    CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi) $(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" \
+    CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which clang++.exe) -fuse-ld=lld -target $arch-w64-mingw32" \
     AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
     LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
     DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
@@ -8137,13 +8140,13 @@ for arch in i686 x86_64 armv7 aarch64; do
   #--with-widl-includedir=$INSTALLPREFIX/share/llvm/include &&
   cd .. &&
   wl-showstatus build &&
-  PATH=$INSTALLPREFIX/share/llvm/bin:$PATH \
+  PATH=$PWD/stage1/bin:$PATH \
   make -Cbuild_mingw-w64-widl-$arch install-strip &&
   touch SUCCESS_$arch || break
  done &&
  if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
  rm -f SUCCESS_* &&
- ln -sf ../$HOST/bin/$HOST-widl.exe $INSTALLPREFIX/share/llvm/bin/widl.exe &&
+ ln -sf ../$HOST/bin/$HOST-widl.exe $PWD/stage1/bin/widl.exe &&
     echo OK
 
 
@@ -8154,15 +8157,14 @@ for arch in i686 x86_64 armv7 aarch64; do
 mkdir -p build_stage1 &&
  # build main LLVM suite
  wl-showstatus configure &&
- #libunwind;openmp;parallel-libs;polly;pstl;flang
- #;polly;mlir;pstl
+ #libunwind;openmp;polly;pstl;flang;polly;mlir;pstl
  #-DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
  #-DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi" \
- PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH \
+ PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH \
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$PWD/stage1 -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DLLVM_BUILD_LLVM_DYLIB:BOOL=OFF \
-  -DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;lld;lldb;libclc;pstl;polly;mlir;flang" \
+  -DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;lld;lldb;libclc;pstl;mlir;flang" \
   -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi;libunwind" \
   -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64" \
   -DLLVM_RUNTIME_TARGETS=default \
@@ -8221,7 +8223,7 @@ mkdir -p build_stage1 &&
   -DLIBCXX_INCLUDE_TESTS:BOOL=OFF \
   -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT:BOOL=OFF \
   \
-  -DLIBCXXABI_ENABLE_SHARED:BOOL=ON \
+  -DLIBCXXABI_ENABLE_SHARED:BOOL=Off \
   -DLIBCXXABI_ENABLE_STATIC:BOOL=ON \
   -DLIBCXXABI_USE_COMPILER_RT:BOOL=ON \
   -DLIBCXXABI_LIBCXX_INCLUDES:PATH=$PWD/build_libcxx/include/c++/v1 \
@@ -8264,6 +8266,7 @@ mkdir -p build_stage1 &&
   -DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
   -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
   \
+  -DCMAKE_ASM_MASM_COMPILER:FILEPATH=$(PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ml.exe) \
   -DCMAKE_ASM_COMPILER:FILEPATH=$(PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which clang.exe) \
   -DCMAKE_ASM_COMPILER_AR:FILEPATH=$(PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ar.exe) \
   -DCMAKE_ASM_COMPILER_RANLIB:FILEPATH=$(PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ranlib.exe) \
@@ -8291,7 +8294,6 @@ mkdir -p build_stage1 &&
   -DPython3_FIND_REGISTRY:BOOL=NEVER \
   -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
   -Sllvm -Bbuild_stage1 &&
-  #-DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $PWD/libcxx/include)" \
  wl-showstatus build-install &&
  PATH=$MINGWPREFIX/share/python/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH ninja -Cbuild_stage1 install/strip &&
  strip build_stage1/bin/clang-tblgen.exe &&
@@ -8302,3 +8304,98 @@ mkdir -p build_stage1 &&
 
 
 
+
+
+
+
+ # build runtimes
+ for arch in i686 x86_64 armv7 aarch64; do
+  mkdir -p build_cross_runtimes_$arch &&
+  wl-showstatus configure &&
+  PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH \
+  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$PWD/cross -DCMAKE_BUILD_TYPE:STRING=Release  \
+   -DCMAKE_CROSSCOMPILING:BOOL=ON \
+   -DCMAKE_SYSTEM_NAME:STRING=Windows \
+   -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt" \
+   -DLLVM_ENABLE_ASSERTIONS:BOOL=ON \
+   -DLLVM_ENABLE_EH:BOOL=ON \
+   -DLLVM_ENABLE_RTTI:BOOL=ON \
+   \
+   -DCMAKE_ASM_COMPILER_TARGET=$arch-w64-mingw32 \
+   -DCMAKE_C_COMPILER_TARGET=$arch-w64-mingw32 \
+   -DCMAKE_CXX_COMPILER_TARGET=$arch-w64-mingw32 \
+   -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$arch-w64-mingw32 \
+   -DCOMPILER_RT_DEFAULT_TARGET_ONLY:BOOL=OFF \
+   -DCOMPILER_RT_USE_LIBCXX:BOOL=ON \
+   -DCOMPILER_RT_BUILD_XRAY:BOOL=OFF \
+   -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON \
+   -DCOMPILER_RT_BUILD_BUILTINS:BOOL=ON \
+   -DCOMPILER_RT_BUILD_LIBFUZZER:BOOL=OFF \
+   -DCOMPILER_RT_BUILD_MEMPROF:BOOL=OFF \
+   -DCOMPILER_RT_BUILD_PROFILE:BOOL=OFF \
+   -DCOMPILER_RT_BUILD_SANITIZERS:BOOL=OFF \
+   -DCOMPILER_RT_SANITIZERS_TO_BUILD:STRING="" \
+   -DCOMPILER_RT_INCLUDE_TESTS:BOOL=OFF \
+   \
+   -DLIBCXXABI_ENABLE_SHARED:BOOL=ON \
+   -DLIBCXXABI_ENABLE_STATIC:BOOL=ON \
+   -DLIBCXXABI_TARGET_TRIPLE:STRING=$arch-w64-mingw32 \
+   -DLIBCXXABI_USE_COMPILER_RT:BOOL=ON \
+   -DLIBCXXABI_LIBCXX_INCLUDES:PATH=$PWD/build_libcxx/include/c++/v1 \
+   -DLIBCXXABI_LIBDIR_SUFFIX="" \
+   -DLIBCXXABI_INCLUDE_TESTS:BOOL=OFF \
+   \
+   -DLIBUNWIND_ENABLE_SHARED:BOOL=ON \
+   -DLIBUNWIND_ENABLE_STATIC:BOOL=ON \
+   -DLIBUNWIND_USE_COMPILER_RT:BOOL=ON \
+   \
+   -DCMAKE_SYSTEM_PROGRAM_PATH=$PWD/native/bin \
+   -DCMAKE_FIND_ROOT_PATH="$PWD/native" \
+   -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+   -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+   -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+   \
+   -DLLVM_CONFIG_PATH:STRING=$PWD/stage1/bin/llvm-config.exe \
+    \
+   -DCMAKE_ASM_MASM_COMPILER:FILEPATH=$PWD/stage1/bin/llvm-ml.exe \
+   -DCMAKE_ASM_COMPILER:FILEPATH=$PWD/stage1/bin/clang.exe \
+   -DCMAKE_ASM_COMPILER_AR:FILEPATH=$PWD/stage1/bin/llvm-ar.exe \
+   -DCMAKE_ASM_COMPILER_RANLIB:FILEPATH=$PWD/stage1/bin/llvm-ranlib.exe \
+   -DCMAKE_C_COMPILER:FILEPATH=$PWD/stage1/bin/clang.exe \
+   -DCMAKE_C_COMPILER_AR:FILEPATH=$PWD/stage1/bin/llvm-ar.exe \
+   -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$PWD/stage1/bin/llvm-ranlib.exe \
+   -DCMAKE_CXX_COMPILER:FILEPATH=$PWD/stage1/bin/clang++.exe \
+   -DCMAKE_CXX_COMPILER_AR:FILEPATH=$PWD/stage1/bin/llvm-ar.exe \
+   -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$PWD/stage1/bin/llvm-ranlib.exe \
+   -DCMAKE_RC_COMPILER:FILEPATH=$PWD/stage1/bin/llvm-windres.exe \
+   -DCMAKE_AR:FILEPATH=$PWD/stage1/bin/llvm-ar.exe \
+   -DCMAKE_RANLIB:FILEPATH=$PWD/stage1/bin/llvm-ranlib.exe \
+   -DCMAKE_READELF:FILEPATH=$PWD/stage1/bin/llvm-readelf.exe \
+   -DCMAKE_DLLTOOL:FILEPATH=$PWD/stage1/bin/llvm-dlltool.exe \
+   -DCMAKE_NM:FILEPATH=$PWD/stage1/bin/llvm-nm.exe \
+   -DCMAKE_OBJCOPY:FILEPATH=$PWD/stage1/bin/llvm-objcopy.exe \
+   -DCMAKE_OBJDUMP:FILEPATH=$PWD/stage1/bin/llvm-objdump.exe \
+   -DCMAKE_LINKER:FILEPATH=$PWD/stage1/bin/llvm-link.exe \
+   -DCMAKE_STRIP:FILEPATH=$PWD/stage1/bin/llvm-strip.exe \
+   -DGOLD_EXECUTABLE:FILEPATH=$PWD/stage1/bin/ld.lld.exe \
+   -DCMAKE_ASM_FLAGS:STRING="-g0 -v -integrated-as -fuse-ld=lld" \
+   -DCMAKE_C_FLAGS:STRING="-g0 -fuse-ld=lld -D_WIN32_WINNT=0x0600 -I$PWD/stage1/$RUNPLATFORM/include" \
+   -DCMAKE_CXX_FLAGS:STRING="-g0 -fuse-ld=lld -D_WIN32_WINNT=0x0600 -I$PWD/stage1/$RUNPLATFORM/include" \
+   -DCMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS:STRING="-fuse-ld=lld -lwinpthread -L$PWD/stage1/$RUNPLATFORM/lib -L$PWD/stage1/lib " \
+   \
+   -DPython3_FIND_REGISTRY:BOOL=NEVER \
+   -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+   -Sruntimes -Bbuild_cross_runtimes_$arch &&
+  #-DCMAKE_ASM_COMPILER:FILEPATH=$PWD/prebuilt/bin/$arch-w64-mingw32-as.exe \
+  #-DCMAKE_ASM_FLAGS:STRING="-g0 -v -no-integrated-as -fuse-ld=lld" \
+  #-DCMAKE_CXX_FLAGS:STRING="-g0 -fuse-ld=lld -I$PWD/prebuilt/include/c++/v1" \
+  sed -i.bak -e "s?/IGNORE:[0-9]*??" build_cross_runtimes_$arch/build.ninja &&
+  #sed -i.bak2 -e "s?-lNOTFOUND??g" build_cross_runtimes_$arch/build.ninja &&
+  wl-showstatus build-install &&
+  PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH \
+  ninja -Cbuild_cross_runtimes_$arch install/strip &&
+  touch SUCCESS_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
+ rm -f SUCCESS_* &&
+    echo OK
