@@ -7963,7 +7963,8 @@ PREBUILT_BASE=llvm-mingw-$PREBUILT_VERSION-$(if [ "0$USE_UCRT" -ne 0 ]; then ech
 wl-download -v -d $TARBALLDIR/$BASENAME https://github.com/mstorsjo/llvm-mingw/releases/download/$PREBUILT_VERSION/$PREBUILT_BASE.zip
 mkdir -p prebuilt
 unzip -oq $TARBALLDIR/$BASENAME/$PREBUILT_BASE.zip -dprebuilt
-echo prebuilt/$PREBUILT_BASE/bin
+cp -f prebuilt/$PREBUILT_BASE/bin/clang.exe prebuilt/$PREBUILT_BASE/bin/gcc_renamed_clang.exe
+cp -f prebuilt/$PREBUILT_BASE/bin/clang++.exe prebuilt/$PREBUILT_BASE/bin/g++_renamed_clang++.exe
 
 # fix compiler-rt/cmake/config-ix.cmake (version >= 13.0.0)
 patch -ulbf compiler-rt/cmake/config-ix.cmake << EOF
@@ -7974,20 +7975,195 @@ patch -ulbf compiler-rt/cmake/config-ix.cmake << EOF
  endif()
 EOF
 
+
+
+# build MinGW-w64 headers and crt
+for arch in i686 x86_64 armv7 aarch64; do
+ mkdir -p build_mingw-w64-headers-$arch build_mingw-w64-crt-$arch &&
+ wl-showstatus configure &&
+ cd build_mingw-w64-headers-$arch &&
+ PATH=$PWD/stage1/bin:$PATH \
+ $MINGWPREFIX/src/mingw-w64/mingw-w64-headers/configure --prefix=$PWD/../stage1/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 \
+  --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrt"; else echo "msvcrt-os"; fi) \
+  --enable-sdk=all \
+  --enable-idl &&
+ cd .. &&
+ wl-showstatus build-install &&
+ PATH=$PWD/stage1/bin:$PATH \
+ make -Cbuild_mingw-w64-headers-$arch install-strip &&
+ wl-showstatus configure &&
+ cd build_mingw-w64-crt-$arch &&
+ PATH=$PWD/stage1/bin:$PATH \
+ $MINGWPREFIX/src/mingw-w64/mingw-w64-crt/configure --prefix=$PWD/../stage1/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 \
+  --$(if [ "$arch" == "i686" ]; then echo "enable"; else echo "disable"; fi)-lib32 \
+  --$(if [ "$arch" == "x86_64" ]; then echo "enable"; else echo "disable"; fi)-lib64 \
+  --$(if [ "$arch" == "armv7" ]; then echo "enable"; else echo "disable"; fi)-libarm32 \
+  --$(if [ "$arch" == "aarch64" ]; then echo "enable"; else echo "disable"; fi)-libarm64 \
+  --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrt"; else echo "msvcrt-os"; fi) \
+  --enable-wildcard \
+  CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi)" \
+  CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld" \
+  AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
+  LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
+  DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
+  AR="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ar.exe)" \
+  RANLIB="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ranlib.exe)" \
+  RC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-windres.exe)" \
+  NM="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-nm.exe)" \
+  OBJDUMP="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-objdump.exe)" \
+  &&
+ cd .. &&
+ wl-showstatus build &&
+ PATH=$PWD/stage1/bin:$PATH make -Cbuild_mingw-w64-crt-$arch &&
+ wl-showstatus build-install &&
+ PATH=$PWD/stage1/bin:$PATH make -Cbuild_mingw-w64-crt-$arch install-strip &&
+ touch SUCCESS_$arch || break
+done &&
+ if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
+ rm -f SUCCESS_* &&
+    echo OK
+
+
+
+# build MinGW-w64 winpthreads
+#for arch in i686 x86_64 aarch64; do
+for arch in i686 x86_64 armv7 aarch64; do
+  mkdir -p build_mingw-w64_winpthreads_stage1_$arch &&
+  wl-showstatus configure &&
+  cd build_mingw-w64_winpthreads_stage1_$arch &&
+  #PATH=$PWD/native/bin:$PATH $MINGWPREFIX/src/mingw-w64/mingw-w64-libraries/winpthreads/configure --prefix=$PWD/../stage1/$arch-w64-mingw32 \
+  $MINGWPREFIX/src/mingw-w64/mingw-w64-libraries/winpthreads/configure --prefix=$PWD/../stage1/$arch-w64-mingw32 \
+   --build=$BUILDPLATFORM \
+   --host=$arch-w64-mingw32 \
+   --with-sysroot=$PWD/../stage1 \
+   --without-gnu-ld \
+   CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi) $(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" \
+   CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld -target $arch-w64-mingw32" \
+   AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
+   LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
+   DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
+   AR="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ar.exe)" \
+   RANLIB="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ranlib.exe)" \
+   RC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-windres.exe) --target=$arch-w64-mingw32" \
+   NM="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-nm.exe)" \
+   OBJDUMP="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-objdump.exe)" \
+   STRIP="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-strip.exe)" \
+   CFLAGS="-D_FORTIFY_SOURCE=2" \
+   LDFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-lmsvcrt -lmingwex"; fi)" \
+   &&
+   #CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" \
+   #CFLAGS="-I$PWD/../stage1/include -I$PWD/../stage1/include/$RUNPLATFORM/c++/v1 -I$PWD/../stage1/include/c++/v1 $(if [ "$arch" == "aarch64" ]; then echo "-D__aarch64__"; fi)" \
+   #LDFLAGS="-L$PWD/../stage1/lib -Wl,-no-undefined" \
+   #LDFLAGS="-Lstage1/$arch-w64-mingw32/lib $(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-lmsvcrt -lmingwex"; fi)" \
+  cd .. &&
+  #-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ 
+  #-Wl,-m,$(case $arch in i686) echo "i386pe";; x86_64) echo "i386pep";; armv7) echo "thumb2pe";; aarch64) echo "arm64pe";; esac)
+  # fix detection of shared libraries
+  sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" build_mingw-w64_winpthreads_stage1_$arch/libtool &&
+  # fix link issues in build_mingw-w64/mingw-w64-libraries/winpthreads/
+  sed -i.bak -e "s?\(-o \)\([^ ]*\)\(.*\) -link \(-dll\)?-shared -s -mwindows \1.libs/libwinpthread-1.dll -Wl,--out-implib,\2 \3 \4?" build_mingw-w64_winpthreads_stage1_$arch/libtool &&
+  sed -i.bak -e "s?\$(AM_V_CCLD).*\$(libwinpthread_la_OBJECTS).*?& \&\& \$(AR) \$(ARFLAGS) .libs/libwinpthread.a \$(libwinpthread_la_OBJECTS:.lo=.o) \&\& cp -f .libs/libwinpthread.a .libs/libwinpthread.lib?" build_mingw-w64_winpthreads_stage1_$arch/Makefile &&
+  wl-showstatus build-install &&
+  # build include files and make them available
+  #PATH=$PWD/prebuilt/bin:$PATH make -Cbuild_mingw-w64_winpthreads_stage1_$arch install-strip &&
+  make -Cbuild_mingw-w64_winpthreads_stage1_$arch install-strip &&
+  #make -Cbuild_mingw-w64_winpthreads_stage1_$arch install-strip CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" &&
+  cp -u build_mingw-w64_winpthreads_stage1_$arch/fakelib/*.a stage1/$arch-w64-mingw32/lib/ &&
+  #mkdir -p stage1/$arch-w64-mingw32 &&
+  #cp -rf mingw-w64_winpthreads_$arch/* stage1/$arch-w64-mingw32/ &&
+  #mkdir -p stage1/lib/$arch-w64-mingw32 &&
+  #cp -rf mingw-w64_winpthreads_$arch/* stage1/lib/$arch-w64-mingw32/ &&
+  ##mkdir -p stage1/$arch-w64-windows-gnu/lib &&
+  ##cp -rf mingw-w64_winpthreads_$arch/lib/* stage1/$arch-w64-windows-gnu/lib/ &&
+  touch SUCCESS_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
+ rm -f SUCCESS_* &&
+    echo OK
+
+
+ # build MinGW-w64 gendef
+ mkdir -p build_mingw-w64-gendef &&
+ wl-showstatus configure &&
+ cd build_mingw-w64-gendef &&
+ $MINGWPREFIX/src/mingw-w64/mingw-w64-tools/gendef/configure --prefix=$INSTALLPREFIX/share/llvm \
+  --build=$BUILDPLATFORM \
+  --host=$RUNPLATFORM \
+   CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld" \
+   CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld" \
+   AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
+   LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
+   DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
+   AR="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ar.exe)" \
+   RANLIB="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ranlib.exe)" \
+   RC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-windres.exe) --target=$arch-w64-mingw32" \
+   NM="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-nm.exe)" \
+   OBJDUMP="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-objdump.exe)" \
+   STRIP="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-strip.exe)" \
+   CFLAGS="-D_FORTIFY_SOURCE=2" \
+   LDFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-lmsvcrt -lmingwex"; fi)" \
+  &&
+ #LDFLAGS="-Wl,--unwindlib=compiler-rt" &&
+ cd .. &&
+ wl-showstatus build &&
+ make -Cbuild_mingw-w64-gendef install-strip &&
+    echo OK
+
+ # build MinGW-w64 widl (probably okay to only build for $HOST)
+ for arch in i686 x86_64 armv7 aarch64; do
+  mkdir -p build_mingw-w64-widl-$arch &&
+  wl-showstatus configure &&
+  cd build_mingw-w64-widl-$arch &&
+  PATH=$INSTALLPREFIX/share/llvm/bin:$PATH \
+  $MINGWPREFIX/src/mingw-w64/mingw-w64-tools/widl/configure --prefix=$INSTALLPREFIX/share/llvm/$arch-w64-mingw32 \
+   --build=$BUILDPLATFORM \
+   --host=$RUNPLATFORM \
+   --target=$arch-w64-mingw32 \
+   --with-widl-includedir=../include \
+    CC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which gcc_renamed_clang.exe) -fuse-ld=lld -target $arch-w64-mingw32 $(if [ "$arch" == "armv7" ]; then echo "-march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2"; fi) $(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" \
+    CXX="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which g++_renamed_clang++.exe) -fuse-ld=lld -target $arch-w64-mingw32" \
+    AS="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-as.exe)" \
+    LD="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which lld-link.exe)" \
+    DLLTOOL="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-dlltool.exe)" \
+    AR="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ar.exe)" \
+    RANLIB="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-ranlib.exe)" \
+    RC="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-windres.exe) --target=$arch-w64-mingw32" \
+    NM="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-nm.exe)" \
+    OBJDUMP="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-objdump.exe)" \
+    STRIP="$(PATH=$PWD/../prebuilt/$PREBUILT_BASE/bin:$PATH which llvm-strip.exe)" \
+    CFLAGS="-D_FORTIFY_SOURCE=2" \
+    LDFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-lmsvcrt -lmingwex"; fi)" \
+   &&
+  #--with-widl-includedir=$INSTALLPREFIX/share/llvm/include &&
+  cd .. &&
+  wl-showstatus build &&
+  PATH=$INSTALLPREFIX/share/llvm/bin:$PATH \
+  make -Cbuild_mingw-w64-widl-$arch install-strip &&
+  touch SUCCESS_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
+ rm -f SUCCESS_* &&
+ ln -sf ../$HOST/bin/$HOST-widl.exe $INSTALLPREFIX/share/llvm/bin/widl.exe &&
+    echo OK
+
+
+
+
+
+
 mkdir -p build_stage1 &&
  # build main LLVM suite
  wl-showstatus configure &&
  #libunwind;openmp;parallel-libs;polly;pstl;flang
  #;polly;mlir;pstl
+ #-DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
+ #-DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi" \
  PATH=$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH \
- C_INCLUDE_PATH=$PWD/prebuilt/$PREBUILT_BASE/include:${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} \
- CPLUS_INCLUDE_PATH=$PWD/prebuilt/$PREBUILT_BASE/include:${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} \
- LIBRARY_PATH=$PWD/prebuilt/$PREBUILT_BASE/lib:$PWD/prebuilt/$PREBUILT_BASE/$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "i686"; fi)-w64-mingw32/lib:${LIBRARY_PATH:+:$LIBRARY_PATH} \
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$PWD/stage1 -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
-  -DBUILD_SHARED_LIBS:BOOL=OFF \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
   -DLLVM_BUILD_LLVM_DYLIB:BOOL=OFF \
-  -DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
-  -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi" \
+  -DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;lld;lldb;libclc;pstl;polly;mlir;flang" \
+  -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi;libunwind" \
   -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64" \
   -DLLVM_RUNTIME_TARGETS=default \
   -DLLVM_HOST_TRIPLE:STRING=$(echo $BUILDPLATFORM|sed -e "s/-.*$//")-w64-mingw32 \
@@ -8014,7 +8190,7 @@ mkdir -p build_stage1 &&
   -DLLVM_USE_RELATIVE_PATHS_IN_FILES:BOOL=ON \
   -DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=OFF \
   -DLLVM_INSTALL_CCTOOLS_SYMLINKS:BOOL=OFF \
-  -DLLVM_ENABLE_DOXYGEN:BOOL=OFF -DDOXYGEN_DOT_EXECUTABLE:FILEPATH= -DDOXYGEN_EXECUTABLE:FILEPATH= \
+  -DLLVM_ENABLE_DOXYGEN:BOOL=OFF -DDOXYGEN_EXECUTABLE:FILEPATH= -DDOXYGEN_DOT_EXECUTABLE:FILEPATH= \
   -DLLVM_ENABLE_SPHINX=OFF \
   -DLLVM_INCLUDE_DOCS:BOOL=OFF \
   -DLLVM_BUILD_EXAMPLES:BOOL=OFF \
@@ -8088,7 +8264,8 @@ mkdir -p build_stage1 &&
   -DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
   -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
   \
-  -DCMAKE_CXX_FLAGS:STRING="-D_WIN32_WINNT=0x0600" \
+  -DCMAKE_CXX_FLAGS:STRING="-D_WIN32_WINNT=0x0600 -I$PWD/stage1/$RUNPLATFORM/include -I$PWD/prebuilt/$PREBUILT_BASE/include" \
+  -DCMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS:STRING="-lwinpthread -L$PWD/stage1/$RUNPLATFORM/lib -L$PWD/prebuilt/$PREBUILT_BASE/lib -L$PWD/prebuilt/$PREBUILT_BASE/$RUNPLATFORM/lib" \
   \
   -DPython3_FIND_REGISTRY:BOOL=NEVER \
   -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
@@ -8101,3 +8278,6 @@ mkdir -p build_stage1 &&
  cp -f stage1/bin/clang.exe stage1/bin/gcc_renamed_clang.exe &&
  cp -f stage1/bin/clang++.exe stage1/bin/g++_renamed_clang++.exe &&
     echo OK
+
+
+
