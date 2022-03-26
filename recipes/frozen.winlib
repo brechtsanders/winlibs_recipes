@@ -1,0 +1,51 @@
+export NAME="frozen"
+export STATUS=
+export URL=https://github.com/cesanta/frozen
+export BASENAME=frozen
+export DESCRIPTION="JSON parser and generator for C/C++ with scanf/printf like interface. Targeting embedded systems."
+export CATEGORY=fileformat,dataprocessing
+export TYPE=library
+export VERSION=1.6
+export VERSIONDATE=20220326
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/cesanta/frozen/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/cesanta/frozen/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing int64_t/uint64_t in frozen.c (version >= 1.6)
+patch -ulbf frozen.c << EOF
+@@ -41,3 +41,3 @@
+ int cs_win_vsnprintf(char *str, size_t size, const char *format, va_list ap);
+-#if _MSC_VER >= 1700
++#if _MSC_VER >= 1700 || defined(__MINGW32__)
+ #include <stdint.h>
+EOF
+## fix Makefile (version >= 1.6)
+#sed -i.bak -e "s/\(\s\)cc /\1\$(CC) /; s/\(\s\)g++ /\1\$(CXX) /" Makefile
+#wl-showstatus build &&
+# make CC=${CC:-gcc} CXX=${CXX:-g++} &&
+#    echo OK
+wl-showstatus build &&
+ gcc -c -o frozen.o frozen.c -I. -O3 &&
+ ar cru libfrozen.a frozen.o &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libfrozen.a | sed -n -e "s/^_*\(json[^ ]*\) T .*$/\1/p" ) > frozen.def &&
+ gcc -shared -s -mwindows -def frozen.def -o frozen.dll libfrozen.a -Wl,--out-implib,libfrozen.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
