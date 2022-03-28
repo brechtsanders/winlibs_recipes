@@ -1,0 +1,76 @@
+export NAME="PPLNN"
+export STATUS=
+export URL=https://github.com/openppl-public/ppl.nn
+export BASENAME=pplnn
+export DESCRIPTION="PPLNN, which is short for \"PPLNN is a Primitive Library for Neural Network\", is a high-performance deep-learning inference engine for efficient AI inferencing. It can run various ONNX models and has better support for OpenMMLab."
+export CATEGORY=
+export TYPE=library
+export VERSION=0.6.3
+export VERSIONDATE=20220327
+wl-showstatus --package-version
+export DEPENDANCIES=mman-win32
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/openppl-public/ppl.nn/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/openppl-public/ppl.nn/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd ppl.nn-$VERSION
+# fix deps/pplcommon/src/ppl/common/file_mapping.cc (version >= 0.6.3)
+patch -ulbf deps/pplcommon/src/ppl/common/file_mapping.cc << EOF
+@@ -101,3 +101,7 @@
+     struct stat file_stat_info;
+-    int fd = open(filename, O_RDONLY | O_CLOEXEC);
++    int fd = open(filename, O_RDONLY
++#ifdef O_CLOEXEC
++      | O_CLOEXEC
++#endif
++    );
+     if (fd < 0) {
+EOF
+# fix format strings and error: reference to 'byte' is ambiguous in deps/pplcommon/src/ppl/common/log.cc (version >= 0.6.3)
+patch -ulbf deps/pplcommon/src/ppl/common/log.cc << EOF
+@@ -20,2 +20,6 @@
+ #include <memory>
++#if defined(__MINGW32__)
++#include <windows.h>
++#include <inttypes.h>
++#endif
+ using namespace std;
+@@ -103,2 +107,5 @@
+ DEF_READ_OPERATOR_FUNC(uint64_t, "%llu");
++#elif defined(__MINGW32__)
++DEF_READ_OPERATOR_FUNC(int64_t, "%" PRIi64);
++DEF_READ_OPERATOR_FUNC(uint64_t, "%" PRIu64);
+ #else
+EOF
+# also allow building shared library
+sed -i.bak -e "s/\(add_library(\)\([^ ]*\)\(_static\) STATIC \(.*)\)$/\1\2\3 \4\nset_target_properties(\2\3 PROPERTIES OUTPUT_NAME \2)/" CMakeLists.txt deps/pplcommon/CMakeLists.txt
+sed -i.bak -e "s/^\(install(TARGETS .*\))$/\1 RUNTIME DESTINATION bin)/" cmake/install.cmake deps/pplcommon/cmake/install.cmake
+## use already installed protobuf
+#mv -f cmake/protobuf.cmake cmake/protobuf.cmake.bak &&
+#echo "find_package(Protobuf REQUIRED)" > cmake/protobuf.cmake
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/ppln -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DPPLCOMMON_BUILD_TESTS:BOOL=OFF -DRAPIDJSON_BUILD_TESTS:BOOL=OFF -Dprotobuf_BUILD_TESTS:BOOL=OFF -DPPLNN_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_static &&
+ # fix missing linker flags
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lmman/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/ppln -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DPPLCOMMON_BUILD_TESTS:BOOL=OFF -DRAPIDJSON_BUILD_TESTS:BOOL=OFF -Dprotobuf_BUILD_TESTS:BOOL=OFF -DPPLNN_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_shared &&
+ # fix missing linker flags
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lmman/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ppl.nn-$VERSION
+####TO DO: don't install libprotobuf/libprotobuf-lite, to avoid conflicts install in separate location
+
+
+
