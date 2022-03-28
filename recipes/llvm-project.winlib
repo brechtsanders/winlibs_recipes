@@ -282,6 +282,394 @@
 
 
 
+#export NAME="The LLVM Compiler Infrastructure"
+#export STATUS=
+#export URL=https://llvm.org/
+#export BASENAME=llvm-project
+#export DESCRIPTION="The LLVM Compiler Infrastructure - a toolkit for the construction of highly optimized compilers, optimizers, and run-time environments."
+#export CATEGORY=development
+#export TYPE=application
+##export VERSION=13.0.0
+##export VERSIONDATE=20211212
+#export VERSION=13.0.1
+#export VERSIONDATE=20220209
+#wl-showstatus --package-version
+##export DEPENDANCIES=pthreads,zlib,xz,libxml2,libffi,isl,z3,swig,lua,ncurses,protobuf,wineditline
+#export DEPENDANCIES=pthreads,zlib,xz,libxml2,libffi,isl,z3,swig,lua,ncurses,protobuf,wineditline,cpython-mingw,tbb
+#export OPTIONALDEPENDANCIES=udis86,graphviz,hwloc,libpfm4
+#export BUILDDEPENDANCIES=cmake,ninja,jwasm
+#export LICENSEFILE=llvm/LICENSE.TXT
+#export LICENSETYPE="Apache with exceptions"
+##export DOWNLOADURL="https://releases.llvm.org/ llvmorg-"
+##export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ llvm-project- .src.tar.xz"
+##export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ llvmorg-"
+#export DOWNLOADURL="https://github.com/llvm/llvm-project/tags/ llvmorg-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$VERSION/llvm-project-$VERSION.src.tar.xz
+#export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/\([0-9]\)\(rc\)/\1-\2/")/llvm-project-$VERSION.src.tar.xz
+##export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfJ $TARBALLDIR/$BASENAME/llvm-project-$VERSION.src.tar.xz
+#cd llvm-project-$VERSION.src
+##tar xfz $TARBALLDIR/$BASENAME/llvmorg-$VERSION.tar.gz
+##cd llvm-project-llvmorg-$VERSION
+#patch -ulbf llvm/tools/llvm-config/llvm-config.cpp << EOF
+#@@ -382,2 +382,25 @@
+#     SharedVersionedExt = LLVM_DYLIB_VERSION ".dll";
+#+#ifdef __MINGW32__
+#+    if (1) {
+#+      SharedPrefix = "lib";
+#+      StaticExt = "a";
+#+      StaticPrefix = "lib";
+#+      if (getenv("MSYSTEM")) {
+#+        std::replace(ActiveObjRoot.begin(), ActiveObjRoot.end(), '\\\\', '/');
+#+        std::replace(ActivePrefix.begin(), ActivePrefix.end(), '\\\\', '/');
+#+        std::replace(ActiveBinDir.begin(), ActiveBinDir.end(), '\\\\', '/');
+#+        std::replace(ActiveLibDir.begin(), ActiveLibDir.end(), '\\\\', '/');
+#+        std::replace(ActiveCMakeDir.begin(), ActiveCMakeDir.end(), '\\\\', '/');
+#+        std::replace(ActiveIncludeOption.begin(), ActiveIncludeOption.end(), '\\\\', '/');
+#+      } else {
+#+        DirSep = "\\\\";
+#+        std::replace(ActiveObjRoot.begin(), ActiveObjRoot.end(), '/', '\\\\');
+#+        std::replace(ActivePrefix.begin(), ActivePrefix.end(), '/', '\\\\');
+#+        std::replace(ActiveBinDir.begin(), ActiveBinDir.end(), '/', '\\\\');
+#+        std::replace(ActiveLibDir.begin(), ActiveLibDir.end(), '/', '\\\\');
+#+        std::replace(ActiveCMakeDir.begin(), ActiveCMakeDir.end(), '/', '\\\\');
+#+        std::replace(ActiveIncludeOption.begin(), ActiveIncludeOption.end(), '/', '\\\\');
+#+      }
+#+    } else
+#+#endif
+#     if (HostTriple.isOSCygMing()) {
+#EOF
+## ignore -fPIC flag for Windows targets (version <= 13.0.0)
+#####bug reported here: https://github.com/llvm/llvm-project/issues/52947
+#patch -ulbf clang/lib/Driver/ToolChains/CommonArgs.cpp << EOF
+#@@ -1188,6 +1188,4 @@
+#                                     options::OPT_fpie, options::OPT_fno_pie);
+#-  if (Triple.isOSWindows() && LastPICArg &&
+#-      LastPICArg ==
+#-          Args.getLastArg(options::OPT_fPIC, options::OPT_fpic,
+#-                          options::OPT_fPIE, options::OPT_fpie)) {
+#+  if (Triple.isOSWindows() && !Triple.isOSCygMing() && LastPICArg &&
+#+      LastPICArg == Args.getLastArg(options::OPT_fPIC, options::OPT_fpic, options::OPT_fPIE, options::OPT_fpie)) {
+#     ToolChain.getDriver().Diag(diag::err_drv_unsupported_opt_for_target)
+#EOF
+#patch -ulbf clang/lib/Driver/ToolChains/MinGW.cpp << EOF
+#@@ -481,5 +481,3 @@
+#
+#-bool toolchains::MinGW::isPICDefaultForced() const {
+#-  return getArch() == llvm::Triple::x86_64;
+#-}
+#+bool toolchains::MinGW::isPICDefaultForced() const { return true; }
+#
+#EOF
+## ignore --as-needed linker flag for Windows targets (version <= 13.0.0)
+#####bug reported here: https://github.com/llvm/llvm-project/issues/52947
+#patch -ulbf lld/MinGW/Options.td << EOF
+#@@ -148,2 +148,3 @@
+# def: Joined<["-"], "O">;
+#+def: F<"as-needed">;
+# def: F<"build-id">;
+#@@ -155,2 +156,3 @@
+# defm: EqNoHelp<"minor-image-version">;
+#+def: F<"no-as-needed">;
+# def: F<"no-undefined">;
+#EOF
+## fix errors when working on a (ImDisk) RAM-drive (version <= 13.0.0)
+#####bug reported here: https://bugs.llvm.org/show_bug.cgi?id=52080
+#patch -ulbf llvm/include/llvm/Support/FileSystem.h << EOF
+#@@ -866,2 +866,6 @@
+#   int FD = -1;
+#+#ifdef _WIN32
+#+  // Whether we need to manually remove the file on close.
+#+  bool RemoveOnClose = false;
+#+#endif
+#
+#EOF
+#patch -ulbf llvm/lib/Support/Path.cpp << EOF
+#@@ -1192,2 +1192,6 @@
+#   Other.FD = -1;
+#+#ifdef _WIN32
+#+  RemoveOnClose = Other.RemoveOnClose;
+#+  Other.RemoveOnClose = false;
+#+#endif
+#   return *this;
+#@@ -1208,14 +1212,16 @@
+#   TmpName = "";
+#-  return Error::success();
+#-#else
+#-  // Always try to close and remove.
+#+  bool Remove = true;
+#+#endif
+#   std::error_code RemoveEC;
+#-  if (!TmpName.empty()) {
+#+  if (Remove && !TmpName.empty()) {
+#     RemoveEC = fs::remove(TmpName);
+#+#ifndef _WIN32
+#     sys::DontRemoveFileOnSignal(TmpName);
+#+#endif
+#     if (!RemoveEC)
+#       TmpName = "";
+#+  } else {
+#+    TmpName = "";
+#   }
+#   return errorCodeToError(RemoveEC);
+#-#endif
+# }
+#@@ -1230,2 +1236,3 @@
+#   std::error_code RenameEC = setDeleteDisposition(H, false);
+#+  bool ShouldDelete = false;
+#   if (!RenameEC) {
+#@@ -1236,3 +1243,3 @@
+#       RenameEC = copy_file(TmpName, Name);
+#-      setDeleteDisposition(H, true);
+#+      ShouldDelete = true;
+#     }
+#@@ -1242,3 +1249,9 @@
+#   if (RenameEC)
+#-    setDeleteDisposition(H, true);
+#+    ShouldDelete = true;
+#+  if (ShouldDelete) {
+#+    if (!RemoveOnClose)
+#+      setDeleteDisposition(H, true);
+#+    else
+#+      remove(TmpName);
+#+  }
+# #else
+#@@ -1300,2 +1313,7 @@
+# #ifndef _WIN32
+#+  auto H = reinterpret_cast<HANDLE>(_get_osfhandle(FD));
+#+  if (std::error_code EC = setDeleteDisposition(H, true)) {
+#+    Ret.RemoveOnClose = true;
+#+  }
+#+#else
+#   if (sys::RemoveFileOnSignal(ResultPath)) {
+#EOF
+#patch -ulbf llvm/lib/Support/Windows/Path.inc << EOF
+#@@ -429,3 +429,3 @@
+#   if (!IsLocal)
+#-    return std::error_code();
+#+    return errc::not_supported;
+#
+#@@ -1185,8 +1185,2 @@
+#
+#-  if (Flags & OF_Delete) {
+#-    if ((EC = setDeleteDisposition(Result, true))) {
+#-      ::CloseHandle(Result);
+#-      return errorCodeToError(EC);
+#-    }
+#-  }
+#   return Result;
+#EOF
+## llvm/include/llvm/Support/FileSystem.h llvm/lib/Support/Path.cpp llvm/lib/Support/Windows/Path.inc
+### fix C++ issue with missing include of limits
+##if echo $CXX|grep -q clang++; then
+## for F in $(find llvm -name '*.cpp') $(find clang -name '*.cpp') $(find lldb -name '*.cpp'); do
+##  if [ -f $F ]; then
+##   mv $F $F.bak1 &&
+##   echo "#include <cstdlib>" > $F &&
+##   echo "#include <limits>" >> $F &&
+##   echo "#include <cmath>" >> $F &&
+##   cat $F.bak1 >> $F
+##  fi
+## done
+##fi
+### fix issues with std::isnan/std::isinf/std::signbit in llvm/lib/Support/NativeFormatting.cpp (version >= 13.0.0)
+##if echo $CXX|grep -q clang++; then
+## sed -i.bak -e "s/std::\(isnan\|isinf\|signbit\)/\1/" llvm/lib/Support/NativeFormatting.cpp
+##fi
+######llvm/lib/Target/X86/X86FrameLowering.cpp:3686:24: note: include the header <cstdlib> or explicitly provide a declaration for 'std::abs'
+##mv llvm/lib/Target/X86/X86FrameLowering.cpp llvm/lib/Target/X86/X86FrameLowering.cpp.bak &&
+##echo "#include <cstdlib>" > llvm/lib/Target/X86/X86FrameLowering.cpp &&
+##cat llvm/lib/Target/X86/X86FrameLowering.cpp.bak >> llvm/lib/Target/X86/X86FrameLowering.cpp
+######llvm/lib/Support/FileUtilities.cpp:146:14: note: include the header <cmath> or explicitly provide a declaration for 'std::abs'
+##mv llvm/lib/Support/FileUtilities.cpp llvm/lib/Support/FileUtilities.cpp.bak &&
+##echo "#include <cstdlib>" > llvm/lib/Support/FileUtilities.cpp &&
+##echo "#include <cmath>" > llvm/lib/Support/FileUtilities.cpp &&
+##cat llvm/lib/Support/FileUtilities.cpp.bak >> llvm/lib/Support/FileUtilities.cpp
+#
+#mkdir -p build &&
+# # build main LLVM suite
+# wl-showstatus configure &&
+# #libunwind;openmp;parallel-libs;polly;pstl;flang
+# #-DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;libclc;lld;lldb;polly;mlir;pstl;parallel-libs" \
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+#  -DBUILD_SHARED_LIBS:BOOL=OFF \
+#  -DLLVM_BUILD_LLVM_DYLIB:BOOL=OFF \
+#  -DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;libclc;lld;lldb;polly;mlir;pstl" \
+#  -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi" \
+#  -DLLVM_TARGETS_TO_BUILD:STRING="X86;NVPTX;AMDGPU;ARM;AArch64;WebAssembly" \
+#  -DLLVM_HOST_TRIPLE:STRING=$(echo $BUILDPLATFORM|sed -e "s/-.*$//")-w64-mingw32 \
+#  -DLLVM_DEFAULT_TARGET_TRIPLE=$(echo $BUILDPLATFORM|sed -e "s/-.*$//")-w64-mingw32 \
+#  -DLLVM_BUILD_STATIC=OFF \
+#  -DLLVM_LINK_LLVM_DYLIB:BOOL=OFF \
+#  -DLLVM_CCACHE_BUILD:BOOL=OFF \
+#  -DLLVM_ENABLE_MODULES:BOOL=OFF \
+#  -DLLVM_ENABLE_PLUGINS:BOOL=ON \
+#  -DLLVM_ENABLE_THREADS:BOOL=ON \
+#  -DLLVM_ENABLE_UNWIND_TABLES:BOOL=ON \
+#  -DLLVM_ENABLE_ASSERTIONS:BOOL=OFF \
+#  -DLLVM_OPTIMIZED_TABLEGEN:BOOL=ON \
+#  -DLLVM_ENABLE_LTO:STRING=OFF \
+#  -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) \
+#  -DLLVM_ENABLE_RTTI:BOOL=ON \
+#  -DLLVM_ENABLE_TERMINFO:BOOL=OFF \
+#  -DLLVM_ENABLE_Z3_SOLVER:BOOL=ON \
+#  -DLLVM_Z3_INSTALL_DIR:STRING=$MINGWPREFIX \
+#  -DLLVM_ENABLE_FFI:BOOL=ON \
+#  -DLLVM_ENABLE_FFI:BOOL=ON \
+#  -DFFI_INCLUDE_DIR:PATH=$MINGWPREFIX/include \
+#  -DLLVM_ENABLE_LIBXML2:BOOL=ON \
+#  -DLLVM_ENABLE_PIC:BOOL=OFF \
+#  -DLLVM_USE_RELATIVE_PATHS_IN_DEBUG_INFO:BOOL=ON \
+#  -DLLVM_USE_RELATIVE_PATHS_IN_FILES:BOOL=ON \
+#  -DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=OFF \
+#  -DLLVM_INSTALL_CCTOOLS_SYMLINKS:BOOL=OFF \
+#  -DLLVM_ENABLE_DOXYGEN:BOOL=OFF -DDOXYGEN_DOT_EXECUTABLE:FILEPATH= -DDOXYGEN_EXECUTABLE:FILEPATH= \
+#  -DLLVM_ENABLE_SPHINX=OFF \
+#  -DLLVM_INCLUDE_DOCS:BOOL=OFF \
+#  -DLLVM_BUILD_EXAMPLES:BOOL=OFF \
+#  -DLLVM_INCLUDE_EXAMPLES:BOOL=OFF \
+#  -DLLVM_INCLUDE_BENCHMARKS:BOOL=OFF \
+#  -DLLVM_INCLUDE_TESTS:BOOL=OFF \
+#  -DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
+#  \
+#  -DCOMPILER_RT_DEFAULT_TARGET_ONLY=OFF \
+#  -DCOMPILER_RT_BUILD_BUILTINS:BOOL=ON \
+#  -DCOMPILER_RT_USE_BUILTINS_LIBRARY=OFF \
+#  -DSANITIZER_CXX_ABI=libc++ \
+#  -DCOMPILER_RT_INCLUDE_TESTS:BOOL=OFF \
+#  \
+#  -DLIBCXX_ENABLE_SHARED:BOOL=Off \
+#  -DLIBCXX_ENABLE_STATIC:BOOL=ON \
+#  -DLIBCXX_USE_COMPILER_RT:BOOL=ON \
+#  -DLIBCXX_HAS_WIN32_THREAD_API:BOOL=ON \
+#  -DLIBCXX_HAS_PTHREAD_API:BOOL=OFF \
+#  -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY:BOOL=OFF \
+#  -DLIBCXX_CXX_ABI=libcxxabi \
+#  -DLIBCXX_CXX_ABI_INCLUDE_PATHS=$PWD/libcxxabi/include \
+#  -DLIBCXX_CXX_ABI_LIBRARY_PATH:PATH=$PWD/build_libcxxabi/lib \
+#  -DLIBCXX_LIBDIR_SUFFIX="" \
+#  -DLIBCXX_INCLUDE_TESTS:BOOL=OFF \
+#  -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT:BOOL=OFF \
+#  \
+#  -DLIBCXXABI_ENABLE_SHARED:BOOL=Off \
+#  -DLIBCXXABI_ENABLE_STATIC:BOOL=ON \
+#  -DLIBCXXABI_USE_COMPILER_RT:BOOL=ON \
+#  -DLIBCXXABI_LIBCXX_INCLUDES:PATH=$PWD/build_libcxx/include/c++/v1 \
+#  -DLIBCXXABI_LIBDIR_SUFFIX="" \
+#  -DLIBCXXABI_ENABLE_EXCEPTIONS:BOOL=ON \
+#  -DLIBCXXABI_ENABLE_ASSERTIONS:BOOL=OFF \
+#  \
+#  -DLIBUNWIND_ENABLE_SHARED:BOOL=Off \
+#  -DLIBUNWIND_ENABLE_STATIC:BOOL=ON \
+#  -DLIBUNWIND_USE_COMPILER_RT:BOOL=ON \
+#  \
+#  -DLIBCLANG_BUILD_STATIC:BOOL=OFF \
+#  -DCLANG_LINK_CLANG_DYLIB:BOOL=OFF \
+#  -DCLANG_PLUGIN_SUPPORT:BOOL=ON \
+#  -DCLANG_ENABLE_CLANGD:BOOL=ON \
+#  -DCLANG_DEFAULT_CXX_STDLIB:STRING=libc++ \
+#  -DCLANG_DEFAULT_RTLIB:STRING=compiler-rt \
+#  -DCLANG_DEFAULT_UNWINDLIB:STRING=none \
+#  -DCLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
+#  -DCLANG_ENABLE_PROTO_FUZZER:BOOL=OFF \
+#  -DCLANG_ENABLE_STATIC_ANALYZER:BOOL=ON \
+#  -DCLANG_TOOL_APINOTES_TEST_BUILD:BOOL=OFF \
+#  -DCLANG_TOOL_ARCMT_TEST_BUILD:BOOL=OFF \
+#  -DCLANG_TOOL_CLANG_IMPORT_TEST_BUILD:BOOL=OFF \
+#  -DCLANG_TOOL_C_ARCMT_TEST_BUILD:BOOL=OFF \
+#  -DCLANG_TOOL_C_INDEX_TEST_BUILD:BOOL=OFF \
+#  -DCLANG_INCLUDE_DOCS:BOOL=OFF \
+#  -DCLANG_BUILD_EXAMPLES:BOOL=OFF \
+#  -DCLANG_INCLUDE_TESTS:BOOL=OFF \
+#  \
+#  -DLLDB_TOOL_LLDB_SERVER_BUILD:BOOL=ON \
+#  -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=ON \
+#  -DLLDB_ENABLE_LIBEDIT:BOOL=OFF \
+#  -DLLDB_ENABLE_CURSES:BOOL=ON \
+#  -DLLDB_ENABLE_LIBXML2:BOOL=ON \
+#  -DLLDB_ENABLE_LZMA:BOOL=ON \
+#  -DLLDB_ENABLE_PYTHON:BOOL=ON \
+#  \
+#  -DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+#  -DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
+#  -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+#  \
+#  -DCMAKE_CXX_FLAGS:STRING="-D_WIN32_WINNT=0x0600" \
+#  \
+#  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+#  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+#  -Sllvm -Bbuild &&
+# # -DCMAKE_CXX_FLAGS:STRING=" " \
+# #-DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;lld;lldb;libclc;pstl" \
+# #-DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libc;libcxx;libcxxabi;libunwind;openmp" \
+# #-DCOMPILER_RT_USE_BUILTINS_LIBRARY:BOOL=ON 
+# #-DLLVM_HOST_TRIPLE:STRING=$BUILDPLATFORM -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM -DLIBCXXABI_TARGET_TRIPLE:STRING=$RUNPLATFORM -DLIBUNWIND_TARGET_TRIPLE:STRING=$RUNPLATFORM 
+# #-DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+# #-DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
+# #-DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+# #-DCMAKE_C_FLAGS:STRING="-D_FORTIFY_SOURCE=0 -D__SSP_FORTIFY_LEVEL=0" \
+# #-DCMAKE_CXX_FLAGS:STRING="-D_FORTIFY_SOURCE=0 -D__SSP_FORTIFY_LEVEL=0" \
+# #-LLVM_BUILD_32_BITS:BOOL=ON \
+# #-DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=ON \
+# #-DLLVM_INSTALL_CCTOOLS_SYMLINKS:BOOL=ON \
+# #  + share/llvm/bin/addr2line.exe
+# #  + share/llvm/bin/ar.exe
+# #  + share/llvm/bin/bitcode_strip.exe
+# #  + share/llvm/bin/c++filt.exe
+# #  + share/llvm/bin/dlltool.exe
+# #  + share/llvm/bin/dwp.exe
+# #  + share/llvm/bin/install_name_tool.exe
+# #  + share/llvm/bin/libtool.exe
+# #  + share/llvm/bin/lipo.exe
+# #  + share/llvm/bin/nm.exe
+# #  + share/llvm/bin/objcopy.exe
+# #  + share/llvm/bin/objdump.exe
+# #  + share/llvm/bin/ranlib.exe
+# #  + share/llvm/bin/readelf.exe
+# #  + share/llvm/bin/size.exe
+# #  + share/llvm/bin/strings.exe
+# #  + share/llvm/bin/strip.exe
+# #  + share/llvm/bin/windres.exe
+# #-DCLANG_DEFAULT_UNWINDLIB:STRING=libcxx \
+# #-DCLANG_ENABLE_PROTO_FUZZER:BOOL=OFF \
+# #-DBUILD_SHARED_LIBS:BOOL=OFF #see also: https://llvm.org/docs/BuildingADistribution.html
+#
+# #-DCMAKE_C_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which clang.exe) \
+# #-DCMAKE_CXX_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which clang++.exe) \
+# #-DCMAKE_RC_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which windres.exe) \
+# #-DCMAKE_ASM_MASM_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ml.exe) \
+# #-DCMAKE_AR:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ar.exe) \
+# #-DCMAKE_RANLIB:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ranlib.exe) \
+# #-DCMAKE_EXE_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/llvm/lib" \
+# #-DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/llvm/include/c++/v1" \
+#
+# #-DCMAKE_ASM_COMPILER:STRING=yasm.exe \
+# #-DCMAKE_ASM_MASM_COMPILER:STRING="jwasm.exe $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-win64"; else echo "-coff"; fi)" \
+# #$(if which clang.exe &> /dev/null; then echo "-DCMAKE_C_COMPILER:FILEPATH=$(which clang.exe)"; fi) \
+# #$(if which clang++.exe &> /dev/null; then echo "-DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++.exe)"; fi) \
+# #$(if which llvm-ranlib.exe &> /dev/null; then echo "-DCMAKE_C_COMPILER_RANLIB:FILEPATH=$(which llvm-ranlib.exe) -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$(which llvm-ranlib.exe)"; fi) \
+# #$(if which llvm-ar.exe &> /dev/null; then echo "-DCMAKE_C_COMPILER_AR:FILEPATH=$(which llvm-ar.exe) -DCMAKE_CXX_COMPILER_AR:FILEPATH=$(which llvm-ar.exe)"; fi) \
+# #-DLLVM_TABLEGEN:STRING=$(which llvm-tblgen.exe 2> /dev/null) \
+# ## don't use -fno-lto flag with yasm
+# #sed -i.bak -e "s/\(yasm\.exe .*\) -fno-lto/\1/" build/compile_commands.json &&
+# #sed -i.bak -e "s/-fno-lto//" build/build.ninja build/compile_commands.json
+# ## fix missing -lgcc/-lgcc_s
+# #sed -i.bak -e "s/-lgcc_s\|-lgcc//g" build/build.ninja &&
+# ## fix missing link libraries
+# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -lpthread/" build/build.ninja &&
+# wl-showstatus build-install &&
+# ninja -Cbuild install/strip &&
+# #ninja -Cbuild install-distribution &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-project-$VERSION.src
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-project-llvmorg-$VERSION
+
+
+
 export NAME="The LLVM Compiler Infrastructure"
 export STATUS=
 export URL=https://llvm.org/
@@ -289,15 +677,10 @@ export BASENAME=llvm-project
 export DESCRIPTION="The LLVM Compiler Infrastructure - a toolkit for the construction of highly optimized compilers, optimizers, and run-time environments."
 export CATEGORY=development
 export TYPE=application
-#export VERSION=13.0.0
-#export VERSIONDATE=20211212
-export VERSION=13.0.1
-export VERSIONDATE=20220209
-#export VERSION=14.0.0
-#export VERSIONDATE=20220323
+export VERSION=14.0.0
+export VERSIONDATE=20220323
 wl-showstatus --package-version
-#export DEPENDANCIES=pthreads,zlib,xz,libxml2,libffi,isl,z3,swig,lua,ncurses,protobuf,wineditline
-export DEPENDANCIES=pthreads,zlib,xz,libxml2,libffi,isl,z3,swig,lua,ncurses,protobuf,wineditline,cpython-mingw,tbb
+export DEPENDANCIES=pthreads,zlib,xz,libxml2,libffi,isl,z3,swig,ncurses,protobuf,wineditline,cpython-mingw,tbb
 export OPTIONALDEPENDANCIES=udis86,graphviz,hwloc,libpfm4
 export BUILDDEPENDANCIES=cmake,ninja,jwasm
 export LICENSEFILE=llvm/LICENSE.TXT
@@ -308,278 +691,83 @@ export LICENSETYPE="Apache with exceptions"
 export DOWNLOADURL="https://github.com/llvm/llvm-project/tags/ llvmorg-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$VERSION/llvm-project-$VERSION.src.tar.xz
-export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/\([0-9]\)\(rc\)/\1-\2/")/llvm-project-$VERSION.src.tar.xz
-#export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/\([0-9]\)\(rc\)/\1-\2/")/llvm-project-$VERSION.src.tar.xz
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xfJ $TARBALLDIR/$BASENAME/llvm-project-$VERSION.src.tar.xz
 cd llvm-project-$VERSION.src
-#tar xfz $TARBALLDIR/$BASENAME/llvmorg-$VERSION.tar.gz
-#cd llvm-project-llvmorg-$VERSION
-patch -ulbf llvm/tools/llvm-config/llvm-config.cpp << EOF
-@@ -382,2 +382,25 @@
-     SharedVersionedExt = LLVM_DYLIB_VERSION ".dll";
-+#ifdef __MINGW32__
-+    if (1) {
-+      SharedPrefix = "lib";
-+      StaticExt = "a";
-+      StaticPrefix = "lib";
-+      if (getenv("MSYSTEM")) {
-+        std::replace(ActiveObjRoot.begin(), ActiveObjRoot.end(), '\\\\', '/');
-+        std::replace(ActivePrefix.begin(), ActivePrefix.end(), '\\\\', '/');
-+        std::replace(ActiveBinDir.begin(), ActiveBinDir.end(), '\\\\', '/');
-+        std::replace(ActiveLibDir.begin(), ActiveLibDir.end(), '\\\\', '/');
-+        std::replace(ActiveCMakeDir.begin(), ActiveCMakeDir.end(), '\\\\', '/');
-+        std::replace(ActiveIncludeOption.begin(), ActiveIncludeOption.end(), '\\\\', '/');
-+      } else {
-+        DirSep = "\\\\";
-+        std::replace(ActiveObjRoot.begin(), ActiveObjRoot.end(), '/', '\\\\');
-+        std::replace(ActivePrefix.begin(), ActivePrefix.end(), '/', '\\\\');
-+        std::replace(ActiveBinDir.begin(), ActiveBinDir.end(), '/', '\\\\');
-+        std::replace(ActiveLibDir.begin(), ActiveLibDir.end(), '/', '\\\\');
-+        std::replace(ActiveCMakeDir.begin(), ActiveCMakeDir.end(), '/', '\\\\');
-+        std::replace(ActiveIncludeOption.begin(), ActiveIncludeOption.end(), '/', '\\\\');
-+      }
-+    } else
-+#endif
-     if (HostTriple.isOSCygMing()) {
-EOF
-# ignore -fPIC flag for Windows targets (version <= 13.0.0)
-####bug reported here: https://github.com/llvm/llvm-project/issues/52947
-patch -ulbf clang/lib/Driver/ToolChains/CommonArgs.cpp << EOF
-@@ -1188,6 +1188,4 @@
-                                     options::OPT_fpie, options::OPT_fno_pie);
--  if (Triple.isOSWindows() && LastPICArg &&
--      LastPICArg ==
--          Args.getLastArg(options::OPT_fPIC, options::OPT_fpic,
--                          options::OPT_fPIE, options::OPT_fpie)) {
-+  if (Triple.isOSWindows() && !Triple.isOSCygMing() && LastPICArg &&
-+      LastPICArg == Args.getLastArg(options::OPT_fPIC, options::OPT_fpic, options::OPT_fPIE, options::OPT_fpie)) {
-     ToolChain.getDriver().Diag(diag::err_drv_unsupported_opt_for_target)
-EOF
-patch -ulbf clang/lib/Driver/ToolChains/MinGW.cpp << EOF
-@@ -481,5 +481,3 @@
-
--bool toolchains::MinGW::isPICDefaultForced() const {
--  return getArch() == llvm::Triple::x86_64;
--}
-+bool toolchains::MinGW::isPICDefaultForced() const { return true; }
-
-EOF
-# ignore --as-needed linker flag for Windows targets (version <= 13.0.0)
-####bug reported here: https://github.com/llvm/llvm-project/issues/52947
-patch -ulbf lld/MinGW/Options.td << EOF
-@@ -148,2 +148,3 @@
- def: Joined<["-"], "O">;
-+def: F<"as-needed">;
- def: F<"build-id">;
-@@ -155,2 +156,3 @@
- defm: EqNoHelp<"minor-image-version">;
-+def: F<"no-as-needed">;
- def: F<"no-undefined">;
-EOF
-# fix errors when working on a (ImDisk) RAM-drive (version <= 13.0.0)
-####bug reported here: https://bugs.llvm.org/show_bug.cgi?id=52080
-patch -ulbf llvm/include/llvm/Support/FileSystem.h << EOF
-@@ -866,2 +866,6 @@
-   int FD = -1;
-+#ifdef _WIN32
-+  // Whether we need to manually remove the file on close.
-+  bool RemoveOnClose = false;
-+#endif
-
-EOF
-patch -ulbf llvm/lib/Support/Path.cpp << EOF
-@@ -1192,2 +1192,6 @@
-   Other.FD = -1;
-+#ifdef _WIN32
-+  RemoveOnClose = Other.RemoveOnClose;
-+  Other.RemoveOnClose = false;
-+#endif
-   return *this;
-@@ -1208,14 +1212,16 @@
-   TmpName = "";
--  return Error::success();
--#else
--  // Always try to close and remove.
-+  bool Remove = true;
-+#endif
-   std::error_code RemoveEC;
--  if (!TmpName.empty()) {
-+  if (Remove && !TmpName.empty()) {
-     RemoveEC = fs::remove(TmpName);
-+#ifndef _WIN32
-     sys::DontRemoveFileOnSignal(TmpName);
-+#endif
-     if (!RemoveEC)
-       TmpName = "";
-+  } else {
-+    TmpName = "";
-   }
-   return errorCodeToError(RemoveEC);
--#endif
- }
-@@ -1230,2 +1236,3 @@
-   std::error_code RenameEC = setDeleteDisposition(H, false);
-+  bool ShouldDelete = false;
-   if (!RenameEC) {
-@@ -1236,3 +1243,3 @@
-       RenameEC = copy_file(TmpName, Name);
--      setDeleteDisposition(H, true);
-+      ShouldDelete = true;
-     }
-@@ -1242,3 +1249,9 @@
-   if (RenameEC)
--    setDeleteDisposition(H, true);
-+    ShouldDelete = true;
-+  if (ShouldDelete) {
-+    if (!RemoveOnClose)
-+      setDeleteDisposition(H, true);
-+    else
-+      remove(TmpName);
-+  }
- #else
-@@ -1300,2 +1313,7 @@
- #ifndef _WIN32
-+  auto H = reinterpret_cast<HANDLE>(_get_osfhandle(FD));
-+  if (std::error_code EC = setDeleteDisposition(H, true)) {
-+    Ret.RemoveOnClose = true;
-+  }
-+#else
-   if (sys::RemoveFileOnSignal(ResultPath)) {
-EOF
-patch -ulbf llvm/lib/Support/Windows/Path.inc << EOF
-@@ -429,3 +429,3 @@
-   if (!IsLocal)
--    return std::error_code();
-+    return errc::not_supported;
-
-@@ -1185,8 +1185,2 @@
-
--  if (Flags & OF_Delete) {
--    if ((EC = setDeleteDisposition(Result, true))) {
--      ::CloseHandle(Result);
--      return errorCodeToError(EC);
--    }
--  }
-   return Result;
-EOF
-# llvm/include/llvm/Support/FileSystem.h llvm/lib/Support/Path.cpp llvm/lib/Support/Windows/Path.inc
-## fix C++ issue with missing include of limits
-#if echo $CXX|grep -q clang++; then
-# for F in $(find llvm -name '*.cpp') $(find clang -name '*.cpp') $(find lldb -name '*.cpp'); do
-#  if [ -f $F ]; then
-#   mv $F $F.bak1 &&
-#   echo "#include <cstdlib>" > $F &&
-#   echo "#include <limits>" >> $F &&
-#   echo "#include <cmath>" >> $F &&
-#   cat $F.bak1 >> $F
-#  fi
-# done
-#fi
-## fix issues with std::isnan/std::isinf/std::signbit in llvm/lib/Support/NativeFormatting.cpp (version >= 13.0.0)
-#if echo $CXX|grep -q clang++; then
-# sed -i.bak -e "s/std::\(isnan\|isinf\|signbit\)/\1/" llvm/lib/Support/NativeFormatting.cpp
-#fi
-#####llvm/lib/Target/X86/X86FrameLowering.cpp:3686:24: note: include the header <cstdlib> or explicitly provide a declaration for 'std::abs'
-#mv llvm/lib/Target/X86/X86FrameLowering.cpp llvm/lib/Target/X86/X86FrameLowering.cpp.bak &&
-#echo "#include <cstdlib>" > llvm/lib/Target/X86/X86FrameLowering.cpp &&
-#cat llvm/lib/Target/X86/X86FrameLowering.cpp.bak >> llvm/lib/Target/X86/X86FrameLowering.cpp
-#####llvm/lib/Support/FileUtilities.cpp:146:14: note: include the header <cmath> or explicitly provide a declaration for 'std::abs'
-#mv llvm/lib/Support/FileUtilities.cpp llvm/lib/Support/FileUtilities.cpp.bak &&
-#echo "#include <cstdlib>" > llvm/lib/Support/FileUtilities.cpp &&
-#echo "#include <cmath>" > llvm/lib/Support/FileUtilities.cpp &&
-#cat llvm/lib/Support/FileUtilities.cpp.bak >> llvm/lib/Support/FileUtilities.cpp
-
-mkdir -p build &&
- # build main LLVM suite
+mkdir -p build_shared &&
  wl-showstatus configure &&
- #libunwind;openmp;parallel-libs;polly;pstl;flang
- #-DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;libclc;lld;lldb;polly;mlir;pstl;parallel-libs" \
+ #flang
+ #-DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM \
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
-  -DBUILD_SHARED_LIBS:BOOL=OFF \
-  -DLLVM_BUILD_LLVM_DYLIB:BOOL=OFF \
-  -DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;libclc;lld;lldb;polly;mlir;pstl" \
-  -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libcxx;libcxxabi" \
-  -DLLVM_TARGETS_TO_BUILD:STRING="X86;NVPTX;AMDGPU;ARM;AArch64;WebAssembly" \
-  -DLLVM_HOST_TRIPLE:STRING=$(echo $BUILDPLATFORM|sed -e "s/-.*$//")-w64-mingw32 \
-  -DLLVM_DEFAULT_TARGET_TRIPLE=$(echo $BUILDPLATFORM|sed -e "s/-.*$//")-w64-mingw32 \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
   -DLLVM_BUILD_STATIC=OFF \
-  -DLLVM_LINK_LLVM_DYLIB:BOOL=OFF \
-  -DLLVM_CCACHE_BUILD:BOOL=OFF \
-  -DLLVM_ENABLE_MODULES:BOOL=OFF \
-  -DLLVM_ENABLE_PLUGINS:BOOL=ON \
-  -DLLVM_ENABLE_THREADS:BOOL=ON \
-  -DLLVM_ENABLE_UNWIND_TABLES:BOOL=ON \
-  -DLLVM_ENABLE_ASSERTIONS:BOOL=OFF \
-  -DLLVM_OPTIMIZED_TABLEGEN:BOOL=ON \
-  -DLLVM_ENABLE_LTO:STRING=OFF \
-  -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) \
-  -DLLVM_ENABLE_RTTI:BOOL=ON \
-  -DLLVM_ENABLE_TERMINFO:BOOL=OFF \
-  -DLLVM_ENABLE_Z3_SOLVER:BOOL=ON \
-  -DLLVM_Z3_INSTALL_DIR:STRING=$MINGWPREFIX \
-  -DLLVM_ENABLE_FFI:BOOL=ON \
-  -DLLVM_ENABLE_FFI:BOOL=ON \
-  -DFFI_INCLUDE_DIR:PATH=$MINGWPREFIX/include \
-  -DLLVM_ENABLE_LIBXML2:BOOL=ON \
-  -DLLVM_ENABLE_PIC:BOOL=OFF \
-  -DLLVM_USE_RELATIVE_PATHS_IN_DEBUG_INFO:BOOL=ON \
-  -DLLVM_USE_RELATIVE_PATHS_IN_FILES:BOOL=ON \
-  -DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=OFF \
-  -DLLVM_INSTALL_CCTOOLS_SYMLINKS:BOOL=OFF \
-  -DLLVM_ENABLE_DOXYGEN:BOOL=OFF -DDOXYGEN_DOT_EXECUTABLE:FILEPATH= -DDOXYGEN_EXECUTABLE:FILEPATH= \
-  -DLLVM_ENABLE_SPHINX=OFF \
-  -DLLVM_INCLUDE_DOCS:BOOL=OFF \
-  -DLLVM_BUILD_EXAMPLES:BOOL=OFF \
-  -DLLVM_INCLUDE_EXAMPLES:BOOL=OFF \
-  -DLLVM_INCLUDE_BENCHMARKS:BOOL=OFF \
-  -DLLVM_INCLUDE_TESTS:BOOL=OFF \
-  -DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
-  \
-  -DCOMPILER_RT_DEFAULT_TARGET_ONLY=OFF \
-  -DCOMPILER_RT_BUILD_BUILTINS:BOOL=ON \
-  -DCOMPILER_RT_USE_BUILTINS_LIBRARY=OFF \
-  -DSANITIZER_CXX_ABI=libc++ \
-  -DCOMPILER_RT_INCLUDE_TESTS:BOOL=OFF \
-  \
-  -DLIBCXX_ENABLE_SHARED:BOOL=Off \
-  -DLIBCXX_ENABLE_STATIC:BOOL=ON \
-  -DLIBCXX_USE_COMPILER_RT:BOOL=ON \
-  -DLIBCXX_HAS_WIN32_THREAD_API:BOOL=ON \
-  -DLIBCXX_HAS_PTHREAD_API:BOOL=OFF \
-  -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY:BOOL=OFF \
-  -DLIBCXX_CXX_ABI=libcxxabi \
-  -DLIBCXX_CXX_ABI_INCLUDE_PATHS=$PWD/libcxxabi/include \
-  -DLIBCXX_CXX_ABI_LIBRARY_PATH:PATH=$PWD/build_libcxxabi/lib \
-  -DLIBCXX_LIBDIR_SUFFIX="" \
-  -DLIBCXX_INCLUDE_TESTS:BOOL=OFF \
-  -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT:BOOL=OFF \
-  \
-  -DLIBCXXABI_ENABLE_SHARED:BOOL=Off \
-  -DLIBCXXABI_ENABLE_STATIC:BOOL=ON \
-  -DLIBCXXABI_USE_COMPILER_RT:BOOL=ON \
-  -DLIBCXXABI_LIBCXX_INCLUDES:PATH=$PWD/build_libcxx/include/c++/v1 \
-  -DLIBCXXABI_LIBDIR_SUFFIX="" \
-  -DLIBCXXABI_ENABLE_EXCEPTIONS:BOOL=ON \
-  -DLIBCXXABI_ENABLE_ASSERTIONS:BOOL=OFF \
-  \
-  -DLIBUNWIND_ENABLE_SHARED:BOOL=Off \
-  -DLIBUNWIND_ENABLE_STATIC:BOOL=ON \
-  -DLIBUNWIND_USE_COMPILER_RT:BOOL=ON \
-  \
   -DLIBCLANG_BUILD_STATIC:BOOL=OFF \
+  -DLLVM_LINK_LLVM_DYLIB:BOOL=OFF \
   -DCLANG_LINK_CLANG_DYLIB:BOOL=OFF \
-  -DCLANG_PLUGIN_SUPPORT:BOOL=ON \
-  -DCLANG_ENABLE_CLANGD:BOOL=ON \
-  -DCLANG_DEFAULT_CXX_STDLIB:STRING=libc++ \
-  -DCLANG_DEFAULT_RTLIB:STRING=compiler-rt \
-  -DCLANG_DEFAULT_UNWINDLIB:STRING=none \
-  -DCLANG_DEFAULT_OPENMP_RUNTIME:STRING=libomp \
+  -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM \
+  -DLLVM_DEFAULT_TARGET_TRIPLE=$RUNPLATFORM \
+  -DLLVM_TARGETS_TO_BUILD:STRING="X86" \
+  -DLLVM_RUNTIME_TARGETS=$RUNPLATFORM \
+  -DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;lld;lldb;libclc;pstl" \
+  -DLLVM_ENABLE_RUNTIMES:STRING="" \
+  -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=OFF \
+  -DLLVM_ENABLE_THREADS:BOOL=ON \
+  -DCLANG_BUILD_TOOLS:BOOL=ON \
+  -DCLANG_DEFAULT_RTLIB:STRING=libgcc \
+  -DCLANG_DEFAULT_CXX_STDLIB:STRING=libstdc++ \
+  -DCLANG_DEFAULT_OPENMP_RUNTIME:STRING=libgomp \
+  -DCLANG_DEFAULT_UNWINDLIB:STRING=libgcc \
+  -DSANITIZER_CXX_ABI:STRING=libstdc++ \
   -DCLANG_ENABLE_PROTO_FUZZER:BOOL=OFF \
   -DCLANG_ENABLE_STATIC_ANALYZER:BOOL=ON \
+  -DLLVM_ENABLE_LIBEDIT:BOOL=ON \
+  -DLLDB_ENABLE_LIBEDIT:BOOL=ON \
+  -DLibEdit_INCLUDE_DIRS:PATH=$MINGWPREFIX/include \
+  -DLLDB_ENABLE_CURSES:BOOL=ON \
+  -DLLDB_ENABLE_LIBXML2:BOOL=ON \
+  -DLLDB_ENABLE_LUA:BOOL=OFF \
+  -DLLDB_ENABLE_LZMA:BOOL=ON \
+  -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) \
+  -DLLVM_ENABLE_RTTI:BOOL=ON \
+  -DLLVM_ENABLE_MODULES:BOOL=OFF \
+  -DLLVM_ENABLE_ASSERTIONS:BOOL=OFF \
+  -DLLVM_ENABLE_FFI:BOOL=ON \
+  -DLLVM_OPTIMIZED_TABLEGEN:BOOL=ON \
+  -DLLVM_ENABLE_LIBXML2:BOOL=ON \
+  -DLLVM_ENABLE_THREADS:BOOL=ON \
+  -DLLVM_ENABLE_UNWIND_TABLES:BOOL=ON \
+  -DLLVM_ENABLE_Z3_SOLVER:BOOL=ON \
+  -DLLVM_INCLUDE_TOOLS:BOOL=ON \
+  -DLLVM_INCLUDE_UTILS:BOOL=ON \
+  -DLLVM_INSTALL_UTILS:BOOL=ON \
+  -DLLVM_ENABLE_TERMINFO:BOOL=OFF \
+  -DLLVM_ENABLE_LIBEDIT:BOOL=OFF \
+  -DLLDB_ENABLE_LIBEDIT:BOOL=OFF \
+  -DLLDB_ENABLE_CURSES:BOOL=ON \
+  -DLLDB_ENABLE_LIBXML2:BOOL=ON \
+  -DLLDB_ENABLE_LZMA:BOOL=ON \
+  -DLLDB_ENABLE_PYTHON:BOOL=ON \
+  -DLLVM_ENABLE_SPHINX=OFF \
+  -DLLVM_INCLUDE_DOCS:BOOL=OFF \
+  -DCLANG_INCLUDE_TESTS:BOOL=OFF \
+  -DLLDB_INCLUDE_TESTS:BOOL=OFF \
+  -DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
+  -DLLVM_INCLUDE_TESTS:BOOL=OFF \
+  -DLLVM_TOOL_LLVM_C_TEST_BUILD:BOOL=OFF \
+  -DLLVM_INCLUDE_EXAMPLES:BOOL=OFF \
+  -DLLVM_BUILD_BENCHMARKS:BOOL=OFF \
+  -DLLVM_BUILD_TESTS:BOOL=OFF \
+  -DBUILD_CLANG_FORMAT_VS_PLUGIN:BOOL=OFF \
+  -DCLANG_PLUGIN_SUPPORT:BOOL=ON \
+  -DCLANG_ENABLE_CLANGD:BOOL=ON \
   -DCLANG_TOOL_APINOTES_TEST_BUILD:BOOL=OFF \
   -DCLANG_TOOL_ARCMT_TEST_BUILD:BOOL=OFF \
   -DCLANG_TOOL_CLANG_IMPORT_TEST_BUILD:BOOL=OFF \
@@ -587,88 +775,24 @@ mkdir -p build &&
   -DCLANG_TOOL_C_INDEX_TEST_BUILD:BOOL=OFF \
   -DCLANG_INCLUDE_DOCS:BOOL=OFF \
   -DCLANG_BUILD_EXAMPLES:BOOL=OFF \
-  -DCLANG_INCLUDE_TESTS:BOOL=OFF \
-  \
+  -DLLD_BUILD_TOOLS:BOOL=ON \
   -DLLDB_TOOL_LLDB_SERVER_BUILD:BOOL=ON \
   -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=ON \
-  -DLLDB_ENABLE_LIBEDIT:BOOL=OFF \
-  -DLLDB_ENABLE_CURSES:BOOL=ON \
-  -DLLDB_ENABLE_LIBXML2:BOOL=ON \
-  -DLLDB_ENABLE_LZMA:BOOL=ON \
-  -DLLDB_ENABLE_PYTHON:BOOL=ON \
-  \
-  -DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
-  -DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
-  -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
-  \
-  -DCMAKE_CXX_FLAGS:STRING="-D_WIN32_WINNT=0x0600" \
-  \
+  -DLLVM_TOOL_OPENMP_BUILD:BOOL=ON \
+  -DLLVM_TOOL_PARALLEL_LIBS_BUILD:BOOL=ON \
+  -DCLANG_ENABLE_PROTO_FUZZER:BOOL=OFF \
+  -DLLDB_DISABLE_PYTHON:BOOL=OFF \
   -DPython3_FIND_REGISTRY:BOOL=NEVER \
   -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
-  -Sllvm -Bbuild &&
- # -DCMAKE_CXX_FLAGS:STRING=" " \
- #-DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;lld;lldb;libclc;pstl" \
- #-DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libc;libcxx;libcxxabi;libunwind;openmp" \
- #-DCOMPILER_RT_USE_BUILTINS_LIBRARY:BOOL=ON 
- #-DLLVM_HOST_TRIPLE:STRING=$BUILDPLATFORM -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM -DLIBCXXABI_TARGET_TRIPLE:STRING=$RUNPLATFORM -DLIBUNWIND_TARGET_TRIPLE:STRING=$RUNPLATFORM 
- #-DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
- #-DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
- #-DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
- #-DCMAKE_C_FLAGS:STRING="-D_FORTIFY_SOURCE=0 -D__SSP_FORTIFY_LEVEL=0" \
- #-DCMAKE_CXX_FLAGS:STRING="-D_FORTIFY_SOURCE=0 -D__SSP_FORTIFY_LEVEL=0" \
- #-LLVM_BUILD_32_BITS:BOOL=ON \
- #-DLLVM_INSTALL_BINUTILS_SYMLINKS:BOOL=ON \
- #-DLLVM_INSTALL_CCTOOLS_SYMLINKS:BOOL=ON \
- #  + share/llvm/bin/addr2line.exe
- #  + share/llvm/bin/ar.exe
- #  + share/llvm/bin/bitcode_strip.exe
- #  + share/llvm/bin/c++filt.exe
- #  + share/llvm/bin/dlltool.exe
- #  + share/llvm/bin/dwp.exe
- #  + share/llvm/bin/install_name_tool.exe
- #  + share/llvm/bin/libtool.exe
- #  + share/llvm/bin/lipo.exe
- #  + share/llvm/bin/nm.exe
- #  + share/llvm/bin/objcopy.exe
- #  + share/llvm/bin/objdump.exe
- #  + share/llvm/bin/ranlib.exe
- #  + share/llvm/bin/readelf.exe
- #  + share/llvm/bin/size.exe
- #  + share/llvm/bin/strings.exe
- #  + share/llvm/bin/strip.exe
- #  + share/llvm/bin/windres.exe
- #-DCLANG_DEFAULT_UNWINDLIB:STRING=libcxx \
- #-DCLANG_ENABLE_PROTO_FUZZER:BOOL=OFF \
- #-DBUILD_SHARED_LIBS:BOOL=OFF #see also: https://llvm.org/docs/BuildingADistribution.html
-
- #-DCMAKE_C_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which clang.exe) \
- #-DCMAKE_CXX_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which clang++.exe) \
- #-DCMAKE_RC_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which windres.exe) \
- #-DCMAKE_ASM_MASM_COMPILER:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ml.exe) \
- #-DCMAKE_AR:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ar.exe) \
- #-DCMAKE_RANLIB:FILEPATH=$(PATH=$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ranlib.exe) \
- #-DCMAKE_EXE_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/llvm/lib" \
- #-DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/llvm/include/c++/v1" \
-
- #-DCMAKE_ASM_COMPILER:STRING=yasm.exe \
- #-DCMAKE_ASM_MASM_COMPILER:STRING="jwasm.exe $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-win64"; else echo "-coff"; fi)" \
- #$(if which clang.exe &> /dev/null; then echo "-DCMAKE_C_COMPILER:FILEPATH=$(which clang.exe)"; fi) \
- #$(if which clang++.exe &> /dev/null; then echo "-DCMAKE_CXX_COMPILER:FILEPATH=$(which clang++.exe)"; fi) \
- #$(if which llvm-ranlib.exe &> /dev/null; then echo "-DCMAKE_C_COMPILER_RANLIB:FILEPATH=$(which llvm-ranlib.exe) -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$(which llvm-ranlib.exe)"; fi) \
- #$(if which llvm-ar.exe &> /dev/null; then echo "-DCMAKE_C_COMPILER_AR:FILEPATH=$(which llvm-ar.exe) -DCMAKE_CXX_COMPILER_AR:FILEPATH=$(which llvm-ar.exe)"; fi) \
- #-DLLVM_TABLEGEN:STRING=$(which llvm-tblgen.exe 2> /dev/null) \
- ## don't use -fno-lto flag with yasm
- #sed -i.bak -e "s/\(yasm\.exe .*\) -fno-lto/\1/" build/compile_commands.json &&
- #sed -i.bak -e "s/-fno-lto//" build/build.ninja build/compile_commands.json
- ## fix missing -lgcc/-lgcc_s
- #sed -i.bak -e "s/-lgcc_s\|-lgcc//g" build/build.ninja &&
- ## fix missing link libraries
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -lpthread/" build/build.ninja &&
+  -Sllvm -Bbuild_shared &&
+ #-DLLVM_ENABLE_PROJECTS:STRING="libunwind;polly;flang"
  wl-showstatus build-install &&
- ninja -Cbuild install/strip &&
- #ninja -Cbuild install-distribution &&
+ PATH=$MINGWPREFIX/share/python/bin:$PATH ninja -Cbuild_shared install/strip &&
+ #( ninja -Cbuild_shared install/strip || ninja -j1 -Cbuild_shared install/strip ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-project-$VERSION.src
- #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-project-llvmorg-$VERSION
+
+
+
 
 
 
