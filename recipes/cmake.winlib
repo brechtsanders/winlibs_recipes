@@ -629,21 +629,45 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix Source/kwsys/SystemTools.cxx (version >= 3.21.0)
-patch -ulbf Source/kwsys/SystemTools.cxx << EOF
-@@ -1 +1,6 @@
-+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
-+#undef _WIN32_WINNT
-+#define _WIN32_WINNT 0x0600
-+#endif
-+#include "../../Utilities/cmlibuv/src/win/winapi.h"
- /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-@@ -89,3 +94,3 @@
- // Windows API.
--#if defined(_WIN32)
-+#if defined(_WIN32) && !defined(__MINGW32__)
- #  include <windows.h>
-EOF
+## fix Source/kwsys/SystemTools.cxx (version >= 3.21.0 <= 3.22.3)
+#patch -ulbf Source/kwsys/SystemTools.cxx << EOF
+#@@ -1 +1,6 @@
+#+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#+#undef _WIN32_WINNT
+#+#define _WIN32_WINNT 0x0600
+#+#endif
+#+#include "../../Utilities/cmlibuv/src/win/winapi.h"
+# /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
+#@@ -89,3 +94,3 @@
+# // Windows API.
+#-#if defined(_WIN32)
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+# #  include <windows.h>
+#EOF
+## fix issue with GetAppExecLink() in Source/kwsys/SystemTools.cxx (version >= 3.23.0)
+##### Bug reported: https://discourse.cmake.org/t/cmake-3-23-0-build-with-mingw-w64-fails-with-getappexeclink-issue/5330
+#patch -ulbf Source/kwsys/SystemTools.cxx << EOF
+#@@ -102,5 +102,6 @@
+# // Windows API.
+#-#if defined(_WIN32) && !defined(__MINGW32__)
+#+#if defined(_WIN32) && !defined(__CYGWIN__)
+# #  include <windows.h>
+# #  include <winioctl.h>
+#+# if !defined(__MINGW32__)
+# #  ifndef INVALID_FILE_ATTRIBUTES
+#@@ -158,2 +159,3 @@
+# } REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
+#+# endif
+#
+#@@ -162,2 +164,3 @@
+# {
+#+# if !defined(__MINGW32__)
+#   // We only know the layout of version 3.
+#@@ -166,2 +169,3 @@
+#   }
+#+# endif
+#
+#EOF
 ## fix error expected unqualified-id in Utilities/cmjsoncpp/src/lib_json/json_value.cpp (version >= 3.22.3)
 #patch -ulbf Utilities/cmjsoncpp/src/lib_json/json_value.cpp << EOF
 #@@ -815,3 +815,3 @@
@@ -677,30 +701,6 @@ patch -ulbf Source/CursesDialog/ccmake.cxx << EOF
 +#ifdef SIGWINCH
    signal(SIGWINCH, onsig);
 +#endif
-
-EOF
-# fix issue with GetAppExecLink() in Source/kwsys/SystemTools.cxx (version >= 3.23.0)
-#### Bug reported: https://discourse.cmake.org/t/cmake-3-23-0-build-with-mingw-w64-fails-with-getappexeclink-issue/5330
-patch -ulbf Source/kwsys/SystemTools.cxx << EOF
-@@ -102,5 +102,6 @@
- // Windows API.
--#if defined(_WIN32) && !defined(__MINGW32__)
-+#if defined(_WIN32) && !defined(__CYGWIN__)
- #  include <windows.h>
- #  include <winioctl.h>
-+# if !defined(__MINGW32__)
- #  ifndef INVALID_FILE_ATTRIBUTES
-@@ -158,2 +159,3 @@
- } REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
-+# endif
-
-@@ -162,2 +164,3 @@
- {
-+# if !defined(__MINGW32__)
-   // We only know the layout of version 3.
-@@ -166,2 +169,3 @@
-   }
-+# endif
 
 EOF
 # escape backslashes in pkg-config output in Modules/FindPkgConfig.cmake (version >= 3.22.2)

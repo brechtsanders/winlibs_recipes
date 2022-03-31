@@ -103,32 +103,70 @@ cd cpython-mingw
 #cp -f PC/pyconfig.h pyconfig.h
 #mv Modules/pwdmodule.c Modules/pwdmodule.c.bak &&
 #touch Modules/pwdmodule.c
-# fix detection of current module in Python/initconfig.c (version >= 3.9.7)
-patch -ulbf Python/initconfig.c << EOF
-@@ -1120,2 +1120,15 @@
-     const wchar_t *program_name = _Py_path_config.program_name;
+## fix detection of current module in Python/initconfig.c (version >= 3.9.7)
+#patch -ulbf Python/initconfig.c << EOF
+#@@ -1120,2 +1120,15 @@
+#     const wchar_t *program_name = _Py_path_config.program_name;
+#+#ifdef __MINGW32__
+#+    HMODULE hm = NULL;
+#+    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&config_init_program_name, &hm)) {
+#+        wchar_t progpath[MAX_PATH];
+#+        if (GetModuleFileNameW(hm, progpath, MAX_PATH) < MAX_PATH) {
+#+            config->program_name = _PyMem_RawWcsdup(progpath);
+#+            if (config->program_name == NULL) {
+#+                return _PyStatus_NO_MEMORY();
+#+            }
+#+            return _PyStatus_OK();
+#+        }
+#+    }
+#+#endif
+#     if (program_name != NULL) {
+#EOF
+## fix Python/pathconfig.c (version >= 3.9.7)
+#patch -ulbf Python/pathconfig.c << EOF
+#@@ -423,3 +423,4 @@
+#
+#-#ifdef MS_WINDOWS
+#+#if defined(MS_WINDOWS)
+#+#if !defined(__MINGW32__)
+#     if (config->executable != NULL && config->base_executable == NULL) {
+#@@ -429,3 +430,5 @@
+#     }
+#-    else {
+#+    else
+#+#endif
+#+    {
+#         COPY_ATTR(base_executable, base_executable);
+#EOF
+## fix Python/pathconfig.c (version >= 3.9.7)
+#patch -ulbf Python/pathconfig.c << EOF
+#@@ -423,3 +423,3 @@
+#
+#-#ifdef MS_WINDOWS
+#+#if defined(MS_WINDOWS) && !defined(__MINGW32__)
+#     if (config->executable != NULL && config->base_executable == NULL) {
+#EOF
+# fix PYTONPATH default fallback in Modules/getpath.c (version >= 3.9.7)
+patch -ulbf Modules/getpath.c << EOF
+@@ -1538,2 +1538,18 @@
+     calculate->pythonpath_env = config->pythonpath_env;
++    if (calculate->pythonpath_env == NULL) {
 +#ifdef __MINGW32__
-+    HMODULE hm = NULL;
-+    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&config_init_program_name, &hm)) {
-+        wchar_t progpath[MAX_PATH];
-+        if (GetModuleFileNameW(hm, progpath, MAX_PATH) < MAX_PATH) {
-+            config->program_name = _PyMem_RawWcsdup(progpath);
-+            if (config->program_name == NULL) {
-+                return _PyStatus_NO_MEMORY();
-+            }
-+            return _PyStatus_OK();
-+        }
-+    }
++      HMODULE hm = NULL;
++      if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&calculate_init, &hm)) {
++          wchar_t progpath[MAX_PATH];
++          if (GetModuleFileNameW(hm, progpath, MAX_PATH) < MAX_PATH) {
++            PathRemoveFileSpecW(progpath);
++            PathRemoveFileSpecW(progpath);
++            wcscat(progpath, L"\\\\");
++            wcscat(progpath, config->platlibdir);
++            wcscat(progpath, L"\\\\python$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")");
++            calculate->pythonpath_env = _PyMem_RawWcsdup(progpath);
++          }
++      }
 +#endif
-     if (program_name != NULL) {
-EOF
-# fix Python/pathconfig.c (version >= 3.9.7)
-patch -ulbf Python/pathconfig.c << EOF
-@@ -423,3 +423,3 @@
-
--#ifdef MS_WINDOWS
-+#if defined(MS_WINDOWS) && !defined(__MINGW32__)
-     if (config->executable != NULL && config->base_executable == NULL) {
++    }
+     calculate->platlibdir = config->platlibdir;
 EOF
 ## fix missing _W_decimal_point
 #sed -i.bak -e "s/_W_ ## \(ATTR\)/\1/" Python/fileutils.c Modules/_localemodule.c
@@ -153,6 +191,9 @@ mkdir -p build_win &&
  cp -u build_win/libpython*.a $INSTALLPREFIX/share/python/lib/ &&
  strip $INSTALLPREFIX/share/python/bin/*.{dll,exe} &&
  cp -u $INSTALLPREFIX/share/python/bin/python3.exe $INSTALLPREFIX/share/python/bin/python.exe &&
+ # remove absolute paths
+ sed -i -e "s?$(cygpath -m $INSTALLPREFIX/share/python/bin/)??" $INSTALLPREFIX/share/python/lib/python*/config-*/python-config.py &&
+ sed -i -e "s/^import .*$/&, os/; s?$(cygpath -m $INSTALLPREFIX)?' + os.path.abspath(os.path.dirname(os.path.abspath(__file__))) + '?g" $INSTALLPREFIX/share/python/lib/python*/_sysconfigdata__win32_.py &&
  #find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
