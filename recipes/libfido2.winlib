@@ -1,0 +1,80 @@
+export NAME="libfido2"
+export STATUS=
+export URL=https://github.com/Yubico/libfido2
+export BASENAME=libfido2
+export DESCRIPTION="libfido2 provides library functionality and command-line tools to communicate with a FIDO device over USB, and to verify attestation and assertion signatures. libfido2 supports the FIDO U2F (CTAP 1) and FIDO2 (CTAP 2) protocols."
+export CATEGORY=hardware
+export TYPE=library
+export VERSION=1.10.0
+export VERSIONDATE=20220412
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/Yubico/libfido2/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Yubico/libfido2/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/hid_win.c (version >= 1.10.0)
+patch -ulbf src/hid_win.c << EOF
+@@ -29,3 +29,3 @@
+
+-#if defined(__MINGW32__)
++#if defined(__MINGW32__) && __MINGW64_VERSION_MAJOR < 9
+ DEFINE_DEVPROPKEY(DEVPKEY_Device_Parent, 0x4340a6c5, 0x93fa, 0x4706, 0x97,
+EOF
+# fix tools/util.c (version >= 1.10.0)
+patch -ulbf tools/util.c << EOF
+@@ -517,3 +517,3 @@
+        }
+-       if ((n = read(fd, *ptr, *len)) < 0) {
++       if ((n = read(fd, *ptr, (unsigned int)*len)) < 0) {
+                warn("%s: read", __func__);
+@@ -550,3 +550,3 @@
+        }
+-       if ((n = write(fd, ptr, len)) < 0) {
++       if ((n = write(fd, ptr, (unsigned int)len)) < 0) {
+                warn("%s: write", __func__);
+EOF
+# fix openbsd-compat/readpassphrase_win32.c (version >= 1.10.0)
+patch -ulbf openbsd-compat/readpassphrase_win32.c << EOF
+@@ -40,3 +40,7 @@
+ #include <conio.h>
++#ifdef __MINGW32__
++#include <levmar.h>
++#else
+ #include <lm.h>
++#endif
+ #include <sddl.h>
+EOF
+# fix CMakeLists.txt (version >= 1.10.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -275,3 +275,3 @@
+        endif()
+-       if(HAVE_STACK_PROTECTOR_ALL)
++       if(HAVE_STACK_PROTECTOR_ALL AND NOT MINGW)
+                add_compile_options(-fstack-protector-all)
+@@ -281,3 +281,5 @@
+        set(CMAKE_C_FLAGS_DEBUG "\${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer")
++       if(NOT MINGW)
+        set(CMAKE_C_FLAGS_RELEASE "\${CMAKE_C_FLAGS_RELEASE} -D_FORTIFY_SOURCE=2")
++       endif()
+
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DNFC_LINUX:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####fido2-token -L
+
+
+
