@@ -8558,6 +8558,7 @@ mkdir -p build_stage1 &&
   -DBUILD_SHARED_LIBS:BOOL=OFF \
   -DLLVM_BUILD_LLVM_DYLIB:BOOL=ON \
   -DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
+  -DLLVM_ENABLE_RUNTIMES:STRING="" \
   -DLLVM_TARGETS_TO_BUILD:STRING="ARM;AArch64;X86" \
   -DLLVM_ENABLE_ASSERTIONS:BOOL=OFF \
   -DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=ON \
@@ -8655,6 +8656,74 @@ mkdir -p build_stage1 &&
  if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
  rm -f SUCCESS_* &&
  
+
+
+
+ # create dummy libraries
+ mkdir -p dummylibs &&
+ ##cp -f $MINGWDIR/lib/gcc/$RUNPLATFORM/*/libgcc*.a $MINGWDIR/lib/libgcc*.a dummylibs/ &&
+ ar cr dummylibs/libgcc.a
+ ar cr dummylibs/libgcc_s.a
+ ar cr dummylibs/libgcc_eh.a
+
+ # build main LLVM suite
+ mkdir -p build_stage1 &&
+ wl-showstatus configure &&
+ PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH \
+ # -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libc;libcxx;libcxxabi;libunwind;openmp"
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$PWD/stage1 -DCMAKE_BUILD_TYPE:STRING=Release \
+  -DBUILD_SHARED_LIBS:BOOL=OFF \
+  -DLLVM_BUILD_LLVM_DYLIB:BOOL=ON \
+  -DLLVM_ENABLE_PROJECTS:STRING="clang;clang-tools-extra;lld;flang" \
+  -DLLVM_ENABLE_RUNTIMES:STRING="compiler-rt;libc;libcxx;libcxxabi;libunwind;openmp" \
+  -DLLVM_TARGETS_TO_BUILD:STRING="ARM;AArch64;X86" \
+  -DLLVM_ENABLE_ASSERTIONS:BOOL=OFF \
+  -DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=ON \
+  \
+  -DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DLLD_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  \
+  -DLLVM_TABLEGEN:STRING=$PWD/stage1/bin/llvm-tblgen.exe \
+  -DCLANG_TABLEGEN:STRING=$PWD/stage1/bin/clang-tblgen.exe \
+  -DLLVM_CONFIG:STRING=$PWD/stage1/bin/llvm-config.exe \
+  \
+  -DCMAKE_ASM_COMPILER:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which clang.exe) \
+  -DCMAKE_ASM_COMPILER_AR:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ar.exe) \
+  -DCMAKE_ASM_COMPILER_RANLIB:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ranlib.exe) \
+  -DCMAKE_C_COMPILER:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which clang.exe) \
+  -DCMAKE_C_COMPILER_AR:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ar.exe) \
+  -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ranlib.exe) \
+  -DCMAKE_CXX_COMPILER:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which clang++.exe) \
+  -DCMAKE_CXX_COMPILER_AR:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ar.exe) \
+  -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ranlib.exe) \
+  -DCMAKE_RC_COMPILER:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-windres.exe) \
+  -DCMAKE_AR:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ar.exe) \
+  -DCMAKE_RANLIB:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-ranlib.exe) \
+  -DCMAKE_READELF:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-readelf.exe) \
+  -DCMAKE_DLLTOOL:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-dlltool.exe) \
+  -DCMAKE_NM:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-nm.exe) \
+  -DCMAKE_OBJCOPY:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-objcopy.exe) \
+  -DCMAKE_OBJDUMP:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-objdump.exe) \
+  -DCMAKE_LINKER:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-link.exe) \
+  -DCMAKE_STRIP:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which llvm-strip.exe) \
+  -DGOLD_EXECUTABLE:FILEPATH=$(PATH=$PWD/stage1/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$MINGWPREFIX/share/llvm/bin:$PATH which ld.lld.exe) \
+  \
+  -DCMAKE_CXX_FLAGS:STRING="-g0 -D_WIN32_WINNT=0x0600 -I$PWD/stage1/$RUNPLATFORM/include -I$PWD/prebuilt/$PREBUILT_BASE/include -I$MINGWPREFIX/share/llvm/$RUNPLATFORM/include -I$MINGWPREFIX/share/llvm/$PREBUILT_BASE/include" \
+  -DCMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS:STRING="-L$PWD/stage1/$RUNPLATFORM/lib -L$(cygpath -m $PWD/dummylibs) -L$PWD/stage1/$RUNPLATFORM/lib -L$PWD/prebuilt/$PREBUILT_BASE/lib -L$PWD/prebuilt/$PREBUILT_BASE/$RUNPLATFORM/lib -L$MINGWPREFIX/share/llvm/$RUNPLATFORM/lib -L$MINGWPREFIX/share/llvm/$PREBUILT_BASE/lib -L$MINGWPREFIX/share/llvm/$PREBUILT_BASE/$RUNPLATFORM/lib" \
+  \
+  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+  -Sllvm -Bbuild_stage1 &&
+ #-lmsvcrt -lucrt 
+ ## fix missing link libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lpthread/" build_stage1/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$MINGWPREFIX/share/python/bin:$PWD/prebuilt/$PREBUILT_BASE/bin:$PATH ninja -Cbuild_stage1 install/strip &&
+   echo OK
+
+
+
  # build MinGW-w64 winpthreads
  for arch in i686 x86_64 armv7 aarch64; do
   mkdir -p build_mingw-w64_winpthreads_stage1_$arch &&
