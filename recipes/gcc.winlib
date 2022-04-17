@@ -291,6 +291,8 @@ export VERSIONDATE=20210728
 #export VERSIONDATE=20220218
 #export VERSION=11-20220219
 #export VERSIONDATE=20220222
+#export VERSION=11-20220409
+#export VERSIONDATE=20220416
 #export VERSION=12-20211205
 #export VERSIONDATE=20211206
 #export VERSION=12-20220123
@@ -299,8 +301,6 @@ export VERSIONDATE=20210728
 #export VERSIONDATE=20220218
 #export VERSION=12-20220227
 #export VERSIONDATE=20220228
-#export VERSION=12-20220410
-#export VERSIONDATE=20220415
 wl-showstatus --package-version
 export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl
 export OPTIONALDEPENDANCIES=
@@ -673,6 +673,53 @@ EOF
 #+  msvcUsesUCRT = 1;
 # #endif
 #EOF
+# fix libgo/sysinfo.c (version >= 11-20220409)
+patch -ulbf libgo/sysinfo.c << EOF
+@@ -19,3 +19,7 @@
+ #include <ucontext.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <netinet/in.h>
++#endif
+ /* <netinet/tcp.h> needs u_char/u_short, but <sys/bsd_types> is only
+@@ -29,3 +33,5 @@
+ #endif
++#ifndef _WIN32
+ #include <netinet/tcp.h>
++#endif
+ #if defined(HAVE_NETINET_IN_SYSTM_H)
+@@ -43,4 +49,6 @@
+ #include <signal.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
+ #include <termios.h>
++#endif
+ #if defined(HAVE_SYSCALL_H)
+@@ -72,2 +80,3 @@
+ #endif
++#ifndef _WIN32
+ #include <sys/resource.h>
+@@ -75,4 +84,6 @@
+ #include <sys/socket.h>
++#endif
+ #include <sys/stat.h>
+ #include <sys/time.h>
++#ifndef _WIN32
+ #include <sys/times.h>
+@@ -80,2 +91,3 @@
+ #include <sys/un.h>
++#endif
+ #if defined(HAVE_SYS_USER_H)
+@@ -91,2 +103,3 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <netdb.h>
+@@ -94,2 +107,3 @@
+ #include <grp.h>
++#endif
+ #if defined(HAVE_LINUX_FILTER_H)
+EOF
 ## fix libphobos/libdruntime/gcc/config.d.in (version >= 11-20220219)
 #####Bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104654
 #patch -ulbf libphobos/libdruntime/gcc/config.d.in << EOF
@@ -758,6 +805,9 @@ mkdir -p build_mingw &&
  #CXXFLAGS="-fpermissive" 
  #LDFLAGS="-Wl,--as-needed -lgcc" 
  #--enable-languages=go --enable-libgo -> know not to work on MinGW
+ #PATH=$MINGWPREFIX/share/binutils/bin:$PWD/build_mingw/gcc:$PATH build_mingw/gcc/gccgo.exe -c build_mingw/x86_64-w64-mingw32/libgo/cpugen.go -o build_mingw/x86_64-w64-mingw32/libgo/cpugen.o
+ #PATH=$MINGWPREFIX/share/binutils/bin:$PWD/build_mingw/gcc:$PATH build_mingw/gcc/gccgo.exe -c build_mingw/x86_64-w64-mingw32/libgo/cpugen.go -o build_mingw/x86_64-w64-mingw32/libgo/internal/cpu.o
+ #PATH=$MINGWPREFIX/share/binutils/bin:$PWD/build_mingw/gcc:$PATH build_mingw/gcc/gccgo.exe -c build_mingw/x86_64-w64-mingw32/libgo/cpugen.go -o build_mingw/x86_64-w64-mingw32/libgo/internal/.libs/cpu.o
  #--enable-languages=jit -> still experimental
  #--enable-languages=brig -> not supported
  #--enable-default-pie -> causes build to fail
@@ -1259,6 +1309,8 @@ echo -e "#include <iostream>\n#if defined(__clang__)\n#define COMPILERNAME \"cla
 
 #--enable-offload-targets=nvptx-none
 #--with-native-system-header-dir=$MINGWPREFIX/share/mingw-w64/include
+
+#for -m32 support on Win64: --with-arch-32=i686
 
 # Roadmap / development plan: https://gcc.gnu.org/develop.html
 
