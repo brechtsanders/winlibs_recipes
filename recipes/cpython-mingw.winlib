@@ -168,6 +168,25 @@ patch -ulbf Modules/getpath.c << EOF
 +    }
      calculate->platlibdir = config->platlibdir;
 EOF
+# fix missing setenv in Python/pylifecycle.c (version >= 3.9.7)
+patch -ulbf Python/pylifecycle.c << EOF
+@@ -309,3 +309,15 @@
+     /* Set the relevant locale environment variable */
++#ifdef _WIN32
++    int status = 1;
++    char* envcmd;
++    if (newloc && (envcmd = (char*)malloc(10 + strlen(newloc))) != NULL) {
++      strcpy(envcmd, "LC_CTYPE=");
++      strcpy(envcmd + 9, newloc);
++      status = putenv(envcmd);
++      free(envcmd);
++    }
++    if (status) {
++#else
+     if (setenv("LC_CTYPE", newloc, 1)) {
++#endif
+         fprintf(stderr,
+EOF
 ## fix missing _W_decimal_point
 #sed -i.bak -e "s/_W_ ## \(ATTR\)/\1/" Python/fileutils.c Modules/_localemodule.c
 # avoid using soft links
@@ -196,6 +215,7 @@ mkdir -p build_win &&
  sed -i -e "s/^import .*$/&, os/; s?$(cygpath -m $INSTALLPREFIX)?' + os.path.abspath(os.path.dirname(os.path.abspath(__file__))) + '?g" $INSTALLPREFIX/share/python/lib/python*/_sysconfigdata__win32_.py &&
  #find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####echo -e "import sys\nprint('Home: ', sys.prefix)\nprint('Path: ', sys.path)" | $MINGWPREFIX/share/python/bin/python.exe
 
 
 
