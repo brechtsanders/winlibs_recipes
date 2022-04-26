@@ -464,10 +464,10 @@ export TYPE=library
 #export VERSIONDATE=20210521
 #export VERSION=2.68.2
 #export VERSIONDATE=20211006
-export VERSION=2.70.0
-export VERSIONDATE=20211006
-#export VERSION=2.72.0
-#export VERSIONDATE=20220409
+#export VERSION=2.70.0
+#export VERSIONDATE=20211006
+export VERSION=2.72.0
+export VERSIONDATE=20220409
 wl-showstatus --package-version
 export DEPENDANCIES=glib2,libsigcplusplus3,gettext,mm-common
 export OPTIONALDEPENDANCIES=
@@ -485,19 +485,22 @@ cd glibmm-$VERSION
 #sed -e "s/?=/=/" build/generate-binding.am > untracked/build_scripts/generate-binding.py
 # fix location of Perl
 sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+# fix to allow building both static and shared library in subprojects/glib/meson.build (version >= 2.72.0)
+patch -ulbf subprojects/glib/meson.build << EOF
+@@ -197,5 +197,2 @@
+   if host_system == 'windows' or host_system == 'cygwin'
+-    if get_option('default_library') != 'shared'
+-      error('On Windows default_library must be "shared" or "static" but not "both"')
+-    endif
+     glib_conf.set('DLL_EXPORT', true)
+EOF
+# fix detection of Python
+sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" subprojects/glib/meson.build
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild-deprecated-api=true -Dmaintainer-mode=true -Dbuild-documentation=false -Dbuild-examples=false . build_both &&
- PKG_CONFIG= CC=$(which gcc.exe) CXX=$(which g++.exe) PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild-deprecated-api=true -Dmaintainer-mode=true -Dbuild-documentation=false -Dbuild-examples=false . build_both &&
- #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild-deprecated-api=true -Dmaintainer-mode=true -Dbuild-documentation=true -Dbuild-examples=false . build_both &&
- ## fix slash/backslash path issue when calling Python from Ninja
- #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
- ## fix Python path issues in meson_exe
- #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
- ## fix execution of Python scripts
- #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
- ## fix executing shell scripts
- #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ #PKG_CONFIG= CC=$(which gcc.exe) CXX=$(which g++.exe) PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild-deprecated-api=true -Dmaintainer-mode=true -Dbuild-documentation=false -Dbuild-examples=false . build_both &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild-deprecated-api=true -Dbuild-documentation=false -Dbuild-examples=false . build_both &&
  wl-showstatus build-install &&
  PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf glibmm-$VERSION
