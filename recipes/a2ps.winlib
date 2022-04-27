@@ -1,0 +1,91 @@
+export NAME="A2Ps"
+export STATUS=
+export URL=http://www.gnu.org/software/a2ps/
+export URL=https://savannah.gnu.org/projects/a2ps/
+export BASENAME=a2ps
+export DESCRIPTION="GNU a2ps is an Any to PostScript filter. Of course it processes plain text files, but also pretty prints quite a few popular languages."
+export CATEGORY=fileformat
+export TYPE=application
+export VERSION=4.14
+export VERSIONDATE=20220427
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://ftp.gnu.org/gnu/a2ps/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/a2ps/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix lib/mktime.c (version >= 4.14)
+patch -ulbf lib/mktime.c << EOF
+@@ -366,4 +366,5 @@
+
+ /* Convert *TP to a time_t value.  */
++#ifndef __MINGW32__
+ time_t
+ mktime (tp)
+@@ -379,4 +380,5 @@
+   return __mktime_internal (tp, my_mktime_localtime_r, &localtime_offset);
+ }
++#endif
+
+ #ifdef weak_alias
+EOF
+# fix contrib/fixnt.c (version >= 4.14)
+patch -ulbf contrib/fixnt.c << EOF
+@@ -22,2 +22,5 @@
+ #include <stdlib.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -2406,3 +2409,3 @@
+ #ifdef _WIN32
+-  GetTempPath(_MAX_PATH, tmpdir);
++  GetTempPathA(_MAX_PATH, tmpdir);
+ #else
+EOF
+# fix configure
+sed -i.bak "s?alarm (60);?#error Don't use alarm()//&?" configure
+wl-showstatus configure &&
+ #mkdir -p m4 &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-medium=A4 --with-encoding=latin1 &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-medium=A4 --with-encoding=latin1 &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-medium=A4 --with-encoding=latin1 LDFLAGS="-Wl,--as-needed -lintl" &&
+ echo "#define HAVE_MEMPCPY 1" >> config.h &&
+ echo "#define __mempcpy mempcpy" >> config.h &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build shared library
+
+
+
