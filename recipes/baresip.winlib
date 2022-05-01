@@ -1,72 +1,181 @@
+#export NAME="Baresip"
+#export STATUS=
+#export URL=http://creytiv.com/baresip.html
+#export BASENAME=baresip
+#export DESCRIPTION="Baresip is a portable and modular SIP User-Agent with audio and video support."
+#export CATEGORY=communication
+#export TYPE=application
+##export VERSION=0.5.0
+##export VERSIONDATE=20170215
+##export VERSION=0.5.1
+##export VERSIONDATE=20170304
+##export VERSION=0.5.2
+##export VERSIONDATE=20170408
+##export VERSION=0.5.3
+##export VERSIONDATE=20170514
+##export VERSION=0.5.4
+##export VERSIONDATE=20170625
+##export VERSION=0.5.5
+##export VERSIONDATE=20170908
+##export VERSION=0.5.6
+##export VERSIONDATE=20171014
+##export VERSION=0.5.7
+##export VERSIONDATE=20171225
+##export VERSION=0.5.8
+##export VERSIONDATE=20180212
+##export VERSION=0.5.9
+##export VERSIONDATE=20180422
+##export VERSION=0.5.10
+##export VERSIONDATE=20180705
+##export VERSION=0.5.11
+##export VERSIONDATE=20180915
+#####install: missing destination file operand after '/home/win64/inst_baresip-0.5.7/lib/baresip/modules'
+##export VERSION=0.6.0
+##export VERSIONDATE=20181201
+##export VERSION=0.6.1
+##export VERSIONDATE=20190217
+##export VERSION=0.6.2
+##export VERSIONDATE=20190420
+##export VERSION=0.6.3
+##export VERSIONDATE=20190622
+##export VERSION=0.6.4
+##export VERSIONDATE=20190901
+##export VERSION=0.6.5
+##export VERSIONDATE=20191201
+#export VERSION=0.6.6
+#export VERSIONDATE=20201114
+##export VERSION=1.0.0
+##export VERSIONDATE=20201114
+##export VERSION=1.1.0
+##export VERSIONDATE=20210424
+##export VERSION=2.0.0
+##export VERSIONDATE=20220313
+##export VERSION=2.0.1
+##export VERSIONDATE=20220327
+##export VERSION=2.0.2
+##export VERSIONDATE=20220409
+##export VERSION=2.3.0
+##export VERSIONDATE=20220501
+#####src/call.c:358: undefined reference to `sdp_media_disabled'
+#wl-showstatus --package-version
+##export DEPENDANCIES=libre,librem
+#export DEPENDANCIES=libre,librem,pthreads,glib2,gtk2,gstreamer,gst-plugins-base,pulseaudio
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=README.md
+#export LICENSETYPE=
+##export DOWNLOADURL="http://creytiv.com/pub/"
+#export DOWNLOADURL="https://github.com/alfredh/baresip/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://creytiv.com/pub/$BASENAME-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=https://github.com/alfredh/baresip/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/baresip/baresip/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+### fix src/main.c
+##patch -ulbf src/main.c << EOF
+##@@ -69,4 +69,11 @@
+## int main(int argc, char *argv[])
+## {
+##+#ifdef _WIN32
+##+       static WSADATA wsaData;
+##+       int wsaerr = WSAStartup(MAKEWORD(2, 0), &wsaData);
+##+       if (wsaerr)
+##+               exit(1);
+##+       atexit((void(*)())WSACleanup);
+##+#endif
+##        bool prefer_ipv6 = false, run_daemon = false, test = false;
+##        const char *ua_eprm = NULL;
+##EOF
+### fix already defined interface in modules/ctrl_dbus/ctrl_dbus.c (version >= 2.0.0)
+##sed -i.bak -e "s/\binterface\b/iface/g" modules/ctrl_dbus/ctrl_dbus.c
+### fix modules/av1/decode.c (version >= 2.0.0)
+##patch -ulbf modules/av1/decode.c << EOF
+##@@ -12,2 +12,3 @@
+## #include <aom/aom_decoder.h>
+##+#include <aom/aom_encoder.h>
+## #include <aom/aomdx.h>
+##EOF
+### fix modules/ctrl_dbus/ctrl_dbus.c (version >= 2.0.0)
+##mv modules/ctrl_dbus/ctrl_dbus.c modules/ctrl_dbus/ctrl_dbus.c.bak &&
+##echo "#include <pthread.h>" > modules/ctrl_dbus/ctrl_dbus.c &&
+##cat modules/ctrl_dbus/ctrl_dbus.c.bak >> modules/ctrl_dbus/ctrl_dbus.c
+### fix building modules (version <= 0.5.11)
+##patch -ulbf mk/modules.mk << EOF
+##--- mk/modules.mk  2016-12-23 15:43:25.000000000 +0100
+##+++ mk/modules.mk  2017-02-16 15:04:04.731898600 +0100
+##@@ -64,6 +64,4 @@
+## USE_L16   := 1
+##
+##-ifneq (\$(OS),win32)
+##-
+## USE_ALSA  := \$(shell [ -f \$(SYSROOT)/include/alsa/asoundlib.h ] || \\
+##        [ -f \$(SYSROOT_ALT)/include/alsa/asoundlib.h ] && echo "yes")
+##@@ -205,10 +203,4 @@
+##        || [ -f \$(SYSROOT_ALT)/include/vpx/vp8.h ] \\
+##        && echo "yes")
+##-else
+##-# Windows.
+##-# Accounts for mingw with Windows SDK (formerly known as Platform SDK)
+##-# mounted at /winsdk
+##-USE_DSHOW := \$(shell [ -f /winsdk/Include/um/dshow.h ] && echo "yes")
+##-endif
+##
+## # Platform specific modules
+##EOF
+## fix building modules (version >= 0.6.0)
+#sed -i.bak -e "s/ifneq (\$(OS),win32)/ifeq (1,1)/" mk/modules.mk
+### skip building x11 module (version >= 2.0.2)
+##sed -i.bak2 -e "s/^\(USE_X11\s*:=\).*$/\1/" mk/modules.mk
+## fix installation when not building modules because of static build
+#patch -ulbf Makefile << EOF
+#@@ -246,4 +246,6 @@
+#        \$(INSTALL) -m 0755 \$(BIN) \$(DESTDIR)\$(BINDIR)
+#+ifeq (\$(STATIC),)
+#        @mkdir -p \$(DESTDIR)\$(MOD_PATH)
+#        \$(INSTALL) -m 0644 \$(MOD_BINS) \$(DESTDIR)\$(MOD_PATH)
+#+endif
+#        @mkdir -p \$(DESTDIR)\$(SHARE_PATH)
+#EOF
+### skip building X11 module (version >= 2.0.0)
+##sed -i.bak -e "s?^USE_X11?#&?" mk/modules.mk
+### fix missing gio-unix (version >= 2.0.0)
+##sed -i.bak -e "s/gio-unix/gio-windows/" modules/ctrl_dbus/module.mk
+#mkdir -p $INSTALLPREFIX/lib/restund/modules
+#wl-showstatus build-install &&
+# #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk LIBS="-lre -lrem -lwinmm -lws2_32" PREFIX=$INSTALLPREFIX &&
+# #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk STATIC= PREFIX=$INSTALLPREFIX &&
+# #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
+# make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/re -I$MINGWPREFIX/include/rem $(pkg-config --cflags gtk+-2.0)" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
+# #PATH=$PYDIR:$PATH make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/re -I$MINGWPREFIX/include/rem -I$MINGWPREFIX/include/gsm $(pkg-config --cflags gtk+-2.0)" LFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lfdk-aac" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
+# strip $INSTALLPREFIX/bin/*.exe &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: check why baresip.exe starts with error
+
+
+
 export NAME="Baresip"
 export STATUS=
-export URL=http://creytiv.com/baresip.html
+export URL=https://github.com/baresip/baresip
 export BASENAME=baresip
 export DESCRIPTION="Baresip is a portable and modular SIP User-Agent with audio and video support."
 export CATEGORY=communication
 export TYPE=application
-#export VERSION=0.5.0
-#export VERSIONDATE=20170215
-#export VERSION=0.5.1
-#export VERSIONDATE=20170304
-#export VERSION=0.5.2
-#export VERSIONDATE=20170408
-#export VERSION=0.5.3
-#export VERSIONDATE=20170514
-#export VERSION=0.5.4
-#export VERSIONDATE=20170625
-#export VERSION=0.5.5
-#export VERSIONDATE=20170908
-#export VERSION=0.5.6
-#export VERSIONDATE=20171014
-#export VERSION=0.5.7
-#export VERSIONDATE=20171225
-#export VERSION=0.5.8
-#export VERSIONDATE=20180212
-#export VERSION=0.5.9
-#export VERSIONDATE=20180422
-#export VERSION=0.5.10
-#export VERSIONDATE=20180705
-#export VERSION=0.5.11
-#export VERSIONDATE=20180915
-####install: missing destination file operand after '/home/win64/inst_baresip-0.5.7/lib/baresip/modules'
-#export VERSION=0.6.0
-#export VERSIONDATE=20181201
-#export VERSION=0.6.1
-#export VERSIONDATE=20190217
-#export VERSION=0.6.2
-#export VERSIONDATE=20190420
-#export VERSION=0.6.3
-#export VERSIONDATE=20190622
-#export VERSION=0.6.4
-#export VERSIONDATE=20190901
-#export VERSION=0.6.5
-#export VERSIONDATE=20191201
-export VERSION=0.6.6
-export VERSIONDATE=20201114
-#export VERSION=1.0.0
-#export VERSIONDATE=20201114
-#export VERSION=1.1.0
-#export VERSIONDATE=20210424
-#export VERSION=2.0.0
-#export VERSIONDATE=20220313
-#export VERSION=2.0.1
-#export VERSIONDATE=20220327
-#export VERSION=2.0.2
-#export VERSIONDATE=20220409
-####src/call.c:358: undefined reference to `sdp_media_disabled'
+export VERSION=2.3.0
+export VERSIONDATE=20220501
 wl-showstatus --package-version
-#export DEPENDANCIES=libre,librem
-export DEPENDANCIES=libre,librem,pthreads,glib2,gtk2,gstreamer,gst-plugins-base,pulseaudio
+export DEPENDANCIES=pthreads,libre,librem,openssl,libopus
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=README.md
 export LICENSETYPE=
-#export DOWNLOADURL="http://creytiv.com/pub/"
 export DOWNLOADURL="https://github.com/alfredh/baresip/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-#export DOWNLOADSOURCEURL=http://creytiv.com/pub/$BASENAME-$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=https://github.com/alfredh/baresip/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
 export DOWNLOADSOURCEURL=https://github.com/baresip/baresip/archive/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
@@ -75,85 +184,63 @@ wl-showstatus extract
 #tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-## fix src/main.c
-#patch -ulbf src/main.c << EOF
-#@@ -69,4 +69,11 @@
-# int main(int argc, char *argv[])
-# {
-#+#ifdef _WIN32
-#+       static WSADATA wsaData;
-#+       int wsaerr = WSAStartup(MAKEWORD(2, 0), &wsaData);
-#+       if (wsaerr)
-#+               exit(1);
-#+       atexit((void(*)())WSACleanup);
-#+#endif
-#        bool prefer_ipv6 = false, run_daemon = false, test = false;
-#        const char *ua_eprm = NULL;
-#EOF
-## fix already defined interface in modules/ctrl_dbus/ctrl_dbus.c (version >= 2.0.0)
-#sed -i.bak -e "s/\binterface\b/iface/g" modules/ctrl_dbus/ctrl_dbus.c
-## fix modules/av1/decode.c (version >= 2.0.0)
-#patch -ulbf modules/av1/decode.c << EOF
-#@@ -12,2 +12,3 @@
-# #include <aom/aom_decoder.h>
-#+#include <aom/aom_encoder.h>
-# #include <aom/aomdx.h>
-#EOF
-## fix modules/ctrl_dbus/ctrl_dbus.c (version >= 2.0.0)
-#mv modules/ctrl_dbus/ctrl_dbus.c modules/ctrl_dbus/ctrl_dbus.c.bak &&
-#echo "#include <pthread.h>" > modules/ctrl_dbus/ctrl_dbus.c &&
-#cat modules/ctrl_dbus/ctrl_dbus.c.bak >> modules/ctrl_dbus/ctrl_dbus.c
-## fix building modules (version <= 0.5.11)
-#patch -ulbf mk/modules.mk << EOF
-#--- mk/modules.mk  2016-12-23 15:43:25.000000000 +0100
-#+++ mk/modules.mk  2017-02-16 15:04:04.731898600 +0100
-#@@ -64,6 +64,4 @@
-# USE_L16   := 1
-#
-#-ifneq (\$(OS),win32)
-#-
-# USE_ALSA  := \$(shell [ -f \$(SYSROOT)/include/alsa/asoundlib.h ] || \\
-#        [ -f \$(SYSROOT_ALT)/include/alsa/asoundlib.h ] && echo "yes")
-#@@ -205,10 +203,4 @@
-#        || [ -f \$(SYSROOT_ALT)/include/vpx/vp8.h ] \\
-#        && echo "yes")
-#-else
-#-# Windows.
-#-# Accounts for mingw with Windows SDK (formerly known as Platform SDK)
-#-# mounted at /winsdk
-#-USE_DSHOW := \$(shell [ -f /winsdk/Include/um/dshow.h ] && echo "yes")
-#-endif
-#
-# # Platform specific modules
-#EOF
-# fix building modules (version >= 0.6.0)
-sed -i.bak -e "s/ifneq (\$(OS),win32)/ifeq (1,1)/" mk/modules.mk
-## skip building x11 module (version >= 2.0.2)
-#sed -i.bak2 -e "s/^\(USE_X11\s*:=\).*$/\1/" mk/modules.mk
-# fix installation when not building modules because of static build
-patch -ulbf Makefile << EOF
-@@ -246,4 +246,6 @@
-        \$(INSTALL) -m 0755 \$(BIN) \$(DESTDIR)\$(BINDIR)
-+ifeq (\$(STATIC),)
-        @mkdir -p \$(DESTDIR)\$(MOD_PATH)
-        \$(INSTALL) -m 0644 \$(MOD_BINS) \$(DESTDIR)\$(MOD_PATH)
-+endif
-        @mkdir -p \$(DESTDIR)\$(SHARE_PATH)
+# fix modules/stdio/stdio.c (version >= 2.3.0)
+patch -ulbf modules/stdio/stdio.c << EOF
+@@ -8,3 +8,5 @@
+ #include <fcntl.h>
++#ifndef _WIN32
+ #include <termios.h>
++#endif
+ #include <re.h>
+@@ -30,4 +32,6 @@
+        struct tmr tmr;
++#ifndef _WIN32
+        struct termios term;
+        bool term_set;
++#endif
+ };
+@@ -43,2 +47,3 @@
+
++#ifndef _WIN32
+        fd_close(STDIN_FILENO);
+@@ -47,2 +52,3 @@
+                tcsetattr(STDIN_FILENO, TCSANOW, &st->term);
++#endif
+
+@@ -95,2 +101,3 @@
+ {
++#ifndef _WIN32
+        struct termios now;
+@@ -113,2 +120,3 @@
+        st->term_set = true;
++#endif
+
+@@ -120,2 +128,6 @@
+ {
++#ifdef _WIN32
++       info("stdio: terminal not supported on Windows\\n");
++       return ENOTSUP;
++#else
+        struct ui_st *st;
+@@ -149,2 +161,3 @@
+        return err;
++#endif
+ }
 EOF
-## skip building X11 module (version >= 2.0.0)
-#sed -i.bak -e "s?^USE_X11?#&?" mk/modules.mk
-## fix missing gio-unix (version >= 2.0.0)
-#sed -i.bak -e "s/gio-unix/gio-windows/" modules/ctrl_dbus/module.mk
-mkdir -p $INSTALLPREFIX/lib/restund/modules
-wl-showstatus build-install &&
- #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk LIBS="-lre -lrem -lwinmm -lws2_32" PREFIX=$INSTALLPREFIX &&
- #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk STATIC= PREFIX=$INSTALLPREFIX &&
- #make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/rem" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
- make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/re -I$MINGWPREFIX/include/rem $(pkg-config --cflags gtk+-2.0)" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
- #PATH=$PYDIR:$PATH make install LIBRE_INC=$MINGWPREFIX/include/re LIBRE_SO=$MINGWPREFIX/bin/libre.dll CC="${CC:-gcc} -I$MINGWPREFIX/include/re -I$MINGWPREFIX/include/rem -I$MINGWPREFIX/include/gsm $(pkg-config --cflags gtk+-2.0)" LFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lfdk-aac" AR=ar RANLIB=ranlib OS=win32 CROSS_COMPILE= LIBRE_MK=$MINGWPREFIX/share/re/re.mk PREFIX=$INSTALLPREFIX &&
- strip $INSTALLPREFIX/bin/*.exe &&
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSTATIC:BOOL=ON -DUSE_OPENSSL:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$(cygpath -m $MINGWPREFIX/include/re) -I$(cygpath -m $MINGWPREFIX/include/rem)" -S. -Bbuild_win &&
+ # add linker flag
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
+ strip build_win/*.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/share/baresip &&
+ cp -rf build_win/*.exe $INSTALLPREFIX/bin/ &&
+ cp -rf share/* $INSTALLPREFIX/share/baresip/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####TO DO: check why baresip.exe starts with error
+####TO DO: build with -DSTATIC:BOOL=OFF to also build modules
 
 
 
