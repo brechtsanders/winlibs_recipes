@@ -1,0 +1,73 @@
+export NAME="libdict"
+export STATUS=
+export URL=https://github.com/fmela/libdict
+export BASENAME=libdict
+export DESCRIPTION="C library of key-value data structures with an object-oriented interface."
+export CATEGORY=development,dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20151213
+####benchmark.c:16:26: fatal error: sys/resource.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="2-clause BSD-style"
+export DOWNLOADURL="https://github.com/fmela/libdict/releases v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/fmela/libdict/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/dict_private.h (version >= master)
+patch -ulbf src/dict_private.h << EOF
+@@ -103,3 +103,7 @@
+
++#ifdef _WIN32
++#define random() rand()
++#else
+ extern long random(void);
++#endif
+ static inline unsigned dict_rand() { return (unsigned) random(); }
+EOF
+# fix demo.c (version >= master)
+patch -ulbf demo.c << EOF
+@@ -12,2 +12,12 @@
+ #include <time.h>
++#include <inttypes.h>
++#ifdef _WIN32
++#  ifdef _WIN64
++#    define PRI_SIZET PRIu64
++#  else
++#    define PRI_SIZET PRIu32
++#  endif
++#else
++#  define PRI_SIZET "zu"
++#endif
+
+@@ -234,3 +244,3 @@
+            }
+-           printf("count = %zu\\n", dict_count(dct));
++           printf("count = %" PRI_SIZET "\\n", dict_count(dct));
+        } else if (strcmp(buf, "quit") == 0) {
+EOF
+# skip building benchmark
+sed -i.bak -e "s/benchmark\.c//; s/\.so/.dll/; s/\(-shared\) \(-o\)/\1 -s -mwindows -Wl,--out-implib,\$@.a \2/" GNUmakefile
+wl-showstatus build &&
+ make CC=${CC:-gcc} &&
+ wl-showstatus build-install &&
+ make install CC=${CC:-gcc} INSTALL_PREFIX=$INSTALLPREFIX &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ rm -f $INSTALLPREFIX/lib/*_p.a $INSTALLPREFIX/lib/*.dll.[0-9]* &&
+ cp -f bin/*.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
