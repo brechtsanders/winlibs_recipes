@@ -1,0 +1,43 @@
+export NAME="brunsli"
+export STATUS=
+export URL=https://github.com/google/brunsli
+export BASENAME=brunsli
+export DESCRIPTION="Practical JPEG Repacker"
+export CATEGORY=fileformat,compression
+export TYPE=library
+export VERSION=0.1
+export VERSIONDATE=20220513
+wl-showstatus --package-version
+export DEPENDANCIES=brotli,highwayhash,gtest
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/google/brunsli/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/google/brunsli/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# don't build third party libraries
+sed -i.bak -e "s/^add_subdirectory(third_party)/#&/" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lbrotlicommon/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ strip build_win/*.dll build_win/*.exe &&
+ cp -u build_win/*-static.a $INSTALLPREFIX/lib/ &&
+ cp -u build_win/libbrunslidec-static.a $INSTALLPREFIX/lib/libbrunslidec-c.a &&
+ cp -u build_win/libbrunslienc-static.a $INSTALLPREFIX/lib/libbrunslienc-c.a &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_win/*.dll build_win/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
