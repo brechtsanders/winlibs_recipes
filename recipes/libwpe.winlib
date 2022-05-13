@@ -70,8 +70,10 @@ export TYPE=library
 #export VERSIONDATE=20210610
 #export VERSION=1.11.1
 #export VERSIONDATE=20210805
-export VERSION=1.12.0
-export VERSIONDATE=20211001
+#export VERSION=1.12.0
+#export VERSIONDATE=20211001
+export VERSION=1.13.1
+export VERSIONDATE=20220513
 wl-showstatus --package-version
 export DEPENDANCIES=egl,xkbcommon,libdl
 export OPTIONALDEPENDANCIES=
@@ -93,61 +95,74 @@ patch -ulbf cmake/FindEGL.cmake << EOF
 -if (EGL_LIBRARIES AND NOT TARGET GL::egl)
 +if (NOT TARGET GL::egl)
 EOF
-# fix CMakeLists.txt (version >= 1.6.0)
-patch -ulbf CMakeLists.txt << EOF
-@@ -68,3 +68,4 @@
-
--add_library(wpe SHARED
-+foreach(LINKTYPE STATIC SHARED)
-+add_library(wpe_\${LINKTYPE} \${LINKTYPE}
-     src/input.c
-@@ -80,3 +81,3 @@
- )
--target_include_directories(wpe PRIVATE
-+target_include_directories(wpe_\${LINKTYPE} PRIVATE
-     "include"
-@@ -86,3 +87,3 @@
- )
--target_compile_definitions(wpe PRIVATE
-+target_compile_definitions(wpe_\${LINKTYPE} PRIVATE
-     WPE_COMPILATION
-@@ -91,10 +92,10 @@
- if (WPE_BACKEND)
--    target_compile_definitions(wpe PRIVATE WPE_BACKEND=\\"\${WPE_BACKEND}\\")
-+    target_compile_definitions(wpe_\${LINKTYPE} PRIVATE WPE_BACKEND=\\"\${WPE_BACKEND}\\")
- endif()
--target_compile_options(wpe PRIVATE
-+target_compile_options(wpe_\${LINKTYPE} PRIVATE
-     \$<TARGET_PROPERTY:GL::egl,INTERFACE_COMPILE_OPTIONS>
- )
--target_link_libraries(wpe PRIVATE XkbCommon::libxkbcommon \${CMAKE_DL_LIBS})
-+target_link_libraries(wpe_\${LINKTYPE} PRIVATE XkbCommon::libxkbcommon \${CMAKE_DL_LIBS})
-
--set_target_properties(wpe PROPERTIES
-+set_target_properties(wpe_\${LINKTYPE} PROPERTIES
-   C_VISIBILITY_PRESET hidden
-@@ -106,3 +107,3 @@
-
--install(TARGETS wpe
-+install(TARGETS wpe_\${LINKTYPE}
-   RUNTIME DESTINATION \${CMAKE_INSTALL_BINDIR}
-@@ -117,2 +118,4 @@
- )
-+set_target_properties(wpe_\${LINKTYPE} PROPERTIES OUTPUT_NAME wpe)
-+endforeach()
-
-EOF
-mkdir -p build_both &&
+## fix CMakeLists.txt (version >= 1.6.0 <= 1.12.0)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -68,3 +68,4 @@
+#
+#-add_library(wpe SHARED
+#+foreach(LINKTYPE STATIC SHARED)
+#+add_library(wpe_\${LINKTYPE} \${LINKTYPE}
+#     src/input.c
+#@@ -80,3 +81,3 @@
+# )
+#-target_include_directories(wpe PRIVATE
+#+target_include_directories(wpe_\${LINKTYPE} PRIVATE
+#     "include"
+#@@ -86,3 +87,3 @@
+# )
+#-target_compile_definitions(wpe PRIVATE
+#+target_compile_definitions(wpe_\${LINKTYPE} PRIVATE
+#     WPE_COMPILATION
+#@@ -91,10 +92,10 @@
+# if (WPE_BACKEND)
+#-    target_compile_definitions(wpe PRIVATE WPE_BACKEND=\\"\${WPE_BACKEND}\\")
+#+    target_compile_definitions(wpe_\${LINKTYPE} PRIVATE WPE_BACKEND=\\"\${WPE_BACKEND}\\")
+# endif()
+#-target_compile_options(wpe PRIVATE
+#+target_compile_options(wpe_\${LINKTYPE} PRIVATE
+#     \$<TARGET_PROPERTY:GL::egl,INTERFACE_COMPILE_OPTIONS>
+# )
+#-target_link_libraries(wpe PRIVATE XkbCommon::libxkbcommon \${CMAKE_DL_LIBS})
+#+target_link_libraries(wpe_\${LINKTYPE} PRIVATE XkbCommon::libxkbcommon \${CMAKE_DL_LIBS})
+#
+#-set_target_properties(wpe PROPERTIES
+#+set_target_properties(wpe_\${LINKTYPE} PROPERTIES
+#   C_VISIBILITY_PRESET hidden
+#@@ -106,3 +107,3 @@
+#
+#-install(TARGETS wpe
+#+install(TARGETS wpe_\${LINKTYPE}
+#   RUNTIME DESTINATION \${CMAKE_INSTALL_BINDIR}
+#@@ -117,2 +118,4 @@
+# )
+#+set_target_properties(wpe_\${LINKTYPE} PROPERTIES OUTPUT_NAME wpe)
+#+endforeach()
+#
+#EOF
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# #PKG_CONFIG_PATH= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -S. -Bbuild_both &&
+# #echo "-Wl,--as-needed -ldl" >> build_both/CMakeFiles/wpe_SHARED.dir/linklibs.rsp &&
+# #PKG_CONFIG_PATH= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -S. -Bbuild_both &&
+# #PKG_CONFIG_PATH= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_both &&
+# PKG_CONFIG_PATH= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_both &&
+# sed -i.bak -e "s/LINK_LIBRARIES\s*=\s*/&-Wl,--as-needed -ldl /g" build_both/build.ninja &&
+# wl-showstatus build-install &&
+# #make -Cbuild_both install/strip &&
+# ninja -Cbuild_both install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- #PKG_CONFIG_PATH= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -S. -Bbuild_both &&
- #echo "-Wl,--as-needed -ldl" >> build_both/CMakeFiles/wpe_SHARED.dir/linklibs.rsp &&
- #PKG_CONFIG_PATH= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -S. -Bbuild_both &&
- #PKG_CONFIG_PATH= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_both &&
- PKG_CONFIG_PATH= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_both_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_both &&
- sed -i.bak -e "s/LINK_LIBRARIES\s*=\s*/&-Wl,--as-needed -ldl /g" build_both/build.ninja &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_DOCS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_DOCS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/LINK_LIBRARIES\s*=\s*/&-Wl,--as-needed -ldl /g" build_shared/build.ninja &&
  wl-showstatus build-install &&
- #make -Cbuild_both install/strip &&
- ninja -Cbuild_both install/strip &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ cp -u $INSTALLPREFIX/lib/libwpe-*.dll.a $INSTALLPREFIX/lib/libwpe.dll.a &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 

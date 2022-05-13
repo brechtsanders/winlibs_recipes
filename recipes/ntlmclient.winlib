@@ -27,22 +27,39 @@ wl-showstatus extract
 #tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing htonll in src/ntlm.c
+## fix missing htonll in src/ntlm.c
+#patch -ulbf src/ntlm.c << EOF
+#@@ -16,5 +16,13 @@
+# #include <fcntl.h>
+# #include <time.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+inline uint64_t htonll(uint64_t value)
+#+{
+#+  return ((uint64_t)htonl((uint32_t)(value & 0xFFFFFFFFLL)) << 32) | htonl((uint32_t)(value >> 32));
+#+}
+#+#else
+# #include <arpa/inet.h>
+#+#endif
+#
+# #include "ntlm.h"
+#EOF
+# fix src/ntlm.c (version >= 0.9.1)
 patch -ulbf src/ntlm.c << EOF
-@@ -16,5 +16,13 @@
- #include <fcntl.h>
+@@ -16,3 +16,13 @@
  #include <time.h>
 +#ifdef _WIN32
 +#include <winsock2.h>
++#if !(defined(__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR >= 10)
 +inline uint64_t htonll(uint64_t value)
 +{
 +  return ((uint64_t)htonl((uint32_t)(value & 0xFFFFFFFFLL)) << 32) | htonl((uint32_t)(value >> 32));
 +}
++#endif
 +#else
  #include <arpa/inet.h>
 +#endif
 
- #include "ntlm.h"
 EOF
 # fix src/util.c (version >= 0.9.1)
 patch -ulbf src/util.c << EOF
@@ -55,9 +72,12 @@ patch -ulbf src/util.c << EOF
 +#endif
 
 EOF
+# don't treat warnings as errors
+sed -i.bak -e "s/ADD_DEFINITIONS(-Werror)/#&/" cmake/EnableWarnings.cmake
 wl-showstatus configure &&
  #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_win &&
  cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCRYPT:STRING=openssl -DUNICODE:STRING=iconv -DBUILD_TESTS:BOOL=OFF -DCMAKE_MODULE_LINKER_FLAGS:STRING= -DCMAKE_SHARED_LINKER_FLAGS:STRING= -DCMAKE_STATIC_LINKER_FLAGS:STRING= CMAKE_EXE_LINKER_FLAGS:STRING= -S. -Bbuild_win &&
+ ##-DCRYPT:STRING=mbedtls 
  echo "-Wl,--as-needed -lws2_32" >> build_win/CMakeFiles/ntlmclient_shared.dir/linklibs.rsp &&
  echo "-Wl,--as-needed -lws2_32" >> build_win/CMakeFiles/ntlm.dir/linklibs.rsp &&
  wl-showstatus build &&
