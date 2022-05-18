@@ -37,11 +37,31 @@ wl-wait4deps
 wl-showstatus extract
 tar xfJ $TARBALLDIR/$BASENAME/man-db-$VERSION.tar.xz
 cd man-db-$VERSION
-  ./configure --help 2> /dev/null
-  cat meson_options.txt 2> /dev/null
-  head COPYING* LICENSE* COPYRIGHT*
-  ls -ld COPYING* LICENSE* COPYRIGHT* configure* m4 CMakeLists.txt cmake Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro build 2> /dev/null
-
+# fix missing SIGHUP in lib/cleanup.c (version >= 2.10.2)
+patch -ulbf lib/cleanup.c << EOF
+@@ -109,4 +109,7 @@
+ {
+-  if (   trap_signal (SIGHUP, &saved_hup_action)
+-      || trap_signal (SIGINT, &saved_int_action)
++  if (
++#ifdef SIGHUP
++         trap_signal (SIGHUP, &saved_hup_action) ||
++#endif
++         trap_signal (SIGINT, &saved_int_action)
+       || trap_signal (SIGTERM, &saved_term_action))
+@@ -139,4 +142,7 @@
+ {
+-  if (  untrap_signal (SIGHUP, &saved_hup_action)
+-      | untrap_signal (SIGINT, &saved_int_action)
++  if (
++#ifdef SIGHUP
++        untrap_signal (SIGHUP, &saved_hup_action) |
++#endif
++        untrap_signal (SIGINT, &saved_int_action)
+       | untrap_signal (SIGTERM, &saved_term_action))
+EOF
+# skip detection of libpipeline
+sed -i.bak -e "s/as_fn_error\(.*Package requirements .*libpipeline\)/echo \1/" configure
 wl-showstatus configure &&
  # mkdir -p m4 &&
  # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
