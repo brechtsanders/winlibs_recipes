@@ -60,6 +60,39 @@ patch -ulbf lib/cleanup.c << EOF
 +        untrap_signal (SIGINT, &saved_int_action)
        | untrap_signal (SIGTERM, &saved_term_action))
 EOF
+# fix lib/linelength.c (version >= 2.10.2)
+patch -ulbf lib/linelength.c << EOF
+@@ -34,3 +34,5 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <termios.h>
++#endif
+ #include <sys/ioctl.h>
+EOF
+# fix lib/security.h (version >= 2.10.2)
+patch -ulbf lib/security.h << EOF
+@@ -25,3 +25,5 @@
+ #include <stdbool.h>
++#ifdef MAN_OWNER
+ #include <pwd.h>
++#endif
+
+EOF
+# fix lib/tempfile.c (version >= 2.10.2)
+patch -ulbf lib/tempfile.c << EOF
+@@ -41,2 +41,7 @@
+
++#ifdef _WIN32
++       dir = getenv("TEMP");
++       if (!dir || !CAN_ACCESS (dir, W_OK))
++               dir = NULL;
++#else
+        if (getuid () == geteuid () && getgid () == getegid ()) {
+@@ -63,2 +68,3 @@
+        }
++#endif
+
+EOF
 # skip detection of libpipeline
 sed -i.bak -e "s/as_fn_error\(.*Package requirements .*libpipeline\)/echo \1/" configure
 wl-showstatus configure &&
@@ -77,9 +110,11 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe 
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-threads --with-browser=less --with-pager=less --with-nroff=nroff --without-included-regex --without-libseccomp &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-threads --with-browser=less --with-pager=less --with-nroff=nroff --without-included-regex --without-libseccomp LDFLAGS="-Wl,--as-needed -lpcreposix" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # don't define MAN_OWNER
+ echo "#undef MAN_OWNER" >> config.h &&
  #wl-showstatus build &&
  #make &&
  wl-showstatus build-install &&

@@ -39,11 +39,21 @@ cd ORBit2-$VERSION
 ## enable deprecated glib stuff
 #mv linc2/src/Makefile.am linc2/src/Makefile.am.bak
 #sed -e "s/-DG_DISABLE_DEPRECATED//" linc2/src/Makefile.am.bak > linc2/src/Makefile.am
+## fix issue with backslashes in paths in src/orb/poa/Makefile.in (version >= 2.14.19)
+#sed -i.bak -e "s/\(--deps\) \([^ ]*\) \([^ ]*\)/\1 '\2' '\3'/" src/orb/poa/Makefile.in
+# fix configure (version >= 2.14.19)
+patch -ulbf configure << EOF
+@@ -3105,3 +3105,3 @@
+
+-if test "\$os_win32" = "yes"; then
++if test "\$os_win32" = "yes_SKIP"; then
+   if test x\$enable_static = xyes -o x\$enable_static = x; then
+EOF
 wl-showstatus configure &&
- # fix building DLLs on 64-bit
- if ( echo $RUNPLATFORM | grep -q x86_64 ); then
-  ( autoreconf -f -i -I $MINGWPREFIX/share/aclocal || autoreconf-2.13 -f -i )
- fi &&
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # ( autoreconf -f -i -I $MINGWPREFIX/share/aclocal || autoreconf-2.13 -f -i )
+ #fi &&
  ## allow use of deprecated functions
  #mv configure configure.bak
  ##sed -e "s/-DG_DISABLE_DEPRECATED//" configure.bak > configure
@@ -53,14 +63,18 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --with-idl-compiler=gcc &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --enable-compile-warnings=no CFLAGS="-DGLIB_DISABLE_DEPRECATION_WARNINGS" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --enable-compile-warnings=no IDL_FLAGS="-Dcpp_quote=\"#pragma midl_echo\" -D__WIDL__" CFLAGS="-DGLIB_DISABLE_DEPRECATION_WARNINGS" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --enable-compile-warnings=no IDL_FLAGS="-Dcpp_quote=\"#pragma midl_echo\" -D__WIDL__" CFLAGS="-DGLIB_DISABLE_DEPRECATION_WARNINGS" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-compile-warnings CFLAGS="-DGLIB_DISABLE_DEPRECATION_WARNINGS" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --disable-compile-warnings --with-idl-compiler="$(which widl.exe)" IDL_FLAGS="--win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) -Dcpp_quote="#pragma midl_echo" -D__WIDL__" CFLAGS="-DGLIB_DISABLE_DEPRECATION_WARNINGS" &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
  echo "#define HAVE_WINSOCK2_H" >> config.h &&
  echo "#include <process.h>" >> config.h &&
  echo "#define getpid() 0" >> config.h &&
  #make install-strip &&
- ( make install-strip || make install-strip IDL_FLAGS="-Dcpp_quote=\"#pragma midl_echo\" -D__WIDL__" ) &&
+ #( make install-strip || make install-strip IDL_FLAGS="-Dcpp_quote=\"#pragma midl_echo\" -D__WIDL__" ) &&
+ ( make install-strip || ( make -Csrc/idl && make -Csrc/idl-compiler && make -i install-strip )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ORBit2-$VERSION
 
 
