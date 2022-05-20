@@ -49,8 +49,10 @@ export TYPE=application
 #export VERSIONDATE=20211106
 #export VERSION=1.9.14
 #export VERSIONDATE=20211223
-export VERSION=1.9.15
-export VERSIONDATE=20220206
+#export VERSION=1.9.15
+#export VERSIONDATE=20220206
+export VERSION=1.9.16
+export VERSIONDATE=20220520
 wl-showstatus --package-version
 export DEPENDANCIES=gnutls,fltk
 export OPTIONALDEPENDANCIES=libxpm
@@ -169,12 +171,27 @@ patch -ulbf htmldoc/zipc.h << EOF
 +#  if defined(_WIN32) && !defined(__MINGW32__)
  typedef long ssize_t;
 EOF
-# fix missing gmtime_r (version >= 1.9.8)
-for F in $(grep -lw gmtime_r htmldoc/*.c*); do
+## fix missing gmtime_r (version >= 1.9.8 <= 1.9.15)
+#for F in $(grep -lw gmtime_r htmldoc/*.c*); do
+# mv $F $F.bak &&
+# echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > $F &&
+# cat $F.bak >> $F
+#done
+# fix missing gmtime_r/localtime_r (version >= 1.9.16)
+for F in $(grep -lw "gmtime_r\|localtime_r" htmldoc/*.c*); do
  mv $F $F.bak &&
  echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > $F &&
  cat $F.bak >> $F
 done
+# fix redefinition of localtime_r in htmldoc/zipc.c (version >= 1.9.16)
+patch -ulbf htmldoc/zipc.c << EOF
+@@ -40,3 +40,5 @@
+ #  define _CRT_SECURE_NO_WARNINGS      /* Disable warnings for standard library functions */
++# ifndef _POSIX_THREAD_SAFE_FUNCTIONS
+ #  define localtime_r(t,tm) localtime_s(tm,t)
++# endif
+ #endif /* _WIN32 */
+EOF
 # disable stack-protector (version >= 1.9.11)
 ####undefined reference to `__memcpy_chk'
 sed -i.bak -e "s/-D_FORTIFY_SOURCE=2//" configure
