@@ -147,10 +147,10 @@ export TYPE=library
 #export DEPENDANCIES=gupnp,gssdp,glib2,gtk3,gdk-pixbuf,libsoup-2.4,libxml2,gnome-icon-theme,gettext
 #export OPTIONALDEPENDANCIES=
 #export BUILDDEPENDANCIES=graphicsmagick,png2ico,meson
-export VERSION=0.10.2
-export VERSIONDATE=20211117
-#export VERSION=0.10.3
-#export VERSIONDATE=20220520
+#export VERSION=0.10.2
+#export VERSIONDATE=20211117
+export VERSION=0.10.3
+export VERSIONDATE=20220520
 wl-showstatus --package-version
 export DEPENDANCIES=gssdp,gupnp,gupnp-av,glib2,gtk3,gdk-pixbuf,libsoup,libxml2,gnome-icon-theme,gettext
 export OPTIONALDEPENDANCIES=
@@ -178,17 +178,30 @@ patch -ulbf subprojects/gssdp-1.2/libgssdp/gssdp-net-win32.c << EOF
 EOF
 # fix undefined type SoupURI in src/universal-cp/details-treeview.c (version >= 0.10.3)
 sed -i.bak -e "s/SoupURI/struct &/g" src/universal-cp/details-treeview.c
+# fix missing gupnp_service_action_return in src/network-light/upnp.c (version >= 0.10.3)
+sed -i.bak -e "s/gupnp_service_action_return/&_success/" src/network-light/upnp.c
+# ignore missing gupnp_service_info_get_introspection_async in src/universal-cp/device-treeview.c (version >= 0.10.3)
+patch -ulbf src/universal-cp/device-treeview.c << EOF
+@@ -604,2 +604,3 @@
+
++/*
+                 gupnp_service_info_get_introspection_async (info,
+@@ -607,2 +608,3 @@
+                                                             service_iter);
++*/
+
+EOF
 # fix detection of newer gssdp/gupnp (version >= 0.10.2)
 sed -i.bak -e "s/gssdp-[0-9][0-9]*\.[0-9][0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gssdp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\(gssdp-.*\)\.pc/\1/")/; s/gupnp-[0-9][0-9]*\.[0-9][0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gupnp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\(gupnp-.*\)\.pc/\1/")/" meson.build
-mkdir -p build_static &&
+mkdir -p build_win &&
  wl-showstatus configure &&
- PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library static -Dav-tools=true . build_static &&
- #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library static -Dav-tools=true -Dc_args="-I$MINGWPREFIX/include/libsoup-2.4" . build_static &&
+ #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library static -Dav-tools=true . build_win &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dav-tools=true . build_win &&
  #-Dc_link_args="-lole32" 
- #sed -i.bak -e "s/\(\"--extra-library=\)intl\(\",\)/& \1-lole32\2/g" build_static/meson-info/intro-targets.json &&
- #sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lgupnp-1.6\"/" build_static/build.ninja &&
+ #sed -i.bak -e "s/\(\"--extra-library=\)intl\(\",\)/& \1-lole32\2/g" build_win/meson-info/intro-targets.json &&
+ #sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lgupnp-1.6\"/" build_win/build.ninja &&
  wl-showstatus build-install &&
- PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_static install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_win install &&
  # remove unnecessary .exe.a files
  rm -f $INSTALLPREFIX/lib/*.exe.a &&
  ( rmdir $INSTALLPREFIX/lib || true ) &&
