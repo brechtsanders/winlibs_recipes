@@ -1,0 +1,47 @@
+export NAME="Cxref"
+export STATUS=
+export URL=https://www.gedanken.org.uk/software/cxref/
+export BASENAME=cxref
+export DESCRIPTION="Cxref is a program that will produce documentation (in LaTeX, HTML, RTF or SGML) including cross-references from C program source code."
+export CATEGORY=documentation
+export TYPE=application
+export VERSION=1.6e
+export VERSIONDATE=20210601
+wl-showstatus --package-version
+export DEPENDANCIES=sys_wait_h,win32-fork
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=doc/COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://www.gedanken.org.uk/software/cxref/download/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.gedanken.org.uk/software/cxref/download/$BASENAME-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+cd $BASENAME-$VERSION
+# fix mkdir()/pipe()/fork()
+cat >> src/version.h << EOF
+#ifndef mkdir
+#include <sys/stat.h>
+#define pipe(fds) _pipe((fds), 4096, _O_BINARY)
+#include <fcntl.h>
+#define mkdir(path,mode) mkdir(path)
+#include <win32fork.h>
+#endif
+EOF
+# fix missing lstat()
+sed -i.bak -e "s/lstat/stat/" src/preproc.c
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/win32ports/include" LDFLAGS="-Wl,--as-needed" LIBS="-lwin32fork" &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus build-install &&
+ make install &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
