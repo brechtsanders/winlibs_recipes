@@ -8,7 +8,7 @@ export TYPE=library
 export VERSION=1.7.5
 export VERSIONDATE=20110924
 wl-showstatus --package-version
-export DEPENDANCIES=
+export DEPENDANCIES=sys_wait_h,win32-fork
 export OPTIONALDEPENDANCIES=pngcrush
 export BUILDDEPENDANCIES=
 export LICENSEFILE=COPYING
@@ -56,11 +56,49 @@ EOF
 mv ulxmlrpcpp/ulxr_log4j.cpp ulxmlrpcpp/ulxr_log4j.cpp.bak
 echo "#include <sys/time.h>" > ulxmlrpcpp/ulxr_log4j.cpp
 cat ulxmlrpcpp/ulxr_log4j.cpp.bak >> ulxmlrpcpp/ulxr_log4j.cpp
+# fix ulxmlrpcpp/ulxr_http_server.cpp (version >= 1.7.5)
+patch -ulbf ulxmlrpcpp/ulxr_http_server.cpp << EOF
+@@ -1165,3 +1165,3 @@
+     int resume = ResumeThread(tdh);
+-    if (tdh >= 0 && resume >= 0)
++    if ((uintptr_t)tdh >= 0 && resume >= 0)
+       ++num_started;
+EOF
+# fix ulxmlrpcpp/ulxr_mtrpc_server.cpp (version >= 1.7.5)
+patch -ulbf ulxmlrpcpp/ulxr_mtrpc_server.cpp << EOF
+@@ -408,3 +408,3 @@
+     int resume = ResumeThread(tdh);
+-    if (tdh >= 0 && resume >= 0)
++    if ((uintptr_t)tdh >= 0 && resume >= 0)
+       ++num_started;
+EOF
+# fix ulxmlrpcpp/ulxr_mutex.cpp (version >= 1.7.5)
+patch -ulbf ulxmlrpcpp/ulxr_mutex.cpp << EOF
+@@ -48,3 +48,3 @@
+ #if defined __WIN32__
+-  if ((handle = CreateMutex(0, false, 0)) < 0)
++  if ((handle = CreateMutex(0, false, 0)) == 0)
+ #else
+EOF
+# fix ulxmlrpcpp/contrib/mprocess_rpc_server.cpp (version >= 1.7.5)
+patch -ulbf ulxmlrpcpp/contrib/mprocess_rpc_server.cpp << EOF
+@@ -46,4 +46,8 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+ #include <netdb.h>
++#endif
+ #include <errno.h>
+EOF
 ## remove dependancy on dynamic libstdc++ (GCC 4)
 #mv libtool libtool.bak &&
 #sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
 wl-showstatus configure &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-unicode --disable-log4j LIBS="-Wl,--as-needed -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-unicode --disable-log4j CFLAGS="-I$MINGWPREFIX/win32ports/include" CXXFLAGS="-I$MINGWPREFIX/win32ports/include" LIBS="-Wl,--as-needed -lws2_32 -lwin32fork" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  wl-showstatus build-install &&
  make install-strip &&
     echo OK
