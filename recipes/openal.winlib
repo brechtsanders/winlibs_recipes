@@ -115,11 +115,31 @@ mkdir -p build_win &&
  #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DALSOFT_BACKEND_WINMM:BOOL=ON -DALSOFT_REQUIRE_WINMM:BOOL=ON -DALSOFT_REQUIRE_WASAPI:BOOL=ON -DALSOFT_BACKEND_PORTAUDIO:BOOL=ON -DALSOFT_BACKEND_PULSEAUDIO:BOOL=OFF -DDSOUND_LIBRARY:STRING=-ldsound DSOUND_INCLUDE_DIR:PATH= -DALSOFT_EXAMPLES:BOOL=OFF -DALSOFT_TESTS:BOOL=OFF -S. -Bbuild_win &&
  # fix problem linking to correct windows library
  sed -i.bak -e "s?C:/Windows/System32/\([^ ]*\)\.dll?-l\1?" build_win/CMakeFiles/OpenAL.dir/linklibs.rsp &&
- # ling with -lws2_32 for WSAPoll() (version >= 1.20.1)
+ # link with -lws2_32 for WSAPoll() (version >= 1.20.1)
  echo "-Wl,--as-needed -lws2_32" >> build_win/CMakeFiles/OpenAL.dir/linklibs.rsp &&
  wl-showstatus build-install &&
  #( make -Cbuild_win install/strip || ( make -Cbuild_win install && strip $INSTALLPREFIX/*.dll $INSTALLPREFIX/*.exe ) ) &&
- ( PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install/strip || ( PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install && strip $INSTALLPREFIX/*.dll $INSTALLPREFIX/*.exe ) ) &&
+ #( PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install/strip || ( PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install && strip $INSTALLPREFIX/*.dll $INSTALLPREFIX/*.exe ) ) &&
+ (
+  make -Cbuild_win resources/openal32.rc.obj ||
+  (
+   # fix issue with __attribute__((force_align_arg_pointer)) (version >= 1.22.0)
+   sed -i.bak -e "s/ __attribute__((force_align_arg_pointer))//" build_win/CMakeFiles/OpenAL.dir/DependInfo.cmake build_win/CMakeFiles/OpenAL.dir/flags.make &&
+   make -Cbuild_win resources/openal32.rc.obj
+  ) ||
+  (
+   # fix issue with __attribute__((force_align_arg_pointer)) (version >= 1.22.0)
+   sed -i.bak -e "s/ __attribute__((force_align_arg_pointer))//" build_win/CMakeFiles/OpenAL.dir/DependInfo.cmake build_win/CMakeFiles/OpenAL.dir/flags.make &&
+   make -Cbuild_win resources/openal32.rc.obj
+  )
+ ) &&
+ (
+  PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install/strip ||
+  (
+   PATH=$PATH:$MINGWPREFIX/qt/bin make -Cbuild_win install &&
+   strip $INSTALLPREFIX/bin/*.{dll,exe}
+  )
+ ) &&
  pexports -o $INSTALLPREFIX/bin/OpenAL32.dll > libopenal.def && 
  dlltool --def libopenal.def --dllname $INSTALLPREFIX/bin/OpenAL32.dll --output-lib $INSTALLPREFIX/lib/libopenal.dll.a && 
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf openal-soft*$VERSION

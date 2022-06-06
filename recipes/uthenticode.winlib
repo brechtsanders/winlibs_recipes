@@ -1,0 +1,61 @@
+export NAME="uthenticode"
+export STATUS=
+export URL=https://github.com/trailofbits/uthenticode
+export BASENAME=uthenticode
+export DESCRIPTION="A cross-platform library for verifying Authenticode signatures "
+export CATEGORY=security
+export TYPE=library
+export VERSION=1.0.8
+export VERSIONDATE=20220605
+wl-showstatus --package-version
+export DEPENDANCIES=peparse
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/trailofbits/uthenticode/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/trailofbits/uthenticode/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing sk_X509_free in src/include/uthenticode.h (version >= 1.0.8)
+patch -ulbf src/include/uthenticode.h << EOF
+@@ -6,2 +6,7 @@
+ #include <openssl/x509.h>
++#undef sk_X509_free
++static void sk_X509_free (stack_st_X509* sk)
++{
++  OPENSSL_sk_free(ossl_check_X509_sk_type(sk));
++}
+ #include <pe-parse/parse.h>
+EOF
+# fix src/uthenticode.cpp (version >= 1.0.8)
+patch -ulbf src/uthenticode.cpp << EOF
+@@ -171,4 +171,7 @@
+     : cert_buf_(std::move(s.cert_buf_)),
+-      p7_(std::exchange(s.p7_, nullptr)),
+-      indirect_data_(std::exchange(s.indirect_data_, nullptr)) {
++      //p7_(std::exchange(s.p7_, nullptr)),
++      //indirect_data_(std::exchange(s.indirect_data_, nullptr)) {
++      p7_(s.p7_), indirect_data_(s.indirect_data_) {
++  s.p7_ = nullptr;
++  s.indirect_data_ = nullptr;
+ }
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
