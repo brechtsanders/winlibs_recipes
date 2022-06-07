@@ -35,32 +35,27 @@ patch -ulbf libfplutil/src/file_utils.cpp << EOF
 +}
  #else
 EOF
-
-#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
 #mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -Dthird_party_root:PATH=$MINGWPREFIX -Sfbx_common -Bbuild_test -LH && echo OK; rm -rf build_test
-#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -Dfplutil_build_tests:BOOL=OFF -Slibfplutil -Bbuild_test -LH && echo OK; rm -rf build_test
-
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -Dfplutil_build_tests:BOOL=OFF -Slibfplutil -Bbuild_static &&
- #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -Dfplutil_build_tests:BOOL=OFF -Slibfplutil -Bbuild_shared &&
- ## fix execution of Python scripts
- #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
- ## fix missing link libraries
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
  wl-showstatus build &&
  ninja -Cbuild_static &&
  wl-showstatus build &&
  ninja -Cbuild_shared &&
- wl-showstatus build-install &&
- ninja -Cbuild_static install/strip &&
- wl-showstatus build-install &&
- ninja -Cbuild_shared install/strip &&
-    echo OK
-
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ strip build_shared/*.dll &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf libfplutil/include/* $INSTALLPREFIX/include/ &&
+ cp -f build_{static,shared}/obj/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 
