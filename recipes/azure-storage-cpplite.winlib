@@ -1,0 +1,62 @@
+export NAME="Azure Storage C++ Client Library (Lite)"
+export STATUS=
+export URL=https://github.com/Azure/azure-storage-cpplite
+export BASENAME=azure-storage-cpplite
+export DESCRIPTION="Lite version of C++ Client Library for Microsoft Azure Storage "
+export CATEGORY=communication
+export TYPE=library
+export VERSION=0.3.0
+export VERSIONDATE=20220610
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads,libcurl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/Azure/azure-storage-cpplite/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Azure/azure-storage-cpplite/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix unknown pragma in include/logging.h (version >= 0.3.0)
+patch -ulbf include/logging.h << EOF
+@@ -8,3 +8,5 @@
+ #include <Rpc.h>
++#ifndef __MINGW32__
+ #pragma warning(disable : 4996)
++#endif
+ #define _SNPRINTF _snprintf
+EOF
+# fix std::runtime_error in src/base64.cpp (version >= 0.3.0)
+patch -ulbf src/base64.cpp << EOF
+@@ -2,2 +2,3 @@
+ #include <cstring>
++#include <stdexcept>
+
+EOF
+# fix issue with stat in src/blob/blob_client_wrapper.cpp (version >= 0.3.0)
+patch -ulbf src/blob/blob_client_wrapper.cpp << EOF
+@@ -7,3 +7,3 @@
+
+-#ifndef _WIN32
++#if !defined(_WIN32) || defined(__MINGW32__)
+ #include <sys/stat.h>
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/azure-storage-cpplite -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_SAMPLES:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/azure-storage-cpplite -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_SAMPLES:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####NOTE: install several header files not unique to this project -> moved to seperate subfolder
+
+
+
