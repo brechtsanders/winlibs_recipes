@@ -1,0 +1,71 @@
+export NAME="Additional implementation of BIKE (Bit Flipping Key Encapsulation)"
+export STATUS=
+export URL=https://github.com/awslabs/bike-kem
+export BASENAME=bike-kem
+export DESCRIPTION="This package is an \"Additional Optimized\" implementation of the Key Encapsulation Mechanism (KEM) BIKE."
+export CATEGORY=security
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20220611
+wl-showstatus --package-version
+export DEPENDANCIES=openssl
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/awslabs/bike-kem/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/awslabs/bike-kem/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing SecureZeroMemory in include/internal/cleanup.h (version >= master)
+patch -ulbf include/internal/cleanup.h << EOF
+@@ -10,2 +10,5 @@
+ #include "utilities.h"
++#if defined(_WIN32)
++#include <windows.h>
++#endif
+
+EOF
+# fix type issues in tests/main_test.c (version >= master)
+patch -ulbf tests/main_test.c << EOF
+@@ -65,3 +65,3 @@
+
+-    printf("Code test: %lu\\n", i);
++    printf("Code test: %lu\\n", (unsigned long)i);
+
+@@ -89,3 +89,3 @@
+     if(dec_rc != 0) {
+-      printf("Decoding failed after %ld code tests!\\n", i);
++      printf("Decoding failed after %ld code tests!\\n", (unsigned long)i);
+     } else {
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ # add missing linker flags
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcrypto/" build_shared/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/*.dll &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/bike $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f include/*.h $INSTALLPREFIX/include/bike/ &&
+ cp -f build_static/*.a build_shared/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
