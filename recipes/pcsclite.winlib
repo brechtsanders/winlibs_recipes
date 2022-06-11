@@ -79,10 +79,12 @@ export TYPE=library
 #export VERSIONDATE=20210807
 #export VERSION=1.9.4
 #export VERSIONDATE=20211002
-export VERSION=1.9.5
-export VERSIONDATE=20211204
+#export VERSION=1.9.5
+#export VERSIONDATE=20211204
 #export VERSION=1.9.6
 #export VERSIONDATE=20220512
+export VERSION=1.9.8
+export VERSIONDATE=20220611
 wl-showstatus --package-version
 export DEPENDANCIES=libdl,pthreads
 export OPTIONALDEPENDANCIES=
@@ -182,7 +184,7 @@ cat src/utils.c.bak >> src/utils.c
 # fix src/PCSC/wintypes.h (version >= 1.8.8)
 mv src/PCSC/wintypes.h src/PCSC/wintypes.h.bak
 sed -e "s?\(typedef short BOOL;\)?//\1?" src/PCSC/wintypes.h.bak > src/PCSC/wintypes.h
-# fix src/sys_unix.c (version >= 1.8.8)
+# fix missing sleep in src/sys_unix.c (version >= 1.8.8)
 mv src/sys_unix.c src/sys_unix.c.bak
 cat > src/sys_unix.c << EOF
 #include <winsock2.h>
@@ -191,6 +193,13 @@ cat > src/sys_unix.c << EOF
 #endif
 EOF
 cat src/sys_unix.c.bak >> src/sys_unix.c
+# fix missing srand48/lrand48 in src/sys_unix.c (version >= 1.9.8)
+mv src/sys_unix.c src/sys_unix.c.bak2
+cat > src/sys_unix.c << EOF
+#define srand48(x) srand(x)
+#define lrand48 rand
+EOF
+cat src/sys_unix.c.bak2 >> src/sys_unix.c
 # fix src/winscard_msg.c (version >= 1.8.8)
 patch -ulbf src/winscard_msg.c << EOF
 --- src/winscard_msg.c  2012-08-25 16:29:44 +0200
@@ -263,8 +272,7 @@ wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-embedded --disable-libusb --disable-libsystemd CFLAGS="-I$(pwd)/winfix -I$(pwd)/src -I$(pwd)/src/PCSC -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -lwinmm -lpthread -Wl,--enable-stdcall-fixup" &&
  wl-showstatus build-install &&
  # fix building DLLs
- mv libtool libtool.bak &&
- sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ( make install-strip || (
   make -Csrc libpcsclite.la &&
   make -Csrc/spy libpcscspy.la &&
