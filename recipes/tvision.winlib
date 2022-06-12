@@ -5,8 +5,10 @@ export BASENAME=tvision
 export DESCRIPTION="A modern port of Turbo Vision 2.0, the classical framework for text-based user interfaces. Now cross-platform and with Unicode support."
 export CATEGORY=console
 export TYPE=library
-export VERSION=586
-export VERSIONDATE=20220607
+#export VERSION=586
+#export VERSIONDATE=20220607
+export VERSION=master
+export VERSIONDATE=20220612
 wl-showstatus --package-version
 export DEPENDANCIES=
 export OPTIONALDEPENDANCIES=
@@ -15,20 +17,33 @@ export LICENSEFILE=COPYRIGHT
 export LICENSETYPE=MIT
 export DOWNLOADURL="https://github.com/magiblot/tvision/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/magiblot/tvision/archive/refs/tags/r$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/magiblot/tvision/archive/refs/tags/r$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/magiblot/tvision/archive/refs/heads/$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xfz $TARBALLDIR/$BASENAME/r$VERSION.tar.gz
-cd tvision-r$VERSION
-# fix include/tvision/system.h (version >= 586)
+#tar xfz $TARBALLDIR/$BASENAME/r$VERSION.tar.gz
+#cd tvision-r$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd tvision-$VERSION
+## fix include/tvision/system.h (version >= 586)
+#patch -ulbf include/tvision/system.h << EOF
+#@@ -63,2 +63,4 @@
+# #include <tvision/borland/win.h>
+#+#elif defined(_WIN32)
+#+#include <windows.h>
+# #endif
+#EOF
+# fix include/tvision/system.h (version >= master)
 patch -ulbf include/tvision/system.h << EOF
-@@ -63,2 +63,4 @@
- #include <tvision/borland/win.h>
+@@ -62,2 +62,6 @@
+ const int meDoubleClick = 0x02;
 +#elif defined(_WIN32)
 +#include <windows.h>
- #endif
++const int meMouseMoved = 0x01;
++const int meDoubleClick = 0x02;
+ #else
 EOF
 # fix include/tvision/borland/dos.h (version >= 586)
 patch -ulbf include/tvision/borland/dos.h << EOF
@@ -38,27 +53,28 @@ patch -ulbf include/tvision/borland/dos.h << EOF
 +#ifndef _WIN32
 
 EOF
-# also allow building shared library
-sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" CMakeLists.txt
+## also allow building shared library (version = 586)
+#sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" CMakeLists.txt
+# also allow building shared library (version >= master)
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" source/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-D__WINDOWS_H" -S. -Bbuild_static &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-D__WINDOWS_H" -S. -Bbuild_shared &&
- ## fix execution of Python scripts
- #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
- ## fix missing link libraries
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
- wl-showstatus build &&
- ninja -Cbuild_static &&
- wl-showstatus build &&
- ninja -Cbuild_shared &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
  wl-showstatus build-install &&
- ninja -Cbuild_static install &&
+ #ninja -Cbuild_static install &&
+ ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
- ninja -Cbuild_shared install &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tvision-r$VERSION
+ #ninja -Cbuild_shared install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/*.dll &&
+ cp -u build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tvision-r$VERSION
 
 
 
