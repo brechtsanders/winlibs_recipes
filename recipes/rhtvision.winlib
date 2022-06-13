@@ -1,0 +1,104 @@
+export NAME="rhtvision"
+export STATUS=rhtvision
+export URL=http://tvision.sourceforge.net/
+export BASENAME=rhtvision
+export DESCRIPTION="Turbo Vision (TVision for short) is a TUI (Text User Interface) that implements the well known CUA widgets. With TVision you can create an intuitive text mode application, intuitive means it will have CUA like interface (check boxes, radio buttons, push buttons, input lines, pull-down menues, status bars, etc.). All the people acustomed to the Windows, MacOS, OS/2, Motif, GTK, etc. interfaces will understand the interface at first sight."
+export CATEGORY=
+export TYPE=library
+export VERSION=2.1.0-3
+export VERSIONDATE=
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="http://tvision.sourceforge.net/"
+export DOWNLOADURL="https://sourceforge.net/projects/tvision/files/UNIX/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://prdownloads.sourceforge.net/tvision/rhtvision-$VERSION.src.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/rhtvision-$VERSION.src.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/tvision
+# fix missing ssize_t in compat/getline.c (version >= 2.1.0-3)
+mv compat/getline.c compat/getline.c.bak
+cat > compat/getline.c << EOF
+#include <io.h>
+#ifndef _SSIZE_T_
+#define _SSIZE_T_
+#endif
+EOF
+cat compat/getline.c.bak >> compat/getline.c
+# fix missing ssize_t in include/compatlayer.h (version >= 2.1.0-3)
+mv include/compatlayer.h include/compatlayer.h.bak
+cat > include/compatlayer.h << EOF
+#include <io.h>
+#ifndef CLY_ssize_t
+#define CLY_ssize_t
+#endif
+EOF
+sed -e "s?#define usleep(microseconds) CLY_YieldProcessor(microseconds)?//&?" include/compatlayer.h.bak >> include/compatlayer.h
+# fix ambiguous abs() in classes/tdesktop.cc (version >= 2.1.0-3)
+patch -ulbf classes/tdesktop.cc << EOF
+@@ -144,4 +144,4 @@
+ {
+-    unsigned res1 = 2;
+-    unsigned res2 = i/res1;
++    long res1 = 2;
++    long res2 = i/res1;
+     while( abs( res1 - res2 ) > 1 )
+EOF
+# fix ambiguous abs() in classes/tdisplay.cc (version >= 2.1.0-3)
+patch -ulbf classes/tdisplay.cc << EOF
+@@ -383,6 +383,6 @@
+     i=indexMin=firstXMatch;
+-    minDif=abs(res[i].y-y);
++    minDif=abs((long)res[i].y-(long)y);
+     while (++i<cant && res[i].x==x)
+       {
+-       dif=abs(res[i].y-y);
++       dif=abs((long)res[i].y-(long)y);
+        if (dif<minDif)
+@@ -398,3 +398,3 @@
+  indexMin=0;
+- minDif=abs(res[0].y-y)+abs(res[0].x-x);
++ minDif=abs((long)res[0].y-(long)y)+abs((long)res[0].x-(long)x);
+  i=1;
+@@ -402,3 +402,3 @@
+    {
+-    dif=abs(res[i].y-y)+abs(res[i].x-x);
++    dif=abs((long)res[i].y-(long)y)+abs((long)res[i].x-(long)x);
+     if (dif<minDif)
+EOF
+# fix classes/tfilecol.cc (version >= 2.1.0-3)
+patch -ulbf classes/tfilecol.cc << EOF
+@@ -104,3 +104,3 @@
+     TSearchRec *item = (TSearchRec *)obj;
+-    os << item->attr << (unsigned long)item->time << item->size;
++    os << item->attr << (unsigned long)item->time << (unsigned long)item->size;
+     os.writeString( item->name );
+@@ -112,3 +112,3 @@
+     unsigned long aux;
+-    is >> item->attr >> aux >> item->size;
++    is >> item->attr >> aux >> (unsigned long&)item->size;
+     is.readString( item->name, sizeof(item->name) );
+EOF
+sed -i.bak -e "s/\(if (.*roll.*\) >= 0)/\1)/" examples/dlgdsn/dsgobjs.cc
+wl-showstatus configure &&
+ PERLLIB=${PERLLIB:+$PERLLIB:}$PWD $PERLDIR/bin/perl.exe config.pl --prefix=$INSTALLPREFIX --no-libs-here --cxxflags="-fpermissive -Wno-narrowing" &&
+ wl-showstatus build &&
+ make &&
+ make -Cexamples &&
+ wl-showstatus build-install &&
+ make install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: fix rhtv-config to be relocatable
+####TO DO: also build DLLs
+
+
+

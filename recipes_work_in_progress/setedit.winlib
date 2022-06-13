@@ -12,6 +12,7 @@ export VERSION=0.5.8-1
 export VERSIONDATE=20220612
 wl-showstatus --package-version
 export DEPENDANCIES=tvision
+#export DEPENDANCIES=rhtvision
 export OPTIONALDEPENDANCIES=
 export BUILDDEPENDANCIES=
 export LICENSEFILE=
@@ -29,6 +30,22 @@ mkdir -p $BASENAME-$VERSION
 #tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
 tar xfz $TARBALLDIR/$BASENAME/setedit_$VERSION.tar.gz -C$BASENAME-$VERSION
 cd $BASENAME-$VERSION/setedit
+# fix undefined uint32
+for F in include/*.h; do
+ mv $F $F.bak &&
+ echo "#include <setedit_compat.h>" > $F &&
+ cat $F.bak >> $F
+done
+cat > include/setedit_compat.h << EOF
+#ifndef __INCLUDED_SETEDIT_COMPAT_H
+#define __INCLUDED_SETEDIT_COMPAT_H
+#include <stdint.h>
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
+#endif
+EOF
+# fix conflib.pl (version >= 0.5.8-1)
 patch -ulbf conflib.pl << EOF
 @@ -12 +12 @@
 -\$OS='';
@@ -39,6 +56,29 @@ patch -ulbf conflib.pl << EOF
 @@ -20 +20 @@
 -\$Compf='';
 +\$Compf='MinGW';
+EOF
+# fix config.pl (version >= 0.5.8-1)
+patch -ulbf config.pl << EOF
+@@ -26,3 +26,3 @@
+
+-\$TVVersionNeeded='2.1.0';
++\$TVVersionNeeded='0';
+ \$ZLibVersionNeeded='1.1.2';
+@@ -841,4 +841,4 @@
+  @dirsL=(\$conf{'TV_LIB'},@dirsL) if \$conf{'TV_LIB'};
+- \$TVLib=LookForFile('librhtv.[as]*',@dirsL);
+- \$TVLib=LookForFile('librhtv*dylib',@dirsL) if (!length(\$TVLib));
++ \$TVLib=LookForFile('libtvision.[as]*',@dirsL);
++ \$TVLib=LookForFile('libtvision*dylib',@dirsL) if (!length(\$TVLib));
+  if (!length(\$TVLib))
+@@ -879,3 +879,2 @@
+        CreateCache();
+-       die "Missing tool\\n";
+       }
+@@ -1880,3 +1879,2 @@
+        print "filXXXb.zip where XXX is the version.\\n";
+-       die "\\n";
+       }
 EOF
 wl-showstatus configure &&
  touch Makefile &&
@@ -58,13 +98,13 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
  #./configure --prefix=$INSTALLPREFIX --dynamic --no-comp-exe --bzip2 --with-aa &&
- PERLLIB=${PERLLIB:+$PERLLIB:}$PWD $PERLDIR/bin/perl.exe config.pl --prefix=$INSTALLPREFIX --dynamic --no-comp-exe --bzip2 &&
+ PERLLIB=${PERLLIB:+$PERLLIB:}$PWD $PERLDIR/bin/perl.exe config.pl --prefix=$INSTALLPREFIX --dynamic --no-comp-exe --bzip2 --tv-include=$MINGWPREFIX/include/tvision --tv-lib=$MINGWPREFIX/lib &&
  #--with-aa 
  ## fix building DLLs
  #mv libtool libtool.bak &&
  #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
- #wl-showstatus build &&
- #make &&
+ wl-showstatus build &&
+ make &&
  wl-showstatus build-install &&
  make install-strip &&
     ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
