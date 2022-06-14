@@ -212,6 +212,25 @@ inline void setenv (const char* var, const char* val, int param)
 }
 EOF
 cat pgp/seahorse-gpgme-key-op.c.bak >> pgp/seahorse-gpgme-key-op.c
+# fix number of arguments to secret_service_prompt_at_dbus_path_finish/secret_service_prompt_at_dbus_path in gkr/seahorse-gkr-actions.c (version >= 3.8.2)
+patch -ulbf gkr/seahorse-gkr-actions.c << EOF
+@@ -219,3 +219,3 @@
+
+-       retval = secret_service_prompt_at_dbus_path_finish (SECRET_SERVICE (source), result, NULL, &error);
++       retval = secret_service_prompt_at_dbus_path_finish (SECRET_SERVICE (source), result, &error);
+        if (retval != NULL)
+@@ -243,3 +243,3 @@
+                g_variant_get (retval, "(&o)", &prompt_path);
+-               secret_service_prompt_at_dbus_path (change->service, prompt_path, NULL,
++               secret_service_prompt_at_dbus_path (change->service, prompt_path, NULL, NULL,
+                                                    on_change_password_done, change);
+EOF
+# fix missing secret_service_new in gkr/seahorse-gkr-backend.c (version >= 3.8.2)
+sed -i.bak -e "s/\(secret_service_\)new/\1open/g" gkr/seahorse-gkr-backend.c
+# fix missing gmtime_r in pgp/seahorse-gpgme-expires.c (version >= 3.8.2)
+mv pgp/seahorse-gpgme-expires.c pgp/seahorse-gpgme-expires.c.bak &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > pgp/seahorse-gpgme-expires.c &&
+cat pgp/seahorse-gpgme-expires.c.bak >> pgp/seahorse-gpgme-expires.c
 # skip making help
 cat > help/Makefile.in << EOF
 clean:
@@ -230,11 +249,13 @@ sed "s?/aux?/aux_?" configure.bak2 > configure
 wl-showstatus configure &&
  #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no LDFLAGS="-no-undefined -Wl,-no-undefined" &&
  #PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no --enable-debug=no LDFLAGS="-Wl,-no-undefined" &&
- PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no --enable-debug=no LDFLAGS="-Wl,-no-undefined" &&
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-introspection=no --enable-debug=no LDFLAGS="-Wl,-no-undefined" &&
+ PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-pgp --disable-ssh --disable-introspection --disable-debug LDFLAGS="-Wl,-no-undefined" &&
  wl-showstatus build-install &&
- make install-strip &&
+ #make install-strip &&
+ PATH=$PYDIR:$PATH make install-strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####$INSTALLPREFIX/bin/seahorse.exe application crashes
+####application crashes: $MINGWPREFIX/bin/seahorse.exe
 
 
 
