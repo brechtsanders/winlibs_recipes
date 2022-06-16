@@ -307,12 +307,15 @@ export TYPE=application
 ####Could NOT find POD (missing: POD2MAN_EXECUTABLE POD2HTML_EXECUTABLE)
 #export VERSION=3.6.2
 #export VERSIONDATE=20220211
-export VERSION=3.6.3
-export VERSIONDATE=20220324
+#export VERSION=3.6.3
+#export VERSIONDATE=20220324
 #export VERSION=3.6.5
 #export VERSIONDATE=20220505
+export VERSION=3.6.6
+export VERSIONDATE=20220616
 #export VERSION=3.7.0
 #export VERSIONDATE=20220512
+####This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
 wl-showstatus --package-version
 export DEPENDANCIES=qt,libsmi,gnutls,zlib,brotli,snappy,zstd,liblz4,nghttp2,libsbc,spandsp,bcg729,ilbc,libopus,libxml2,libmaxminddb
 export OPTIONALDEPENDANCIES=
@@ -340,13 +343,39 @@ patch -ulbf epan/oids.c << EOF
 +#if (SMI_VERSION_MAJOR >= 0) && ((SMI_VERSION_MINOR > 4) || ((SMI_VERSION_MINOR >= 4) && (SMI_VERSION_PATCHLEVEL >= 8)))
         smiFree(ptr);
 EOF
-patch -ulbf CMakeLists.txt << EOF
-@@ -76,3 +76,3 @@
-
--if(WIN32)
-+if(FALSE)
-        find_package(PowerShell REQUIRED)
-EOF
+## fix extcap.c (version >= 3.7.0)
+#patch -ulbf extcap.c << EOF
+#@@ -1181,4 +1181,4 @@
+#
+#-        ws_debug("Extcap [%s] - Cleaning up fifo: %s; PID: %d", interface_opts->name,
+#-              interface_opts->extcap_fifo, interface_opts->extcap_pid);
+#+        ws_debug("Extcap [%s] - Cleaning up fifo: %s; PID: %" PRIuPTR, interface_opts->name,
+#+              interface_opts->extcap_fifo, (uintptr_t)interface_opts->extcap_pid);
+# #ifdef _WIN32
+#@@ -1235,4 +1235,4 @@
+#          * pid should be closed */
+#-        ws_debug("Extcap [%s] - Closing spawned PID: %d", interface_opts->name,-              interface_opts->extcap_pid);
+#+        ws_debug("Extcap [%s] - Closing spawned PID: %" PRIuPTR, interface_opts->name,
+#+              (uintptr_t)interface_opts->extcap_pid);
+#
+#@@ -1536,3 +1536,3 @@
+#     {
+#-        ws_debug("Error creating pipe => (%d)", GetLastError());
+#+        ws_debug("Error creating pipe => (%lu)", (unsigned long)GetLastError());
+#         g_free (pipename);
+#@@ -1542,3 +1542,3 @@
+#     {
+#-        ws_debug("Wireshark Created pipe =>(%s) handle (%" PRIuPTR ")", pipename, *handle_out);
+#+        ws_debug("Wireshark Created pipe =>(%s) handle (%" PRIuPTR ")", pipename, (uintptr_t)*handle_out);
+#         *fifo = g_strdup(pipename);
+#EOF
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -76,3 +76,3 @@
+#
+#-if(WIN32)
+#+if(FALSE)
+#        find_package(PowerShell REQUIRED)
+#EOF
 # disable use of windeployqt in CMakeLists.txt (version >= 3.6.3)
 patch -ulbf CMakeLists.txt << EOF
 @@ -1413,3 +1413,3 @@
@@ -388,13 +417,15 @@ EOF
 #    echo OK
 mkdir -p build_win &&
  wl-showstatus configure &&
- PKG_CONFIG= WIRESHARK_BASE_DIR=$(pwd) WIRESHARK_LIB_DIR=$(pwd)/libdir PLATFORM=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -GNinja -Wno-dev -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/wireshark -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DM_LIBRARY=-lm -DM_INCLUDE_DIR:PATH=$MINGWPREFIX -DPOWERSHELL_EXECUTABLE:FILEPATH=%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -DPLATFORM:STRING=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) -DWIRESHARK_TARGET_PLATFORM:STRING=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) -DCMAKE_CL_64:BOOL=FALSE -DGLIB2_INTERNAL_INCLUDE_DIR:PATH=$MINGWPREFIX/lib/glib-2.0/include -DPython3_EXECUTABLE:FILEPARH=$PYDIR/python.exe -S. -Bbuild_win &&
+ #PKG_CONFIG= WIRESHARK_BASE_DIR=$(pwd) WIRESHARK_LIB_DIR=$(pwd)/libdir PLATFORM=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -GNinja -Wno-dev -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/wireshark -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DM_LIBRARY=-lm -DM_INCLUDE_DIR:PATH=$MINGWPREFIX -DPOWERSHELL_EXECUTABLE:FILEPATH=%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -DPLATFORM:STRING=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) -DWIRESHARK_TARGET_PLATFORM:STRING=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) -DCMAKE_CL_64:BOOL=FALSE -DGLIB2_INTERNAL_INCLUDE_DIR:PATH=$MINGWPREFIX/lib/glib-2.0/include -DPython3_EXECUTABLE:FILEPARH=$PYDIR/python.exe -S. -Bbuild_win &&
+ PKG_CONFIG= WIRESHARK_BASE_DIR=$(pwd) WIRESHARK_LIB_DIR=$(pwd)/libdir PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -GNinja -Wno-dev -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/wireshark -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_WINSPARKLE:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPLATFORM:STRING=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) -DWIRESHARK_TARGET_PLATFORM:STRING=win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) -DGLIB2_INTERNAL_INCLUDE_DIR:PATH=$MINGWPREFIX/lib/glib-2.0/include -DPython3_EXECUTABLE:FILEPARH=$PYDIR/python.exe -S. -Bbuild_win &&
  echo "#undef HAVE_GETOPT" >> config.h &&
  echo "#undef HAVE_GETOPT_H" >> config.h &&
  wl-showstatus build &&
  ( ninja -Cbuild_win install/strip || ninja -Cbuild_win install ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####PATH=$MINGWPREFIX/qt/bin:$PATH $MINGWPREFIX/share/wireshark/Wireshark.exe
+
 
 
 
