@@ -24,18 +24,31 @@ wl-showstatus extract
 #tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-wl-showstatus configure &&
- make GENIE=$(which genie.exe) BX_DIR=$MINGWPREFIX/include/bx &&
- wl-showstatus build &&
- #( make mingw-gcc-release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} || make -C.build/projects/gmake-mingw-gcc bnet config=release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} ) &&
- ( make mingw-gcc-release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} MINGW=$(dirname $(dirname $(which ar.exe))) || make -C.build/projects/gmake-mingw-gcc bnet config=release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} MINGW=$(dirname $(dirname $(which ar.exe))) ) &&
+#wl-showstatus configure &&
+# make GENIE=$(which genie.exe) BX_DIR=$MINGWPREFIX/include/bx &&
+# wl-showstatus build &&
+# #( make mingw-gcc-release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} || make -C.build/projects/gmake-mingw-gcc bnet config=release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} ) &&
+# ( make mingw-gcc-release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} MINGW=$(dirname $(dirname $(which ar.exe))) || make -C.build/projects/gmake-mingw-gcc bnet config=release$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) CXX=${CXX:-g++} MINGW=$(dirname $(dirname $(which ar.exe))) ) &&
+# wl-showstatus install &&
+# rm -f .build/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)_mingw-gcc/bin/libbxRelease.a &&
+# rm -f .build/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)_mingw-gcc/bin/libexample*.a &&
+# mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include/bnet &&
+# cp -f .build/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)_mingw-gcc/bin/*.a $INSTALLPREFIX/lib/ &&
+# cp -rf include/bnet/* $INSTALLPREFIX/include/bnet/ &&
+# cp -rf scripts $INSTALLPREFIX/include/bnet/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+wl-showstatus build &&
+ ${CXX:-g++} -c -o bnet.o src/bnet.cpp -Iinclude -O3 &&
+ ar cru libbnet.a bnet.o &&
+ #( echo "EXPORTS"; sed -n -e "s/^.* \**\(bnet_.*\) *(.*$/\1/p" bnet.h ) > bnet.def &&
+ #( echo "EXPORTS"; ${CXX:-g++} -E bnet.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(bnet_[^ *]*\).*/\1/p" ) > bnet.def &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libbnet.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" | sed -e "s/^__/_/" ) > bnet.def &&
+ ${CXX:-g++} -shared -s -mwindows -def bnet.def -o bnet.dll libbnet.a -Wl,--out-implib,libbnet.dll.a -lbxRelease -lws2_32 &&
  wl-showstatus install &&
- rm -f .build/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)_mingw-gcc/bin/libbxRelease.a &&
- rm -f .build/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)_mingw-gcc/bin/libexample*.a &&
- mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include/bnet &&
- cp -f .build/win$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)_mingw-gcc/bin/*.a $INSTALLPREFIX/lib/ &&
- cp -rf include/bnet/* $INSTALLPREFIX/include/bnet/ &&
- cp -rf scripts $INSTALLPREFIX/include/bnet/ &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
