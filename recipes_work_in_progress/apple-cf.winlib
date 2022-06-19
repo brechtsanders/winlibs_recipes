@@ -16,8 +16,8 @@ export OPTIONALDEPENDANCIES=
 export BUILDDEPENDANCIES=
 export LICENSEFILE=APPLE_LICENSE
 export LICENSETYPE="Apple public source license"
-export DOWNLOADURL="https://opensource.apple.com/tarballs/CF/ CF-"
 #export DOWNLOADURL="https://opensource.apple.com/source/CF/ CF-"
+export DOWNLOADURL="https://opensource.apple.com/tarballs/CF/ CF-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 export DOWNLOADSOURCEURL=https://opensource.apple.com/tarballs/CF/CF-$VERSION.tar.gz
 wl-showstatus download
@@ -74,13 +74,114 @@ touch Availability.h AvailabilityMacros.h
 #mkdir -p pthread
 mkdir -p dispatch
 echo "#include_next <dispatch.h>" > dispatch/dispatch.h
+# build for Windows
+sed -i.bak2 -e "s/DEPLOYMENT_TARGET_MACOSX/DEPLOYMENT_TARGET_WINDOWS/" Makefile
 wl-showstatus build &&
- make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1" &&
+ #make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1" &&
+ make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe -I$(pwd) -DTARGET_OS_WIN32=1 -DHAVE_STRUCT_TIMESPEC=1" &&
  #make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe" CFLAGS="-c -x c -std=gnu99 -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1 -DCF_BUILDING_CF=1 -DU_SHOW_DRAFT_API=1 -DU_SHOW_CPLUSPLUS_API=0 -DHAVE_STRUCT_TIMESPEC=1 -I\$(OBJBASE) -DVERSION=\$(VERSION) -include CoreFoundation_Prefix.h" &&
  make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe" CFLAGS="-c -x c++ -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1 -DCF_BUILDING_CF=1 -DU_SHOW_DRAFT_API=1 -DU_SHOW_CPLUSPLUS_API=0 -DHAVE_STRUCT_TIMESPEC=1 -I\$(OBJBASE) -DVERSION=\$(VERSION) -include CoreFoundation_Prefix.h" &&
  make -fMakefileLinux -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe" CFLAGS="-c -x c -std=gnu99 -Wno-trigraphs -fexceptions -I$(pwd) -DTARGET_OS_WIN32=1 -DDEPLOYMENT_TARGET_WINDOWS=1 -DCF_BUILDING_CF=1 -DU_SHOW_DRAFT_API=1 -DU_SHOW_CPLUSPLUS_API=0 -DHAVE_STRUCT_TIMESPEC=1 -I\$(OBJBASE) -DVERSION=\$(VERSION) -include CoreFoundation_Prefix.h" LFLAGS="-shared -s -Wl,--out-implib,libCoreFoundation.dll.a -init=___CFInitialize" &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf CF-$VERSION
+
+
+
+export NAME="Apple CoreFoundation"
+export STATUS=
+export URL=https://github.com/macmade/CoreFoundation/
+export BASENAME=apple-cf
+export DESCRIPTION="Custom implementation of Apple's CoreFoundation framework intended to be used in the XEOS operating system as a base for its Objective-C library."
+export CATEGORY=development
+export TYPE=library
+export VERSION=main
+export VERSIONDATE=20220619
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=README.md
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/macmade/CoreFoundation/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/macmade/CoreFoundation/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd CoreFoundation-$VERSION
+wl-showstatus build &&
+ make &&
+ #make CC=${CC:-gcc} &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf CoreFoundation-$VERSION
+
+
+
+export NAME="Apple CoreFoundation"
+export STATUS=
+export URL=https://github.com/apple-oss-distributions/CF
+export BASENAME=apple-cf
+export DESCRIPTION="Apple's core foundation source code"
+export CATEGORY=development
+export TYPE=library
+export VERSION=1153.18
+export VERSIONDATE=20220619
+wl-showstatus --package-version
+export DEPENDANCIES=libdispatch
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=APPLE_LICENSE
+export LICENSETYPE="Apple public source license"
+export DOWNLOADURL="https://github.com/apple-oss-distributions/CF/tags CF-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/apple-oss-distributions/CF/archive/refs/tags/CF-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/CF-$VERSION.tar.gz
+cd CF-CF-$VERSION
+# fix missing Availability.h in CF-Objects/normal/CoreFoundation/CFAvailability.h (version >= 1153.18)
+patch -ulbf CF-Objects/normal/CoreFoundation/CFAvailability.h << EOF
+@@ -31,3 +31,5 @@
+ #include <TargetConditionals.h>
++#ifndef TARGET_OS_WIN32
+ #include <Availability.h>
++#endif
+
+EOF
+# fix redefinition of BOOL in CoreFoundation_Prefix.h (version >= 1153.18)
+patch -ulbf CoreFoundation_Prefix.h << EOF
+@@ -58,3 +58,5 @@
+ #else
++#ifndef TARGET_OS_WIN32
+ typedef signed char    BOOL;
++#endif
+ typedef char * id;
+@@ -235,3 +237,7 @@
+ CF_EXPORT int _NS_rename(const char *oldName, const char *newName);
+-CF_EXPORT int _NS_open(const char *name, int oflag, int pmode = 0);
++CF_EXPORT int _NS_open(const char *name, int oflag, int pmode
++#ifdef __cplusplus
++ = 0
++#endif
++);
+ CF_EXPORT int _NS_chdir(const char *name);
+@@ -283,3 +289,5 @@
+
++#ifndef __MINGW32__
+ #define scalbn(A, B) _scalb(A, B)
++#endif
+
+EOF
+# build for Windows
+sed -i.bak2 -e "s/DEPLOYMENT_TARGET_MACOSX/DEPLOYMENT_TARGET_WINDOWS/" Makefile
+wl-showstatus build &&
+ make -j1 CC="$MINGWPREFIX/share/llvm/bin/clang.exe -I$PWD  -DHAVE_STRUCT_TIMESPEC=1" ARCHFLAGS= &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf CF-CF-$VERSION
 
 
 

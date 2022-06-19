@@ -33,20 +33,25 @@ export VERSIONDATE=20190325
 wl-showstatus --package-version
 export DEPENDANCIES=
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=COPYING
 export LICENSETYPE="GPL/LGPL"
 #export DOWNLOADURL="http://mctrl.sourceforge.net/download.php"
-#export DOWNLOADURL="http://sourceforge.net/projects/mctrl/files/mctrl/"
-export DOWNLOADURL="http://www.mctrl.org/ mCtrl- -src.zip"
+#export DOWNLOADURL="http://sourcefor	ge.net/projects/mctrl/files/mctrl/"
+#export DOWNLOADURL="http://www.mctrl.org/ mCtrl- -src.zip"
+export DOWNLOADURL="https://github.com/mity/mctrl/tags release-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/mctrl/mctrl/mctrl-$VERSION/mCtrl-$VERSION-src.zip
-export DOWNLOADSOURCEURL=http://www.mctrl.org/download/$VERSION/mCtrl-$VERSION-src.zip
+#export DOWNLOADSOURCEURL=http://www.mctrl.org/download/$VERSION/mCtrl-$VERSION-src.zip
+export DOWNLOADSOURCEURL=https://github.com/mity/mctrl/archive/refs/tags/release-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
-unzip -oq $TARBALLDIR/$BASENAME/mCtrl-$VERSION-src.zip
-cd mCtrl-$VERSION
+#unzip -oq $TARBALLDIR/$BASENAME/mCtrl-$VERSION-src.zip
+tar xfz $TARBALLDIR/$BASENAME/release-$VERSION.tar.gz
+#cd mCtrl-$VERSION
+cd mctrl-release-$VERSION
 #touch vssym32.h vsstyle.h
 #echo "#include <tmschema.h>" > vssym32.h
 ## fix missing size_t (version >= 0.9.6)
@@ -63,16 +68,46 @@ cd mCtrl-$VERSION
 #sed -e "s/-municode/-DUNICODE/" Makefile.bak > Makefile
 #make -j1 CFLAGS="-I`pwd`" &&
 #    echo OK
-wl-showstatus configure &&
-cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+#wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# wl-showstatus build &&
+# make PREFIX=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64-w64-mingw32-; else echo i686-w64-mingw32-; fi) all &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp -rf include/* $INSTALLPREFIX/include/ &&
+# cp -f *.a $INSTALLPREFIX/lib/ &&
+# cp -f *.dll $INSTALLPREFIX/bin/ &&
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf mCtrl-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf mctrl-release-$VERSION
+# disable LTO build in src/CMakeLists.txt (version >= 0.11.5)
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -76,3 +76,3 @@
+     # With gcc >= 4.9, use LTO for Release builds:
+-    if(GCC_VERSION VERSION_GREATER 4.9 OR GCC_VERSION VERSION_EQUAL 4.9)
++    if((GCC_VERSION VERSION_GREATER 4.9 OR GCC_VERSION VERSION_EQUAL 4.9) AND NOT MINGW)
+         string(REGEX REPLACE "(^| )-O[0-9a-z]+" "" CMAKE_C_FLAGS_RELEASE "\${CMAKE_C_FLAGS_RELEASE}")
+EOF
+# allow building both static and shared libraries
+sed -i.bak "s/\(add_library([^ ]*\) \(STATIC\|SHARED\)/\1/" src/CMakeLists.txt lib/hsluv-c/src/CMakeLists.txt lib/windrawlib/src/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMCTRL_BUILD_EXAMPLES:BOOL=OFF -DWINDRAWLIB_BUILD_EXAMPLES:BOOL=OFF -DHSLUV_C_TESTS:BOOL=OFF -DMCTRL_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ cp src/mCtrl.def build_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMCTRL_BUILD_EXAMPLES:BOOL=OFF -DWINDRAWLIB_BUILD_EXAMPLES:BOOL=OFF -DHSLUV_C_TESTS:BOOL=OFF -DMCTRL_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
  wl-showstatus build &&
- make PREFIX=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64-w64-mingw32-; else echo i686-w64-mingw32-; fi) all &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/*.dll &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
  cp -rf include/* $INSTALLPREFIX/include/ &&
- cp -f *.a $INSTALLPREFIX/lib/ &&
- cp -f *.dll $INSTALLPREFIX/bin/ &&
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf mCtrl-$VERSION
+ cp -f build_static/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf mCtrl-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf mctrl-release-$VERSION
 ####See also: http://www.mctrl.org/doc/0.9.3/page_build.html
 
 
