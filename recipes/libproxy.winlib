@@ -48,7 +48,8 @@ wl-showstatus --package-version
 export DEPENDANCIES=
 export OPTIONALDEPENDANCIES=
 #export OPTIONALDEPENDANCIES=xulrunner
-export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=COPYING
 export LICENSETYPE=LGPL2
 #export DOWNLOADURL="http://code.google.com/p/libproxy/downloads/list"
@@ -213,31 +214,39 @@ cp -f libproxy/cmake/libproxy.cmk libproxy/cmake/libproxy.cmk.bak
 sed -ne "s/\(add_library.*\)\(  *\)SHARED/\1_s\2STATIC/p" libproxy/cmake/libproxy.cmk.bak >> libproxy/cmake/libproxy.cmk
 echo "set_target_properties(libproxy_s PROPERTIES OUTPUT_NAME proxy)" >> libproxy/cmake/libproxy.cmk
 echo "set_target_properties(libproxy PROPERTIES OUTPUT_NAME proxy)" >> libproxy/cmake/libproxy.cmk &&
-wl-showstatus configure &&
-##PERL="$PERLDIR/bin/perl.exe" cmake -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DWIN32=1
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DWIN32=1 . &&
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DWIN32=1 -DPERL_LIBRARY=$PERLDIR/lib -DPERL_INCLUDE_PATH=$PERLDIR/lib . && 
-#cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS="-fpermissive" . &&
-cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
-#cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMOZJS_INCLUDE_DIR:PATH=$MINGWPREFIX/include/js -DMOZJS_LIBRARIES:FILEPATH=$MINGWPREFIX/lib &&
-####/include/js/jsapi.h:14:32: fatal error: mozilla/Attributes.h: No such file or directory
+#wl-showstatus configure &&
+# ##PERL="$PERLDIR/bin/perl.exe" cmake -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DWIN32=1
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DWIN32=1 . &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DWIN32=1 -DPERL_LIBRARY=$PERLDIR/lib -DPERL_INCLUDE_PATH=$PERLDIR/lib . && 
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS="-fpermissive" . &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMOZJS_INCLUDE_DIR:PATH=$MINGWPREFIX/include/js -DMOZJS_LIBRARIES:FILEPATH=$MINGWPREFIX/lib &&
+# ####/include/js/jsapi.h:14:32: fatal error: mozilla/Attributes.h: No such file or directory
+# wl-showstatus build-install &&
+# ( make install/strip || make install ) &&
+# mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# #mv -f $INSTALLPREFIX/*.a $INSTALLPREFIX/lib/ &&
+# #mv -f $INSTALLPREFIX/*.dll $INSTALLPREFIX/*.exe $INSTALLPREFIX/bin/ &&
+# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# cp -f libproxy/libproxy.a $INSTALLPREFIX/lib/libproxy.a &&
+# # fix libproxy.dll.a
+# echo "LIBRARY proxy.dll" > proxy.def &&
+# echo "EXPORTS" >> proxy.def &&
+# sed -n -e "s/^.* \**\(px_.*\)(.*$/\1/p" libproxy/proxy.h >> proxy.def &&
+# dlltool -D $INSTALLPREFIX/proxy.dll -d proxy.def -l $INSTALLPREFIX/lib/libproxy.dll.a &&
+# if [ ! -f $INSTALLPREFIX/lib/pkgconfig/libproxy*.pc ]; then
+#  rm -rf $INSTALLPREFIX/pkgconfig &&
+#  mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+#  cp -f libproxy*.pc $INSTALLPREFIX/lib/pkgconfig/ 
+# fi &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
  wl-showstatus build-install &&
- ( make install/strip || make install ) &&
- mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
- #mv -f $INSTALLPREFIX/*.a $INSTALLPREFIX/lib/ &&
- #mv -f $INSTALLPREFIX/*.dll $INSTALLPREFIX/*.exe $INSTALLPREFIX/bin/ &&
+ ninja -Cbuild_win install/strip &&
  mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
- cp -f libproxy/libproxy.a $INSTALLPREFIX/lib/libproxy.a &&
- # fix libproxy.dll.a
- echo "LIBRARY proxy.dll" > proxy.def &&
- echo "EXPORTS" >> proxy.def &&
- sed -n -e "s/^.* \**\(px_.*\)(.*$/\1/p" libproxy/proxy.h >> proxy.def &&
- dlltool -D $INSTALLPREFIX/proxy.dll -d proxy.def -l $INSTALLPREFIX/lib/libproxy.dll.a &&
- if [ ! -f $INSTALLPREFIX/lib/pkgconfig/libproxy*.pc ]; then
-  rm -rf $INSTALLPREFIX/pkgconfig &&
-  mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
-  cp -f libproxy*.pc $INSTALLPREFIX/lib/pkgconfig/ 
- fi &&
+ cp -u build_win/libproxy/libproxy.a $INSTALLPREFIX/lib/libproxy.a &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
