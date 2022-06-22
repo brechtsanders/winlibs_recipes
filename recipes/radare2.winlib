@@ -1,0 +1,88 @@
+export NAME="Radare2"
+export STATUS=
+#export URL=https://rada.re/
+export URL=https://www.radare.org/
+export BASENAME=radare2
+export DESCRIPTION="UNIX-like reverse engineering framework and command-line toolset"
+export CATEGORY=development
+export TYPE=application
+#export VERSION=5.6.6
+#export VERSIONDATE=20220411
+#export VERSION=5.6.8
+#export VERSIONDATE=20220419
+#export VERSION=5.7.0
+#export VERSIONDATE=20220531
+export VERSION=5.7.2
+export VERSIONDATE=20220622
+wl-showstatus --package-version
+export DEPENDANCIES=zlib,libzip,liblz4,xxhash,file,openssl,capstone
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/radareorg/radare2/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/radareorg/radare2/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix libr/include/r_util/r_w32.h (version >= 5.7.2)
+patch -ulbf libr/include/r_util/r_w32.h << EOF
+@@ -13,3 +13,5 @@
+ #ifndef NTSTATUS
++#ifndef __MINGW32__
+ #define NTSTATUS DWORD
++#endif
+ #undef TEXT
+@@ -31,3 +33,3 @@
+ R_API NTSTATUS r_w32_NtDuplicateObject(HANDLE, HANDLE, HANDLE, PHANDLE, ACCESS_MASK, ULONG, ULONG);
+-R_API NTSTATUS r_w32_NtQueryObject(HANDLE, ULONG, PVOID, ULONG, PULONG);
++R_API DWORD r_w32_NtQueryObject(HANDLE, ULONG, PVOID, ULONG, PULONG);
+ R_API ut64 r_w32_GetEnabledXStateFeatures(void);
+EOF
+# fix libr/socket/meson.build (version >= 5.6.6)
+patch -ulbf libr/socket/meson.build << EOF
+@@ -13,2 +13,3 @@
+ r_util_deps = [utl, r_util_dep, platform_deps]
++r_util_static_deps = []
+ if get_option('blob')
+EOF
+# fix libr/syscall/d/meson.build (version >= 5.6.6)
+patch -ulbf libr/syscall/d/meson.build << EOF
+@@ -1,21 +1,2 @@
+ sdb_files = [
+-  'darwin-arm-32',
+-  'darwin-arm-64',
+-  'darwin-x86-32',
+-  'darwin-x86-64',
+-  'dos-x86-16',
+-  'freebsd-x86-32',
+-  'ios-arm-32',
+-  'ios-arm-64',
+-  'ios-x86-32',
+-  'linux-arm-32',
+-  'linux-arm-64',
+-  'linux-mips-32',
+-  'linux-sparc-32',
+-  'linux-x86-32',
+-  'linux-x86-64',
+-  'netbsd-x86-32',
+-  'openbsd-x86-32',
+-  'openbsd-x86-64',
+-  's110-arm-16',
+   'windows-x86-32',
+EOF
+# fix detection of Python
+sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_sys_openssl=true -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
