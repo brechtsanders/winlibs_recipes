@@ -564,14 +564,19 @@ export CATEGORY=accessibility
 export TYPE=library
 #export VERSION=2.40.3
 #export VERSIONDATE=20210710
-export VERSION=2.42.0
-export VERSIONDATE=20210919
+#export VERSION=2.42.0
+#export VERSIONDATE=20210919
+#export DEPENDANCIES=libx11,libxtst,dbus,libdl,glib2,libxevie,dbus-glib,libsm,xkbcommon,sys_wait_h
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=meson
 #export VERSION=2.44.0
 #export VERSIONDATE=20220318
 #export VERSION=2.44.1
 #export VERSIONDATE=20220422
+export VERSION=2.45.1
+export VERSIONDATE=20220703
 wl-showstatus --package-version
-export DEPENDANCIES=libx11,libxtst,dbus,libdl,glib2,libxevie,dbus-glib,libsm,xkbcommon,sys_wait_h
+export DEPENDANCIES=libx11,libxtst,dbus,libdl,glib2,libxevie,dbus-glib,libsm,xkbcommon,sys_wait_h,atk
 export OPTIONALDEPENDANCIES=
 export BUILDDEPENDANCIES=meson
 export LICENSEFILE=COPYING
@@ -620,6 +625,35 @@ sed -i.bak -e "s/\binterface\b/iface/g" atspi/atspi-misc-private.h atspi/atspi-m
 mv registryd/deviceeventcontroller.c registryd/deviceeventcontroller.c.bak2 &&
 echo "#define LockMask 0" > registryd/deviceeventcontroller.c &&
 cat registryd/deviceeventcontroller.c.bak2 >> registryd/deviceeventcontroller.c
+# fix missing getuid/geteuid in atk-adaptor/bridge.c (version >= 2.45.1)
+patch -ulbf atk-adaptor/bridge.c << EOF
+@@ -651,2 +651,5 @@
+ {
++#ifdef _WIN32
++  return 0;
++#else
+   FILE *fp;
+@@ -678,2 +681,3 @@
+   return get_ancestral_uid (ppid);
++#endif
+ }
+@@ -683,2 +687,3 @@
+ {
++#ifndef _WIN32
+   if (uid == getuid () || uid == geteuid ())
+@@ -690,2 +695,3 @@
+   }
++#endif
+   return FALSE;
+@@ -939,2 +945,3 @@
+
++#ifndef _WIN32
+   if (getuid () != 0)
+@@ -950,2 +957,3 @@
+   }
++#endif
+
+EOF
 # fix bus/meson.build (version >= 2.42.0)
 patch -ulbf bus/meson.build << EOF
 @@ -36,2 +36,3 @@
@@ -631,9 +665,39 @@ patch -ulbf bus/meson.build << EOF
 +endif
 
 EOF
-# don't build test/memory.c due to missing fork/kill (version >= 2.35.1)
-mv test/meson.build test/meson.build.bak &&
-touch test/meson.build
+## don't build test/memory.c due to missing fork/kill (version >= 2.35.1)
+#mv test/meson.build test/meson.build.bak &&
+#touch test/meson.build
+# fix missing atspi_conf and don't build atk/atk-adaptor/test in meson.build (version >= 2.45.1)
+patch -ulbf meson.build << EOF
+@@ -62,3 +62,3 @@
+   if host_system == 'windows'
+-    atspi_conf.set('DLL_EXPORT', true)
++    at_spi_conf.set('DLL_EXPORT', true)
+     at_spi_conf.set('_ATK_EXTERN', '__declspec(dllexport) extern')
+@@ -215,6 +215,6 @@
+ subdir('registryd')
+-subdir('atk')
++#subdir('atk')
+ subdir('droute')
+-subdir('atk-adaptor')
+-subdir('tests')
++#subdir('atk-adaptor')
++#subdir('tests')
+
+EOF
+## fix reinstalling already installed atk in atk/meson.build (version >= 2.45.1)
+#patch -ulbf atk/meson.build << EOF
+#@@ -70,3 +70,2 @@
+#
+#-install_headers(atk_headers + ['atk.h'], subdir: atk_api_path)
+#
+#@@ -130,3 +129,3 @@
+#   version: atk_libversion,
+#-  install: true,
+#+  install: false,
+#   dependencies: [glib_dep, gobject_dep],
+#EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Ddefault_bus=dbus-broker -Dintrospection=no -Denable-x11=no -Ddocs=false -Dc_args="-I$MINGWPREFIX/win32ports/include" -Dc_args="-I$MINGWPREFIX/include/libdl-win32" . build_both &&
@@ -646,7 +710,10 @@ mkdir -p build_both &&
  wl-showstatus build-install &&
  PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
  #PKG_CONFIG= PATH=$PYDIR:$PATH PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both install &&
+ # don't install at-spi2-atk.desktop (already part of at-spi2-atk) (version >= 2.45.1)
+ rm -f $INSTALLPREFIX/lib/gnome-settings-daemon-3.0/gtk-modules/at-spi2-atk.desktop &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: check if at-spi2-atk is now included in at-spi2-core
 
 
 
