@@ -1,0 +1,65 @@
+export NAME="GNOME Dictionary"
+export STATUS=
+export URL=https://wiki.gnome.org/Apps/Dictionary
+#export URL=https://gitlab.gnome.org/GNOME/gnome-dictionary
+export BASENAME=gnome-dictionary
+export DESCRIPTION="Dictionary is the GNOME application to look up definitions."
+export CATEGORY=office
+export TYPE=application
+export VERSION=40.0
+export VERSIONDATE=20220703
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://gitlab.gnome.org/GNOME/gnome-dictionary/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.gnome.org/GNOME/gnome-dictionary/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix error: Function does not take positional arguments in data/appdata/meson.build (version >= 40.0)
+patch -ulbf data/appdata/meson.build << EOF
+@@ -2,3 +2,3 @@
+ appdata_conf.set('application_id', application_id)
+-i18n.merge_file('appdata',
++i18n.merge_file(
+   input: configure_file(
+EOF
+# fix error: Function does not take positional arguments in data/meson.build (version >= 40.0)
+patch -ulbf data/meson.build << EOF
+@@ -5,3 +5,3 @@
+ desktop_conf.set('application_id', application_id)
+-i18n.merge_file('desktop',
++i18n.merge_file(
+   input: configure_file(
+@@ -47,3 +47,3 @@
+ foreach s: sources
+-  i18n.merge_file('sources',
++  i18n.merge_file(
+     input: '@0@.in'.format(s),
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Duse_ipv6=false -Dbuild_man=false . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib GETTEXTDATADIR=$MINGWPREFIX/share/gettext ninja -Cbuild_both install &&
+ #PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
