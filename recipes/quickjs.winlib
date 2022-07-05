@@ -1,0 +1,57 @@
+export NAME="QuickJS"
+export STATUS=
+export URL=https://bellard.org/quickjs/
+export BASENAME=quickjs
+export DESCRIPTION="QuickJS is a small and embeddable Javascript engine. It supports the ES2020 specification including modules, asynchronous generators, proxies and BigInt."
+export CATEGORY=development
+export TYPE=library
+export VERSION=2021-03-27
+export VERSIONDATE=20220705
+wl-showstatus --package-version
+export DEPENDANCIES=pthreads
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/bellard/quickjs/tags"
+export DOWNLOADURL="https://bellard.org/quickjs/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://bellard.org/quickjs/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix Makefile
+patch -ulbf Makefile << EOF
+@@ -220,3 +220,3 @@
+ qjscalc: qjs
+-       ln -sf \$< \$@
++$(echo -e '\t')cp -f \$<\$(EXE) \$@\$(EXE)
+
+@@ -301,5 +301,5 @@
+        mkdir -p "\$(DESTDIR)\$(prefix)/bin"
+-       \$(STRIP) qjs qjsc
+-       install -m755 qjs qjsc "\$(DESTDIR)\$(prefix)/bin"
+-       ln -sf qjs "\$(DESTDIR)\$(prefix)/bin/qjscalc"
++$(echo -e '\t')\$(STRIP) qjs\$(EXE) qjsc\$(EXE)
++$(echo -e '\t')install -m755 qjs\$(EXE) qjsc\$(EXE) "\$(DESTDIR)\$(prefix)/bin"
++$(echo -e '\t')cp -f qjs\$(EXE) "\$(DESTDIR)\$(prefix)/bin/qjscalc\$(EXE)"
+        mkdir -p "\$(DESTDIR)\$(prefix)/lib/quickjs"
+EOF
+wl-showstatus build-install &&
+ make install prefix=$INSTALLPREFIX CC=${CC:-gcc} STRIP=strip CONFIG_WIN32=1 $( if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "CONFIG_M32=1"; fi) &&
+ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+  ( echo "EXPORTS" && nm -f posix --defined-only -p libquickjs.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > quickjs.def
+ else
+  ( echo "EXPORTS" && nm -f posix --defined-only -p libquickjs.a | sed -n -e "s/^\(_\|\)\([^ ]*\) T .*$/\2/p" ) > quickjs.def
+ fi &&
+ ${CC:-gcc} -shared -s -mwindows -def quickjs.def -o quickjs.dll libquickjs.a -Wl,--out-implib,libquickjs.dll.a &&
+ #( echo "EXPORTS" && nm -f posix --defined-only -p libquickjs.lto.a | sed -n -e "s/^\(_\|\)\([^ ]*\) T .*$/\2/p" ) > quickjs.lto.def &&
+ #${CC:-gcc} -shared -s -mwindows -def quickjs.lto.def -o quickjs.lto.dll libquickjs.lto.a -Wl,--out-implib,libquickjs.lto.dll.a &&
+ cp -u libquickjs.a libquickjs.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
