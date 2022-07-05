@@ -25,6 +25,34 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing fchdir in src/findlib/savecwd.c (version >= 13.0.0)
+patch -ulbf src/findlib/savecwd.c << EOF
+@@ -83,3 +83,7 @@
+    if (m_fd >= 0) {
++#ifdef _WIN32
++      if (1) {
++#else
+       if (fchdir(m_fd) != 0) {
++#endif
+          berrno be;
+EOF
+# fix missing Dmsg in src/findlib/namedpipe.c (version >= 13.0.0)
+patch -ulbf src/findlib/namedpipe.c << EOF
+@@ -44,2 +44,4 @@
+ # define Dmsg(level, ...) printf(__VA_ARGS__ )
++#else
++# define Dmsg(level, ...)
+ #endif
+EOF
+# fix redefinition of strcasecmp in src/win32/compat/compat.h (version >= 13.0.0)
+patch -ulbf src/win32/compat/compat.h << EOF
+@@ -179,3 +179,5 @@
+
++#ifndef strcasecmp
+ int strcasecmp(const char*, const char *);
++#endif
+ int gettimeofday(struct timeval *, struct timezone *);
+EOF
 # don't abort because of missing fork in configure (version >= 11.0.6)
 patch -ulbf configure << EOF
 @@ -28892,3 +28892,3 @@
@@ -50,8 +78,8 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
  #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-client-only --without-x --without-systemd CFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -I$PWD/src/win32/compat" CXXFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -I$PWD/src/win32/compat" &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-sqlite3=$MINGWPREFIX --with-postgresql=$MINGWPREFIX --without-x --without-systemd CFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -I$PWD/src/win32/compat" CXXFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -I$PWD/src/win32/compat" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-client-only --without-x --without-systemd CFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -D_POSIX_THREAD_SAFE_FUNCTIONS -I$PWD/src/win32/compat" CXXFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -D_POSIX_THREAD_SAFE_FUNCTIONS -I$PWD/src/win32/compat" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-sqlite3=$MINGWPREFIX --with-postgresql=$MINGWPREFIX --without-x --without-systemd CFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -D_POSIX_THREAD_SAFE_FUNCTIONS -I$PWD/src/win32/compat" CXXFLAGS="-DHAVE_WIN32 -DHAVE_MINGW -D_POSIX_THREAD_SAFE_FUNCTIONS -I$PWD/src/win32/compat" LDFLAGS="-Wl,--as-needed -lws2_32" &&
  #--with-mysql=$MINGWPREFIX/include/mariadb 
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
