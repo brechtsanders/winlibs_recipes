@@ -23,13 +23,53 @@ wl-wait4deps
 wl-showstatus extract
 tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
-wl-showstatus build &&
- #make -f common.mk CC=${CC:-gcc} CFLAGS="-DNT -O3" TARGET="-s -o jam0.exe" &&
- #JAM_TOOLSET=MINGW make -fbuilds/win32-gcc.mk &&
- #( JAM_TOOLSET=MINGW make -fbuilds/win32-gcc.mk || ( unzip -oq $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip && mv -f jam.exe jam0.exe )) &&
- ( JAM_TOOLSET=MINGW make -fbuilds/win32-gcc.mk || (( unzip -oq $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip || 'C:\Program Files\7-Zip\7z.exe' x $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip ) && mv -f jam.exe jam0.exe )) &&
- ./jam0 JAM_TOOLSET=MINGW &&
- strip bin.nt*/*.exe &&
+#wl-showstatus build &&
+# #make -f common.mk CC=${CC:-gcc} CFLAGS="-DNT -O3" TARGET="-s -o jam0.exe" &&
+# #JAM_TOOLSET=MINGW make -fbuilds/win32-gcc.mk &&
+# #( JAM_TOOLSET=MINGW make -fbuilds/win32-gcc.mk || ( unzip -oq $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip && mv -f jam.exe jam0.exe )) &&
+# ( JAM_TOOLSET=MINGW make -fbuilds/win32-gcc.mk || (( unzip -oq $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip || 'C:\Program Files\7-Zip\7z.exe' x $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip ) && mv -f jam.exe jam0.exe )) &&
+# ./jam0 JAM_TOOLSET=MINGW &&
+# strip bin.nt*/*.exe &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# cp -f bin.nt*/*.exe $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# fix segmentation fault in filent.c (version >= 2.5.2)
+patch -ulbf filent.c << EOF
+@@ -47,2 +47,5 @@
+ # include <sys/stat.h>
++# ifdef __MINGW32__
++#  include <windows.h>
++# endif
+
+@@ -112,2 +115,17 @@
+        }
++# elif defined(__MINGW32__)
++       HANDLE dirhandle;
++       WIN32_FIND_DATAA direntry;
++       dirhandle = FindFirstFileA( filespec, &direntry );
++       if (dirhandle != INVALID_HANDLE_VALUE) {
++           do {
++               f.f_base.ptr = direntry.cFileName;
++               f.f_base.len = strlen( direntry.cFileName );
++
++               path_build( &f, filename, 0 );
++
++               (*func)( closure, filename, 1 /* stat()'ed */, finfo->time_write );
++           } while (FindNextFileA( dirhandle, &direntry ));
++           FindClose( dirhandle );
++       }
+ # else
+EOF
+## don't strip executable
+#sed -i.bak -e "s/if \$(JAM_TOOLSET) = MINGW/&_SKIP/" Jamfile
+# use prebuilt binary
+( unzip -oq $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip || 'C:\Program Files\7-Zip\7z.exe' x $TARBALLDIR/$BASENAME/ftjam-$VERSION-win32.zip ) && mv -f jam.exe jam0.exe
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DNT -O0 -g" LDFLAGS="-Wl,--stack,0x100000000" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DNT" LDFLAGS="-s" &&
+ wl-showstatus build &&
+ make JAM_TOOLSET=MINGW &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/bin &&
  cp -f bin.nt*/*.exe $INSTALLPREFIX/bin/ &&
