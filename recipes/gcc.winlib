@@ -293,8 +293,8 @@ export TYPE=application
 #export VERSIONDATE=20220222
 #export VERSION=11-20220409
 #export VERSIONDATE=20220416
-export VERSION=11.3.0
-export VERSIONDATE=20220421
+#export VERSION=11.3.0
+#export VERSIONDATE=20220421
 #export VERSION=12-20211205
 #export VERSIONDATE=20211206
 #export VERSION=12-20220123
@@ -305,8 +305,10 @@ export VERSIONDATE=20220421
 #export VERSIONDATE=20220228
 #export VERSION=12-20220417
 #export VERSIONDATE=20220418
-#export VERSION=12.1.0
-#export VERSIONDATE=20220506
+export VERSION=12.1.0
+export VERSIONDATE=20220506
+#export VERSION=12-20220528
+#export VERSIONDATE=20220601
 wl-showstatus --package-version
 export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl
 export OPTIONALDEPENDANCIES=libbacktrace
@@ -796,6 +798,7 @@ mkdir -p build_mingw &&
  #--enable-languages=ada 
  #--enable-default-ssp 
  #--enable-default-pie (doesn't seem to work)
+ #CFLAGS="-D__USE_MINGW_ACCESS" CXXFLAGS="-D__USE_MINGW_ACCESS" 
  ####configure: error: GNAT is required to build ada
  #--with-native-system-header-dir=/$(echo $(pwd)/mingw-w64|sed -e "s?[^/]*?..?g")$MINGWPREFIX/share/mingw-w64/include 
  #CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/mman-win32" CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" LDFLAGS_FOR_TARGET="-Wl,--as-needed -lmman" 
@@ -859,7 +862,9 @@ mkdir -p build_mingw &&
  rm -f $(find $INSTALLPREFIX -name '*.la') &&
  # fix absolute path
  sed -i -e "s?$INSTALLPREFIX/share/gcc?\$(realpath \$(dirname \$0)/../../../../..)?" $INSTALLPREFIX/share/gcc/libexec/gcc/*/*/install-tools/mkheaders &&
- sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX//share/gcc/lib/libstdc++.dll.a-gdb.py &&
+ sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc/lib/libstdc++.dll.a-gdb.py &&
+ ## when using --enable-version-specific-runtime-libs
+ #sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc/lib/gcc/*/*/libstdc++.dll.a-gdb.py &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####To get all configure parameters: rm -f configure_help && for F in $(find -name configure); do ( echo "[$F]" && $F --help ) >> configure_help; done
 
@@ -1321,11 +1326,12 @@ echo -e "#include <iostream>\n#if defined(__clang__)\n#define COMPILERNAME \"cla
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98860 (GCC11 prerelease bootstrap failure)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=97618 / https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99401 (undefined references to LC0/LC1/LC2/LC3) -> resolved in version 11.1.0
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99913 (GCC11 windows 32-bit build issues)
-# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100160 (-fopenmp -foffload=nvptx-none looks for libgomp-plugin-nvptx.so.1 instead of libgomp-plugin-nvptx-1.dll)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104654 (undefined PTHREAD_ONCE_INIT/pthread_key_t/pthread_once_t in libphobos/libdruntime/gcc/gthread.d when building D language)
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100160 (-fopenmp -foffload=nvptx-none looks for libgomp-plugin-nvptx.so.1 instead of libgomp-plugin-nvptx-1.dll)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104659 (undefined msvcUsedUCRT in libphobos/libdruntime/config/mingw/msvc.c)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105302 (GCC12 building gccgo)
-# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105506 (GCC12 first release: fatal error: cannot execute 'cc1': CreateProcess: No such file or directory)
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105506 (GCC12 first release (UCRT): fatal error: cannot execute 'cc1': CreateProcess: No such file or directory)
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105858 (GCC12 first release (64-bit): build_mingw/x86_64-w64-mingw32/libstdc++-v3/include/ext/enc_filebuf.h:63:1: fatal error: cannot write PCH file: required memory segment unavailable)
 # -fstack-protector need -lssp_nonshared -lssp -> https://sourceware.org/legacy-ml/gdb-patches/2019-12/msg00795.html
 # --enable-offload-targets doesn't work when using ucrt
 
@@ -1339,3 +1345,10 @@ echo -e "#include <iostream>\n#if defined(__clang__)\n#define COMPILERNAME \"cla
 
 
 # mingw-w64-ucrt-x86_64 -> x86_64-w64-mingw32ucrt
+
+# enable DEP and ASLR
+#LDFLAGS="-Wl,--nxcompat -Wl,--disable-auto-image-base -Wl,--dynamicbase -Wl,--high-entropy-va -Wl,--image-base,0x180000000" #Wl,--enable-auto-image-base
+# the following breaks building of boost
+#export CC="gcc.exe -Wl,--nxcompat -Wl,--disable-auto-image-base -Wl,--large-address-aware -Wl,--dynamicbase -Wl,--high-entropy-va"
+#export CXX="g++.exe -Wl,--nxcompat -Wl,--disable-auto-image-base -Wl,--large-address-aware -Wl,--dynamicbase -Wl,--high-entropy-va"
+#export LD="ld.exe --nxcompat --disable-auto-image-base --large-address-aware --dynamicbase --high-entropy-va"
