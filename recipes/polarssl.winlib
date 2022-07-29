@@ -102,7 +102,8 @@ export VERSIONDATE=20141023
 wl-showstatus --package-version
 export DEPENDANCIES=zlib
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=
 export LICENSETYPE=
 #export DOWNLOADURL="http://polarssl.org/code/releases/ polarssl- -gpl.tgz"
@@ -147,25 +148,37 @@ cd $BASENAME-$VERSION
 #+#if defined(_WIN32) && !defined(__MINGW32__)
 # #include <strsafe.h>
 #EOF
-# build static+shared (version >= 1.0.0)
-wl-showstatus configure &&
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=OFF . &&
-cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=OFF -DENABLE_ZLIB_SUPPORT:BOOL=ON . &&
- wl-showstatus build-install &&
- ( make -j1 -Clibrary install/strip || make -j1 -Clibrary install ) &&
+## build static+shared (version >= 1.0.0)
+#wl-showstatus configure &&
+##cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=OFF . &&
+#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=OFF -DENABLE_ZLIB_SUPPORT:BOOL=ON . &&
+# wl-showstatus build-install &&
+# ( make -j1 -Clibrary install/strip || make -j1 -Clibrary install ) &&
+# wl-showstatus configure &&
+# rm -f CMakeCache.txt &&
+# #make -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SHARED_LINKER_FLAGS:String="-Wl,--as-needed -lws2_32" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" -DCMAKE_MODULE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=ON . &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=ON -DENABLE_ZLIB_SUPPORT:BOOL=ON . &&
+# wl-showstatus build-install &&
+# ## fix missing -lws2_32
+# #sed -i.bak -e "s/\(-lkernel32 -luser32\)/-Wl,--as-needed \1 -lws2_32/g" $(grep -l "\-lkernel32 -luser32" `find . -iname build.make`) &&
+# ( make -j1 install/strip || make -j1 install ) &&
+# mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+#    echo OK
+mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- rm -f CMakeCache.txt &&
- #make -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SHARED_LINKER_FLAGS:String="-Wl,--as-needed -lws2_32" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" -DCMAKE_MODULE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=ON . &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=ON -DENABLE_ZLIB_SUPPORT:BOOL=ON . &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=OFF -DENABLE_ZLIB_SUPPORT:BOOL=ON -DENABLE_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_SHARED_POLARSSL_LIBRARY:BOOL=ON -DENABLE_ZLIB_SUPPORT:BOOL=ON -DENABLE_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- ## fix missing -lws2_32
- #sed -i.bak -e "s/\(-lkernel32 -luser32\)/-Wl,--as-needed \1 -lws2_32/g" $(grep -l "\-lkernel32 -luser32" `find . -iname build.make`) &&
- ( make -j1 install/strip || make -j1 install ) &&
- mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####replaced by mbed TLS
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/bin/polarssl &&
+ mv -f $INSTALLPREFIX/bin/*.exe $INSTALLPREFIX/bin/polarssl/ &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####replaced by mbed TLS?
 
 
 
