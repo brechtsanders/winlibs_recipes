@@ -25,12 +25,14 @@ export TYPE=library
 #export VERSION=2.3.0
 #export VERSIONDATE=20210528
 ####vendor/kazhdan/SparseMatrix.inl:310:34: error: 'omp' was not declared in this scope
-export VERSION=2.4.0
-export VERSIONDATE=20220326
+#export VERSION=2.4.0
+#export VERSIONDATE=20220326
 #export VERSION=2.4.1
 #export VERSIONDATE=20220520
 #export VERSION=2.4.2
 #export VERSIONDATE=20220607
+export VERSION=2.4.3
+export VERSIONDATE=20220806
 wl-showstatus --package-version
 export DEPENDANCIES=zstd,libxml2,openssl,laszip,gdal,libgeotiff,zlib,xz,libcurl,postgresql
 export OPTIONALDEPENDANCIES=
@@ -59,6 +61,48 @@ for F in io/Ilvis2MetadataReader.cpp pdal/Polygon.cpp pdal/Polygon.cpp pdal/Geom
  echo "#include <stdlib.h>" > $F &&
  cat $F.bak >> $F
 done
+# fix pdal/util/FileUtils.cpp (version >= 2.4.3)
+patch -ulbf pdal/util/FileUtils.cpp << EOF
+@@ -236,3 +236,3 @@
+         {
+-            files.push_back(fromNative(it->path()));
++            files.push_back(fromNative(it->path().string().c_str()));
+             it++;
+@@ -542,3 +542,3 @@
+
+-#ifndef _WIN32
++#if !defined(_WIN32) || defined(__MINGW32__)
+     ctx.m_fd = ::open(filename.c_str(), readOnly ? O_RDONLY : O_RDWR);
+EOF
+ fix apps/pdal.cpp (version >= 2.4.3)
+patch -ulbf apps/pdal.cpp << EOF
+@@ -303,3 +303,3 @@
+
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+ int wmain( int argc, wchar_t *argv[ ], wchar_t *envp[ ] )
+EOF
+# fix apps/CMakeLists.txt (version >= 2.4.3)
+patch -ulbf apps/CMakeLists.txt << EOF
+@@ -32,5 +32,5 @@
+
+-IF(WIN32)
++IF(MSVC)
+     target_link_options(\${PDAL_APP} PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wmainCRTStartup)
+-endif(WIN32)
++endif(MSVC)
+
+EOF
+# fix dimbuilder/CMakeLists.txt (version >= 2.4.3)
+patch -ulbf dimbuilder/CMakeLists.txt << EOF
+@@ -36,4 +36,4 @@
+
+-if (WIN32)
++if (MSVC)
+     target_link_options(dimbuilder PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:mainCRTStartup)
+-endif(WIN32)
++endif(MSVC)
+EOF
 ## also allow building static libraries
 #sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" cmake/macros.cmake cmake/pluginmacros.cmake
 #sed -i.bak -e "s/^set(PDAL_LIB_TYPE \"SHARED\")/#&/" cmake/libraries.cmake
