@@ -492,11 +492,10 @@ export TYPE=library
 #export VERSIONDATE=20220628
 #export VERSION=4.4.1
 #export VERSIONDATE=20220629
-export VERSION=5.0.1
-export VERSIONDATE=20220724
-#export VERSION=5.1.0
-#export VERSIONDATE=20220801
-####OSError: [WinError 1] Incorrect function: '..\\src\\hb-aat-layout.cc'
+#export VERSION=5.0.1
+#export VERSIONDATE=20220724
+export VERSION=5.1.0
+export VERSIONDATE=20220801
 #### Bug reported: https://github.com/harfbuzz/harfbuzz/issues/3776
 wl-showstatus --package-version
 #export DEPENDANCIES=glib2,cairo,freetype2,icu,graphite2,gettext
@@ -543,6 +542,42 @@ cd $BASENAME-$VERSION
 #+#endif
 #
 #EOF
+# fix src/gen-harfbuzzcc.py (version = 5.1.0)
+####OSError: [WinError 1] Incorrect function: '..\\src\\hb-aat-layout.cc'
+patch -ulbf src/gen-harfbuzzcc.py << EOF
+@@ -4,6 +4,3 @@
+
+-import shutil
+-import sys
+-
+-from pathlib import Path
++import os, sys, shutil
+
+@@ -12,14 +9,16 @@
+
+-OUTPUT = Path (sys.argv[1])
+-CURRENT_SOURCE_DIR = Path (sys.argv[2])
++OUTPUT = sys.argv[1]
++CURRENT_SOURCE_DIR = sys.argv[2]
+
+ # make sure input files are unique
+-sources = [Path(x) for x in sorted(set(sys.argv[3:]))]
++sources = sorted(set(sys.argv[3:]))
+
+ with open (OUTPUT, "wb") as f:
+-       f.write ("".join ('#include "{}"\\n'.format (p.resolve ().relative_to (CURRENT_SOURCE_DIR)) for p in sources if p.suffix == ".cc").encode ())
++       f.write ("".join ('#include "{}"\\n'.format (os.path.relpath (os.path.abspath (x), CURRENT_SOURCE_DIR)) for x in sources if x.endswith (".cc")).encode ())
+
+ # copy it also to the source tree, but only if it has changed
+-baseline = CURRENT_SOURCE_DIR / OUTPUT.name
+-if baseline.read_bytes() != OUTPUT.read_bytes():
+-       shutil.copyfile (OUTPUT, baseline)
++baseline_filename = os.path.join (CURRENT_SOURCE_DIR, os.path.basename (OUTPUT))
++with open(baseline_filename, "rb") as baseline:
++       with open(OUTPUT, "rb") as generated:
++               if baseline.read() != generated.read():
++                       shutil.copyfile (OUTPUT, baseline_filename)
+EOF
 # fix MSVC issue
 mkdir -p winfix
 cp -rf $PYDIR/lib/distutils winfix/
