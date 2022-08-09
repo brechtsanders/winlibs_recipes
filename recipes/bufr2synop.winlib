@@ -1,0 +1,90 @@
+export NAME="bufr2synop"
+export STATUS=
+export URL=https://github.com/gbvalor/bufr2synop
+export BASENAME=bufr2synop
+export DESCRIPTION="Decode and get meteorological reports in Traditional Alphanumeric Code format from binary BUFR."
+export CATEGORY=fileformat
+export TYPE=application
+#export VERSION=0.15.0
+#export VERSIONDATE=20220608
+#export VERSION=0.16.0
+#export VERSIONDATE=20220807
+export VERSION=0.17.0
+export VERSIONDATE=20220809
+####Cannot found ECMWF BUFR library.  Please install it
+wl-showstatus --package-version
+export DEPENDANCIES=date-time
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/gbvalor/bufr2synop/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/gbvalor/bufr2synop/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing exp10() (version >= 0.17.0)
+sed -i.bak -e "s/exp10\(\s*(\s*\)/pow\110.0, /g" $(grep -l exp10 $(find -name '*.c'))
+# fix missing S_ISLNK in src/bufrdeco/bufrdeco_read.c (version >= 0.17.0)
+sed -i.bak -e "s/^.*S_ISLNK\s*(/#ifndef S_ISLNK\n#define S_ISLNK(mode) 0\n#endif\n&/" src/bufrdeco/bufrdeco_read.c
+# fix missing strptime/strftime (version >= 0.17.0)
+for F in $(grep "str[pf]time" -lw $(find -name '*.c')); do
+mv $F $F.bak2
+cat > $F << EOF
+#ifdef _WIN32
+#include <stdint.h>
+#define bool int
+#include <time_local.h>
+#endif
+EOF
+sed -e "s/str[pf]time/ya_&/g" $F.bak2 >> $F
+done
+# fix missing setenv() in src/libraries/bufr2tac_synop.c (version >= 0.17.0)
+patch -ulbf src/libraries/bufr2tac_synop.c << EOF
+@@ -51,2 +51,3 @@
+
++#ifndef _WIN32
+   // Get current TZ
+@@ -62,2 +63,3 @@
+   tzset();
++#endif
+
+@@ -72,2 +74,3 @@
+   // Revert TZ changes
++#ifndef _WIN32
+   if ( tz[0] )
+@@ -81,2 +84,3 @@
+     }
++#endif
+
+EOF
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS" LDFLAGS="-Wl,--as-needed" LIBS="-ldate_time" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+##export BUILDDEPENDANCIES=cmake,ninja
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

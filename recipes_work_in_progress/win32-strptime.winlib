@@ -1,0 +1,53 @@
+export NAME="win32-strptime"
+export STATUS=
+export URL=http://cvsweb.netbsd.org/bsdweb.cgi/src/lib/libc/time/strptime.c
+export BASENAME=win32-strptime
+export DESCRIPTION="strptime() implementation on Windows"
+export CATEGORY=system
+export TYPE=library
+export VERSION=1.63
+export VERSIONDATE=20220908
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=BSD
+export DOWNLOADURL="http://cvsweb.netbsd.org/bsdweb.cgi/src/lib/libc/time/strptime.c ?r1="
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL="http://cvsweb.netbsd.org/bsdweb.cgi/~checkout~/src/lib/libc/time/strptime.c?content-type=text/plain&rev=$VERSION"
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+mkdir $BASENAME-$VERSION
+cp -f $TARBALLDIR/$BASENAME/*=$VERSION $BASENAME-$VERSION/win32strptime.c
+cd $BASENAME-$VERSION
+# generate header file
+grep "^strptime.*(.*)" win32strptime.c -B1 | sed -e "s/)$/&;/; s/^-*$//" > win32strptime.h
+mkdir -p sys
+touch namespace.h setlocale_local.h sys/localedef.h
+cat > private.h << EOF
+#define u_char unsigned char
+#define uint unsigned int
+EOF
+wl-showstatus build &&
+ ${CC:-gcc} -c -o win32strptime.o win32strptime.c -I. -O3 &&
+ ar cru libwin32strptime.a win32strptime.o &&
+ #( echo "EXPORTS"; sed -n -e "s/^.* \**\(win32strptime_.*\) *(.*$/\1/p" win32strptime.h ) > win32strptime.def &&
+ #( echo "EXPORTS"; ${CC:-gcc} -E win32strptime.h | sed -n -e "s/(.*//p"|sed -n -e "s/^.*\(win32strptime_[^ *]*\).*/\1/p" ) > win32strptime.def &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libwin32strptime.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > win32strptime.def &&
+ ${CC:-gcc} -shared -s -mwindows -def win32strptime.def -o win32strptime.dll libwin32strptime.a -Wl,--out-implib,libwin32strptime.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
