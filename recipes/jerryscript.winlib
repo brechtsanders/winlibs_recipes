@@ -1,0 +1,66 @@
+export NAME="JerryScript"
+export STATUS=
+export URL=https://jerryscript.net/
+#export URL=https://github.com/jerryscript-project/jerryscript
+export BASENAME=jerryscript
+export DESCRIPTION="JerryScript is a lightweight JavaScript engine for resource-constrained devices such as microcontrollers."
+export CATEGORY=development
+export TYPE=library
+export VERSION=2.4.0
+export VERSIONDATE=20220808
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/jerryscript-project/jerryscript/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/jerryscript-project/jerryscript/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix jerry-ext/handle-scope/handle-scope-allocator.c (version >= 2.4.0)
+patch -ulbf jerry-ext/handle-scope/handle-scope-allocator.c << EOF
+@@ -128,3 +128,3 @@
+   }
+-  long idx = JERRYX_HANDLE_SCOPE_PRELIST_IDX (scope);
++  long long idx = JERRYX_HANDLE_SCOPE_PRELIST_IDX (scope);
+   if (idx < 0)
+EOF
+# fix jerry-port/default/default-module.c (version >= 2.4.0)
+patch -ulbf jerry-port/default/default-module.c << EOF
+@@ -129,3 +129,3 @@
+     _splitpath_s (base_file_p, drive, _MAX_DRIVE, dir_p, _MAX_DIR, NULL, 0, NULL, 0);
+-    const size_t drive_len = strnlen (&drive, _MAX_DRIVE);
++    const size_t drive_len = strnlen ((char*)&drive, _MAX_DRIVE);
+     const size_t dir_len = strnlen (dir_p, _MAX_DIR);
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DDOCTESTS:BOOL=OFF -DUNITTESTS:BOOL=OFF -S. -Bbuild_static &&
+ #wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS:BOOL=ON -DDOCTESTS:BOOL=OFF -DUNITTESTS:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ ## manually build shared libraries
+ #wl-showstatus build &&
+ #for F in $INSTALLPREFIX/lib/*.a; do
+ # ( echo "EXPORTS" && nm -f posix --defined-only -p $F | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > $(basename $F|sed -e "s/\.a$//").def &&
+ # ${CC:-gcc} -shared -s -mwindows -def $(basename $F|sed -e "s/\.a$//").def -o $INSTALLPREFIX/bin/$(basename $F|sed -e "s/\.a$//").dll $F -Wl,--out-implib,$INSTALLPREFIX/lib/$(basename $F|sed -e "s/\.a$//").dll.a
+ # #${CC:-gcc} -shared -s -mwindows -def $(basename $F|sed -e "s/\.a$//").def -o $INSTALLPREFIX/bin/$(basename $F|sed -e "s/\.a$//").dll $INSTALLPREFIX/lib/*.a -Wl,--out-implib,$INSTALLPREFIX/lib/$(basename $F|sed -e "s/\.a$//").dll.a
+ #done &&
+ #${CC:-gcc} -shared -s -mwindows -def libjerry-core.def -o $INSTALLPREFIX/bin/libjerry-core.dll $INSTALLPREFIX/lib/libjerry-core.a -Wl,--out-implib,$INSTALLPREFIX/lib/libjerry-core.dll.a
+ #${CC:-gcc} -shared -s -mwindows -def libjerry-ext.def -o $INSTALLPREFIX/bin/libjerry-ext.dll $INSTALLPREFIX/lib/libjerry-ext.a -Wl,--out-implib,$INSTALLPREFIX/lib/libjerry-ext.dll.a
+ #${CC:-gcc} -shared -s -mwindows -def libjerry-port-default.def -o $INSTALLPREFIX/bin/libjerry-port-default.dll $INSTALLPREFIX/lib/libjerry-port-default.a -Wl,--out-implib,$INSTALLPREFIX/lib/libjerry-port-default.dll.a
+ #wl-showstatus install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build shared libraries
+
+
+
