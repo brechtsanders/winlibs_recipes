@@ -92,8 +92,12 @@ export VERSIONDATE=20211113
 #export VERSION=1.0.14
 #export VERSIONDATE=20220522
 ####src/marshal.c:24:10: fatal error: sys/queue.h: No such file or directory
+#export VERSION=1.0.15
+#export VERSIONDATE=20220818
+####lldpd-structs.h:42:10: fatal error: netinet/if_ether.h: No such file or directory
 wl-showstatus --package-version
 export DEPENDANCIES=libxml2,libjansson,libevent,netsnmp
+#export DEPENDANCIES=libxml2,libjansson,libevent,netsnmp,sys_queue_h
 export OPTIONALDEPENDANCIES=
 export BUILDDEPENDANCIES=
 export LICENSEFILE=README.md
@@ -729,7 +733,6 @@ patch -ulbf src/client/commands.c << EOF
 +#endif
                         if (rc == -1) goto end;
 EOF
-wl-showstatus configure &&
 ## fix building DLLs on 64-bit
 #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
 # echo "AM_GNU_GETTEXT_VERSION(`gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/"`)" >> configure.ac &&
@@ -738,6 +741,7 @@ wl-showstatus configure &&
 # fix missing extension in src/client/Makefile
 mv src/client/Makefile.in src/client/Makefile.in.bak
 sed -e "s/\(rm -f lldpctl\)/\1\$(EXEEXT)/; s/\(lldpcli\)\( lldpctl\)/\1\$(EXEEXT)\2\$(EXEEXT)/" src/client/Makefile.in.bak > src/client/Makefile.in
+wl-showstatus preconfigure &&
 autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
 # avoid supported OS detection failure
 patch -ulbf configure << EOF
@@ -751,15 +755,18 @@ patch -ulbf configure << EOF
 EOF
 # don't use -fstack-protector compiler flags (version >= 0.7.9)
 sed -i.bak -e "s/\(-fstack-protector\)/\1BAD/g" configure
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-readline --with-snmp --with-xml --without-json CFLAGS="-I`pwd`/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -lintl" &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-readline --with-snmp --with-xml CFLAGS="-I`pwd`/winfix" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -Wl,-lws2_32 -Wl,-lintl" &&
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-readline --with-snmp --with-xml --without-json CFLAGS="-I`pwd`/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -lintl" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-readline --with-snmp --with-xml CFLAGS="-I$PWD/winfix" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -Wl,-lws2_32 -Wl,-lintl" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-readline --with-snmp --with-xml CFLAGS="-I$PWD/winfix -I$MINGWPREFIX/win32ports/include" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -Wl,-lws2_32 -Wl,-lintl" &&
  wl-showstatus build-install &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  #( ( make && make install-strip ) || ( make -Csrc/lib install-strip && make -Csrc/client && mkdir -p $INSTALLPREFIX/sbin && cp -f src/client/lldpcli.exe $INSTALLPREFIX/sbin/ && make -j1 -Csrc/client install-strip ) ) &&
- (( make CC="${CC:-gcc} -I$(pwd)/winfix" && make install-strip CC="${CC:-gcc} -I$(pwd)/winfix" ) || ( make -Csrc/lib install-strip CC="${CC:-gcc} -I$(pwd)/winfix" && make -Csrc/client CC="${CC:-gcc} -I$(pwd)/winfix" && mkdir -p $INSTALLPREFIX/sbin && cp -f src/client/lldpcli.exe $INSTALLPREFIX/sbin/ && make -j1 -Csrc/client install-strip CC="${CC:-gcc} -I$(pwd)/winfix" )) &&
+ (( make CC="${CC:-gcc} -I$PWD/winfix" && make install-strip CC="${CC:-gcc} -I$PWD/winfix" ) || ( make -Csrc/lib install-strip CC="${CC:-gcc} -I$PWD/winfix" && make -Csrc/client CC="${CC:-gcc} -I$PWD/winfix" && mkdir -p $INSTALLPREFIX/sbin && cp -f src/client/lldpcli.exe $INSTALLPREFIX/sbin/ && make -j1 -Csrc/client install-strip CC="${CC:-gcc} -I$PWD/winfix" )) &&
+ #(( make CC="${CC:-gcc} -I$PWD/winfix -I$MINGWPREFIX/win32ports/include" && make install-strip CC="${CC:-gcc} -I$PWD/winfix -I$MINGWPREFIX/win32ports/include" ) || ( make -Csrc/lib install-strip CC="${CC:-gcc} -I$PWD/winfix -I$MINGWPREFIX/win32ports/include" && make -Csrc/client CC="${CC:-gcc} -I$PWD/winfix -I$MINGWPREFIX/win32ports/include" && mkdir -p $INSTALLPREFIX/sbin && cp -f src/client/lldpcli.exe $INSTALLPREFIX/sbin/ && make -j1 -Csrc/client install-strip CC="${CC:-gcc} -I$PWD/winfix -I$MINGWPREFIX/win32ports/include" )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
 ####$MINGWPREFIX/sbin/lldpcli.exe --version
 ####TO DO: also build src/daemon
