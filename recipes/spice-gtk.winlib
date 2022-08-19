@@ -63,11 +63,10 @@ export TYPE=application
 #export VERSIONDATE=20200316
 #export VERSION=0.39
 #export VERSIONDATE=20201202
-export VERSION=0.40
-export VERSIONDATE=20220210
-#export VERSION=0.41
-#export VERSIONDATE=20220712
-####python.exe: can't open file 'python': [Errno 2] No such file or directory
+#export VERSION=0.40
+#export VERSIONDATE=20220210
+export VERSION=0.41
+export VERSIONDATE=20220712
 wl-showstatus --package-version
 export DEPENDANCIES=spice-protocol,pulseaudio,gstreamer,gst-plugins-base,polkit,dbus,libusb,liblz4,gtk3,libcacard,libjpeg,phodav
 export OPTIONALDEPENDANCIES=celt
@@ -133,10 +132,15 @@ mkdir -p build_both &&
  sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
  # fix missing undefined references to libepoxy symbols (version >= 0.39)
  sed -i.bak2 -e "s/^\s*LINK_ARGS\s*=.*-Wl,--end-group\(\"*\)/& \1-Wl,--as-needed\1 \1-lepoxy\1/" build_both/build.ninja &&
- ## fix issue calling Python (version >= 0.41)
- #sed -i.bak -e "s/\(python\.exe\" \)\"python\" //" build_both/build.ninja &&
+ # fix issue calling Python (version >= 0.41)
+ sed -i.bak3 -e "s/\(python\.exe\" \)\"python\" //g" build_both/build.ninja &&
+ # fix issue with Python path (version >= 0.41)
+ sed -i.bak4 -e "s/\"$(cygpath -w $PYDIR|sed -e 's/\\/&&/g')\\\\\(\"[^ ]\)/\1/g" build_both/build.ninja &&
+ # fix issue with keymap-gen (version >= 0.41)
+ sed -i.bak5 -e "s?\(\"--\"\) \(\"[^\"]*keymap-gen\"\)?\1 \"$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&/g')\" \2?g" build_both/build.ninja &&
  wl-showstatus build-install &&
- PATH=$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/python:$MINGWPREFIX/python/Lib/site-packages:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both install &&
  #PATH=$PATH:$PYDIR PKG_CONFIG= PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/python/Lib/site-packages:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: build Windows application (alongside console application)
