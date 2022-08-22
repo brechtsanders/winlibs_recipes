@@ -157,8 +157,10 @@ export TYPE=library
 #export VERSIONDATE=20211019
 #export VERSION=1.47.0
 #export VERSIONDATE=20220223
-export VERSION=1.48.0
-export VERSIONDATE=20220625
+#export VERSION=1.48.0
+#export VERSIONDATE=20220625
+export VERSION=1.49.0
+export VERSIONDATE=20220822
 wl-showstatus --package-version
 export DEPENDANCIES=zlib,libxml2,libev,libjansson,jemalloc,boost,openssl,c-ares
 export OPTIONALDEPENDANCIES=spdylay
@@ -175,11 +177,37 @@ wl-wait4deps
 wl-showstatus extract
 tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
+# fix missing gmtime_r/localtime_r in src/util.cc (version >= 1.49.0)
+patch -ulbf src/util.cc << EOF
+@@ -24,2 +24,5 @@
+  */
++#ifdef _WIN32
++#define _POSIX_THREAD_SAFE_FUNCTIONS
++#endif
+ #include "util.h"
+@@ -470,2 +473,5 @@
+ time_t parse_openssl_asn1_time_print(const StringRef &s) {
++#ifdef _WIN32
++  return 0;
++#else
+   tm tm{};
+@@ -476,2 +482,3 @@
+   return nghttp2_timegm_without_yday(&tm);
++#endif
+ }
+@@ -1685,2 +1692,4 @@
+   return 0;
++#elif _WIN32
++  return -1;
+ #else  // !__APPLE__
+EOF
 # fix missing file (version >= 1.45.0)
 touch bpf/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED_LIB:BOOL=ON -DENABLE_STATIC_LIB:BOOL=ON -DENABLE_APP:BOOL=OFF -DENABLE_HPACK_TOOLS:BOOL=ON -DENABLE_ASIO_LIB:BOOL=OFF -DENABLE_THREADS:BOOL=ON -DENABLE_EXAMPLES:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ # fix missing link libraries (version >= 1.49.0)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  #cp -f $INSTALLPREFIX/lib/libnghttp2_static.a $INSTALLPREFIX/lib/libnghttp2.a &&
