@@ -1,0 +1,84 @@
+export NAME="IP2Location"
+export STATUS=
+export URL=https://www.ip2location.com/
+#export URL=https://github.com/chrislim2888/IP2Location-C-Library
+export BASENAME=ip2location
+export DESCRIPTION=""
+export CATEGORY=geo
+export TYPE=library
+export VERSION=8.5.1
+export VERSIONDATE=20220825
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=libdl
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/chrislim2888/IP2Location-C-Library/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/chrislim2888/IP2Location-C-Library/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd IP2Location-C-Library-$VERSION
+# fix missing getline and asprintf in ip2location.c
+mv ip2location.c ip2location.c.bak
+cat > ip2location.c << EOF
+#define _GNU_SOURCE	//needed for asprintf
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat ip2location.c.bak >> ip2location.c
+## avoid invalid linker flag -lrt
+#sed -i.bak -e "s/-lrt//" configure.ac
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lws2_32" &&
+ wl-showstatus build-install &&
+ make install-strip ip2location_LDADD= &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf IP2Location-C-Library-$VERSION
+
+
+
