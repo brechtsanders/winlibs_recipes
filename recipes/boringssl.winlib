@@ -19,7 +19,8 @@ export VERSIONDATE=20181019
 wl-showstatus --package-version
 export DEPENDANCIES=go,pthreads
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=LICENSE
 export LICENSETYPE=
 export DOWNLOADURL="https://boringssl.googlesource.com/boringssl/+refs"
@@ -130,30 +131,52 @@ sed -i.bak2 -e "s/-Werror\|-Wformat=2//g" CMakeLists.txt
 if ( echo $RUNPLATFORM | grep -q x86_64 ); then
  sed -i.bak -e "s/CMAKE_CL_64/& OR MINGW/" CMakeLists.txt
 fi
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
+# echo "-Wl,--as-needed -lws2_32" >> build_static/ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
+# echo "-Wl,--as-needed -lws2_32" >> build_static/tool/CMakeFiles/bssl.dir/linklibs.rsp &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
+# echo "-Wl,--as-needed -lws2_32" >> build_shared/ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
+# echo "-Wl,--as-needed -lws2_32" >> build_shared/tool/CMakeFiles/bssl.dir/linklibs.rsp &&
+# echo "-Wl,--as-needed -lws2_32" >> build_shared/crypto/CMakeFiles/crypto.dir/linklibs.rsp &&
+# wl-showstatus build &&
+# make -Cbuild_static &&
+# #wl-showstatus build-install &&
+# #make -Cbuild_static install/strip &&
+# wl-showstatus build &&
+# make -Cbuild_shared &&
+# strip build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe &&
+# #wl-showstatus build-install &&
+# #make -Cbuild_shared install/strip &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/boringssl/include/openssl $INSTALLPREFIX/boringssl/lib $INSTALLPREFIX/boringssl/bin &&
+# cp -rf include/* $INSTALLPREFIX/boringssl/include/openssl &&
+# cp -f build_*/*/*.a $INSTALLPREFIX/boringssl/lib/ &&
+# cp -f build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe $INSTALLPREFIX/boringssl/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cd build_static &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe .. &&
- echo "-Wl,--as-needed -lws2_32" >> ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
- echo "-Wl,--as-needed -lws2_32" >> tool/CMakeFiles/bssl.dir/linklibs.rsp &&
- cd .. &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
  wl-showstatus configure &&
- cd build_shared &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe .. &&
- echo "-Wl,--as-needed -lws2_32" >> ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
- echo "-Wl,--as-needed -lws2_32" >> tool/CMakeFiles/bssl.dir/linklibs.rsp &&
- echo "-Wl,--as-needed -lws2_32" >> crypto/CMakeFiles/crypto.dir/linklibs.rsp &&
- cd .. &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
  wl-showstatus build &&
- make -Cbuild_static &&
+ ninja -Cbuild_static &&
  #wl-showstatus build-install &&
- #make -Cbuild_static install/strip &&
+ #ninja -Cbuild_static install/strip &&
  wl-showstatus build &&
- make -Cbuild_shared &&
- strip build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe &&
+ ninja -Cbuild_shared &&
  #wl-showstatus build-install &&
- #make -Cbuild_shared install/strip &&
+ #ninja -Cbuild_shared install/strip &&
  wl-showstatus install &&
+ strip build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe &&
  mkdir -p $INSTALLPREFIX/boringssl/include/openssl $INSTALLPREFIX/boringssl/lib $INSTALLPREFIX/boringssl/bin &&
  cp -rf include/* $INSTALLPREFIX/boringssl/include/openssl &&
  cp -f build_*/*/*.a $INSTALLPREFIX/boringssl/lib/ &&
