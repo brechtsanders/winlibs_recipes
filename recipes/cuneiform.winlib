@@ -10,7 +10,8 @@ export VERSIONDATE=20180513
 wl-showstatus --package-version
 export DEPENDANCIES=imagemagick
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=cmake
+#export BUILDDEPENDANCIES=cmake
+export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=COPYING
 export LICENSETYPE=
 export DOWNLOADURL="https://launchpad.net/cuneiform-linux cuneiform-linux- .tar.bz2"
@@ -23,11 +24,9 @@ wl-showstatus extract
 tar xfj $TARBALLDIR/$BASENAME/cuneiform-linux-$VERSION.tar.bz2
 cd cuneiform-linux-$VERSION
 # fix missing GWL_HINSTANCE in cuneiform_src/Kern/fon/src/fon_snap.c
-mv cuneiform_src/Kern/fon/src/fon_snap.c cuneiform_src/Kern/fon/src/fon_snap.c.bak &&
-sed -e "s/GWL_HINSTANCE/GWLP_HINSTANCE/g" cuneiform_src/Kern/fon/src/fon_snap.c.bak > cuneiform_src/Kern/fon/src/fon_snap.c
+sed -i.bak -e "s/GWL_HINSTANCE/GWLP_HINSTANCE/g" cuneiform_src/Kern/fon/src/fon_snap.c
 # fix ambigous abs in cuneiform_src/Kern/rimage/sources/main/cricontrol.cpp
-mv cuneiform_src/Kern/rimage/sources/main/cricontrol.cpp cuneiform_src/Kern/rimage/sources/main/cricontrol.cpp.bak &&
-sed -e "s/abs(/&(long long)/g" cuneiform_src/Kern/rimage/sources/main/cricontrol.cpp.bak > cuneiform_src/Kern/rimage/sources/main/cricontrol.cpp
+sed -i.bak -e "s/abs(/&(long long)/g" cuneiform_src/Kern/rimage/sources/main/cricontrol.cpp
 # fix pointer to integer in cuneiform_src/Kern/ced/sources/main/wrapper.cpp
 patch -ulbf cuneiform_src/Kern/ced/sources/main/wrapper.cpp << EOF
 @@ -71 +71 @@
@@ -35,34 +34,26 @@ patch -ulbf cuneiform_src/Kern/ced/sources/main/wrapper.cpp << EOF
 +#define pointer_to_num(x) ((uintptr_t)reinterpret_cast<uintptr_t>(x))
 EOF
 # fix narrowing conversion issues in cuneiform_src/Kern/include/utf8-tables.h
-mv cuneiform_src/Kern/include/utf8-tables.h cuneiform_src/Kern/include/utf8-tables.h.bak &&
-sed -e "s/\([0-9]*,\s*\)\([0-9]*,\s*\)\([0-9]*,\s*\)\([0-9]\)/(char)\1(char)\2(char)\3(char)\4/g" cuneiform_src/Kern/include/utf8-tables.h.bak > cuneiform_src/Kern/include/utf8-tables.h
+sed -i.bak -e "s/\([0-9]*,\s*\)\([0-9]*,\s*\)\([0-9]*,\s*\)\([0-9]\)/(char)\1(char)\2(char)\3(char)\4/g" cuneiform_src/Kern/include/utf8-tables.h
 # fix pointer to integer in cuneiform_src/Kern/rout/src/rout_dll.cpp
-mv cuneiform_src/Kern/rout/src/rout_dll.cpp cuneiform_src/Kern/rout/src/rout_dll.cpp.bak &&
-sed -e "s/long\()\s*pData\)/intptr_t\1/g" cuneiform_src/Kern/rout/src/rout_dll.cpp.bak > cuneiform_src/Kern/rout/src/rout_dll.cpp
-# fix min/max in cuneiform_src/Kern/rfrmt/sources/main/*.cpp
-for F in cuneiform_src/Kern/rfrmt/sources/main/*.cpp; do
-mv $F $F.bak
-cat > $F << EOF
-#include <../../../include/minmax.h>
-#undef min
-#undef max
-#define min CPPmin
-#define max CPPmax
-#include <bits/stl_algobase.h>
-EOF
-cat $F.bak >> $F
-done
-mv -f cuneiform_src/Kern/rfrmt/sources/main/util_lst.cpp.bak cuneiform_src/Kern/rfrmt/sources/main/util_lst.cpp
-# fix cuneiform_src/Kern/include/minmax.h (version >= 1.1.0)
-mv cuneiform_src/Kern/include/minmax.h cuneiform_src/Kern/include/minmax.h.bak
-cat > cuneiform_src/Kern/include/minmax.h << EOF
-#include <windows.h>
-#ifdef __cplusplus
-#include <cmath>
-#endif
-EOF
-cat cuneiform_src/Kern/include/minmax.h.bak >> cuneiform_src/Kern/include/minmax.h
+sed -i.bak -e "s/long\()\s*pData\)/intptr_t\1/g" cuneiform_src/Kern/rout/src/rout_dll.cpp
+## fix min/max in cuneiform_src/Kern/rfrmt/sources/main/*.cpp
+#for F in cuneiform_src/Kern/rfrmt/sources/main/*.cpp; do
+#mv $F $F.bak
+#cat > $F << EOF
+##include <../../../include/minmax.h>
+##undef min
+##undef max
+##define min CPPmin
+##define max CPPmax
+##include <bits/stl_algobase.h>
+#EOF
+#cat $F.bak >> $F
+#done
+#mv -f cuneiform_src/Kern/rfrmt/sources/main/util_lst.cpp.bak cuneiform_src/Kern/rfrmt/sources/main/util_lst.cpp
+# use MIN/MAX instead of min/max to avoid conflicts (version >= 1.1.0)
+sed -i.bak -e "s/\b\(min\|max\)(/\U&/g" $(grep -l "\b\(min\|max\)(" $(find -name '*.h' -or -name '*.c' -or -name '*.cpp'))
+sed -i.bak -e "s/\b\(min\|max\)$/\U&/g" cuneiform_src/Kern/lns32/src/lnscheck.cpp
 # fix cuneiform_src/Kern/ced/sources/main/ced_func_rtf.cpp (version >= 1.1.0)
 patch -ulbf cuneiform_src/Kern/ced/sources/main/ced_func_rtf.cpp << EOF
 @@ -214,3 +214,3 @@
@@ -76,13 +67,30 @@ patch -ulbf cuneiform_src/Kern/ced/sources/main/ced_func_rtf.cpp << EOF
 +    if (prevChar) {
  //       lstrcpy(PrevTypeFace,TerFont[PrevFont].TypeFace);
 EOF
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/cuneiform -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_win &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/cuneiform -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_CXX_FLAGS:STRING="-fcommon -fpermissive" -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cuneiform-linux-$VERSION
 mkdir -p build_win &&
  wl-showstatus configure &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/cuneiform -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_win &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/cuneiform -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_CXX_FLAGS:STRING="-fcommon -fpermissive" -S. -Bbuild_win &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/cuneiform -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_CXX_FLAGS:STRING="-fcommon -fpermissive" -S. -Bbuild_win &&
  wl-showstatus build-install &&
- make -Cbuild_win install/strip &&
+ ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cuneiform-linux-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_CXX_FLAGS:STRING="-fcommon -fpermissive" -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-fcommon" -DCMAKE_CXX_FLAGS:STRING="-fcommon -fpermissive" -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cuneiform-linux-$VERSION
 ####CF_DATADIR=$MINGWPREFIX/cuneiform/share/cuneiform $MINGWPREFIX/cuneiform/bin/cuneiform.exe
 ####TO DO: build static libraries
 ####TO DO: check if installation can be done in normal location (if there are no conflicts)
