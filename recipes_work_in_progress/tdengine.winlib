@@ -20,8 +20,10 @@ export TYPE=library
 #export VERSIONDATE=20220905
 #export VERSION=3.0.0.0
 #export VERSIONDATE=20220813
-export VERSION=3.0.0.1
-export VERSIONDATE=20220823
+#export VERSION=3.0.0.1
+#export VERSIONDATE=20220823
+export VERSION=3.0.1.0
+export VERSIONDATE=20220907
 wl-showstatus --package-version
 export DEPENDANCIES=gtest
 export OPTIONALDEPENDANCIES=
@@ -56,22 +58,41 @@ EOF
 #+        #elif defined(_M_IX86) || defined(_WIN32)
 #             return 6;
 #EOF
-# fix platform detection in contrib/pthread/cmake/target_arch.cmake (version >= 3.0.0.1)
+# fix contrib/pthread/CMakeLists.txt (version >= 3.0.1.0)
+patch -ulbf contrib/pthread/CMakeLists.txt << EOF
+@@ -124,3 +124,3 @@
+     if(\${type} STREQUAL "VCE" OR \${type} STREQUAL "VSE")
+-        set_target_properties(\${targ} PROPERTIES COMPILE_FLAGS \${VCEFLAGS})
++        set_target_properties(\${targ} PROPERTIES COMPILE_FLAGS "\${VCEFLAGS}")     endif()
+@@ -146,3 +146,3 @@
+     if(\${type} STREQUAL "VCE" OR \${type} STREQUAL "VSE")
+-        set_target_properties(\${targ} PROPERTIES COMPILE_FLAGS \${VCEFLAGS})
++        set_target_properties(\${targ} PROPERTIES COMPILE_FLAGS "\${VCEFLAGS}")     endif()
+EOF
+# fix cmake/cmake.define (version >= 3.0.1.0)
+patch -ulbf cmake/cmake.define << EOF
+@@ -81,4 +81,8 @@
+     MESSAGE("\${Yellow} set compiler flag for Windows! \${ColourReset}")
++   IF (MSVC)
+     SET(COMMON_FLAGS "/w /D_WIN32 /DWIN32 /Zi /MTd")
+     SET(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO")
++   ELSE()
++    SET(COMMON_FLAGS "-D_WIN32 -DWIN32")
++   ENDIF()
+     # IF (MSVC AND (MSVC_VERSION GREATER_EQUAL 1900))
+EOF
+# force platform detection in contrib/pthread/cmake/target_arch.cmake (version >= 3.0.1.0)
 patch -ulbf contrib/pthread/cmake/target_arch.cmake << EOF
-@@ -7,3 +7,3 @@
-             return 3;
--        #elif defined(_M_AMD64)
-+        #elif defined(_M_AMD64) || defined(__x86_64__)
-             return 4;
-@@ -11,3 +11,3 @@
-             return 5;
--        #elif defined(_M_IX86)
-+        #elif defined(_M_IX86) || defined(__i386__)
-             return 6;
+@@ -40,3 +40,3 @@
+     else()
+-        set(\${out} "unknown" PARENT_SCOPE)
++        set(\${out} "$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "x86"; fi)" PARENT_SCOPE)
+     endif()
 EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_PTHREAD:BOOL=OFF -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_PTHREAD:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DALLOW_FORBID_FUNC" -DCMAKE_CXX_FLAGS:STRING="-DALLOW_FORBID_FUNC" -S. -Bbuild_win &&
  #wl-showstatus build &&
  #ninja -Cbuild_win &&
  wl-showstatus build-install &&
