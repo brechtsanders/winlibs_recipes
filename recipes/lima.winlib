@@ -51,8 +51,10 @@ export TYPE=library
 #export VERSIONDATE=20220408
 #export VERSION=1.9.17
 #export VERSIONDATE=20220616
-export VERSION=1.9.18
-export VERSIONDATE=20220902
+#export VERSION=1.9.18
+#export VERSIONDATE=20220902
+export VERSION=1.9.19
+export VERSIONDATE=20220924
 wl-showstatus --package-version
 export DEPENDANCIES=processlib
 export OPTIONALDEPENDANCIES=
@@ -91,15 +93,23 @@ patch -ulbf common/src/ThreadUtils.cpp << EOF
 +#if defined(__unix) || defined(__MINGW32__)
  #include <sys/time.h>
 EOF
-# fix common/src/Debug.cpp (version >= 1.9.3)
+## fix common/src/Debug.cpp (version >= 1.9.3 <= 1.9.18)
+#patch -ulbf common/src/Debug.cpp << EOF
+#@@ -29,3 +29,5 @@
+# #include <unistd.h>
+#-#ifdef __unix
+#+#if defined(__unix) || defined(__MINGW32__)
+#+#if defined(__MINGW32__)
+#+#endif
+# #include <sys/time.h>
+#EOF
+# fix common/src/Debug.cpp (version >= 1.9.19)
 patch -ulbf common/src/Debug.cpp << EOF
-@@ -29,3 +29,5 @@
- #include <unistd.h>
+@@ -28,3 +28,3 @@
+ #include <cstring>
 -#ifdef __unix
 +#if defined(__unix) || defined(__MINGW32__)
-+#if defined(__MINGW32__)
-+#endif
- #include <sys/time.h>
+ #include <unistd.h>
 EOF
 # fix hardware/src/HwBufferSave.cpp (version >= 1.9.3)
 patch -ulbf hardware/src/HwBufferSave.cpp << EOF
@@ -109,9 +119,51 @@ patch -ulbf hardware/src/HwBufferSave.cpp << EOF
 +#if defined(__unix) || defined(__MINGW32__)
  #include <sys/time.h>
 EOF
-# fix missing files
-mkdir -p winfix
-touch winfix/time_compat.h
+# fix common/src/Debug.cpp (version >= 1.9.19)
+patch -ulbf common/src/Debug.cpp << EOF
+@@ -445,3 +445,3 @@
+                pthread_t tid = pthread_self();
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+                long long thread_id = (long long)tid;
+EOF
+# fix common/src/ThreadUtils.cpp (version >= 1.9.19)
+patch -ulbf common/src/ThreadUtils.cpp << EOF
+@@ -317,3 +317,3 @@
+                        ostream& os = cerr;
+-#ifdef __unix
++#if defined(__unix) || defined(__MINGW32__)
+                        long long thread_id = (long long) pthread_self();
+EOF
+# fix missing usleep() in control/src/CtTestApp.cpp (version >= 1.9.19)
+patch -ulbf control/src/CtTestApp.cpp << EOF
+@@ -31,2 +31,6 @@
+ #endif
++#ifdef _WIN32
++#include <chrono>
++#include <thread>
++#endif
+
+@@ -422,3 +426,7 @@
+                if (sleep_us > 0)
++#if defined(_WIN32)
++                       std::this_thread::sleep_for(std::chrono::microseconds(sleep_us));
++#else
+                        usleep(sleep_us);
++#endif
+                else
+@@ -437,3 +445,7 @@
+                DEB_ALWAYS() << "sleeping " << DEB_VAR1(m_pars->test_seq_lat);
++#if defined(_WIN32)
++               std::this_thread::sleep_for(std::chrono::microseconds((long)(m_pars->test_seq_lat * 1e6)));
++#else
+                usleep(m_pars->test_seq_lat * 1e6);
++#endif
+        }
+EOF
+## fix missing files
+#mkdir -p winfix
+#touch winfix/time_compat.h
 # fix missing files
 touch third-party/Processlib/CMakeLists.txt camera/common/meta/CMakeLists.txt camera/simulator/CMakeLists.txt
 #make config.inc
