@@ -1,0 +1,90 @@
+export NAME="LibGII"
+export STATUS=
+export URL=http://ibiblio.org/ggicore/
+export BASENAME=libgii
+export DESCRIPTION="GGI General Input Interface"
+export CATEGORY=hardware,graphics
+export TYPE=library
+export VERSION=1.0.2
+export VERSIONDATE=20180914
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=
+export LICENSETYPE=MIT
+#export DOWNLOADURL="http://ibiblio.org/ggicore/download.html libgii- .src.tar.gz"
+export DOWNLOADURL="https://sourceforge.net/projects/ggi/files/ggi-core/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.ggi-project.org/ftp/ggi/v2.2/libgii-$VERSION.src.tar.gz
+export DOWNLOADSOURCEURL=https://download.sourceforge.net/project/ggi/ggi-core/libgii-$VERSION/libgii-$VERSION.src.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/libgii-$VERSION.src.tar.gz
+cd $BASENAME-$VERSION
+# fix missing fd_set in include/ggi/internal/gii.h
+mv include/ggi/internal/gii.h include/ggi/internal/gii.h.bak
+cat > include/ggi/internal/gii.h << EOF
+#include <winsock2.h>
+EOF
+cat include/ggi/internal/gii.h.bak >> include/ggi/internal/gii.h
+# fix include/ggi/system.h.in (version >= 1.0.2)
+patch -ulbf include/ggi/system.h.in << EOF
+@@ -48,3 +48,3 @@
+
+-#if defined(__WIN32__) && defined(_MSC_VER)
++#if defined(__WIN32__) && defined(_MSC_VER) && !defined(__MINGW32__)
+ /* On win32 with MSVC, rely on the compiler/linker
+@@ -66,6 +66,13 @@
+  */
+-# define EXPORTVAR      extern __declspec(dllexport)
+-# define IMPORTVAR      extern __declspec(dllimport)
+-# define EXPORTFUNC     __declspec(dllexport)
+-# define IMPORTFUNC     extern __declspec(dllimport)
++# if defined(STATIC) || !(defined(DLL_EXPORT) || defined(BUILDING_LIBGII))
++#  define EXPORTVAR     extern
++#  define IMPORTVAR     extern
++#  define EXPORTFUNC
++#  define IMPORTFUNC
++# else
++#  define EXPORTVAR     extern __declspec(dllexport)
++#  define IMPORTVAR     extern __declspec(dllimport)
++#  define EXPORTFUNC    __declspec(dllexport)
++#  define IMPORTFUNC    __declspec(dllimport)
++# endif
+ #else
+EOF
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cd build_static &&
+# ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --enable-mutexes=win32 --disable-linux-mouse --disable-linux-kbd --disable-linux-joy --disable-linux-evdev --without-x CFLAGS="-DSTATIC" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+# cd .. &&
+# wl-showstatus configure &&
+# cd build_shared &&
+# ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-static --enable-shared --enable-mutexes=win32 --disable-linux-mouse --disable-linux-kbd --disable-linux-joy --disable-linux-evdev --without-x CFLAGS="-DBUILDING_LIBGII" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+# # fix building DLLs
+# sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# # fix detection of shared libraries
+# sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+# cd .. &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install-strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install-strip &&
+# #sed -i -e "s/\(old_library='\)\('\)/\1libgg.a\2/" $INSTALLPREFIX/lib/libgg.la &&
+# #sed -i -e "s/\(old_library='\)\('\)/\1libgii.a\2/" $INSTALLPREFIX/lib/libgii.la &&
+#    echo OK
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-mutexes=win32 --disable-linux-mouse --disable-linux-kbd --disable-linux-joy --disable-linux-evdev --without-x CFLAGS="-DBUILDING_LIBGII" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
