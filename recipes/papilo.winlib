@@ -1,12 +1,91 @@
+#export NAME="PaPILO"
+#export STATUS=
+#export URL=https://github.com/lgottwald/PaPILO
+#export BASENAME=papilo
+#export DESCRIPTION="Parallel Presolve for Integer and Linear Optimization"
+#export CATEGORY=math
+#export TYPE=library,application
+#export VERSION=1.0.2
+#export VERSIONDATE=20210910
+#wl-showstatus --package-version
+#export DEPENDANCIES=pthreads,zlib,libbz2,boost,gmp,openblas,tbb
+#export OPTIONALDEPENDANCIES=highs,scip,soplex
+#export BUILDDEPENDANCIES=cmake,ninja
+#export LICENSEFILE=COPYING.LESSER
+#export LICENSETYPE=LGPL
+#export LICENSETYPE=
+##export DOWNLOADURL="https://github.com/lgottwald/PaPILO/releases"
+#export DOWNLOADURL="https://github.com/lgottwald/PaPILO/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/lgottwald/PaPILO/archive/refs/tags/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix src/papilo/interfaces/HighsInterface.hpp (version >= 1.0.2)
+#patch -ulbf src/papilo/interfaces/HighsInterface.hpp << EOF
+#@@ -31,2 +31,3 @@
+# #include <type_traits>
+#+#include <soplex.h>
+#
+#@@ -83,3 +84,3 @@
+#       /* set the objective sense and offset */
+#-      model.sense_ = OBJSENSE_MINIMIZE;
+#+      model.sense_ = soplex::SoPlex::OBJSENSE_MINIMIZE;
+#       model.offset_ = double( -obj.offset );
+#@@ -173,3 +174,3 @@
+#       /* set the objective sense and offset */
+#-      model.sense_ = OBJSENSE_MINIMIZE;
+#+      model.sense_ = soplex::SoPlex::OBJSENSE_MINIMIZE;
+#       model.offset_ = 0;
+#EOF
+## fix missing boost::gcd in src/papilo/presolvers/SimplifyInequalities.hpp (version >= 1.0.2)
+#patch -ulbf src/papilo/presolvers/SimplifyInequalities.hpp << EOF
+#@@ -96,3 +96,3 @@
+#    {
+#-      return boost::gcd( intval1, intval2 );
+#+      return boost::integer::gcd( intval1, intval2 );
+#    }
+#@@ -118,3 +118,3 @@
+#    if( isIntegral( 600 * val1, intval4 ) && isIntegral( 600 * val2, intval5 ) )-      return boost::gcd( intval4, intval5 ) / REAL{ 600 };
+#+      return boost::integer::gcd( intval4, intval5 ) / REAL{ 600 };
+#
+#EOF
+## allow building both static and shared library
+#sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" CMakeLists.txt
+#sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" binaries/CMakeLists.txt
+## fix missing OpenMP::OpenMP_CXX target
+#sed -i.bak2 -e "s/^\(\s*\)\(add_executable(papilo-executable\)/\1find_package(OpenMP)\n&/" binaries/CMakeLists.txt
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DHIGHS:BOOL=OFF -S. -Bbuild_static &&
+# #-DHIGHS:BOOL=ON 
+# #-DCMAKE_CXX_FLAGS:STRING="-fpermissive -Wno-missing-template-keyword" 
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DHIGHS:BOOL=OFF -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+# strip build_shared/*.dll build_shared/bin/*.exe &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# cp -u build_{static,shared}/*.a $INSTALLPREFIX/lib/ &&
+# cp -u build_shared/*.dll build_shared/bin/*.exe $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
 export NAME="PaPILO"
 export STATUS=
-export URL=https://github.com/lgottwald/PaPILO
+export URL=https://github.com/scipopt/papilo/
 export BASENAME=papilo
 export DESCRIPTION="Parallel Presolve for Integer and Linear Optimization"
 export CATEGORY=math
 export TYPE=library,application
-export VERSION=1.0.2
-export VERSIONDATE=20210910
+export VERSION=2.1.1
+export VERSIONDATE=20221008
 wl-showstatus --package-version
 export DEPENDANCIES=pthreads,zlib,libbz2,boost,gmp,openblas,tbb
 export OPTIONALDEPENDANCIES=highs,scip,soplex
@@ -14,45 +93,15 @@ export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=COPYING.LESSER
 export LICENSETYPE=LGPL
 export LICENSETYPE=
-#export DOWNLOADURL="https://github.com/lgottwald/PaPILO/releases"
-export DOWNLOADURL="https://github.com/lgottwald/PaPILO/tags"
+export DOWNLOADURL="https://github.com/scipopt/papilo/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/lgottwald/PaPILO/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/scipopt/papilo/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix src/papilo/interfaces/HighsInterface.hpp (version >= 1.0.2)
-patch -ulbf src/papilo/interfaces/HighsInterface.hpp << EOF
-@@ -31,2 +31,3 @@
- #include <type_traits>
-+#include <soplex.h>
-
-@@ -83,3 +84,3 @@
-       /* set the objective sense and offset */
--      model.sense_ = OBJSENSE_MINIMIZE;
-+      model.sense_ = soplex::SoPlex::OBJSENSE_MINIMIZE;
-       model.offset_ = double( -obj.offset );
-@@ -173,3 +174,3 @@
-       /* set the objective sense and offset */
--      model.sense_ = OBJSENSE_MINIMIZE;
-+      model.sense_ = soplex::SoPlex::OBJSENSE_MINIMIZE;
-       model.offset_ = 0;
-EOF
-# fix missing boost::gcd in src/papilo/presolvers/SimplifyInequalities.hpp (version >= 1.0.2)
-patch -ulbf src/papilo/presolvers/SimplifyInequalities.hpp << EOF
-@@ -96,3 +96,3 @@
-    {
--      return boost::gcd( intval1, intval2 );
-+      return boost::integer::gcd( intval1, intval2 );
-    }
-@@ -118,3 +118,3 @@
-    if( isIntegral( 600 * val1, intval4 ) && isIntegral( 600 * val2, intval5 ) )-      return boost::gcd( intval4, intval5 ) / REAL{ 600 };
-+      return boost::integer::gcd( intval4, intval5 ) / REAL{ 600 };
-
-EOF
 # allow building both static and shared library
 sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" CMakeLists.txt
 sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" binaries/CMakeLists.txt
