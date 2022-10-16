@@ -16,7 +16,7 @@ export TYPE=library
 export VERSION=0.7.0
 export VERSIONDATE=20220922
 wl-showstatus --package-version
-export DEPENDANCIES=highway,brotli,openexr,highway,giflib,libjpeg,zlib,libpng,lodepng
+export DEPENDANCIES=pthreads,highway,brotli,openexr,highway,giflib,libjpeg,zlib,libpng,lodepng,lcms2
 export OPTIONALDEPENDANCIES=
 export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=LICENSE
@@ -30,18 +30,29 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-touch third_party/lodepng/LICENSE
-sed -i.bak -e "s/FATAL_ERROR\( .*Please run .* to fetch\)/WARNING\1/" third_party/CMakeLists.txt
+# fix lib/extras/enc/jpg.cc (version >= 0.7.0)
+patch -ulbf lib/extras/enc/jpg.cc << EOF
+@@ -124,3 +124,3 @@
+   unsigned char* buffer = nullptr;
+-  unsigned long size = 0;
++  size_t size = 0;
+   jpeg_mem_dest(&cinfo, &buffer, &size);
+EOF
+# fix missing file
+#touch third_party/lodepng/LICENSE
+## don't abort on fetch error
+#sed -i.bak -e "s/FATAL_ERROR\( .*Please run .* to fetch\)/WARNING\1/" third_party/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DJPEGXL_FORCE_SYSTEM_BROTLI:BOOL=ON -DJPEGXL_FORCE_SYSTEM_HWY:BOOL=ON -DJPEGXL_ENABLE_SJPEG:BOOL=OFF -DJPEGXL_ENABLE_SKCMS:BOOL=OFF -DJPEGXL_BUNDLE_SKCMS:BOOL=OFF -DJPEGXL_ENABLE_JNI:BOOL=OFF -DJPEGXL_ENABLE_MANPAGES:BOOL=OFF -DJPEGXL_FORCE_SYSTEM_GTEST:BOOL=ON -DJPEGXL_ENABLE_EXAMPLES:BOOL=OFF -DJPEGXL_ENABLE_BENCHMARK:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DJPEGXL_FORCE_SYSTEM_BROTLI:BOOL=ON -DJPEGXL_FORCE_SYSTEM_HWY:BOOL=ON -DJPEGXL_ENABLE_SJPEG:BOOL=OFF -DJPEGXL_ENABLE_SKCMS:BOOL=OFF -DJPEGXL_BUNDLE_SKCMS:BOOL=OFF -DJPEGXL_ENABLE_JNI:BOOL=OFF -DJPEGXL_ENABLE_MANPAGES:BOOL=OFF -DJPEGXL_ENABLE_EXAMPLES:BOOL=OFF -DJPEGXL_ENABLE_BENCHMARK:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
  #-DJPEGXL_ENABLE_PLUGINS:BOOL=ON 
  #-DJPEGXL_ENABLE_SJPEG:BOOL=ON 
  #-DJPEGXL_ENABLE_SKCMS:BOOL=ON 
+ #-DJPEGXL_FORCE_SYSTEM_GTEST:BOOL=ON 
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build lib/libjxl_dec.dll.a
 
 
 

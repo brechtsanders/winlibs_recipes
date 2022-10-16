@@ -352,6 +352,66 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/swift-$VERSION-RELEASE.tar.gz
 cd swift-corelibs-libdispatch-swift-$VERSION-RELEASE
+# fix os/generic_win_base.h (version >= 5.5)
+patch -ulbf os/generic_win_base.h << EOF
+@@ -24,4 +24,9 @@
+
++#ifdef __MINGW32__
++#include <sys/types.h>
++#include <pthread.h>
++#else
+ typedef int mode_t;
+ typedef void pthread_attr_t;
++#endif
+
+EOF
+# fix dispatch/base.h (version >= 5.5)
+patch -ulbf dispatch/base.h << EOF
+@@ -207,3 +207,7 @@
+ #if __GNUC__
++#ifdef __MINGW32__
++#define DISPATCH_EXPECT(x, v) (x)
++#else
+ #define DISPATCH_EXPECT(x, v) __builtin_expect((x), (v))
++#endif
+ #define dispatch_compiler_barrier()  __asm__ __volatile__("" ::: "memory")
+EOF
+# fix src/shims/generic_win_stubs.h (version >= 5.5)
+patch -ulbf src/shims/generic_win_stubs.h << EOF
+@@ -27,5 +27,11 @@
+
++#ifndef S_ISDIR
+ #define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
++#endif
++#ifndef S_ISFIFO
+ #define S_ISFIFO(mode) ((mode) & _S_IFIFO)
++#endif
++#ifndef S_ISREG
+ #define S_ISREG(mode)  ((mode) & _S_IFREG)
++#endif
+ #define S_ISSOCK(mode) 0
+@@ -51,2 +57,3 @@
+
++#ifndef __MINGW32__
+ enum {
+@@ -67,2 +74,3 @@
+ } FILE_PIPE_LOCAL_INFORMATION, *PFILE_PIPE_LOCAL_INFORMATION;
++#endif
+
+EOF
+# fix src/internal.h (version >= 5.5)
+patch -ulbf src/internal.h << EOF
+@@ -551,3 +551,3 @@
+ static inline void
+-_dispatch_assert(long e, size_t line) DISPATCH_STATIC_ASSERT_IF(!e)
++_dispatch_assert(uintptr_t e, size_t line) DISPATCH_STATIC_ASSERT_IF(!e)
+ {
+@@ -555,3 +555,3 @@
+ }
+-#define dispatch_assert(e) _dispatch_assert((long)(e), __LINE__)
++#define dispatch_assert(e) _dispatch_assert((uintptr_t)(e), __LINE__)
+
+EOF
 # fix cmake/modules/DispatchWindowsSupport.cmake (version >= 5.5)
 patch -ulbf cmake/modules/DispatchWindowsSupport.cmake << EOF
 @@ -32,2 +32,3 @@
