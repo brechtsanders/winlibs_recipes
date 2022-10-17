@@ -25,16 +25,271 @@ tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix src/include/platform.h (version >= 0.17.6)
 patch -ulbf src/include/platform.h << EOF
-@@ -71,2 +71,5 @@
+@@ -71,2 +71,6 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <netdb.h>
+@@ -89,2 +93,3 @@
+ #include <grp.h>
++#endif
+
+@@ -201,3 +206,3 @@
+
+-#if ENABLE_NLS
++#if ENABLE_NLS && !defined(_WIN32)
+ #include "langinfo.h"
+EOF
+# fix src/include/gnunet_network_lib.h (version >= 0.17.6)
+patch -ulbf src/include/gnunet_network_lib.h << EOF
+@@ -49,2 +49,5 @@
 
 +#ifdef _WIN32
 +#include <winsock2.h>
 +#else
- #include <netdb.h>
-@@ -89,2 +92,3 @@
- #include <grp.h>
+ //#ifdef HAVE_SYS_SELECT_H
+@@ -62,2 +65,3 @@
+ #endif
 +#endif
 
+@@ -121,4 +125,6 @@
+  */
++#ifndef _WIN32
+ void
+ GNUNET_NETWORK_unix_precheck (const struct sockaddr_un *un);
++#endif
+
+EOF
+# fix src/include/gnunet_strings_lib.h (version >= 0.17.6)
+patch -ulbf src/include/gnunet_strings_lib.h << EOF
+@@ -47,2 +47,5 @@
+ #include <stdlib.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+@@ -50,2 +53,3 @@
+ #include <netinet/ip.h>
++#endif
+
+EOF
+# fix src/util/child_management.c (version >= 0.17.6)
+patch -ulbf src/util/child_management.c << EOF
+@@ -167,2 +167,6 @@
+   GNUNET_assert (sigpipe != NULL);
++#ifdef _WIN32
++  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
++              "Child management not supported on Windows .\\n");
++#else
+   shc_chld =
+@@ -172,2 +176,3 @@
+               "Child management started.\\n");
++#endif
+ }
+EOF
+# fix src/util/client.c (version >= 0.17.6)
+patch -ulbf src/util/client.c << EOF
+@@ -511,3 +511,3 @@
+ {
+-#if AF_UNIX
++#if AF_UNIX && !defined(_WIN32)
+   struct GNUNET_NETWORK_Handle *sock;
+EOF
+# fix src/util/common_logging.c (version >= 0.17.6)
+patch -ulbf src/util/common_logging.c << EOF
+@@ -1383,2 +1383,5 @@
+ {
++#ifdef _WIN32
++#define LEN  (INET6_ADDRSTRLEN + 8)
++#else
+ #define LEN                           \\
+@@ -1386,2 +1389,3 @@
+               (1 + sizeof(struct sockaddr_un) - sizeof(sa_family_t)))
++#endif
+   static GNUNET_THREAD_LOCAL char buf[LEN];
+@@ -1390,3 +1394,5 @@
+   const struct sockaddr_in *v4;
++#ifndef _WIN32
+   const struct sockaddr_un *un;
++#endif
+   const struct sockaddr_in6 *v6;
+@@ -1423,2 +1429,3 @@
+
++#ifndef _WIN32
+   case AF_UNIX:
+@@ -1438,2 +1445,3 @@
+     return buf;
++#endif
+
+EOF
+# fix src/util/configuration.c (version >= 0.17.6)
+patch -ulbf src/util/configuration.c << EOF
+@@ -32,2 +32,9 @@
+ #include "gnunet_container_lib.h"
++#ifdef _WIN32
++#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
++struct passwd { char* pw_name; };
++struct group { char* gr_name; };
++#define getpwuid(UID) NULL
++#define getgrgid(GID) NULL
++#endif
+
+EOF
+# fix src/util/disk.c (version >= 0.17.6)
+patch -ulbf src/util/disk.c << EOF
+@@ -29,2 +29,7 @@
+ #include "gnunet_disk_lib.h"
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fsync(fd) _commit(fd)
++#endif
+
+@@ -560,5 +565,8 @@
+       {
+-        ret = mkdir (rdir,
+-                     S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH
+-                     | S_IXOTH);    /* 755 */
++        ret = mkdir (rdir
++#ifndef _WIN32
++                     ,S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH+                     | S_IXOTH
++#endif
++                   );    /* 755 */
+
+@@ -639,2 +647,6 @@
+ {
++#ifdef _WIN32
++  errno = ENOTSUP;
++  return -1;
++#else
+   int flags;
+@@ -659,2 +671,3 @@
+   return ret;
++#endif
+ }
+@@ -704,2 +717,6 @@
+ {
++#ifdef _WIN32
++  errno = ENOTSUP;
++  return -1;
++#else
+   int flags;
+@@ -720,2 +737,3 @@
+   return ret;
++#endif
+ }
+@@ -759,2 +777,3 @@
+
++#ifndef _WIN32
+   if (0 != fchmod (fd,
+@@ -773,2 +792,3 @@
+   }
++#endif
+   if (buf_size !=
+@@ -1213,2 +1233,6 @@
+ {
++#ifdef _WIN32
++  LOG (GNUNET_ERROR_TYPE_ERROR, _ ("Setting file owner not supported on Windows\\n"));
++  return GNUNET_SYSERR;
++#else
+   struct passwd *pws;
+@@ -1230,2 +1254,3 @@
+   return GNUNET_OK;
++#endif
+ }
+@@ -1461,2 +1486,6 @@
+ {
++#ifdef _WIN32
++  errno = ENOTSUP;
++  return NULL;
++#else
+   struct GNUNET_DISK_PipeHandle *p;
+@@ -1527,2 +1556,3 @@
+   return p;
++#endif
+ }
+EOF
+# fix src/util/network.c (version >= 0.17.6)
+patch -ulbf src/util/network.c << EOF
+@@ -144,2 +144,3 @@
+ {
++#ifndef _WIN32
+   struct sockaddr_un dummy;
+@@ -172,2 +173,3 @@
+   strcat (unixpath, (char *) ae.encoding);
++#endif
+   return unixpath;
+@@ -176,2 +178,3 @@
+
++#ifndef _WIN32
+ void
+@@ -215,2 +218,3 @@
+ }
++#endif
+
+@@ -226,2 +230,5 @@
+ {
++#ifdef _WIN32
++  return GNUNET_SYSERR;
++#else
+   int flags = fcntl (fd->fd, F_GETFL);
+@@ -249,2 +256,3 @@
+   return GNUNET_OK;
++#endif
+ }
+@@ -262,2 +270,5 @@
+ {
++#ifdef _WIN32
++  return GNUNET_SYSERR;
++#else
+   int i;
+@@ -273,2 +284,3 @@
+   return GNUNET_OK;
++#endif
+ }
+@@ -442,2 +454,5 @@
+ {
++#ifdef _WIN32
++  return GNUNET_SYSERR;
++#else
+   int ret;
+@@ -503,2 +518,3 @@
+   return GNUNET_OK;
++#endif
+ }
+@@ -509,2 +525,5 @@
+ {
++#ifdef _WIN32
++  return GNUNET_SYSERR;
++#else
+   int ret;
+@@ -560,2 +579,3 @@
+   return (ret == 0) ? GNUNET_OK : GNUNET_SYSERR;
++#endif
+ }
+@@ -585,2 +605,5 @@
+ {
++#ifdef _WIN32
++  return NULL;
++#else
+   struct GNUNET_NETWORK_Handle *ret;
+@@ -593,2 +616,3 @@
+   return ret;
++#endif
+ }
+EOF
+# fix src/util/os_installation.c (version >= 0.17.6)
+patch -ulbf src/util/os_installation.c << EOF
+@@ -814,2 +814,3 @@
+   }
++#ifndef _WIN32
+   if (check_suid)
+@@ -827,2 +828,3 @@
+   }
++#endif
+   GNUNET_free (p);
 EOF
 wl-showstatus configure &&
  #wl-showstatus preconfigure &&
@@ -54,7 +309,7 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
  #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-x PYTHON=$PYDIR/python.exe CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-nls --without-x PYTHON=$PYDIR/python.exe CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ## fix detection of shared libraries
