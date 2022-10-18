@@ -76,27 +76,56 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd indi-$VERSION
+# fix libs/indibase/baseclient.cpp (version >= 1.9.8)
+patch -ulbf libs/indibase/baseclient.cpp << EOF
+@@ -165,3 +165,5 @@
+ {
++#ifndef _WINDOWS
+     struct sockaddr_un serv_addr_un;
++#endif
+     struct sockaddr_in serv_addr_in;
+@@ -247,3 +249,3 @@
+     u_long iMode = 0;
+-    iResult = ioctlsocket(sockfd, FIONBIO, &iMode);
++    int iResult = ioctlsocket(sockfd, FIONBIO, &iMode);
+     if (iResult != NO_ERROR)
+EOF
+# fix missing timespec_get in libs/indicom.c (version >= 1.9.8)
+patch -ulbf libs/indicom.c << EOF
+@@ -323,2 +323,7 @@
+ {
++#if defined(__MINGW32__) && !defined(_UCRT)
++    struct timeval now;
++    mingw_gettimeofday(&now, NULL);
++    return (double)now.tv_sec+(double)(now.tv_usec%1000000)/1000000.0;
++#else
+     struct timespec ts;
+@@ -336,2 +341,3 @@
+     return (double)ts.tv_sec+(double)(ts.tv_nsec%1000000000)/1000000000.0;
++#endif
+ }
+EOF
+# fix error: expected identifier before numeric constant in libs/libastro.cpp (version >= 1.9.8)
+mv libs/libastro.cpp libs/libastro.cpp.bak &&
+echo "#include <math.h>" > libs/libastro.cpp &&
+cat libs/libastro.cpp.bak >> libs/libastro.cpp
+# also allow building shared library (version >= 1.9.8)
+sed -i.bak -e "s/\(add_library(indiclient\) STATIC/\1/" CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DINDI_BUILD_WEBSOCKET:BOOL=ON -DINDI_BUILD_CLIENT:BOOL=ON -DINDI_BUILD_SERVER:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_static &&
- #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DINDI_BUILD_WEBSOCKET:BOOL=ON -DINDI_BUILD_CLIENT:BOOL=ON -DINDI_BUILD_SERVER:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -DCMAKE_CXX_FLAGS:STRING="-D_WINDOWS" -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINDI_BUILD_WEBSOCKET:BOOL=ON -DINDI_BUILD_CLIENT:BOOL=ON -DINDI_BUILD_SERVER:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_shared &&
- ## fix execution of Python scripts
- #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
- ## fix missing link libraries
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
- #wl-showstatus build &&
- #ninja -Cbuild_static &&
- #wl-showstatus build &&
- #ninja -Cbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINDI_BUILD_WEBSOCKET:BOOL=ON -DINDI_BUILD_CLIENT:BOOL=ON -DINDI_BUILD_SERVER:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -DCMAKE_CXX_FLAGS:STRING="-D_WINDOWS" -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -lz -lmman -lnova/" build_shared/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
- #ninja -Cbuild_static library/install/strip &&
  wl-showstatus build-install &&
  ninja -Cbuild_shared install/strip &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf indi-$VERSION
+ strip build_shared/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_shared/*.dll $INSTALLPREFIX/bin &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf indi-$VERSION
 
 
 

@@ -439,6 +439,20 @@ patch -ulbf cmake/modules/DispatchWindowsSupport.cmake << EOF
 + endif()
  endfunction()
 EOF
+# fix missing __popcnt64 in src/shims/hw_config.h (version >= 5.5)
+patch -ulbf src/shims/hw_config.h << EOF
+@@ -156,3 +156,7 @@
+                        ++dwProcessorPhysicalCount;
++#ifdef __MINGW32__
++                       dwProcessorLogicalCount += (DWORD)__builtin_popcountll(slpiCurrent->ProcessorMask);
++#else
+                        dwProcessorLogicalCount += __popcnt64(slpiCurrent->ProcessorMask);
++#endif
+                        break;
+EOF
+# don't abort on warnings
+sed -i.bak -e "s/-Werror -Wall//" src/CMakeLists.txt
+sed -i.bak -e "s/add_compile_options(.*\(-Wassign-enum\|-Wconditional-uninitialized\|-Wshorten-64-to-32\)/#&/" cmake/modules/DispatchCompilerWarnings.cmake
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SWIFT:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH="$(PATH=$PATH:$MINGWPREFIX/share/llvm/bin which clang.exe)" -DCMAKE_CXX_COMPILER:FILEPATH="$(PATH=$PATH:$MINGWPREFIX/share/llvm/bin which clang++.exe)" -S. -Bbuild_static &&
