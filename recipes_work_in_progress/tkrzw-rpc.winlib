@@ -1,0 +1,85 @@
+export NAME="tkrzw-rpc"
+export STATUS=
+export URL=https://dbmx.net/tkrzw-rpc/
+export BASENAME=tkrzw-rpc
+export DESCRIPTION="Tkrzw-RPC is a package of a server program which manages databases of Tkrzw and a library to access the service via gRPC protocol. Tkrzw is a library to manage key-value storages in various algorithms. With Tkrzw, applications can handle database files efficiently in the process without any network overhead. However, multiple processes cannot open the same database file simultaneously. Tkrzw-RPC solves this issue by using a server program which manages database files and allowing other processes to access the contents via RPC."
+export CATEGORY=database
+export TYPE=library,application
+export VERSION=0.9.9
+export VERSIONDATE=20221019
+wl-showstatus --package-version
+export DEPENDANCIES=tkrzw
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://dbmx.net/tkrzw-rpc/pkg/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://dbmx.net/tkrzw-rpc/pkg/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix tkrzw_rpc_common.cc (version >= 0.9.9)
+patch -ulbf tkrzw_rpc_common.cc << EOF
+@@ -14,3 +14,5 @@
+ #include <unistd.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <sys/param.h>
+@@ -19,2 +21,3 @@
+ #include <sys/time.h>
++#ifndef _WIN32
+ #include <sys/times.h>
+@@ -22,2 +25,3 @@
+ #include <fcntl.h>
++#endif
+
+@@ -55,2 +59,5 @@
+ Status DaemonizeProcess() {
++#ifdef _WIN32
++  return Status(Status::INFEASIBLE_ERROR);
++#else
+   std::cout << std::flush;
+@@ -101,2 +108,3 @@
+   return Status(Status::SUCCESS);
++#endif
+ }
+EOF
+wl-showstatus configure &&
+ #wl-showstatus preconfigure &&
+ #mkdir -p m4 &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

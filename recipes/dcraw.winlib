@@ -1,0 +1,63 @@
+export NAME="dcraw"
+export STATUS=
+export URL=https://dechifro.org/dcraw/
+export BASENAME=dcraw
+export DESCRIPTION="Decoding raw digital photos"
+export CATEGORY=graphics,fileformat
+export TYPE=library
+export VERSION=9.28.4
+export VERSIONDATE=20221019
+wl-showstatus --package-version
+export DEPENDANCIES=gimp,libjpeg,libtiff,jasper,lcms2
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/ncruces/dcraw/releases"
+export DOWNLOADURL="https://github.com/ncruces/dcraw/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/ncruces/dcraw/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined O_BINARY in fuji_green.c (version >= 9.28.4)
+mv fuji_green.c fuji_green.c.bak &&
+echo "#include <fcntl.h>" > fuji_green.c &&
+cat fuji_green.c.bak >> fuji_green.c
+# fix missing netinet/in.h (version >= 9.28.4)
+sed -i.bak -e "s?netinet/in\.h?winsock2.h?" $(grep -l "netinet/in\.h" *.c)
+# fix sony_clear.c (version >= 9.28.4)
+patch -ulbf sony_clear.c << EOF
+@@ -33,3 +33,3 @@
+
+-  ip = (void *) cp = buffer+200896;
++  ip = (void *) (cp = buffer+200896);
+   key0 = ntohl(ip[*cp]);
+EOF
+# avoid missing gimp_ui_init in rawphoto.c (version >= 9.28.4)
+patch -ulbf rawphoto.c << EOF
+@@ -282,3 +282,3 @@
+
+-  gimp_ui_init ("rawphoto", TRUE);
++  //gimp_ui_init ("rawphoto", TRUE);
+
+EOF
+wl-showstatus build &&
+ for F in *.c; do
+  echo CC $F
+  ${CC:-gcc} -c -o $(echo $F|sed -e "s/\.c$//").o $F -D_POSIX_THREAD_SAFE_FUNCTIONS $(pkg-config --cflags gtk+-2.0 gimp-2.0) || break
+ done &&
+ for F in *.o; do
+  echo LD $F
+  ${CC:-gcc} -s -o $(echo $F|sed -e "s/\.o$//").exe $F -Wl,--as-needed $(pkg-config --libs gtk+-2.0 gimp-2.0) -lgimpwidgets-2.0 -ljpeg -llcms2 -ljasper -ltiff -lws2_32 || break
+ done &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/share/dcraw/bin &&
+ cp *.exe $INSTALLPREFIX/share/dcraw/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
