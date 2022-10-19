@@ -323,3 +323,86 @@ for arch in i686 x86_64 armv7 aarch64; do
  wl-showstatus build &&
  make -Cbuild_mingw-w64-crt-$arch install-strip
 done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#../configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrtbase"; else echo "msvcrt-os"; fi) --with-default-win32-winnt=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "0x0601"; else echo "0x0501"; fi) --with-libraries=all --with-tools=all --enable-sdk=all --enable-secure-api --enable-wildcard --enable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --disable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 32; else echo 64; fi) --disable-libarm32 --disable-libarm64 --enable-idl CFLAGS="-fcommon $(gcc --help -v 2>/dev/null|grep -q " -Wexpansion-to-defined" && echo "-Wno-expansion-to-defined")" LDFLAGS="-Wl,-no-undefined" &&
+
+ # build MinGW-w64 headers
+ mkdir -p build_mingw-w64-headers &&
+ wl-showstatus configure &&
+ cd build_mingw-w64-headers &&
+ ../mingw-w64-headers/configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrtbase"; else echo "msvcrt-os"; fi) --enable-sdk=all --enable-idl &&
+ cd .. &&
+ wl-showstatus build-install &&
+ make -Cbuild_mingw-w64-headers install-strip &&
+
+ # build MinGW-w64 crt
+ for arch in i686 x86_64 armv7 aarch64; do
+  mkdir -p build_mingw-w64-crt-$arch &&
+  wl-showstatus configure &&
+  cd build_mingw-w64-crt-$arch &&
+  ../mingw-w64-crt/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 --$(if [ "$arch" == "i686" ]; then echo "enable"; else echo "disable"; fi)-lib32 --$(if [ "$arch" == "x86_64" ]; then echo "enable"; else echo "disable"; fi)-lib64 --$(if [ "$arch" == "armv7" ]; then echo "enable"; else echo "disable"; fi)-libarm32 --$(if [ "$arch" == "aarch64" ]; then echo "enable"; else echo "disable"; fi)-libarm64 --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrtbase"; else echo "msvcrt-os"; fi) --enable-delay-import-libs --enable-wildcard &&
+  cd .. &&
+  wl-showstatus build-install &&
+  make -Cbuild_mingw-w64-crt-$arch install-strip &&
+  touch SUCCESS_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
+ rm -f SUCCESS_* &&
+ 
+ # build MinGW-w64 winpthreads
+ for arch in i686 x86_64 armv7 aarch64; do
+  mkdir -p build_mingw-w64_winpthreads_$arch &&
+  wl-showstatus configure &&
+  cd build_mingw-w64_winpthreads_$arch &&
+  ../mingw-w64-libraries/winpthreads/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 --with-sysroot=$PWD/../stage1 &&
+  cd .. &&
+  #-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ 
+  #-Wl,-m,$(case $arch in i686) echo "i386pe";; x86_64) echo "i386pep";; armv7) echo "thumb2pe";; aarch64) echo "arm64pe";; esac)
+  ## fix detection of shared libraries
+  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" build_mingw-w64_winpthreads_$arch/libtool &&
+  ## fix link issues in build_mingw-w64/mingw-w64-libraries/winpthreads/
+  #sed -i.bak -e "s?\(-o \)\([^ ]*\)\(.*\) -link \(-dll\)?-shared -s -mwindows \1.libs/libwinpthread-1.dll -Wl,--out-implib,\2 \3 \4?" build_mingw-w64_winpthreads_$arch/libtool &&
+  #sed -i.bak -e "s?\$(AM_V_CCLD).*\$(libwinpthread_la_OBJECTS).*?& \&\& \$(AR) \$(ARFLAGS) .libs/libwinpthread.a \$(libwinpthread_la_OBJECTS:.lo=.o) \&\& cp -f .libs/libwinpthread.a .libs/libwinpthread.lib?" build_mingw-w64_winpthreads_$arch/Makefile &&
+  wl-showstatus build-install &&
+  # build include files and make them available
+  #PATH=$PWD/prebuilt/bin:$PATH make -Cbuild_mingw-w64_winpthreads_$arch install-strip &&
+  make -Cbuild_mingw-w64_winpthreads_$arch install-strip &&
+  #make -Cbuild_mingw-w64_winpthreads_$arch install-strip CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" &&
+  #cp -u build_mingw-w64_winpthreads_$arch/fakelib/*.a stage1/$arch-w64-mingw32/lib/ &&
+  #mkdir -p stage1/$arch-w64-mingw32 &&
+  #cp -rf mingw-w64_winpthreads_$arch/* stage1/$arch-w64-mingw32/ &&
+  #mkdir -p stage1/lib/$arch-w64-mingw32 &&
+  #cp -rf mingw-w64_winpthreads_$arch/* stage1/lib/$arch-w64-mingw32/ &&
+  ##mkdir -p stage1/$arch-w64-windows-gnu/lib &&
+  ##cp -rf mingw-w64_winpthreads_$arch/lib/* stage1/$arch-w64-windows-gnu/lib/ &&
+  touch SUCCESS_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
+ rm -f SUCCESS_* &&
+    echo OK
+ 
