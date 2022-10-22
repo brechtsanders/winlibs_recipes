@@ -1,0 +1,98 @@
+export NAME="OpenCFLite"
+export STATUS=
+export URL=https://sourceforge.net/projects/opencflite/
+#export URL=https://github.com/nevali/opencflite
+export BASENAME=opencflite
+export DESCRIPTION="A cross platform toolkit for building applications on Mac OS X, Windows, and Linux."
+export CATEGORY=portability
+export TYPE=library
+export VERSION=476.19.0
+export VERSIONDATE=20210516
+wl-showstatus --package-version
+export DEPENDANCIES=icu
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="Apple Public Source License"
+export DOWNLOADURL="https://sourceforge.net/projects/opencflite/files/opencflite/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/opencflite/opencflite/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix CFRunLoop.c (version >= 476.19.0)
+patch -ulbf CFRunLoop.c << EOF
+@@ -3167,2 +3167,3 @@
+
++#ifndef __MINGW32__
+ typedef struct _CLIENT_ID
+@@ -3172,2 +3173,3 @@
+ } CLIENT_ID, *PCLIENT_ID;
++#endif
+
+@@ -3192,3 +3194,3 @@
+ {
+-   static HMODULE hModule = LoadLibraryA("ntdll.dll");
++   HMODULE hModule = LoadLibraryA("ntdll.dll");
+    static pfnNtQueryInformationThread queryInformationThread = 0;
+EOF
+# fix CFUniChar.c (version >= 476.19.0)
+patch -ulbf CFUniChar.c << EOF
+@@ -130,2 +130,5 @@
+ #elif DEPLOYMENT_TARGET_WINDOWS
++#ifndef MAXPATHLEN
++#define MAXPATHLEN MAX_PATH
++#endif
+     strlcpy(cpath, _CFDLLPath(), MAXPATHLEN);
+EOF
+# fix CFInternal.h (version >= 476.19.0)
+patch -ulbf CFInternal.h << EOF
+@@ -116,5 +116,5 @@
+ #elif defined(__i386__) || defined(__x86_64__)
+-    #if defined(__GNUC__)
++    #if defined(__GNUC__) && !defined(__MINGW32__)
+         #define HALT do {asm __volatile__("int3"); kill(getpid(), 9); } while (0)
+-    #elif defined(_MSC_VER)
++    #elif defined(_WIN32)
+         #define HALT do { DebugBreak(); abort(); } while (0)
+EOF
+## fix missing HALT in CFRuntime.c (version >= 476.19.0)
+#cp CFRuntime.c CFRuntime.c.bak &&
+#echo "#include <CFInternal.h>" > CFRuntime.c &&
+#cat CFRuntime.c.bak >> CFRuntime.c
+# fix missing __HALT in CFBase.c (version >= 476.19.0)
+patch -ulbf CFBase.c << EOF
+@@ -1054,2 +1054,6 @@
+ }
++#elif defined(__MINGW32__)
++void __HALT() {
++    asm __volatile__("int3");
++}
+ #else
+EOF
+# fix missing CoreFoundation directory
+wl-showstatus preconfigure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32 -lrpcrt4"  &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # don't redefine strlcat/strlcpy
+ sed -i.bak -e "s?^\(#define strlcat strncat\|#define strlcpy strncpy\)?//&?" include/config.h &&
+ echo "#undef DEBUG" >> include/config.h &&
+ wl-showstatus build &&
+ ( make LN_S="cp -pr" am_libcompat_la_OBJECTS="strlcat.lo strlcpy.lo" || (
+  # manually create CoreFoundation directory
+  mkdir -p CoreFoundation &&
+  cp -u *.h CoreFoundation &&
+  make LN_S="cp -pr" am_libcompat_la_OBJECTS="strlcat.lo strlcpy.lo"
+ )) &&
+ wl-showstatus build-install &&
+ make install-strip LN_S="cp -pr" am_libcompat_la_OBJECTS="strlcat.lo strlcpy.lo" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
