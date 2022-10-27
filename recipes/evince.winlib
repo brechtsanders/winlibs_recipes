@@ -353,6 +353,9 @@ export VERSIONDATE=20220314
 #export VERSION=43.0
 #export VERSIONDATE=20220919
 ####shell\meson.build:77:2: ERROR: Unknown variable "evince_ldflag".
+#export VERSION=43.1
+#export VERSIONDATE=20221027
+####Command '['R:\\winlibs64-11.3.0msvcrt\\evince-43.1\\build_both\\tmp-introspectf4th2994\\EvinceView-3.0.exe', '--introspect-dump=R:\\winlibs64-11.3.0msvcrt\\evince-43.1\\build_both\\tmp-introspectf4th2994\\functions.txt,R:\\winlibs64-11.3.0msvcrt\\evince-43.1\\build_both\\tmp-introspectf4th2994\\dump.xml']' returned non-zero exit status 3221225781.
 wl-showstatus --package-version
 export DEPENDANCIES=atk,cairo,pango,gail,glib2,gtk3,poppler,libxml2,zlib,gettext,libhandy
 export OPTIONALDEPENDANCIES=
@@ -376,7 +379,75 @@ patch -ulbf shell/ev-application.c << EOF
 +#endif
         g_clear_pointer (&application->uri, g_free);
 EOF
-# fix missing ldflag in shell/meson.build (version >= 3.36.7 <= 41.4)
+## fix libdocument/ev-document.c (version >= 43.1)
+#patch -ulbf libdocument/ev-document.c << EOF
+#@@ -613,2 +613,3 @@
+#
+#+#ifndef _WIN32
+#         if (fstat(fd, &statbuf) == -1 ||
+#@@ -622,2 +623,3 @@
+#         }
+#+#endif
+#
+#@@ -630,2 +632,3 @@
+#
+#+#ifndef _WIN32
+#         switch (fd_flags & O_ACCMODE) {
+#@@ -641,2 +644,3 @@
+#         }
+#+#endif
+#
+#EOF
+## fix libview/ev-jobs.c (version >= 43.1)
+#patch -ulbf libview/ev-jobs.c << EOF
+#@@ -1517,3 +1517,7 @@
+#
+#+#ifdef _WIN32
+#+        new_fd = dup (fd);
+#+#else
+#         new_fd = fcntl (fd, F_DUPFD_CLOEXEC, 3);
+#+#endif
+#         if (new_fd == -1) {
+#EOF
+## fix previewer/ev-previewer-window.c (version >= 43.1)
+#patch -ulbf previewer/ev-previewer-window.c << EOF
+#@@ -682,3 +682,7 @@
+#
+#+#ifdef _WIN32
+#+        nfd = dup (fd);
+#+#else
+#         nfd = fcntl (fd, F_DUPFD_CLOEXEC, 3);
+#+#endif
+#         if (nfd == -1) {
+#EOF
+## fix previewer/ev-previewer.c (version >= 43.1)
+#patch -ulbf previewer/ev-previewer.c << EOF
+#@@ -170,2 +170,3 @@
+#
+#+#ifndef _WIN32
+#                 if (fstat (input_fd, &statbuf) == -1 ||
+#@@ -178,2 +179,3 @@
+#                 }
+#+#endif
+#
+#@@ -185,2 +187,3 @@
+#
+#+#ifndef _WIN32
+#                 switch (flags & O_ACCMODE) {
+#@@ -195,2 +198,3 @@
+#                 }
+#+#endif
+#
+#EOF
+## fix missing poppler_document_new_from_gfile in backend/pdf/ev-poppler.c (version >= 43.1)
+#patch -ulbf backend/pdf/ev-poppler.c << EOF
+#@@ -69,3 +69,3 @@
+#
+#-#if POPPLER_CHECK_VERSION (21, 12, 0)
+#+#if POPPLER_CHECK_VERSION (21, 12, 0) && !defined(_WIN32)
+# #define HAVE_POPPLER_LOAD_FD
+#EOF
+## fix missing ldflag in shell/meson.build (version >= 3.36.7 <= 41.4)
 patch -ulbf shell/meson.build << EOF
 @@ -87,3 +87,3 @@
 
@@ -433,6 +504,8 @@ mkdir -p build_both &&
  sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
  ## fix executing shell scripts
  #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ ## add linker flag (version >= 43.1)
+ #sed -i.bak -e "s/^\s*\(LINK_ARGS\|LINK_LIBRARIES\)\s*=.* -ladvapi32/& -Wl,--as-needed -lshlwapi/" build_both/build.ninja &&
  wl-showstatus build-install &&
  PKG_CONFIG= PATH=$PYDIR:$PATH PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib GETTEXTDATADIR=$MINGWPREFIX/share/gettext ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION

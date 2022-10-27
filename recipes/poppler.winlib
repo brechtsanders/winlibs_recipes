@@ -622,6 +622,46 @@ patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
 EOF
 # avoid __declspec(dllexport) in static builds (version >= 21.01.0)
 sed -i.bak -e "s/#if defined(_WIN32)/& \&\& \!defined(STATIC)/" cpp/poppler-global.h glib/poppler-macros.h qt5/src/poppler-export.h qt6/src/poppler-export.h
+## don't remove poppler_document_new_from_gfile from glib/poppler-document.h / glib/poppler-document.cc (version >= 22.10.0)
+#patch -ulbf glib/poppler-document.h << EOF
+#@@ -304,6 +304,4 @@
+# PopplerDocument *poppler_document_new_from_gfile(GFile *file, const char *password, GCancellable *cancellable, GError **error);
+#-#ifndef G_OS_WIN32
+# POPPLER_PUBLIC
+# PopplerDocument *poppler_document_new_from_fd(int fd, const char *password, GError **error);
+#-#endif
+# POPPLER_PUBLIC
+#EOF
+#patch -ulbf glib/poppler-document.cc << EOF
+#@@ -448,3 +448,2 @@
+#
+#-#ifndef G_OS_WIN32
+#
+#@@ -479,2 +478,3 @@
+#
+#+#ifndef G_OS_WIN32
+#     if (fstat(fd, &statbuf) == -1 || (flags = fcntl(fd, F_GETFL, &flags)) == -1) {
+#@@ -496,4 +496,7 @@
+#     }
+#+#endif
+#
+#+#ifndef G_OS_WIN32
+#     if (fd == fileno(stdin) || !S_ISREG(statbuf.st_mode)) {
+#+#endif
+#         FILE *file;
+#@@ -513,2 +516,3 @@
+#         stream = new CachedFileStream(cachedFile, 0, false, cachedFile->getLength(), Object(objNull));
+#+#ifndef G_OS_WIN32
+#     } else {
+#@@ -516,2 +520,3 @@
+#     }
+#+#endif
+#
+#@@ -529,3 +534,2 @@
+#
+#-#endif /* !G_OS_WIN32 */
+#
+#EOF
 # fix detection of Python for glib-mkenums (version >= 22.02.0)
 sed -i.bak -e "s?\(find_program(GLIB2_MKENUMS_PYTHON python\)3)?\1 PATHS \"$(cygpath -m $PYDIR)\")?" glib/CMakeLists.txt
 mkdir -p build_static build_shared &&
