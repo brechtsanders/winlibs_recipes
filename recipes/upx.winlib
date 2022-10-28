@@ -1,3 +1,64 @@
+#export NAME="UPX"
+#export STATUS=
+#export URL=http://upx.sourceforge.net/
+#export BASENAME=upx
+#export DESCRIPTION="UPX is a free, portable, extendable, high-performance executable packer for several executable formats."
+#export CATEGORY=compression
+#export TYPE=application
+##export VERSION=3.91
+##export VERSIONDATE=20141103
+##export VERSION=3.95
+##export VERSIONDATE=20191026
+#export VERSION=3.96
+#export VERSIONDATE=20200123
+#wl-showstatus --package-version
+#export DEPENDANCIES=ucl
+#export OPTIONALDEPENDANCIES=
+#export BUILDDEPENDANCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+##export DOWNLOADURL="http://sourceforge.net/projects/upx/files/upx/ upx- -src.tar.bz2"
+#export DOWNLOADURL="https://github.com/upx/upx/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://sourceforge.net/projects/upx/files/upx/$VERSION/$BASENAME-$VERSION-src.tar.bz2
+#export DOWNLOADSOURCEURL=https://github.com/upx/upx/releases/download/v$VERSION/$BASENAME-$VERSION-src.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-src.tar.bz2
+#tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-src.tar.xz
+#cd $BASENAME-$VERSION-src
+### fix missing assembler stuff in src/compress_ucl.cpp (version <= 3.91)
+##patch -ulbf src/compress_ucl.cpp << EOF
+##--- src/compress_ucl.cpp  2014-11-03 21:52:38 +0100
+##+++ src/compress_ucl.cpp  2014-11-03 21:53:00 +0100
+##@@ -36,3 +36,3 @@
+## #if 1 && !(UCL_USE_ASM) && (ACC_ARCH_I386)
+##-#  if (ACC_CC_CLANG || ACC_CC_GNUC || ACC_CC_INTELC || ACC_CC_MSC || ACC_CC_WATCOMC)
+##+#  if (ACC_CC_CLANG || ACC_CC_GNUC || ACC_CC_INTELC || ACC_CC_MSC || ACC_CC_WATCOMC) && !defined(__MINGW32__)
+## #    define UCL_USE_ASM 1
+##EOF
+## fix src/lzma-sdk/C/Common/MyCom.h (version >= 3.96)
+#patch -ulbf src/lzma-sdk/C/Common/MyCom.h << EOF
+#@@ -159,3 +159,3 @@
+# STDMETHOD_(ULONG, Release)() { if (--__m_RefCount != 0)  \\
+#-  return __m_RefCount; delete this; return 0; }
+#+  { return __m_RefCount; } delete this; return 0; }
+#
+#EOF
+#wl-showstatus build &&
+# #UPX_LZMADIR=$MINGWPREFIX 
+# #( make all LDFLAGS="-static" exeext=.exe || make all CXXFLAGS="-Wno-error=int-in-bool-context" LDFLAGS="-static" exeext=.exe ) &&
+# make -Csrc upx.exe exeext=.exe CXX="${CXX:-g++} -DUCL_NO_ASM" &&
+# wl-showstatus build-install &&
+# strip src/upx.exe &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# cp -f src/upx.exe $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION-src
+
+
+
 export NAME="UPX"
 export STATUS=
 export URL=http://upx.sourceforge.net/
@@ -5,14 +66,8 @@ export BASENAME=upx
 export DESCRIPTION="UPX is a free, portable, extendable, high-performance executable packer for several executable formats."
 export CATEGORY=compression
 export TYPE=application
-#export VERSION=3.91
-#export VERSIONDATE=20141103
-#export VERSION=3.95
-#export VERSIONDATE=20191026
-export VERSION=3.96
-export VERSIONDATE=20200123
-#export VERSION=3.99
-#export VERSIONDATE=20221028
+export VERSION=3.99
+export VERSIONDATE=20221028
 wl-showstatus --package-version
 export DEPENDANCIES=ucl
 export OPTIONALDEPENDANCIES=
@@ -31,41 +86,14 @@ wl-showstatus extract
 #tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-src.tar.bz2
 tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-src.tar.xz
 cd $BASENAME-$VERSION-src
-## fix missing assembler stuff in src/compress_ucl.cpp (version <= 3.91)
-#patch -ulbf src/compress_ucl.cpp << EOF
-#--- src/compress_ucl.cpp  2014-11-03 21:52:38 +0100
-#+++ src/compress_ucl.cpp  2014-11-03 21:53:00 +0100
-#@@ -36,3 +36,3 @@
-# #if 1 && !(UCL_USE_ASM) && (ACC_ARCH_I386)
-#-#  if (ACC_CC_CLANG || ACC_CC_GNUC || ACC_CC_INTELC || ACC_CC_MSC || ACC_CC_WATCOMC)
-#+#  if (ACC_CC_CLANG || ACC_CC_GNUC || ACC_CC_INTELC || ACC_CC_MSC || ACC_CC_WATCOMC) && !defined(__MINGW32__)
-# #    define UCL_USE_ASM 1
-#EOF
-# fix src/lzma-sdk/C/Common/MyCom.h (version >= 3.96)
-patch -ulbf src/lzma-sdk/C/Common/MyCom.h << EOF
-@@ -159,3 +159,3 @@
- STDMETHOD_(ULONG, Release)() { if (--__m_RefCount != 0)  \\
--  return __m_RefCount; delete this; return 0; }
-+  { return __m_RefCount; } delete this; return 0; }
-
-EOF
-wl-showstatus build &&
- #UPX_LZMADIR=$MINGWPREFIX 
- #( make all LDFLAGS="-static" exeext=.exe || make all CXXFLAGS="-Wno-error=int-in-bool-context" LDFLAGS="-static" exeext=.exe ) &&
- make -Csrc upx.exe exeext=.exe CXX="${CXX:-g++} -DUCL_NO_ASM" &&
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lssp/" build_win/build.ninja &&
  wl-showstatus build-install &&
- strip src/upx.exe &&
- mkdir -p $INSTALLPREFIX/bin &&
- cp -f src/upx.exe $INSTALLPREFIX/bin/ &&
+ ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION-src
 
 
 
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
-# #wl-showstatus build &&
-# #ninja -Cbuild_win &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_win install/strip &&
-#    echo OK
