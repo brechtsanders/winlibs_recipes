@@ -6,8 +6,10 @@ export BASENAME=xfconf
 export DESCRIPTION="D-Bus-based configuration storage system"
 export CATEGORY=
 export TYPE=library
-export VERSION=4.16.0
-export VERSIONDATE=20201223
+#export VERSION=4.16.0
+#export VERSIONDATE=20201223
+export VERSION=4.17.0
+export VERSIONDATE=20221101
 wl-showstatus --package-version
 export DEPENDANCIES=libxfce4util,glib2
 #export DEPENDANCIES=libxfce4util,glib2,gobject-introspection,vala
@@ -37,7 +39,55 @@ patch -ulbf common/xfconf-gvaluefuncs.c << EOF
 +    unsigned int i;
 
 EOF
-# fix missing signals support in xfconfd/main.c (version >= 4.16.0)
+## fix missing signals support in xfconfd/main.c (version = 4.16.0)
+#patch -ulbf xfconfd/main.c << EOF
+#@@ -69,2 +69,3 @@
+#
+#+#ifndef _WIN32
+# static void
+#@@ -87,2 +88,3 @@
+# }
+#+#endif
+#
+#@@ -139,3 +141,5 @@
+#     GError *error = NULL;
+#+#ifndef _WIN32
+#     struct sigaction act;
+#+#endif
+#     GIOChannel *signal_io;
+#@@ -160,2 +164,3 @@
+#
+#+#ifndef _WIN32
+#     memset(&act, 0, sizeof(act));
+#@@ -172,2 +177,3 @@
+#     sigaction(SIGPIPE, &act, NULL);
+#+#endif
+#
+#@@ -198,3 +204,6 @@
+#     mloop = g_main_loop_new(NULL, FALSE);
+#-
+#+
+#+#ifdef _WIN32
+#+    g_warning("No signal support on Windows.  Signals will be ignored.");
+#+#else
+#     if(pipe(signal_pipe))
+#@@ -218,2 +227,3 @@
+#     }
+#+#endif
+#
+#@@ -245,2 +255,6 @@
+#
+#+#ifdef _WIN32
+#+        g_printerr("No fork() on Windows\\n");
+#+        return 1;
+#+#else
+#         child_pid = fork();
+#@@ -253,2 +267,3 @@
+#         }
+#+#endif
+#
+#EOF
+# fix xfconfd/main.c (version >= 4.17.0)
 patch -ulbf xfconfd/main.c << EOF
 @@ -69,2 +69,3 @@
 
@@ -47,16 +97,16 @@ patch -ulbf xfconfd/main.c << EOF
  }
 +#endif
 
-@@ -139,3 +141,5 @@
+@@ -140,3 +142,5 @@
      GError *error = NULL;
 +#ifndef _WIN32
-     struct sigaction act;
+     struct sigaction act = {0};
 +#endif
      GIOChannel *signal_io;
 @@ -160,2 +164,3 @@
-
+     };
 +#ifndef _WIN32
-     memset(&act, 0, sizeof(act));
+
 @@ -172,2 +177,3 @@
      sigaction(SIGPIPE, &act, NULL);
 +#endif
@@ -73,14 +123,14 @@ patch -ulbf xfconfd/main.c << EOF
      }
 +#endif
 
-@@ -245,2 +255,6 @@
+@@ -251,2 +261,6 @@
 
 +#ifdef _WIN32
 +        g_printerr("No fork() on Windows\\n");
 +        return 1;
 +#else
          child_pid = fork();
-@@ -253,2 +267,3 @@
+@@ -259,2 +273,3 @@
          }
 +#endif
 

@@ -12,10 +12,10 @@ export TYPE=library
 #export VERSIONDATE=20210627
 #export VERSION=4.17.1
 #export VERSIONDATE=20210719
-export VERSION=4.17.2
-export VERSIONDATE=20220222
-#export VERSION=4.17.3
-#export VERSIONDATE=20221101
+#export VERSION=4.17.2
+#export VERSIONDATE=20220222
+export VERSION=4.17.3
+export VERSIONDATE=20221101
 wl-showstatus --package-version
 export DEPENDANCIES=glib2
 #export DEPENDANCIES=glib2,gobject-introspection,vala
@@ -137,6 +137,50 @@ cat > libxfce4util/xfce-resource.c << EOF
 #define DEFAULT_XDG_CONFIG_DIRS ""
 EOF
 cat libxfce4util/xfce-resource.c.bak >> libxfce4util/xfce-resource.c
+# fix missing getline in libxfce4util/xfce-rc-simple.c (version >= 4.17.3)
+mv libxfce4util/xfce-rc-simple.c libxfce4util/xfce-rc-simple.c.bak
+cat > libxfce4util/xfce-rc-simple.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat libxfce4util/xfce-rc-simple.c.bak >> libxfce4util/xfce-rc-simple.c
 # fix docs/Makefile.am
 sed -i.bak -e "s/\(EXTRA_DIST\s*\)+=/\1=/" docs/Makefile.am
 # fix missing files
