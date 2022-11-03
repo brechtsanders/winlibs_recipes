@@ -1,0 +1,122 @@
+export NAME="publib"
+export STATUS=
+export URL=https://code.google.com/archive/p/publib/
+#export URL=https://github.com/ajkaijanaho/publib
+export BASENAME=publib
+export DESCRIPTION="Publib provides functions for memory allocation, bit arrays, comparing standard C types for qsort and bsearch, error messages, filenames, hash tables, integer sets, log files, NNTP, priority queues, normal queues, editor buffers, stacks, and strings."
+export CATEGORY=
+export TYPE=library
+export VERSION=0.40
+export VERSIONDATE=20221102
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=README
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://code.google.com/archive/p/publib/downloads"
+#export DOWNLOADURL="https://github.com/ajkaijanaho/publib/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/publib/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/ajkaijanaho/publib/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix fname/fnhome.c (version >= 0.40)
+patch -ulbf fname/fnhome.c << EOF
+@@ -37,3 +37,8 @@
+ #include <string.h>
++#ifdef _WIN32
++#include <windows.h>
++#include <shlobj.h>
++#else
+ #include <pwd.h>
++#endif
+ #include <unistd.h>
+@@ -43,2 +48,8 @@
+ int fnhome(char *homedir, const char *username) {
++#ifdef _WIN32
++       if (GetUserProfileDirectoryA(NULL, CSIDL_PROFILE, NULL, 0, homedir) != S_OK) {
++               __publib_error("can't find home directory");
++               return -1;
++       }
++#else
+        struct passwd *pwd;
+@@ -58,2 +69,3 @@
+        strcpy(homedir, pwd->pw_dir);
++#endif
+        return 0;
+EOF
+# fix fname/fnqualify.c (version >= 0.40)
+patch -ulbf fname/fnqualify.c << EOF
+@@ -37,3 +37,6 @@
+ #include <string.h>
++#ifdef _WIN32
++#else
+ #include <pwd.h>
++#endif
+ #include <unistd.h>
+@@ -65,3 +68,6 @@
+        /* Do we just need to prepend the current directory? */
+-       if (path[0] != '~') {
++#ifndef _WIN32
++       if (path[0] != '~')
++#endif
++       {
+                if (getcwd(result, max) == NULL) {
+@@ -78,2 +84,5 @@
+
++#ifdef _WIN32
++       return -1;
++#else
+        /* We need to do tilde substitution, get the password entry (which
+@@ -108,2 +117,3 @@
+        return size;
++#endif
+ }
+EOF
+# fix nntp/nntp.c (version >= 0.40)
+patch -ulbf nntp/nntp.c << EOF
+@@ -46,2 +46,5 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+@@ -52,2 +55,3 @@
+ extern int h_errno;
++#endif
+
+EOF
+# fix lockfile/lockfile.c (version >= 0.40)
+patch -ulbf lockfile/lockfile.c << EOF
+@@ -70,2 +70,10 @@
+
++#ifdef _WIN32
++       if (rename(tempname, lockname) == -1) {
++               e = errno;
++               (void) unlink(tempname);
++               errno = e;
++               return -1;
++       }
++#else
+        if (link(tempname, lockname) == -1
+@@ -80,2 +88,3 @@
+        (void) unlink(tempname);
++#endif
+        return 0;
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p $INSTALLPREFIX/lib/libpub.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > libpub.def &&
+ ${CC:-gcc} -shared -s -mwindows -def libpub.def -o $INSTALLPREFIX/bin/publib.dll $INSTALLPREFIX/lib/libpub.a -Wl,--out-implib,$INSTALLPREFIX/libpub.dll.a -Wl,--as-needed -lpcreposix -lws2_32 -luserenv &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
