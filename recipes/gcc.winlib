@@ -203,6 +203,8 @@ export TYPE=application
 #export VERSIONDATE=20210616
 #export VERSION=9-20211202
 #export VERSIONDATE=20211105
+#export VERSION=9.5.0
+#export VERSIONDATE=20221105
 #export VERSION=10-20200110
 #export VERSIONDATE=20200113
 #export VERSION=10-20200126
@@ -245,6 +247,8 @@ export TYPE=application
 #export VERSIONDATE=20210828
 #export VERSION=10-20211112
 #export VERSIONDATE=20211113
+#export VERSION=10.4.0
+#export VERSIONDATE=20221105
 #export VERSION=11-20201011
 #export VERSIONDATE=20201018
 #export VERSION=11-20201018
@@ -319,6 +323,7 @@ export VERSIONDATE=20220819
 #export VERSIONDATE=20221105
 wl-showstatus --package-version
 export DEPENDANCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl,mman-win32
+#mcfgthread
 export OPTIONALDEPENDANCIES=libbacktrace
 export BUILDDEPENDANCIES=binutils
 export LICENSEFILE=COPYING
@@ -429,6 +434,14 @@ EOF
 #
 #EOF
 #cat gcc/testsuite/gcc.dg/pr88568.c.bak >> gcc/testsuite/gcc.dg/pr88568.c
+## fix libgfortran/runtime/error.c (version >= 9.5.0)
+#patch -ulbf libgfortran/runtime/error.c << EOF
+#@@ -140,3 +140,3 @@
+# static int
+#-gf_vsnprintf (char *str, size_t size, const char *format, va_list ap)
+#+gf_vsnprintf (char *buffer, size_t size, const char *format, va_list ap)
+# {
+#EOF
 ## fix gcc/analyzer/store.h (version >= 11-20201025)
 ##### reported bug: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=97614
 #patch -ulbf gcc/analyzer/store.h << EOF
@@ -819,6 +832,14 @@ EOF
 #+#endif
 #
 #EOF
+## fix libgomp/env.c (version >= 13-20221030)
+#patch -ulbf libgomp/env.c << EOF
+#@@ -285,3 +285,3 @@
+# {
+#-  unsigned upper = (unsigned long) params[2];
+#+  unsigned upper = (uintptr_t) params[2];
+#   unsigned long pvalue = 0;
+#EOF
 ## fix missing -lmman (version >= 12.1.0)
 #sed -i.bak -e "s/^NETLIBS := /&-lmman /" c++tools/Makefile.in
 #sed -i.bak -e "s/-o \$(FI).*$/& -lmman /" fixincludes/Makefile.in
@@ -840,6 +861,9 @@ EOF
 fi
 ## avoid -fPIC (useless on Windows and not supported by clang)
 #sed -i.bak -e "s/-fPIC//" $(grep -l "\-fPIC" $(find -name configure))
+## fix linker error: export ordinal too large (version >= 13)
+##sed -i.bak "s/--export-all-symbols/--discard-all/" gcc/configure
+#sed -i.bak "s/--export-all-symbols/--gc-keep-exported/" gcc/configure
 # copy MinGW-w64 files
 mkdir -p build_mingw/mingw-w64/mingw &&
 cp -rf $MINGWPREFIX/share/mingw-w64/include build_mingw/mingw-w64/mingw/ &&
@@ -873,6 +897,7 @@ mkdir -p build_mingw &&
  PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM $(if echo $VERSION|grep -q "^1[0-9]\."; then echo "--enable-offload-targets=nvptx-none"; fi) --with-pkgversion="MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi)$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "-ucrt"; else echo -n "-msvcrt"; fi)-posix-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" --with-tune=generic --enable-checking=release --enable-threads=posix $(if [ "0$USE_SJLJ" -ne 0 ]; then if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--without-dwarf2 "; fi; echo "--enable-sjlj-exceptions"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--with-dwarf2 "; fi; echo "--disable-sjlj-exceptions"; fi) --disable-libunwind-exceptions --disable-serial-configure --disable-bootstrap --enable-host-shared $(if echo $VERSION|grep -q "^[1-6]\."; then echo "--disable-plugin"; else echo "--enable-plugin"; fi) --disable-default-ssp --disable-rpath --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -q "^1[1-9][.\-]"; then echo ",jit"; fi) --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,libstdcxx-time} --disable-libstdcxx-pch --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) $(if echo $VERSION|grep -q "^1[2-9][.\-]"; then echo "--enable-libstdcxx-backtrace"; fi) --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --enable-clocale=generic --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -D__USE_MINGW_ACCESS" CXXFLAGS="-D__USE_MINGW_ACCESS" LDFLAGS="-Wl,--disable-nxcompat $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--disable-high-entropy-va &> /dev/null; then echo "-Wl,--disable-high-entropy-va"; fi) -Wl,--disable-dynamicbase" &&
  #PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM $(if echo $VERSION|grep -q "^1[0-9]\."; then echo "--enable-offload-targets=nvptx-none"; fi) --with-pkgversion="MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi)$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "-ucrt"; else echo -n "-msvcrt"; fi)-posix-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" --with-tune=generic --enable-checking=release --enable-threads=posix $(if [ "0$USE_SJLJ" -ne 0 ]; then if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--without-dwarf2 "; fi; echo "--enable-sjlj-exceptions"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--with-dwarf2 "; fi; echo "--disable-sjlj-exceptions"; fi) --disable-libunwind-exceptions --disable-serial-configure --disable-bootstrap --enable-host-shared $(if echo $VERSION|grep -q "^[1-6]\."; then echo "--disable-plugin"; else echo "--enable-plugin"; fi) --disable-default-ssp --disable-rpath --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -q "^1[1-9][.\-]"; then echo ",jit"; fi) --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,libstdcxx-pch,libstdcxx-time} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) $(if echo $VERSION|grep -q "^1[2-9][.\-]"; then echo "--enable-libstdcxx-backtrace"; fi) --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --enable-clocale=generic --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/mman-win32 -DHAVE_MMAP_FILE -D__USE_MINGW_ACCESS" CXXFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/mman-win32 -DHAVE_MMAP_FILE -D__USE_MINGW_ACCESS" LDFLAGS="-Wl,--as-needed -ldl -lmman -Wl,--disable-nxcompat $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--disable-high-entropy-va &> /dev/null; then echo "-Wl,--disable-high-entropy-va"; fi) -Wl,--disable-dynamicbase" HOST_LIBS="-ldl" &&
  #PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM $(if echo $VERSION|grep -q "^1[0-9]\."; then echo "--enable-offload-targets=nvptx-none"; fi) --with-pkgversion="MinGW-W64 $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo i686; fi)$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "-ucrt"; fi)-posix-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" --with-tune=generic --enable-checking=release --enable-threads=posix $(if [ "0$USE_SJLJ" -ne 0 ]; then if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--without-dwarf2 "; fi; echo "--enable-sjlj-exceptions"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--with-dwarf2 "; fi; echo "--disable-sjlj-exceptions"; fi) --disable-libunwind-exceptions --disable-serial-configure --disable-bootstrap --enable-host-shared $(if echo $VERSION|grep -q "^[1-6]\."; then echo "--disable-plugin"; else echo "--enable-plugin"; fi) --disable-default-ssp --disable-rpath --enable-libstdcxx-pch --enable-libstdcxx-time=yes --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -q "^1[1-9][.\-]"; then echo ",jit"; fi)$(if echo $VERSION|grep -q "^1[1-9][.\-]"; then echo -n ",d"; fi) $(if echo $VERSION|grep -vq "^[3-8]\."; then echo -n "--enable-libphobos"; fi) --disable-{gold,nls,stage1-checking,win32-registry,multilib,libssp,libitm,libsanitizer} --enable-{ld,libquadmath,libada,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --enable-clocale=generic --with-libiconv --with-system-zlib --with-build-sysroot=$(pwd)/mingw-w64 $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) CFLAGS="-I$MINGWPREFIX/include/libdl-win32" &&
+ #--enable-threads=mcf
  #--with-native-system-header-dir=$MINGWPREFIX/share/mingw-w64/include 
  #--enable-languages=d
  #--enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -q "^1[1-9][.\-]"; then echo ",d,jit"; fi)$(if echo $VERSION|grep -q "^1[2-9][.\-]"; then echo ",brig,go"; fi) 
@@ -936,6 +961,8 @@ mkdir -p build_mingw &&
  # PATH=$MINGWPREFIX/share/mingw-w64/bin:$PATH C_INCLUDE_PATH=$MINGWPREFIX/share/mingw-w64/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} CPLUS_INCLUDE_PATH=$MINGWPREFIX/share/mingw-w64/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} LD_RUN_PATH=$MINGWPREFIX/share/mingw-w64/lib${LD_RUN_PATH:+:$LD_RUN_PATH} LIBRARY_PATH=$MINGWPREFIX/share/mingw-w64/lib${LIBRARY_PATH:+:$LIBRARY_PATH} make -Cbuild_mingw
  #) || PATH=$MINGWPREFIX/share/mingw-w64/bin:$PATH C_INCLUDE_PATH=$MINGWPREFIX/share/mingw-w64/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} CPLUS_INCLUDE_PATH=$MINGWPREFIX/share/mingw-w64/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} LD_RUN_PATH=$MINGWPREFIX/share/mingw-w64/lib${LD_RUN_PATH:+:$LD_RUN_PATH} LIBRARY_PATH=$MINGWPREFIX/share/mingw-w64/lib${LIBRARY_PATH:+:$LIBRARY_PATH} make -j1 -Cbuild_mingw ) &&
  #make -Cbuild_mingw glibcxx_lt_pic_flag= &&
+ ## fix missing cc1.exe.a / cc1plus.exe.a (version >= 13)
+ #touch build_mingw/gcc/cc1.exe.a build_mingw/gcc/cc1plus.exe.a &&
  wl-showstatus build-install &&
  make -Cbuild_mingw install-strip &&
  ## strip absolute -L paths from libstdc++.la and libsupc++.la
@@ -947,6 +974,8 @@ mkdir -p build_mingw &&
  sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc/lib/libstdc++.dll.a-gdb.py &&
  ## when using --enable-version-specific-runtime-libs
  #sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc/lib/gcc/*/*/libstdc++.dll.a-gdb.py &&
+ ## remove dummy cc1.exe.a / cc1plus.exe.a (version >= 13)
+ #for F in build_mingw/gcc/cc1.exe.a build_mingw/gcc/cc1plus.exe.a; do if [ ! -s $F ]; then echo rm -f $F; fi; done &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####To get all configure parameters: rm -f configure_help && for F in $(find -name configure); do ( echo "[$F]" && $F --help ) >> configure_help; done
 
