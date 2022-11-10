@@ -7,10 +7,12 @@ export CATEGORY=database
 export TYPE=library
 #export VERSION=10.0.0
 #export VERSIONDATE=20220420
-export VERSION=11.0.0
-export VERSIONDATE=20220628
+#export VERSION=11.0.0
+#export VERSIONDATE=20220628
+export VERSION=11.1.0
+export VERSIONDATE=20221110
 wl-showstatus --package-version
-export DEPENDANCIES=zlib,liblz4,zstd,snappy
+export DEPENDANCIES=zlib,liblz4,zstd,snappy,libsodium
 export OPTIONALDEPENDANCIES=
 export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=LICENSE
@@ -67,5 +69,43 @@ patch -ulbf cmake/helpers.cmake << EOF
 +    if("\${output_type_size}" EQUAL "")
          # Type does not exist.
 EOF
+# fix cmake/configs/auto.cmake (version >= 11.1.0)                              
+patch -ulbf cmake/configs/auto.cmake << EOF                                     
+@@ -13,4 +13,4 @@                                                               
+ set(default_uintmax_def " ")                                                   
+-if(\${u_intmax_size} STREQUAL "")                                              
+-    if(\${unsigned long long} STREQUAL "")                                     
++if("\${u_intmax_size}" STREQUAL "")                                            
++    if("\${u_long_long_size}" STREQUAL "")                                     
+         set(default_uintmax_def "typedef unsigned long uintmax_t\\\\;")        
+EOF                                                                             
 
-mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DWT_STANDALONE_BUILD:STRING=ON -DENABLE_PYTHON:STRING=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library static -D documentation=true . build_static &&
+# wl-showstatus configure &&
+# PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library shared -D documentation=true . build_shared &&
+# ## fix slash/backslash path issue when calling Python from Ninja
+# #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+# ## add linker flag
+# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed/" build_shared/build.ninja &&
+# ## add linker flag
+# #sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\"/" build_shared/build.ninja &&
+# wl-showstatus build-install &&
+# #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -C build_static install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -C build_static install/strip &&
+# wl-showstatus build-install &&
+# #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -C build_shared install &&
+# PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -C build_shared install/strip &&
+#    echo OK && find . -name '*.a'
