@@ -126,12 +126,15 @@ export TYPE=library
 #export VERSIONDATE=20211220
 #export VERSION=7.6.0
 #export VERSIONDATE=20220330
-export VERSION=7.8.0
-export VERSIONDATE=20220623
-#export VERSION=7.10.0
-#export VERSIONDATE=20221101
+#export VERSION=7.8.0
+#export VERSIONDATE=20220623
+#export DEPENDANCIES=sdl,sdl2,cairo,libdl,libebur128,libexif,fftw,fontconfig,gdk-pixbuf,glib2,libiconv,gettext,jack,pango,rtaudio,rubberband,libsamplerate,sox,swfdec,libvorbis,libxml2
+#export OPTIONALDEPENDANCIES=opencv,movit
+#export BUILDDEPENDANCIES=cmake,ninja
+export VERSION=7.10.0
+export VERSIONDATE=20221101
 wl-showstatus --package-version
-export DEPENDANCIES=sdl,sdl2,cairo,libdl,libebur128,libexif,fftw,fontconfig,gdk-pixbuf,glib2,libiconv,gettext,jack,pango,rtaudio,rubberband,libsamplerate,sox,swfdec,libvorbis,libxml2
+export DEPENDANCIES=sdl,sdl2,cairo,libdl,libebur128,libexif,fftw,fontconfig,gdk-pixbuf,glib2,libiconv,gettext,jack,pango,rubberband,libsamplerate,sox,swfdec,libvorbis,libxml2
 export OPTIONALDEPENDANCIES=opencv,movit
 export BUILDDEPENDANCIES=cmake,ninja
 export LICENSEFILE=COPYING
@@ -145,6 +148,14 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+## fix src/modules/rtaudio/RtAudio.cpp (version >= 7.10.0)
+#patch -ulbf src/modules/rtaudio/RtAudio.cpp << EOF
+#@@ -2686,3 +2686,3 @@
+# #include "asiosys.h"
+#-#include "asio.h"
+#+#include "asio.hpp"
+# #include "iasiothiscallresolver.h"
+#EOF
 # fix detection of rtaudio (version >= 7.4.0)
 echo "SET_TARGET_PROPERTIES(PkgConfig::rtaudio PROPERTIES INTERFACE_INCLUDE_DIRECTORIES \"$(cygpath -m $MINGWPREFIX/include/rtaudio)\")" >> src/modules/rtaudio/CMakeLists.txt
 # fix detection of libdl in CMakeLists.txt (version >= 7.4.0)
@@ -161,13 +172,15 @@ EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
- PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMOD_RTAUDIO:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
  #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/rtaudio/asiosdk/common" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
  # add linker flag
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -liconv/" build_static/build.ninja &&
  wl-showstatus configure &&
  #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
- PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMOD_RTAUDIO:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
  #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/rtaudio/asiosdk/common" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
  # add linker flag
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -liconv/" build_shared/build.ninja &&
