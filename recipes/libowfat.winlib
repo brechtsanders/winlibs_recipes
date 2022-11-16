@@ -1,0 +1,65 @@
+export NAME="libowfat"
+export STATUS=
+export URL=https://www.fefe.de/libowfat/
+export BASENAME=libowfat
+export DESCRIPTION="This project aims to make the excellent libraries from Dan Bernstein available to a wider public by extracting them from his packages and providing a minimal Makefile for each library."
+export CATEGORY=
+export TYPE=library
+#export VERSION=0.32
+#export VERSIONDATE=20210901
+export VERSION=0.33
+export VERSIONDATE=20221116
+####buffer/buffer_1.c:8:40: error: 'write' undeclared here (not in a function)
+wl-showstatus --package-version
+export DEPENDANCIES=mcf
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://www.fefe.de/libowfat/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.fefe.de/libowfat/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION/libowfat
+tar xfJ $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz -C$BASENAME-$VERSION/libowfat --strip-components=1
+cd $BASENAME-$VERSION/libowfat
+# fix missing mcfgthread/c11thread.h
+mkdir mcfgthread &&
+echo "#include <mcfcrt/env/c11thread.h>" > mcfgthread/c11thread.h
+# avoid missing socketpair() in io/io_socketpair.c (version >= 0.33)
+patch -ulbf io/io_socketpair.c << EOF
+@@ -11,2 +11,5 @@
+ int io_socketpair(int64* d) {
++#ifdef __MINGW32__
++  return 0;
++#else
+   int fds[2];
+@@ -25,2 +28,3 @@
+   return 0;
++#endif
+ }
+EOF
+# make sure HAVE_PREAD is not defined
+mv trypread.c trypread.c.bak &&
+echo "#error pread() not supported on Windows" > trypread.c
+wl-showstatus build &&
+ #( make DIET= CC="${CC:-gcc} -mssse3" LDFLAGS="-Wl,--as-needed -lwsock32" $(sed -ne "s/^\(.*\.h\): .*$/\1/p" Makefile) || (
+ # # fix missing libowfat/compiler.h
+ # mkdir -p libowfat &&
+ # cp -u *.h libowfat/
+ #)) &&
+ make DIET= CC="${CC:-gcc} -mssse3 -I$PWD/.." LDFLAGS="-Wl,--as-needed -lwsock32" libowfat.a &&
+ ( echo "EXPORTS" && nm -f posix --defined-only -p libowfat.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > libowfat.def &&
+ ${CC:-gcc} -shared -s -mwindows -def libowfat.def -o libowfat.dll libowfat.a -Wl,--out-implib,libowfat.dll.a -lwsock32 &&
+ wl-showstatus install &&
+ make install prefix=$INSTALLPREFIX &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
