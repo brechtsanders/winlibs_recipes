@@ -1,0 +1,42 @@
+export NAME="GNOME Text Editor"
+export STATUS=
+export URL=https://gitlab.gnome.org/GNOME/gnome-text-editor
+export BASENAME=gnome-text-editor
+export DESCRIPTION="GNOME Text Editor is a simple text editor focused on a pleasing default experience."
+export CATEGORY=
+export TYPE=application
+export VERSION=43.1
+export VERSIONDATE=20221118
+wl-showstatus --package-version
+export DEPENDANCIES=glib2,editorconfig-core-c,enchant2,gtksourceview5,libadwaita
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson,ninja
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://gitlab.gnome.org/GNOME/gnome-text-editor/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.gnome.org/GNOME/gnome-text-editor/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# disable stack protection
+sed -i.bak -e "s/-fstack-protector-strong//" meson.build subprojects/gtksourceview/meson.build
+mkdir -p build_shared &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library shared . build_shared &&
+ # add linker flag
+ sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lssp\"/" build_shared/build.ninja &&
+ # don't use ccache
+ sed -i.bak2 -e "s/\"ccache\" //" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/lib:$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_shared install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####glib-compile-schemas $MINGWPREFIX/share/glib-2.0/schemas/ && echo OK
+####gnome-text-editor.exe
+
+
+

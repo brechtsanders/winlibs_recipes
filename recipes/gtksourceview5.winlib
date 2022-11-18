@@ -1,0 +1,44 @@
+export NAME="GtkSourceView"
+export STATUS=
+export URL=http://projects.gnome.org/gtksourceview/
+export BASENAME=gtksourceview5
+export DESCRIPTION="GtkSourceView is a portable C library that extends the standard GTK+ framework for multiline text editing with support for configurable syntax highlighting, unlimited undo/redo, UTF-8 compliant caseless searching, printing and other features typical of a source code editor."
+export CATEGORY=gui
+export TYPE=library
+export VERSION=5.6.1
+export VERSIONDATE=20221118
+wl-showstatus --package-version
+export DEPENDANCIES=gettext,glib2,gtk4,libxml2,fribidi,fontconfig,pango,cairo,pcre2,vulkan-loader,vala,gobject-introspection
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=meson
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="http://ftp.gnome.org/pub/GNOME/sources/gtksourceview/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://ftp.gnome.org/pub/gnome/sources/gtksourceview/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/gtksourceview-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xfJ $TARBALLDIR/$BASENAME/gtksourceview-$VERSION.tar.xz
+cd gtksourceview-$VERSION
+# fix MSVC issue
+mkdir -p winfix
+cp -rf $PYDIR/lib/distutils winfix/
+patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
+@@ -85,3 +85,3 @@
+         else:
+-            raise ValueError("Unknown MS Compiler version %s " % msc_ver)
++            return None
+
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dvapi=true -Dgtk_doc=false -Dintrospection=enabled -Dinstall_tests=false . build_both &&
+ # add linker flag
+ sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lssp\"/" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=$(pwd)/winfix:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -C build_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gtksourceview-$VERSION
+
+
+
