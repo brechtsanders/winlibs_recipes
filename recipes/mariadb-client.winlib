@@ -438,28 +438,59 @@ patch -ulbf include/mysql.h << EOF
 +struct st_mysql_client_plugin * STDCALL
  mysql_load_plugin(struct st_mysql *mysql, const char *name, int type,
 EOF
-# fix build_win/mariadb_config/mariadb_config.c (version >= 3.1.11)
-patch -ulbf build_win/mariadb_config/mariadb_config.c << EOF
-@@ -8,2 +8,5 @@
+## fix build_win/mariadb_config/mariadb_config.c (version >= 3.1.11)
+#patch -ulbf build_win/mariadb_config/mariadb_config.c << EOF
+#@@ -8,2 +8,5 @@
+# #endif
+#+#if defined(_WIN32)
+#+#include <windows.h>
+#+#endif
+# #if defined(__FreeBSD__)
+#@@ -171,2 +174,5 @@
+#     }
+#+#elif defined(_WIN32)
+#+    if (GetModuleFileNameA(NULL, p, MAX_PATH) == 0)
+#+      *p= 0;
+# #elif defined(__sun) || defined(SOLARIS)
+#@@ -201,3 +207,7 @@
+#     char *c, *search= alloca(6 + strlen(mariadb_progname));
+#+#ifdef _WIN32
+#+    sprintf(search, "\\\\bin\\\\", mariadb_progname);
+#+#else
+#     sprintf(search, "/bin/%s", mariadb_progname);
+#+#endif
+#     c= strstr(p, search);
+#EOF
+# fix mariadb_config/mariadb_config.c.in (version >= 3.1.11)
+patch -ulbf mariadb_config/mariadb_config.c.in << EOF
+@@ -22,2 +22,5 @@
  #endif
 +#if defined(_WIN32)
 +#include <windows.h>
 +#endif
- #if defined(__FreeBSD__)
-@@ -171,2 +174,5 @@
-     }
+
+@@ -193,2 +196,5 @@
+       p[len]= 0;
 +#elif defined(_WIN32)
-+    if (GetModuleFileNameA(NULL, p, MAX_PATH) == 0)
-+      *p= 0;
- #elif defined(__sun) || defined(SOLARIS)
++    if (!GetModuleFileName(NULL, p, PATH_MAX))
++      *p = 0;
+ #else
 @@ -201,3 +207,7 @@
      char *c, *search= alloca(6 + strlen(mariadb_progname));
-+#ifdef _WIN32
-+    sprintf(search, "\\\\bin\\\\", mariadb_progname);
++#if defined(_WIN32)
++    sprintf(search, "\\\\bin\\\\%s", mariadb_progname);
 +#else
      sprintf(search, "/bin/%s", mariadb_progname);
 +#endif
      c= strstr(p, search);
+@@ -220,3 +230,7 @@
+   int c;
++#if defined(_WIN32)
++  char *p = strrchr(argv[0], '\\\\');
++#else
+   char *p = strrchr(argv[0], '/');
++#endif
+   mariadb_progname= p ? p + 1 : argv[0];
 EOF
 # fix CMakeLists.txt (version >= 3.1.11)
 patch -ulbf CMakeLists.txt << EOF
