@@ -59,8 +59,10 @@ export BASENAME=libindi
 export DESCRIPTION="INDI Library for Astronomical Instrumentation Control."
 export CATEGORY=hardware
 export TYPE=library
-export VERSION=1.9.8
-export VERSIONDATE=20221018
+#export VERSION=1.9.8
+#export VERSIONDATE=20221018
+export VERSION=1.9.9
+export VERSIONDATE=20221130
 wl-showstatus --package-version
 export DEPENDANCIES=libusb,libnova,cfitsio,pthreads,gsl,boost
 export OPTIONALDEPENDANCIES=
@@ -109,11 +111,29 @@ EOF
 mv libs/libastro.cpp libs/libastro.cpp.bak &&
 echo "#include <math.h>" > libs/libastro.cpp &&
 cat libs/libastro.cpp.bak >> libs/libastro.cpp
+# fix missing INVALID_SOCKET in libs/sockets/select.h (version >= 1.9.9)
+patch -ulbf libs/sockets/select.h << EOF
+@@ -29,3 +29,3 @@
+ typedef SOCKET SocketFileDescriptor;
+-static const int SocketInvalid = INVALID_SOCKET;
++static const SOCKET SocketInvalid = (SOCKET)(~0);
+ #else
+EOF
+# fix missing timespec_get/TIME_UTC in libs/indicore/indicom.c (version >= 1.9.9)
+patch -ulbf libs/indicore/indicom.c << EOF
+@@ -332,2 +332,4 @@
+     ts.tv_nsec = mts.tv_nsec;
++#elif defined(__MINGW32__) && !defined(_UCRT)
++    clock_gettime(CLOCK_REALTIME, &ts);
+ #else
+EOF
 # also allow building shared library (version >= 1.9.8)
 sed -i.bak -e "s/\(add_library(indiclient\) STATIC/\1/" CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DINDI_BUILD_WEBSOCKET:BOOL=ON -DINDI_BUILD_CLIENT:BOOL=ON -DINDI_BUILD_SERVER:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -DCMAKE_CXX_FLAGS:STRING="-D_WINDOWS" -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINDI_BUILD_WEBSOCKET:BOOL=ON -DINDI_BUILD_CLIENT:BOOL=ON -DINDI_BUILD_SERVER:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -DCMAKE_CXX_FLAGS:STRING="-D_WINDOWS" -S. -Bbuild_shared &&
  # fix missing link libraries
@@ -122,9 +142,9 @@ mkdir -p build_static build_shared &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
  ninja -Cbuild_shared install/strip &&
- strip build_shared/*.dll &&
- mkdir -p $INSTALLPREFIX/bin &&
- cp -u build_shared/*.dll $INSTALLPREFIX/bin &&
+ #strip build_shared/*.dll &&
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #cp -u build_shared/*.dll $INSTALLPREFIX/bin &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf indi-$VERSION
 
 
