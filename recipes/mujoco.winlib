@@ -1,0 +1,93 @@
+export NAME="MuJoCo"
+export STATUS=
+export URL=https://mujoco.org/
+export BASENAME=mujoco
+export DESCRIPTION="Multi-Joint dynamics with Contact. A general purpose physics simulator."
+export CATEGORY=science
+export TYPE=library
+#export VERSION=2.1.0
+#export VERSIONDATE=20211020
+#export VERSION=2.1.1
+#export VERSIONDATE=20211217
+#export VERSION=2.1.2
+#export VERSIONDATE=20220316
+#export VERSION=2.1.3
+#export VERSIONDATE=20220324
+#export VERSION=2.1.4
+#export VERSIONDATE=20220404
+#export VERSION=2.1.5
+#export VERSIONDATE=20220414
+#export VERSION=2.2.0
+#export VERSIONDATE=20220523
+#export VERSION=2.2.2
+#export VERSIONDATE=20220907
+#export VERSION=2.3.0
+#export VERSIONDATE=20221018
+export VERSION=2.3.1
+export VERSIONDATE=20221207
+wl-showstatus --package-version
+export DEPENDANCIES=qhull,tinyxml2,tinyobjloader,libccd,lodepng,glfw3
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/deepmind/mujoco/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/deepmind/mujoco/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/engine/engine_util_errmem.c (version >= 2.3.1)
+patch -ulbf src/engine/engine_util_errmem.c << EOF
+@@ -106,3 +106,3 @@
+
+-#if defined(_POSIX_C_SOURCE) || defined(__APPLE__) || defined(__STDC_VERSION_TIME_H__)
++#if defined(_POSIX_C_SOURCE) || defined(__APPLE__) || defined(__STDC_VERSION_TIME_H__) || defined(_POSIX_THREAD_SAFE_FUNCTIONS)
+     localtime_r(&rawtime, &timeinfo);
+EOF
+# fix dist/mujoco.rc (version >= 2.3.1)
+patch -ulbf dist/mujoco.rc << EOF
+@@ -22,3 +22,3 @@
+   {
+-    VALUE "Translation", 0x0409 0x04B0
++    VALUE "Translation", 0x0409, 0x04B0
+   }
+EOF
+# fix dist/simulate.rc (version >= 2.3.1)
+patch -ulbf dist/simulate.rc << EOF
+@@ -24,3 +24,3 @@
+   {
+-    VALUE "Translation", 0x0409 0x04B0
++    VALUE "Translation", 0x0409, 0x04B0
+   }
+EOF
+## fix detection of glfw3 in simulate/cmake/SimulateDependencies.cmake (version >= 2.3.1)
+#patch -ulbf simulate/cmake/SimulateDependencies.cmake << EOF
+#@@ -80,5 +80,5 @@
+#   PACKAGE_NAME
+#-  glfw
+#+  glfw3
+#   LIBRARY_NAME
+#-  glfw
+#+  glfw3
+#   GIT_REPO
+#EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC_LIBS:BOOL=ON -DBUILD_SHARED_LIBS:BOOL=ON -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=OFF -DBUILD_DOCUMENTATION:BOOL=OFF -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF -DMUJOCO_TEST_PYTHON_UTIL:BOOL=OFF -DBUILD_GMOCK:BOOL=OFF -DMUJOCO_BUILD_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-D_POSIX_THREAD_SAFE_FUNCTIONS" -S. -Bbuild_win &&
+ #-DMUJOCO_SIMULATE_USE_SYSTEM_GLFW:BOOL=ON -DMUJOCO_SIMULATE_USE_SYSTEM_GLFW:BOOL=ON 
+ #-DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DFETCHCONTENT_UPDATES_DISCONNECTED_GLFW:BOOL=OFF 
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: build against already installed libraries instead of fetching source
+####TO DO: build both static and shared library
+####TO DO: check if bin/simulate.exe doesn't conflict with anything and if it should even be installed
+
+
+

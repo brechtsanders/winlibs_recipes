@@ -180,9 +180,11 @@ export TYPE=library
 #export VERSIONDATE=20221027
 #export VERSION=5.1.71
 #export VERSIONDATE=20221119
-export VERSION=5.1.72
-export VERSIONDATE=20221130
 ####src/crypto/mbedtls.c:135:13: error: too few arguments to function 'mbedtls_pk_parse_key'
+#export VERSION=5.1.72
+#export VERSIONDATE=20221130
+export VERSION=5.2.0
+export VERSIONDATE=20221206
 wl-showstatus --package-version
 export DEPENDANCIES=mbedtls
 export OPTIONALDEPENDANCIES=
@@ -240,6 +242,25 @@ sed -e "s/_MSC_VER/_WIN32/" src/utils/port.c.bak >> src/utils/port.c
 #EOF
 # disable encryption cleanup
 sed -i.bak -e "s?bctbx_clean?//&?" src/vfs/vfs.c
+# fix src/utils/win_utils.cc (version >= 5.2.0)
+patch -ulbf src/utils/win_utils.cc << EOF
+@@ -96,3 +96,3 @@
+        if (SymInitialize(process, NULL, TRUE) == FALSE) {
+-               bctbx_error(__FUNCTION__ ": Failed to call SymInitialize.");
++               bctbx_error("getStackTrace: Failed to call SymInitialize.");
+                return std::vector<StackFrame>();
+@@ -151,3 +151,3 @@
+                PIMAGEHLP_SYMBOL symbol = (PIMAGEHLP_SYMBOL)symbolBuffer;
+-               symbol->SizeOfStruct = (sizeof IMAGEHLP_SYMBOL) + 255;
++               symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL) + 255;
+                symbol->MaxNameLength = 254;
+@@ -207,2 +207,5 @@
+ static std::terminate_handler gOldTerminateHandler = NULL;
++#ifdef __MINGW32__
++#define _crt_signal_t __p_sig_fn_t
++#endif
+ static _crt_signal_t gOldABRT = NULL;
+EOF
 ## don't abort on warnings
 #sed -i.bak -e "s/-Wall//" CMakeLists.txt
 #mkdir -p build_static build_shared &&
@@ -262,6 +283,8 @@ patch -ulbf CMakeLists.txt << EOF
 -endif()
 
 EOF
+# avoid invalid compiler flags in CMakeLists.txt (version >= 5.2.0)
+sed -i.bak2 -e "s?add_definitions(-EHa)\|list(APPEND STRICT_OPTIONS_CXX \"/EHa\")?#&?g" src/CMakeLists.txt
 #mkdir -p build_win &&
 # wl-showstatus configure &&
 # #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_win &&
@@ -276,6 +299,8 @@ mkdir -p build_static build_shared &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
  wl-showstatus configure &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ldbghelp/" build_shared/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
