@@ -50,12 +50,13 @@ tar xfz $TARBALLDIR/$BASENAME/cuda_gdb_src-all-all-$VERSION.tar.gz -C$BASENAME-$
 #cd $BASENAME-$VERSION/opensource
 #cd cuda_gdb_src
 cd $BASENAME-$VERSION/cuda_gdb_src
+# fix libcudacore/cudaapi.c (version >= 12.0.90)
+patch -ulbf libcudacore/cudaapi.c << EOF
+@@ -43,2 +43,3 @@
 
-  ./configure --help 2> /dev/null
-  cat meson_options.txt 2> /dev/null
-  head COPYING* LICENSE* COPYRIGHT*
-  ls -ld COPYING* LICENSE* COPYRIGHT* configure* m4 CMakeLists.txt cmake Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro build 2> /dev/null
-
++#define mkstemp MY_mkstemp
+ static int mkstemp(char *name)
+EOF
 wl-showstatus configure &&
  # mkdir -p m4 &&
  # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
@@ -75,7 +76,7 @@ wl-showstatus configure &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  wl-showstatus build &&
- ( make || make YACC="bison -y" LEX="lex" ) &&
+ ( make || ( make -j1 -Cbinutils $(ls -1 binutils/*.y | sed -e "s?^.*/??; s/\.y$/.c/") && make -j1 -Cld $(ls -1 ld/*.y | sed -e "s?^.*/??; s/\.y$/.c/")) || make || make YACC="bison -y" LEX="lex" ) &&
  wl-showstatus build-install &&
  make install-strip &&
     echo OK
