@@ -255,10 +255,11 @@ wl-showstatus configure &&
 
 
 
+archlist="x86_64 i686 aarch64 armv7"
 
 
  # build MinGW-w64 libraries
- for arch in i686 x86_64 armv7 aarch64; do
+ for arch in $archlist; do
   mkdir -p build_mingw-w64_cross_$arch &&
   wl-showstatus configure &&
   cd build_mingw-w64_cross_$arch &&
@@ -292,14 +293,14 @@ wl-showstatus configure &&
   ( ls -1d cross/$arch-w64-mingw32/lib || mv -f cross/$arch-w64-mingw32/lib* cross/$arch-w64-mingw32/lib ) &> /dev/null &&
   touch SUCCESS_$arch || break
  done &&
- if [ $(ls -1 SUCCESS_*|wc -l) -ne 4 ]; then false; fi &&
+ if [ $(ls -1 SUCCESS_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
  rm -f SUCCESS_* &&
     echo OK
 
 
 
 # build MinGW-w64 headers and crt
-for arch in i686 x86_64 armv7 aarch64; do
+for arch in $archlist; do
  mkdir -p build_mingw-w64-headers-$arch build_mingw-w64-crt-$arch &&
  wl-showstatus configure &&
  cd build_mingw-w64-headers-$arch &&
@@ -349,6 +350,14 @@ done
 
 
 
+
+
+#archlist="x86_64 i686 aarch64 armv7"
+archlist="x86_64 i686"
+
+
+
+
 #../configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrtbase"; else echo "msvcrt-os"; fi) --with-default-win32-winnt=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "0x0601"; else echo "0x0501"; fi) --with-libraries=all --with-tools=all --enable-sdk=all --enable-secure-api --enable-wildcard --enable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --disable-lib$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 32; else echo 64; fi) --disable-libarm32 --disable-libarm64 --enable-idl CFLAGS="-fcommon $(gcc --help -v 2>/dev/null|grep -q " -Wexpansion-to-defined" && echo "-Wno-expansion-to-defined")" LDFLAGS="-Wl,-no-undefined" &&
 
  # build MinGW-w64 headers
@@ -361,7 +370,7 @@ done
  make -Cbuild_mingw-w64-headers install-strip &&
 
  # build MinGW-w64 crt
- for arch in i686 x86_64 armv7 aarch64; do
+ for arch in $archlist; do
   mkdir -p build_mingw-w64-crt-$arch &&
   wl-showstatus configure &&
   cd build_mingw-w64-crt-$arch &&
@@ -372,11 +381,11 @@ done
   #make -Cbuild_mingw-w64-crt-$arch install-strip DLLTOOL=$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe &&
   touch SUCCESS_CRT_$arch || break
  done &&
- if [ $(ls -1 SUCCESS_CRT_*|wc -l) -ne 4 ]; then false; fi &&
+ if [ $(ls -1 SUCCESS_CRT_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
  rm -f SUCCESS_CRT_* &&
  
  # build MinGW-w64 winpthreads
- for arch in i686 x86_64 armv7 aarch64; do
+ for arch in $archlist; do
   mkdir -p build_mingw-w64_winpthreads_$arch &&
   wl-showstatus configure &&
   cd build_mingw-w64_winpthreads_$arch &&
@@ -403,7 +412,57 @@ done
   ##cp -rf mingw-w64_winpthreads_$arch/lib/* stage1/$arch-w64-windows-gnu/lib/ &&
   touch SUCCESS_PTHREADS_$arch || break
  done &&
- if [ $(ls -1 SUCCESS_PTHREADS_*|wc -l) -ne 4 ]; then false; fi &&
+ if [ $(ls -1 SUCCESS_PTHREADS_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
  rm -f SUCCESS_PTHREADS_* &&
     echo OK
- 
+
+
+
+
+
+
+
+ # build MinGW-w64 winstorecompat
+ for arch in $archlist; do
+  mkdir -p build_mingw-w64_winstorecompat_$arch &&
+  wl-showstatus configure &&
+  cd build_mingw-w64_winstorecompat_$arch &&
+  ../mingw-w64-libraries/winstorecompat/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 &&
+  cd .. &&
+  wl-showstatus build-install &&
+  make -Cbuild_mingw-w64_winstorecompat_$arch install-strip &&
+  touch SUCCESS_WINSTORECOMPAT_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_WINSTORECOMPAT_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
+ rm -f SUCCESS_WINSTORECOMPAT_* &&
+    echo OK
+
+ # build MinGW-w64 libmangle
+ for arch in $archlist; do
+  mkdir -p build_mingw-w64_libmangle_$arch &&
+  wl-showstatus configure &&
+  cd build_mingw-w64_libmangle_$arch &&
+  ../mingw-w64-libraries/libmangle/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 &&
+  cd .. &&
+  wl-showstatus build-install &&
+  make -Cbuild_mingw-w64_libmangle_$arch install-strip &&
+  touch SUCCESS_LIBMANGLE_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_LIBMANGLE_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
+ rm -f SUCCESS_LIBMANGLE_* &&
+    echo OK
+
+ # build MinGW-w64 pseh (only x86 32-bit Win32 host variants are supported)
+ for arch in i686; do
+  mkdir -p build_mingw-w64_pseh_$arch &&
+  wl-showstatus configure &&
+  cd build_mingw-w64_pseh_$arch &&
+  ../mingw-w64-libraries/pseh/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 &&
+  cd .. &&
+  wl-showstatus build-install &&
+  make -Cbuild_mingw-w64_pseh_$arch install-strip &&
+  touch SUCCESS_PSEH_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_PSEH_*|wc -l) -ne 1 ]; then false; fi &&
+ rm -f SUCCESS_PSEH_* &&
+    echo OK
