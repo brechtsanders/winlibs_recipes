@@ -9,10 +9,10 @@ export TYPE=library
 #export VERSIONDATE=20220323
 #export VERSION=12.0.0
 #export VERSIONDATE=20220618
-export VERSION=1.12.0
-export VERSIONDATE=20220619
-#export VERSION=1.13.0
-#export VERSIONDATE=20221213
+#export VERSION=1.12.0
+#export VERSIONDATE=20220619
+export VERSION=1.13.0
+export VERSIONDATE=20221213
 wl-showstatus --package-version
 export DEPENDANCIES=protobuf
 export OPTIONALDEPENDANCIES=
@@ -41,9 +41,23 @@ EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DONNX_USE_PROTOBUF_SHARED_LIBS:BOOL=OFF -DONNX_COVERAGE:BOOL=OFF -DONNX_BUILD_BENCHMARKS:BOOL=OFF -DONNX_BUILD_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ # fix missing std::filesystem (version >= 1.13.0)
+ sed -i.bak -e "s/-std=gnu++11/-std=gnu++17/" build_static/build.ninja &&
  #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DONNX_USE_PROTOBUF_SHARED_LIBS:BOOL=ON -DONNX_COVERAGE:BOOL=OFF -DONNX_BUILD_BENCHMARKS:BOOL=OFF -DONNX_BUILD_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ # fix missing std::filesystem (version >= 1.13.0)
+ sed -i.bak -e "s/-std=gnu++11/-std=gnu++17/" build_shared/build.ninja &&
+ wl-showstatus build &&
+ # fix redefinition of UNDEFINED/OPTIONAL (version >= 1.13.0)
+ ninja -Cbuild_static onnx/onnx-data.pb.h &&
+ sed -i.bak -e "s/^\(\s*\)\(static constexpr DataType \)\(UNDEFINED\|OPTIONAL\) /\1#undef \3\n\1\2\3/" build_static/onnx/onnx-data.pb.h &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ # fix redefinition of UNDEFINED/OPTIONAL (version >= 1.13.0)
+ ninja -Cbuild_shared onnx/onnx-data.pb.h &&
+ sed -i.bak -e "s/^\(\s*\)\(static constexpr DataType \)\(UNDEFINED\|OPTIONAL\) /\1#undef \3\n\1\2\3/" build_shared/onnx/onnx-data.pb.h &&
+ ninja -Cbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
