@@ -351,6 +351,8 @@ export VERSIONDATE=20211216
 #export VERSIONDATE=20220103
 #export VERSION=21.1.4
 #export VERSIONDATE=20220712
+#export VERSION=21.1.5
+#export VERSIONDATE=20221214
 wl-showstatus --package-version
 export DEPENDANCIES=xorgproto,libdmx,xtrans,khronos-opengl-registry,libxfont2,xcbutil,xcbutilimage,xcbutilwm
 #export DEPENDANCIES=xorgproto,libdmx,xtrans,khronos-opengl-registry,libxfont2,xcbutil,xcbutilimage,xcbutilwm,libxcvt
@@ -576,7 +578,7 @@ cat hw/xwin/winkeybd.c.bak >> hw/xwin/winkeybd.c
 mv hw/xwin/winprocarg.c hw/xwin/winprocarg.c.bak
 echo "#define _WIN32_WINNT 0x0500" > hw/xwin/winprocarg.c
 cat hw/xwin/winprocarg.c.bak >> hw/xwin/winprocarg.c
-# fix include/resource.h (version >= 1.20.11)
+# fix already defined FreeResource in include/resource.h (version >= 1.20.11)
 patch -ulbf include/resource.h << EOF
 @@ -195,2 +195,6 @@
 
@@ -586,7 +588,7 @@ patch -ulbf include/resource.h << EOF
 +#endif
  extern _X_EXPORT void FreeResource(XID /*id */ ,
 EOF
-# fix include/window.h (version >= 1.20.11)
+# fix already defined CreateWindow in include/window.h (version >= 1.20.11)
 patch -ulbf include/window.h << EOF
 @@ -101,2 +101,6 @@
 
@@ -596,7 +598,7 @@ patch -ulbf include/window.h << EOF
 +#endif
  extern _X_EXPORT WindowPtr CreateWindow(Window /*wid */ ,
 EOF
-# fix include/os.h (version >= 1.20.11)
+# fix missing signal stuff in include/os.h (version >= 1.20.11)
 patch -ulbf include/os.h << EOF
 @@ -718,2 +718,3 @@
 
@@ -607,7 +609,7 @@ patch -ulbf include/os.h << EOF
 +#endif
 
 EOF
-# fix dix/colormap.c (version >= 1.20.11)
+# fix already defined UpdateColors in dix/colormap.c (version >= 1.20.11)
 patch -ulbf dix/colormap.c << EOF
 @@ -106,2 +106,6 @@
 
@@ -655,6 +657,16 @@ EOF
 mv dix/inpututils.c dix/inpututils.c.bak &&
 echo "#include <math.h>" > dix/inpututils.c &&
 cat dix/inpututils.c.bak >> dix/inpututils.c
+## fix include/misc.h (version >= 21.1.5)
+#patch -ulbf include/misc.h << EOF
+#@@ -103,2 +103,6 @@
+#
+#+#ifdef _WIN32
+#+#undef ATOM
+#+#define ATOM XATOM
+#+#endif
+# typedef uint32_t ATOM;
+#EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-windowswm --disable-libdrm LDFLAGS="-Wl,-no-undefined" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-windowswm --disable-libdrm --without-xmlto LDFLAGS="-Wl,-no-undefined" &&
@@ -684,3 +696,27 @@ EOF
 
 
 
+export BUILDDEPENDANCIES=meson,ninja
+#-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS -Dcpp_link_args=$LDFLAGS
+## fix location of Perl
+#sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix detection of Python
+#sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix missing gio-unix
+##sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+#sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Ddri1=false -Ddri2=false -Ddri3=false -Dglx=false -Ddrm=false -Dlinux_apm=false -Dlinux_acpi=false -Ddocs=false . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ #PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
