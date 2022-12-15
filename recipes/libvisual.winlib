@@ -5,10 +5,10 @@ export BASENAME=libvisual
 export DESCRIPTION="Libvisual is a library that comes between applications and audio visualisation plugins and provides every application that wants to draw visualisation a clean and easy to use API."
 export CATEGORY=graphics
 export TYPE=library
-export VERSION=0.4.0
-export VERSIONDATE=20111020
-#export VERSION=0.4.1
-#export VERSIONDATE=20221214
+#export VERSION=0.4.0
+#export VERSIONDATE=20111020
+export VERSION=0.4.1
+export VERSIONDATE=20221214
 ####configure: error: No type matching size_t in size
 wl-showstatus --package-version
 export DEPENDANCIES=libiconv,gettext
@@ -24,62 +24,75 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
-# fix 64-bit issues in libvisual/lv_cpu.c (version >= 0.4.0)
+## fix 64-bit issues in libvisual/lv_cpu.c (version = 0.4.0)
+#patch -ulbf libvisual/lv_cpu.c << EOF
+#--- libvisual/lv_cpu.c  2006-01-22 14:23:37.000000000 +0100
+#+++ libvisual/lv_cpu.c  2015-02-23 14:18:19.543538700 +0100
+#@@ -113,3 +113,3 @@
+#
+#-#if defined(VISUAL_OS_WIN32)
+#+#if defined(VISUAL_OS_WIN32) && !defined(_WIN64)
+# LONG CALLBACK win32_sig_handler_sse(EXCEPTION_POINTERS* ep)
+#EOF
+# fix libvisual/lv_cpu.c (version >= 0.4.1)
 patch -ulbf libvisual/lv_cpu.c << EOF
---- libvisual/lv_cpu.c  2006-01-22 14:23:37.000000000 +0100
-+++ libvisual/lv_cpu.c  2015-02-23 14:18:19.543538700 +0100
 @@ -113,3 +113,3 @@
 
 -#if defined(VISUAL_OS_WIN32)
-+#if defined(VISUAL_OS_WIN32) && !defined(_WIN64)
++#if defined(VISUAL_OS_WIN32) && defined(_M_IX86)
  LONG CALLBACK win32_sig_handler_sse(EXCEPTION_POINTERS* ep)
 EOF
 # fix libvisual/lv_actor.c (version >= 0.4.1)
 mv libvisual/lv_actor.c libvisual/lv_actor.c.bak &&
 echo "#include <stdint.h>" > libvisual/lv_actor.c &&
 cat libvisual/lv_actor.c.bak >> libvisual/lv_actor.c
-# fix size_t issues (version = 0.4.0)
-patch -ulbf configure << EOF
---- configure  2015-02-23 14:24:03.950443400 +0100
-+++ configure  2015-02-23 14:27:24.966576900 +0100
-@@ -25091,4 +25091,5 @@
- /* end confdefs.h.  */
- \$ac_includes_default
-+#include <sys/types.h>
- long longval () { return (long) (sizeof (short)); }
- unsigned long ulongval () { return (long) (sizeof (short)); }
-@@ -26417,4 +26418,8 @@
-   visual_size_type=long
-   ;;
-+4)  visual_size_type=int32_t
-+  ;;
-+8)  visual_size_type=int64_t
-+  ;;
- *)  { { echo "\$as_me:\$LINENO: error: No type matching size_t in size" >&5
- echo "\$as_me: error: No type matching size_t in size" >&2;}
-EOF
-## fix size_t issues in configure (version >= 0.4.1)
+## fix size_t issues (version = 0.4.0)
 #patch -ulbf configure << EOF
-#@@ -21380,2 +21380,8 @@
+#--- configure  2015-02-23 14:24:03.950443400 +0100
+#+++ configure  2015-02-23 14:27:24.966576900 +0100
+#@@ -25091,4 +25091,5 @@
+# /* end confdefs.h.  */
+# \$ac_includes_default
+#+#include <sys/types.h>
+# long longval () { return (long) (sizeof (short)); }
+# unsigned long ulongval () { return (long) (sizeof (short)); }
+#@@ -26417,4 +26418,8 @@
+#   visual_size_type=long
 #   ;;
-#+4)
-#+  visual_size_type=int32_t
+#+4)  visual_size_type=int32_t
 #+  ;;
-#+8)
-#+  visual_size_type=int64_t
+#+8)  visual_size_type=int64_t
 #+  ;;
-# *)  as_fn_error \$? "No type matching size_t in size" "\$LINENO" 5
+# *)  { { echo "\$as_me:\$LINENO: error: No type matching size_t in size" >&5
+# echo "\$as_me: error: No type matching size_t in size" >&2;}
 #EOF
+# fix size_t issues in configure (version >= 0.4.1)
+patch -ulbf configure << EOF
+@@ -21380,2 +21380,8 @@
+   ;;
++4)
++  visual_size_type=int32_t
++  ;;
++8)
++  visual_size_type=int64_t
++  ;;
+ *)  as_fn_error \$? "No type matching size_t in size" "\$LINENO" 5
+EOF
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-extra-optimization LDFLAGS="-Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-extra-optimization LDFLAGS="-Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-extra-optimization --disable-examples CFLAGS="-I$PWD" LDFLAGS="-Wl,--as-needed" &&
  ## fix building DLLs
  #mv libtool libtool.bak &&
  #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
- echo "#undef HAVE_SCHED_H" >> config.h &&
- # fix size_t issues (version >= 0.4.0)
+ #echo "#undef HAVE_SCHED_H" >> config.h &&
+ ## fix size_t issues (version = 0.4.0)
+ #mv libvisual/lvconfig.h libvisual/lvconfig.h.bak &&
+ #echo "#include <sys/types.h>" > libvisual/lvconfig.h &&
+ #sed -e "s/^\(typedef\).*\(visual_size_t;\)/\1 size_t \2/" libvisual/lvconfig.h.bak >> libvisual/lvconfig.h &&
+ # fix type issues (version >= 0.4.1)
  mv libvisual/lvconfig.h libvisual/lvconfig.h.bak &&
- echo "#include <sys/types.h>" > libvisual/lvconfig.h &&
- sed -e "s/^\(typedef\).*\(visual_size_t;\)/\1 size_t \2/" libvisual/lvconfig.h.bak >> libvisual/lvconfig.h && wl-showstatus build-install &&
+ echo "#include <stdint.h>" > libvisual/lvconfig.h &&
+ sed -e "s/\(typedef \)unsigned \(int[0-9]*_t\)/\1u\2/" libvisual/lvconfig.h.bak >> libvisual/lvconfig.h &&
  wl-showstatus build-install &&
  make install-strip &&
  # fix invalid library include paths in libtool archive
