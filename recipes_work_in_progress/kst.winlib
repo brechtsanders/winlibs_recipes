@@ -1,56 +1,71 @@
-export NAME="OVITO"
+export NAME="Kst"
 export STATUS=
-export URL=https://www.ovito.org/
-export BASENAME=ovito
-export DESCRIPTION="Open Visualization Tool"
-export CATEGORY=graphics
+export URL=https://kst-plot.kde.org/
+export BASENAME=kst
+export DESCRIPTION="Kst is the fastest real-time large-dataset viewing and plotting tool available (you may be interested in some benchmarks) and has built-in data analysis functionality. Kst contains many powerful built-in features and is expandable with plugins and extensions (see developer information in the \"Resources\" section)."
+export CATEGORY=dataprocessing,graphics
 export TYPE=application
-#export VERSION=3.7.11
-#export VERSIONDATE=20221215
-export VERSION=3.7.12
+export VERSION=2.0.8
 export VERSIONDATE=20221216
 wl-showstatus --package-version
-export DEPENDANCIES=qt,libssh
-export OPTIONALDEPENDANCIES=
+#export DEPENDANCIES=qt4,cfitsio,netcdf,matio,gsl
+export DEPENDANCIES=qt,cfitsio,netcdf,matio,gsl
+export OPTIONALDEPENDANCIES=getdata
 export BUILDDEPENDANCIES=cmake,ninja
-export LICENSEFILE=LICENSE.txt
-export LICENSETYPE=GPL/MIT
-export DOWNLOADURL="https://gitlab.com/stuko/ovito/-/tags"
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/kst/files/ Kst%20"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://gitlab.com/stuko/ovito/-/archive/v$VERSION/$BASENAME-v$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/kst/Kst%20$VERSION/Kst-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xfj $TARBALLDIR/$BASENAME/$BASENAME-v$VERSION.tar.bz2
-cd $BASENAME-v$VERSION
-# fix src/ovito/core/CMakeLists.txt (version >= 3.7.11)
-patch -ulbf src/ovito/core/CMakeLists.txt << EOF
-@@ -306,3 +306,3 @@
-                        IF(NOT lib_dll)
--                               MESSAGE(FATAL_ERROR "Could not find corresponding DLL for ffmpeg library '\${lib}' in same directory.")
-+                               MESSAGE(WARNING "Could not find corresponding DLL for ffmpeg library '\${lib}' in same directory.")
-                        ENDIF()
-EOF
-# fix cmake/Prerequisites.cmake (version >= 3.7.11)
-patch -ulbf cmake/Prerequisites.cmake << EOF
-@@ -59,3 +59,3 @@
-                IF(NOT lib_versions)
--                       MESSAGE(FATAL_ERROR "Did not find any library files that match the file path \${_shared_lib} (globbing patterns: \${lib_base_name}.*\${CMAKE_SHARED_LIBRARY_SUFFIX}; \${lib_base_name}\${CMAKE_SHARED_LIBRARY_SUFFIX}.*)")
-+                       MESSAGE(WARNING "Did not find any library files that match the file path \${_shared_lib} (globbing patterns: \${lib_base_name}.*\${CMAKE_SHARED_LIBRARY_SUFFIX}; \${lib_base_name}\${CMAKE_SHARED_LIBRARY_SUFFIX}.*)")
-                ENDIF()
-@@ -85,3 +85,3 @@
-                FOREACH(lib_file \${lib_files})
--                       IF(NOT APPLE)
-+                       IF(NOT APPLE AND NOT MINGW)
-                                MESSAGE("Installing shared library \${lib_file}")
-EOF
+tar xfz $TARBALLDIR/$BASENAME/Kst-$VERSION.tar.gz
+cd Kst-$VERSION
+# fix src/libkst/editablematrix.cpp (version >= 2.0.8)
+patch -ulbf src/libkst/editablematrix.cpp << EOF
+@@ -21,2 +21,3 @@
+ #include <QXmlStreamWriter>
++#include <QDataStream>
 
-#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
-#mkdir -p build_test && PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -G"MSYS Makefiles" -DOVITO_BUILD_PLUGIN_VULKAN:BOOL=ON -DOVITO_LIBSSH_RUNTIME_LINKING:BOOL=ON -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+EOF
+# fix src/libkst/editablevector.cpp (version >= 2.0.8)
+patch -ulbf src/libkst/editablevector.cpp << EOF
+@@ -20,2 +20,3 @@
+ #include <QXmlStreamWriter>
++#include <QDataStream>
+
+EOF
+# fix src/widgets/gradienteditor.h (version >= 2.0.8)
+patch -ulbf src/widgets/gradienteditor.h << EOF
+@@ -18,2 +18,3 @@
+ #include <QGradient>
++#include <QPainterPath>
+
+EOF
+patch -ulbf src/libkstapp/view.h << EOF
+@@ -16,2 +16,3 @@
+ #include <QGraphicsView>
++#include <QMenu>
+
+EOF
+# fix CMakeLists.txt (version >= 2.0.8)
+patch -ulbf CMakeLists.txt << EOF
+@@ -114,6 +114,6 @@
+             set(md5 de6e8dbab1bb17eee6057941fddc93e3)
+-        else(GCC_VERSION VERSION_EQUAL 4.6 OR GCC_VERSION VERSION_GREATER 4.6)
++        elseif(GCC_VERSION VERSION_EQUAL 4.6 OR GCC_VERSION VERSION_GREATER 4.6)
+             set(ver 4.6)
+             set(md5 70d8670af9c21eb8fb466654c95d8e4d)
+-        else(GCC_VERSION VERSION_GREATER 4.4)
++        elseif(GCC_VERSION VERSION_GREATER 4.4)
+             set(ver 4.4)
+EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
- C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg5/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} CPLUS_INCLUDE_PATH=$MINGWPREFIX/ffmpeg5/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg5/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PATH=$MINGWPREFIX/ffmpeg5/bin:$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOVITO_BUILD_PLUGIN_VULKAN:BOOL=ON -DOVITO_LIBSSH_RUNTIME_LINKING:BOOL=ON -DOPENSSL_ROOT_DIR:PATH=$MINGWPREFIX -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ #PATH=$PATH:$MINGWPREFIX/qt4/bin QTDIR=$MINGWPREFIX/qt4 QMAKESPEC=$MINGWPREFIX/qt4/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dkst_qt5:BOOL=OFF -DNETCDF_DIR:PATH=$MINGWPREFIX -S. -Bbuild_win &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dkst_qt5:BOOL=ON -DNETCDF_DIR:PATH=$MINGWPREFIX -Dkst_pch:BOOL=OFF -DCXXFLAGS:STRING="-std=c++17" -S. -Bbuild_win &&
  #wl-showstatus build &&
  #ninja -Cbuild_win &&
  wl-showstatus build-install &&
@@ -136,11 +151,11 @@ mkdir -p build_win &&
 #    echo OK
 
 #export DEPENDANCIES=qt
-#wl-showstatus configure &&
-# $MINGWPREFIX/qt/bin/qmake -makefile *.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
-# wl-showstatus build &&
-# mingw32-make &&
-#    echo OK
+wl-showstatus configure &&
+ $MINGWPREFIX/qt/bin/qmake -makefile kst.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
+ wl-showstatus build &&
+ mingw32-make &&
+    echo OK
 
 #export DEPENDANCIES=qt
 #mkdir -p build_static build_shared &&
@@ -165,7 +180,7 @@ mkdir -p build_win &&
 # #find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
 #    echo OK
 
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-v$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Kst-$VERSION
 
 
 

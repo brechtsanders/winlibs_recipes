@@ -1,61 +1,103 @@
-export NAME="OVITO"
+export NAME="3Depict"
 export STATUS=
-export URL=https://www.ovito.org/
-export BASENAME=ovito
-export DESCRIPTION="Open Visualization Tool"
-export CATEGORY=graphics
+export URL=https://threedepict.sourceforge.net/
+export BASENAME=3depict
+export DESCRIPTION="3Depict was developed to allow for analysis of scientific datasets commonly encountered in atom probe tomography. You can manipulate, interact with and analyse point based datasets."
+export CATEGORY=science
 export TYPE=application
-#export VERSION=3.7.11
-#export VERSIONDATE=20221215
-export VERSION=3.7.12
+export VERSION=0.0.23
 export VERSIONDATE=20221216
 wl-showstatus --package-version
-export DEPENDANCIES=qt,libssh
+export DEPENDANCIES=wxwidgets,qhull,gsl,mathgl,qhull,gsl,vigra
 export OPTIONALDEPENDANCIES=
-export BUILDDEPENDANCIES=cmake,ninja
-export LICENSEFILE=LICENSE.txt
-export LICENSETYPE=GPL/MIT
-export DOWNLOADURL="https://gitlab.com/stuko/ovito/-/tags"
+export BUILDDEPENDANCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/threedepict/files/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://gitlab.com/stuko/ovito/-/archive/v$VERSION/$BASENAME-v$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/threedepict/$VERSION/3Depict-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xfj $TARBALLDIR/$BASENAME/$BASENAME-v$VERSION.tar.bz2
-cd $BASENAME-v$VERSION
-# fix src/ovito/core/CMakeLists.txt (version >= 3.7.11)
-patch -ulbf src/ovito/core/CMakeLists.txt << EOF
-@@ -306,3 +306,3 @@
-                        IF(NOT lib_dll)
--                               MESSAGE(FATAL_ERROR "Could not find corresponding DLL for ffmpeg library '\${lib}' in same directory.")
-+                               MESSAGE(WARNING "Could not find corresponding DLL for ffmpeg library '\${lib}' in same directory.")
-                        ENDIF()
-EOF
-# fix cmake/Prerequisites.cmake (version >= 3.7.11)
-patch -ulbf cmake/Prerequisites.cmake << EOF
-@@ -59,3 +59,3 @@
-                IF(NOT lib_versions)
--                       MESSAGE(FATAL_ERROR "Did not find any library files that match the file path \${_shared_lib} (globbing patterns: \${lib_base_name}.*\${CMAKE_SHARED_LIBRARY_SUFFIX}; \${lib_base_name}\${CMAKE_SHARED_LIBRARY_SUFFIX}.*)")
-+                       MESSAGE(WARNING "Did not find any library files that match the file path \${_shared_lib} (globbing patterns: \${lib_base_name}.*\${CMAKE_SHARED_LIBRARY_SUFFIX}; \${lib_base_name}\${CMAKE_SHARED_LIBRARY_SUFFIX}.*)")
-                ENDIF()
-@@ -85,3 +85,3 @@
-                FOREACH(lib_file \${lib_files})
--                       IF(NOT APPLE)
-+                       IF(NOT APPLE AND NOT MINGW)
-                                MESSAGE("Installing shared library \${lib_file}")
-EOF
+tar xfz $TARBALLDIR/$BASENAME/3Depict-$VERSION.tar.gz
+cd 3Depict-$VERSION
+
+  ./configure --help 2> /dev/null
+  cat meson_options.txt 2> /dev/null
+  head COPYING* LICENSE* LICENCE* COPYRIGHT*
+  ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
+
+wl-showstatus build &&
+ make &&
+ #make CC=${CC:-gcc} &&
+    echo OK
+
+#GCCFLAG_ASNEEDED=$(echo "int main () { return 0; }"|gcc -xc - -Wl,--as-needed &>/dev/null && echo "-Wl,--as-needed")
+#GCCFLAG_ASNEEDED=$(if gcc --help -v 2>/dev/null | grep -q " --as-needed"; then echo "-Wl,--as-needed"; fi)
+
+# fix detection of qhull
+sed -i.bak -e "s?\bqhull/qhull_a\.h?lib&?" configure
+wl-showstatus configure &&
+ #wl-showstatus preconfigure &&
+ #mkdir -p m4 &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-wxdir=$MINGWPREFIX/wx --with-wx-config=$(which wx-config.exe) CFLAGS="-I$MINGWPREFIX/wx/include" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+    echo OK
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
 
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
-#mkdir -p build_test && PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -G"MSYS Makefiles" -DOVITO_BUILD_PLUGIN_VULKAN:BOOL=ON -DOVITO_LIBSSH_RUNTIME_LINKING:BOOL=ON -S. -Bbuild_test -LH && echo OK; rm -rf build_test
-mkdir -p build_win &&
- wl-showstatus configure &&
- C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg5/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} CPLUS_INCLUDE_PATH=$MINGWPREFIX/ffmpeg5/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg5/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PATH=$MINGWPREFIX/ffmpeg5/bin:$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOVITO_BUILD_PLUGIN_VULKAN:BOOL=ON -DOVITO_LIBSSH_RUNTIME_LINKING:BOOL=ON -DOPENSSL_ROOT_DIR:PATH=$MINGWPREFIX -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
- #wl-showstatus build &&
- #ninja -Cbuild_win &&
- wl-showstatus build-install &&
- ninja -Cbuild_win install/strip &&
-    echo OK
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+#export BUILDDEPENDANCIES=cmake
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+#-DCMAKE_SYSTEM_NAME=Windows 
+#-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+# #wl-showstatus build &&
+# #make -Cbuild_win &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+#    echo OK
+
+#export BUILDDEPENDANCIES=cmake,ninja
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+#-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+# #wl-showstatus build &&
+# #ninja -Cbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
 
 #export BUILDDEPENDANCIES=cmake,ninja
 #mkdir -p build_static build_shared &&
@@ -165,7 +207,7 @@ mkdir -p build_win &&
 # #find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
 #    echo OK
 
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-v$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf 3Depict-$VERSION
 
 
 

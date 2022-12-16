@@ -1,0 +1,71 @@
+export NAME="webvtt"
+export STATUS=
+export URL=https://github.com/alexa/webvtt/
+export BASENAME=webvtt
+export DESCRIPTION="A C/C++ library for interpreting and authoring conformant WebVTT content. WebVTT is a caption and subtitle format designed for use with HTML5 audio and video elements."
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=1.0
+export VERSIONDATE=20221216
+wl-showstatus --package-version
+export DEPENDANCIES=
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/alexa/webvtt/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/alexa/webvtt/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix include/webvtt/util.h (version >= 1.0)
+patch -ulbf include/webvtt/util.h << EOF
+@@ -64,3 +64,3 @@
+ #   if WEBVTT_OS_WIN32
+-#     if WEBVTT_BUILD_LIBRARY
++#     if defined(libwebvtt_EXPORTS)
+ #       define WEBVTT_EXPORT __declspec(dllexport)
+EOF
+# also allow building shared libraries
+sed -i.bak -e "s/\(add_library(.*\) STATIC/\1/" src/webvtt/CMakeLists.txt src/webvttxx/CMakeLists.txt
+# skip building test
+sed -i.bak -e "s/^add_subdirectory(\"test\")/#&/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_GMOCK:BOOL=OFF -DINSTALL_GTEST:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_C_FLAGS:STRING="-DWEBVTT_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DWEBVTT_STATIC" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_GMOCK:BOOL=OFF -DINSTALL_GTEST:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ (
+patch -ulbf build_shared/build.ninja << EOF
+@@ -276,5 +276,5 @@
+ build src/webvttxx/libwebvttxx.dll src/webvttxx/liblibwebvttxx.dll.a: CXX_SHARED_LIBRARY_LINKER__libwebvttxx_Release src/webvttxx/CMakeFiles/libwebvttxx.dir/abstract_parser.cpp.obj src/webvttxx/CMakeFiles/libwebvttxx.dir/file_parser.cpp.obj
+   LANGUAGE_COMPILE_FLAGS = -Wno-narrowing -O3 -DNDEBUG
+-  LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
++  LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Lsrc/webvtt -lwebvtt
+   OBJECT_DIR = src\\webvttxx\\CMakeFiles\\libwebvttxx.dir
+   POST_BUILD = cd .
+EOF
+ ) &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared src/webvtt/libwebvtt.dll &&
+ ninja -Cbuild_shared src/webvttxx/liblibwebvttxx.dll.a &&
+ ninja -Cbuild_shared &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ #wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_{static,shared}/src/*/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/src/*/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
