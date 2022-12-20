@@ -186,7 +186,9 @@ export TYPE=library
 export VERSION=5.2.0
 export VERSIONDATE=20221206
 wl-showstatus --package-version
-export DEPENDANCIES=mbedtls
+export DEPENDANCIES=
+#export DEPENDANCIES=polarssl
+#export DEPENDANCIES=mbedtls
 export OPTIONALDEPENDANCIES=
 #export BUILDDEPENDANCIES=cmake
 export BUILDDEPENDANCIES=cmake,ninja
@@ -261,6 +263,19 @@ patch -ulbf src/utils/win_utils.cc << EOF
 +#endif
  static _crt_signal_t gOldABRT = NULL;
 EOF
+# fix src/crypto/polarssl.c (version >= 5.2.0)
+patch -ulbf src/crypto/polarssl.c << EOF
+@@ -919,3 +919,3 @@
+
+-int32_t bctbx_ssl_get_dtls_srtp_key_material(bctbx_ssl_context_t *ssl_ctx, char *output, size_t *output_length) {
++int32_t bctbx_ssl_get_dtls_srtp_key_material(bctbx_ssl_config_t *ssl_ctx, uint8_t *output, size_t *output_length) {
+        *output_length = 0;
+@@ -1088,3 +1088,3 @@
+
+-int32_t bctbx_ssl_config_set_callback_cli_cert(bctbx_ssl_config_t *ssl_config, int(*callback_function)(void *, bctbx_ssl_context_t *, unsigned char *, size_t), void *callback_data) {
++int32_t bctbx_ssl_config_set_callback_cli_cert(bctbx_ssl_config_t *ssl_config, int(*callback_function)(void *, bctbx_ssl_context_t *, const bctbx_list_t *), void *callback_data) {
+        if (ssl_config != NULL) {
+EOF
 ## don't abort on warnings
 #sed -i.bak -e "s/-Wall//" CMakeLists.txt
 #mkdir -p build_static build_shared &&
@@ -296,10 +311,12 @@ sed -i.bak2 -e "s?add_definitions(-EHa)\|list(APPEND STRICT_OPTIONS_CXX \"/EHa\"
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
  #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
  #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ldbghelp/" build_shared/build.ninja &&
@@ -308,7 +325,7 @@ mkdir -p build_static build_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####TO DO: build with encryption support
+####TO DO: build with encryption support via mbedtls
 
 
 
