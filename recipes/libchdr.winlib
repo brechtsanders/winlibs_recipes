@@ -1,0 +1,55 @@
+export NAME="libchdr"
+export STATUS=
+export URL=https://github.com/rtissera/libchdr
+export BASENAME=libchdr
+export DESCRIPTION="Standalone library for reading MAME's CHDv1-v5 formats."
+export CATEGORY=games
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20221226
+wl-showstatus --package-version
+export DEPENDANCIES=zlib
+export OPTIONALDEPENDANCIES=
+export BUILDDEPENDANCIES=cmake,ninja
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/rtissera/libchdr/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rtissera/libchdr/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix CMakeLists.txt
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -27,5 +27,10 @@
+# # lzma
+#-add_subdirectory(deps/lzma-22.01 EXCLUDE_FROM_ALL)
+#+if (WITH_SYSTEM_LZMA)
+#+  find_package(LZMA REQUIRED)
+#+  list(APPEND PLATFORM_LIBS LZMA::LZMA)
+#+else()
+#+  add_subdirectory(deps/lzma-22.01 EXCLUDE_FROM_ALL)
+#   list(APPEND CHDR_LIBS lzma)
+#   list(APPEND CHDR_INCLUDES lzma)
+#+endif()
+#
+#EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINSTALL_STATIC_LIBS:BOOL=ON -DWITH_SYSTEM_ZLIB:BOOL=ON -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DINSTALL_STATIC_LIBS:BOOL=ON -DWITH_SYSTEM_ZLIB:BOOL=ON -DWITH_SYSTEM_LZMA:BOOL=ON -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ strip build_win/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_win/*.dll $INSTALLPREFIX/bin/ &&
+ rm -f $INSTALLPREFIX/lib/liblzma.a &&
+ cp -u $INSTALLPREFIX/lib/libchdr-static.a $INSTALLPREFIX/lib/libchdr.a &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: use already installed liblzma.a (requires LzmaEnc.h to be present)
+
+
+
