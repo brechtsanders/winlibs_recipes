@@ -33,9 +33,21 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# manually create .pc file
+cat > iconv.pc << EOF
+prefix=$INSTALLPREFIX
+exec_prefix=\${prefix}
+includedir=\${prefix}/include
+libdir=\${prefix}/lib
+
+Name: iconv
+Description: iconv() implementation for use on systems which don't have one
+Version: $VERSION
+Cflags: 
+Libs: -liconv
+EOF
 # fix for .exe extension
-mv src/Makefile.in src/Makefile.in.bak
-sed -e 's?\($(DESTDIR)$(bindir)/iconv\)$?\1.exe?' src/Makefile.in.bak > src/Makefile.in
+sed -i.bak -e 's?\($(DESTDIR)$(bindir)/iconv\)$?\1.exe?' src/Makefile.in
 ## patch for windows/windres-options (version <= 1.12)
 #patch -u -l windows/windres-options << EOF
 #--- windows/windres-options Tue Feb 26 12:54:58 2008
@@ -77,6 +89,9 @@ wl-showstatus configure &&
  sed -i.bak -e "s/^\(gl_.*LIBOBJS.*progreloc\)\(\.l*o\)/\1\2 relocatable\2/" srclib/Makefile &&
  wl-showstatus build-install &&
  make install && ( make install-strip || true ) &&
+ # manually install .pc file
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ cp -u iconv.pc $INSTALLPREFIX/lib/pkgconfig/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 #mkdir -p /home/keith/staged/mingw32/lib && cp lib/.libs/* /home/keith/staged/mingw32/lib/
 
