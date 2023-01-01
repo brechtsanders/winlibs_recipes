@@ -397,10 +397,7 @@ mkdir -p build_win &&
  cd .. &&
  #make -j1 -Cbuild_winconfigure-host &&
  ## fix building DLLs
- #for F in build_win/*/libtool; do 
- # mv $F $F.bak &&
- # sed -e "s/\(allow_undefined=\)yes/\1no/" $F.bak > $F
- #done &&
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" build_win/*/libtool &&
  wl-showstatus build &&
  #( make -Cbuild_win || make -Cbuild_win MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) &&
  # fix missing uint (version >= 2.37)
@@ -447,11 +444,15 @@ mkdir -p build_win &&
 
 # adds support for aarch64-pe in LD and GAS and adds non image vectors in BFD (version >= 2.39)
 #### see also: https://sourceware.org/pipermail/binutils/2021-December/118998.html
-patch -ulbf bfd/Makefile.am << EOF
-@@ -619,2 +619,3 @@
+patch -ulbf bfd/Makefile.in << EOF
+@@ -1083,2 +1083,3 @@
         pei-aarch64.c \\
 +       pe-aarch64.c \\
         pei-ia64.c \\
+@@ -1689,2 +1690,3 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./\$(DEPDIR)/pdp11.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./\$(DEPDIR)/pe-aarch64.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./\$(DEPDIR)/pe-aarch64igen.Plo@am__quote@
 EOF
 patch -ulbf bfd/Makefile.in << EOF
 @@ -1083,2 +1083,3 @@
@@ -487,7 +488,7 @@ EOF
 patch -ulbf bfd/config.bfd << EOF
 @@ -256,2 +256,10 @@
      ;;
-+  aarch64-*-pe)
++  aarch64-*-pe | aarch64-*-mingw*)
 +    # Not currently complete (and probably not stable), warn user
 +    #echo "*** WARNING BFD aarch64-pe support not complete nor stable"
 +    #echo "*** Do not rely on this for production purposes"
@@ -760,16 +761,16 @@ patch -ulbf gas/config/obj-coff.h << EOF
 EOF
 patch -ulbf gas/config/tc-aarch64.c << EOF
 @@ -1477,3 +1477,3 @@
- 
+
 -#ifdef OBJ_ELF
 +#if defined (OBJ_ELF) || defined (OBJ_COFF)
  /* This code is to handle mapping symbols as defined in the ARM AArch64 ELF
-@@ -1647,2 +1647,3 @@
- 
+@@ -2035,2 +2035,3 @@
+
 +#ifdef OBJ_ELF
  static void
 @@ -2043,3 +2044,2 @@
- 
+
 -#ifdef OBJ_ELF
  /* Emit BFD_RELOC_AARCH64_TLSDESC_ADD on the next ADD instruction.  */
 @@ -2117,4 +2117,4 @@
@@ -820,15 +821,15 @@ patch -ulbf gas/config/tc-aarch64.c << EOF
 +#else
 +  mach = bfd_mach_aarch64;
 +#endif
- 
-@@ -10208,2 +10224,3 @@
- 
-+#if defined (OBJ_ELF) || defined (OBJ_MAYBE_ELF)
+
+@@ -10209,2 +10225,3 @@
  /* ABIs.  */
++#if defined (OBJ_ELF) || defined (OBJ_MAYBE_ELF)
+ struct aarch64_option_abi_value_table
 @@ -10241,2 +10258,3 @@
  }
 +#endif
- 
+
 EOF
 patch -ulbf gas/config/tc-aarch64.h << EOF
 @@ -171,3 +171,3 @@
@@ -870,13 +871,13 @@ patch -ulbf gas/config/tc-aarch64.h << EOF
 @@ -276,3 +304,3 @@
  
 -#ifdef TE_PE
-+#ifdef 0 /* TE_PE */
++#if 0 /* #ifdef TE_PE */
  
 EOF
 patch -ulbf gas/configure.tgt << EOF
 @@ -136,2 +136,3 @@
    aarch64*-*-netbsd*)                  fmt=elf em=nbsd;;
-+  aarch64*-*-pe*)                      fmt=coff em=pep ;;
++  aarch64*-*-pe* | aarch64*-*-mingw*)  fmt=coff em=pep ;;
  
 EOF
 patch -ulbf ld/Makefile.am << EOF
@@ -902,7 +903,7 @@ EOF
 patch -ulbf ld/configure.tgt << EOF
 @@ -89,2 +89,6 @@
                         ;;
-+aarch64-*-pe)
++aarch64-*-pe | aarch64-*-mingw*)
 +                       targ_emul=aarch64pe
 +                       targ_extra_ofiles="deffilep.o pep-dll-aarch64.o"
 +                       ;;
