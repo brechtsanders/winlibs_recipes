@@ -12,11 +12,18 @@ export TYPE=library
 #export VERSIONDATE=20220219
 export VERSION=3.2.1
 export VERSIONDATE=20221213
-wl-showstatus --package-version
 export DEPENDENCIES=openssl,libdl,json,libcurl
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
+#export VERSION=4.0.0
+#export VERSIONDATE=20230103
+#### Bug reported here: https://github.com/tpm2-software/tpm2-tss/issues/2528
+wl-showstatus --package-version
+#export DEPENDENCIES=openssl,libdl,json,libcurl,libuuid
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=BSD
 export DOWNLOADURL="https://github.com/tpm2-software/tpm2-tss/releases"
@@ -52,6 +59,33 @@ patch -ulbf src/util/io.h << EOF
 +#endif
  #define _HOST_NAME_MAX MAX_COMPUTERNAME_LENGTH
 EOF
+## fix missing poll.h in src/tss2-fapi/fapi_int.h (version >= 4.0.0)
+#patch -ulbf src/tss2-fapi/fapi_int.h << EOF
+#@@ -31,3 +31,5 @@
+# #include <json-c/json.h>
+#+#ifndef _WIN32
+# #include <poll.h>
+#+#endif
+#
+#EOF
+## fix missing poll.h in src/tss2-fapi/ifapi_io.c (version >= 4.0.0)
+#patch -ulbf src/tss2-fapi/ifapi_io.c << EOF
+#@@ -15,3 +15,5 @@
+# #include <fcntl.h>
+#+#ifndef _WIN32
+# #include <poll.h>
+#+#endif
+# #include <errno.h>
+#EOF
+## fix undefined uint in src/tss2-fapi/ifapi_eventlog_system.c (version >= 4.0.0)
+#sed -i.bak -e "s/\buint\b/unsigned int/g" src/tss2-fapi/ifapi_eventlog_system.c
+## fix Makefile.in (version >= 4.0.0)
+#patch -ulbf Makefile.in << EOF
+#@@ -1173,2 +1173,3 @@
+#        src/tss2-fapi/tpm_json_serialize.c
+#+@FAPI_FALSE@am__src_tss2_fapi_libtss2_fapi_la_SOURCES_DIST =
+# am__objects_9 =  \\
+#EOF
 # skip installing man pages
 sed -i.bak -e "s/\(@install-man:\).*$/\1/" Makefile.in
 # don't on certain errors in configure
@@ -62,6 +96,7 @@ sed -i.bak2 -e "s/\(_FORTIFY_SOURCE=\)2/\10/; s/-fstack-protector/&-DISABLE/" co
 sed -i.bak3 -e "s/as_fn_error\(.*add.* are needed\)/echo\1/" configure
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-esys --disable-fapi --disable-tcti-device --disable-tcti-mssim --enable-tcti-swtpm --disable-tcti-pcap --disable-tcti-cmd --with-crypto=ossl --without-udevrulesdir --disable-doxygen-doc CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-esys --disable-fapi --disable-fapi-async-tests --without-default-test-fapi-profile --disable-tcti-device --disable-tcti-mssim --enable-tcti-swtpm --disable-tcti-pcap --disable-tcti-cmd --with-crypto=ossl --without-udevrulesdir --disable-doxygen-doc CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/portable-uuid" LDFLAGS="-Wl,--as-needed -ldl -lportable-uuid -lws2_32" &&
  #--with-devicetests=
  # fix building DLLs
  sed -i.bak1 -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
