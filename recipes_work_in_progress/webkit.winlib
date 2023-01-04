@@ -446,6 +446,21 @@ patch -ulbf Source/WTF/wtf/RetainPtr.h << EOF
 +#endif
 
 EOF
+# fix Source/ThirdParty/ANGLE/src/common/mathutil.h (version >= 7615.1.16.2)
+patch -ulbf Source/ThirdParty/ANGLE/src/common/mathutil.h << EOF
+@@ -1108,3 +1108,3 @@
+
+-#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__)
++#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__) || defined(__MINGW32__) inline int BitCount(uint32_t bits)
+EOF
+patch -ulbf Source/ThirdParty/ANGLE/src/libANGLE/renderer/d3d/d3d11/renderer11_utils.cpp << EOF
+@@ -1709,2 +1709,5 @@
+     extensions->clipCullDistanceEXT       = true;
++#if !defined(D3D11_CLIP_OR_CULL_DISTANCE_COUNT) && defined(D3D10_CLIP_OR_CULL_DISTANCE_COUNT)
++#define D3D11_CLIP_OR_CULL_DISTANCE_COUNT D3D10_CLIP_OR_CULL_DISTANCE_COUNT
++#endif
+     caps->maxClipDistances                = D3D11_CLIP_OR_CULL_DISTANCE_COUNT;
+EOF
 
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
 #mkdir -p build_test && cmake.exe -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
@@ -457,13 +472,20 @@ EOF
 #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_MEDIA_STATISTICS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ #-DENABLE_WEB_AUDIO:BOOL=ON 
+ #-DENABLE_MEDIA_SOURCE:BOOL=ON 
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=GTK -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=Efl -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WPE -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
  #-DPORT:STRING= choose which WebKit port to build (one of AppleWin;Efl;FTW;GTK;JSCOnly;Mac;PlayStation;WPE;WinCairo)
  # remove invalid linker flag -Wl,--disable-new-dtags
  sed -i.bak -e "s/-Wl,--disable-new-dtags//" build_win/build.ninja &&
+ # fix missing link library
+ sed -i.bak2 -e "s?\([^ ]*\)libicudata\.dll\.a?& \1libicuin.dll.a?" build_win/build.ninja &&
+ # fix invalid link flag
+ sed -i.bak3 -e "s?\"/manifestdependency[^\"]*\"??" build_win/build.ninja &&
  #wl-showstatus build &&
  #ninja -Cbuild_win &&
  wl-showstatus build-install &&
