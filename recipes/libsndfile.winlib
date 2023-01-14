@@ -65,3 +65,74 @@ wl-showstatus configure &&
 
 
 
+## fix src/sfconfig.h
+#cat >> src/sfconfig.h << EOF
+##ifdef _WIN32
+##ifdef __MINGW32__
+##define COMPILER_IS_GCC 1
+##endif
+##ifndef CPU_IS_LITTLE_ENDIAN
+##define CPU_IS_LITTLE_ENDIAN 1
+##endif
+##ifndef CPU_IS_BIG_ENDIAN
+##define CPU_IS_BIG_ENDIAN 0
+##endif
+##if defined(_M_IX86) || defined(_M_X64)
+##undef CPU_IS_X86
+##define CPU_IS_X86 1
+##endif
+##if defined(_M_X64)
+##undef CPU_IS_X86_64
+##define CPU_IS_X86_64 1
+##endif
+##endif
+##ifndef CPU_CLIPS_POSITIVE
+##define CPU_CLIPS_POSITIVE 0
+##endif
+##ifndef CPU_CLIPS_POSITIVE
+##define CPU_CLIPS_POSITIVE 0
+##endif
+##ifndef SIZEOF_SF_COUNT_T
+##define SIZEOF_SF_COUNT_T sizeof(sf_count_t)
+##endif
+##ifndef PACKAGE_NAME
+##define PACKAGE_NAME "libsndfile"
+##endif
+##ifndef PACKAGE_VERSION
+##define PACKAGE_VERSION "$VERSION"
+##endif
+#EOF
+## also allow building static library
+#sed -i.bak -e "s/\(add_library *([^ ]*\)  *SHARED/\1/" CMakeLists.txt
+## also allow building static library
+#sed -i.bak2 -e "s/\(if (\)\(\${undef_count}\)/\1\"\2\"/" CMakeLists.txt
+## fix missing CMakeFiles/config.h.in
+#sed -i.bak3 -e "s?CMakeFiles\(/config\.h\.in\)?src\1?g" CMakeLists.txt
+##export BUILDDEPENDENCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# ## fix missing link libraries
+# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+# #wl-showstatus build &&
+# #cmake.exe --build build_static &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #cmake.exe --build build_shared &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# #cmake.exe --install build_static --strip &&
+# #cmake.exe --build build_static --target "install/strip" &&
+# #cmake.exe --build build_static --target "library/install/strip" &&
+# ninja -Cbuild_static install/strip &&
+# #ninja -Cbuild_static library/install/strip &&
+# wl-showstatus build-install &&
+# #cmake.exe --install build_shared --strip &&
+# #cmake.exe --build build_shared --target "install/strip" &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK

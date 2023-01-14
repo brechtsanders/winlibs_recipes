@@ -33,6 +33,8 @@ export TYPE=library
 #export VERSIONDATE=20220607
 export VERSION=2.4.3
 export VERSIONDATE=20220806
+#export VERSION=2.5.0
+#export VERSIONDATE=20230114
 wl-showstatus --package-version
 export DEPENDENCIES=zstd,libxml2,openssl,laszip,gdal,libgeotiff,zlib,xz,libcurl,postgresql
 export OPTIONALDEPENDENCIES=
@@ -83,6 +85,34 @@ patch -ulbf apps/pdal.cpp << EOF
 +#if defined(_WIN32) && !defined(__MINGW32__)
  int wmain( int argc, wchar_t *argv[ ], wchar_t *envp[ ] )
 EOF
+## fix pdal/util/pdal_util_export.hpp (version >= 2.5.0)
+#patch -ulbf pdal/util/pdal_util_export.hpp << EOF
+#@@ -44,3 +44,7 @@
+# #   define PDAL_DLL_UNIX
+#+#  ifdef __MINGW32__
+#+#   define PDAL_DLL_DEPRECATED   __declspec(dllexport) __attribute__((deprecated))
+#+#  else
+# #   define PDAL_DLL_DEPRECATED   __declspec(deprecated, dllexport)
+#+#  endif
+# #else
+#EOF
+## fix pdal/DynamicLibrary.cpp (version >= 2.5.0)
+#patch -ulbf pdal/DynamicLibrary.cpp << EOF
+#@@ -89,3 +89,4 @@
+# #ifdef _WIN32
+#-    handle = ::LoadLibraryW(FileUtils::toNative(name).c_str());
+#+    std::wstring libname = FileUtils::toNative(name);
+#+    handle = ::LoadLibraryW(libname.c_str());
+#     if (handle == NULL)
+#EOF
+## fix pdal/util/FileUtils.hpp (version >= 2.5.0)
+#patch -ulbf pdal/util/FileUtils.hpp << EOF
+#@@ -287,3 +287,3 @@
+#
+#-#ifdef PDAL_WIN32_STL
+#+#if defined(PDAL_WIN32_STL) || defined(__MINGW32__)
+#     PDAL_DLL std::wstring toNative(const std::string& in);
+#EOF
 # fix apps/CMakeLists.txt (version >= 2.4.3)
 patch -ulbf apps/CMakeLists.txt << EOF
 @@ -32,5 +32,5 @@
