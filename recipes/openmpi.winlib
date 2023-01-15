@@ -363,7 +363,7 @@ patch -ulbf contrib/platform/win32/CMakeModules/ompi_check_MinGW.cmake << EOF
 --- contrib/platform/win32/CMakeModules/ompi_check_MinGW.cmake  2012-04-03 16:29:52 +0200
 +++ contrib/platform/win32/CMakeModules/ompi_check_MinGW.cmake  2013-01-31 14:25:40 +0100
 @@ -36,3 +36,3 @@
- EXECUTE_PROCESS(COMMAND gcc --version OUTPUT_VARIABLE GCC_VERSION)
+ EXECUTE_PROCESS(COMMAND ${CC:-gcc} --version OUTPUT_VARIABLE GCC_VERSION)
 -STRING (REGEX MATCH [.0-9]*\\n GCC_VERSION \${GCC_VERSION})
 +STRING (REGEX MATCH [.0-9]*[^\\n]*\\n GCC_VERSION \${GCC_VERSION})
  STRING (REPLACE "\\n" "" GCC_VERSION \${GCC_VERSION})
@@ -437,17 +437,21 @@ patch -ulbf opal/mca/memory/linux/sysdeps/pthread/malloc-machine.h << EOF
        cnt = 0;
      }
 EOF
+# fix issue with empty GCC_VERSION
+sed -i.bak "s/\([^\"]\)\(\${GCC_VERSION}\)/\1\"\2\"/" contrib/platform/win32/CMakeModules/ompi_check_MinGW.cmake
 # fix wrong link libraries (version >= 1.8)
 sed -i.bak -e "s/Ws2_32\.lib/-lws2_32/g; s/shlwapi\.lib/-lshlwapi/g" $(grep -l \.lib $(find . -iname CMakeLists.txt))
 wl-showstatus configure &&
 if ( echo $RUNPLATFORM | grep -vq x86_64 ); then
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release .
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release .
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-DWIN32" -DCMAKE_CXX_FLAGS:STRING="-DWIN32" .
 else
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOMPI_RELEASE_BUILD:BOOL=ON -DOMPI_ENABLE_MPI_PROFILING:BOOL=OFF -DOMPI_ENABLE_THREAD_MULTIPLE:BOOL=ON -DOPAL_ENABLE_MULTI_THREADS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-fpermissive" -DCMAKE_CXX_FLAGS:STRING="-fpermissive" .
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOMPI_RELEASE_BUILD:BOOL=ON -DOMPI_ENABLE_MPI_PROFILING:BOOL=OFF -DOMPI_ENABLE_THREAD_MULTIPLE:BOOL=ON -DOPAL_ENABLE_MULTI_THREADS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-fpermissive" -DCMAKE_CXX_FLAGS:STRING="-fpermissive" .
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOMPI_RELEASE_BUILD:BOOL=ON -DOMPI_ENABLE_MPI_PROFILING:BOOL=OFF -DOMPI_ENABLE_THREAD_MULTIPLE:BOOL=ON -DOPAL_ENABLE_MULTI_THREADS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-fpermissive -DWIN32" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DWIN32" .
 fi &&
  wl-showstatus build-install &&
  # fix invalid link parameter
- ( sed -i.bak -e "s?/TP??g" $(grep -l " /TP" `find . -iname build.make`) || true ) &&
+ ( sed -i.bak -e "s?/TP??g" $(grep -l " /TP" $(find . -iname build.make)) || true ) &&
  # fix redefinition of pid_t
  mv opal/include/opal_config.h opal/include/opal_config.h.bak &&
  sed -e "s/^\(#define pid_t int\)/\/\/\1/; s/^\(#define SIZEOF_PID_T \)int/\1SIZEOF_INT/" opal/include/opal_config.h.bak > opal/include/opal_config.h &&

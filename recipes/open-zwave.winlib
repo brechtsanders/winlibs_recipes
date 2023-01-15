@@ -54,15 +54,32 @@ cat cpp/src/command_classes/TimeParameters.cpp.bak >> cpp/src/command_classes/Ti
 #+#if (defined _WINDOWS || defined WIN32 || defined _MSC_VER || defined __MINGW32__)
 # #      if defined OPENZWAVE_MAKEDLL    // Create the dynamic library.
 #EOF
+# fix cpp/src/platform/windows/FileOpsImpl.cpp (version >= 1.6)
+patch -ulbf cpp/src/platform/windows/FileOpsImpl.cpp << EOF
+@@ -147,3 +147,3 @@
+        if (!FolderExists(ozwdirname(_destfile))) {
+-               Log::Write(LogLevel_Warning, "Destination Folder %s Doesn't Exist", ozwdirname(_destfile));
++               Log::Write(LogLevel_Warning, "Destination Folder %s Doesn't Exist", ozwdirname(_destfile).c_str());
+                return false;
+EOF
+# fix cpp/src/Utils.cpp (version >= 1.6)
+patch -ulbf cpp/src/Utils.cpp << EOF
+@@ -161,3 +161,4 @@
+ #else
+-       return static_cast< std::ostringstream & >( ( std::ostringstream() << std::dec << x ) ).str();
++       std::ostringstream oss;
++       return static_cast< std::ostringstream & >( ( oss << std::dec << x ) ).str();
+ #endif
+EOF
 mkdir -p cpp/lib/windows-mingw32
 wl-showstatus build &&
- make -C cpp/build/windows/mingw32 &&
- g++ -c -o hidapi.o cpp/hidapi/windows/hid.cpp -Icpp/hidapi/hidapi &&
- ar cru libhidapi.a hidapi.o &&
- g++ -shared -s -mwindows -def cpp/hidapi/windows/ddk_build/hidapi.def -o hidapi.dll -Wl,--out-implib,libhidapi.dll.a libhidapi.a -lsetupapi &&
- #g++ -c -o MinOZW.o cpp/examples/MinOZW/Main.cpp -Icpp/src -DMINGW &&
- #g++ -s -o MinOZW.exe MinOZW.o cpp/lib/windows-mingw32/openzwave.a -lsetupapi -lcl &&
- #gcc -shared -s -mwindows -o openzwave.dll cpp/lib/windows-mingw32/openzwave.a -Wl,--out-implib,libopenzwave.dll.a &&
+ make -C cpp/build/windows/mingw32 CC=${CC:-gcc} CXX=${CXX:-g++} &&
+ ${CXX:-g++} -c -o hidapi.o cpp/hidapi/windows/hid.cpp -Icpp/hidapi/hidapi &&
+ ${AR:-ar} cru libhidapi.a hidapi.o &&
+ ${CXX:-g++} -shared -s -mwindows -def cpp/hidapi/windows/ddk_build/hidapi.def -o hidapi.dll -Wl,--out-implib,libhidapi.dll.a libhidapi.a -lsetupapi &&
+ #${CXX:-g++} -c -o MinOZW.o cpp/examples/MinOZW/Main.cpp -Icpp/src -DMINGW &&
+ #${CXX:-g++} -s -o MinOZW.exe MinOZW.o cpp/lib/windows-mingw32/openzwave.a -lsetupapi -lcl &&
+ #${CC:-gcc} -shared -s -mwindows -o openzwave.dll cpp/lib/windows-mingw32/openzwave.a -Wl,--out-implib,libopenzwave.dll.a &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/include/openzwave $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
  cp -f cpp/lib/windows-mingw32/openzwave.a $INSTALLPREFIX/lib/libopenzwave.a &&

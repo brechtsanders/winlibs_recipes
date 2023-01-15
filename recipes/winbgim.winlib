@@ -35,16 +35,24 @@ patch -ulbf winbgim.h << EOF
 +    int left=0, int top=0, int right=INT_MAX, int bottom=INT_MAX,
      bool active=true, HWND hwnd=NULL
 EOF
-# fix invalid GWL_USERDATA in drawing.cxx
+## fix invalid GWL_USERDATA in drawing.cxx
+#patch -ulbf drawing.cxx << EOF
+#--- drawing.cxx  2006-06-28 16:45:34 +0200
+#+++ drawing.cxx  2014-01-11 20:52:52 +0100
+#@@ -61,7 +61,3 @@
+#     // This gets the address of the WindowData structure associated with the window
+#-    // TODOMGM: Change this function to GetWindowLongPtr and change the set function
+#-    // elsewhere to SetWindowLongPtr.  We are using the short version now because
+#-    // ${CXX:-g++} does not support the long version.
+#-    // return (WindowData*)GetWindowLongPTR( hWnd, GWLP_USERDATA );
+#-    return (WindowData*)GetWindowLong( hWnd, GWL_USERDATA );
+#+    return (WindowData*)GetWindowLongPtr( hWnd, GWLP_USERDATA );
+# }
+#EOF
+# fix drawing.cxx (version >= 6_0_Nov2005)
 patch -ulbf drawing.cxx << EOF
---- drawing.cxx  2006-06-28 16:45:34 +0200
-+++ drawing.cxx  2014-01-11 20:52:52 +0100
-@@ -61,7 +61,3 @@
-     // This gets the address of the WindowData structure associated with the window
--    // TODOMGM: Change this function to GetWindowLongPtr and change the set function
--    // elsewhere to SetWindowLongPtr.  We are using the short version now because
--    // g++ does not support the long version.
--    // return (WindowData*)GetWindowLongPTR( hWnd, GWLP_USERDATA );
+@@ -65,3 +65,3 @@
+     // return (WindowData*)GetWindowLongPTR( hWnd, GWLP_USERDATA );
 -    return (WindowData*)GetWindowLong( hWnd, GWL_USERDATA );
 +    return (WindowData*)GetWindowLongPtr( hWnd, GWLP_USERDATA );
  }
@@ -61,15 +69,20 @@ patch -ulbf winthread.cxx << EOF
 +    SetWindowLongPtr( hWindow, GWLP_USERDATA, (LONG_PTR)pWndData );
 
 EOF
+# also allow building with clang
+sed -i.bak -e "s/g++/\$(CXX)/" makefile
+# avoid error
 sed -e "s/^CPPFLAGS\s*=.*$/& -Wno-narrowing/" makefile > Makefile.mingw 
 wl-showstatus build &&
-( make || make -f Makefile.mingw ) &&
+ ( make CXX=${CXX:-g++} || make -f Makefile.mingw CXX=${CXX:-g++} ) &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libbgi.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > libbgi.def &&
+ ${CXX:-g++} -shared -s -mwindows -def libbgi.def -o libbgi.dll libbgi.a -Wl,--out-implib,libbgi.dll.a -luuid -lole32 -loleaut32 &&
  wl-showstatus install &&
- mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/include/winbgim &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin $INSTALLPREFIX/include/winbgim &&
  cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
  cp -f graphics.h winbgim.h winbgitypes.h $INSTALLPREFIX/include/winbgim/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####TO DO: build DLL
 
 
 

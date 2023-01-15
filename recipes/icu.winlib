@@ -290,6 +290,14 @@ for F in $(find -name '*.cpp'); do
  cat $F.bak1 >> $F
 done
 fi
+# fix undefined reference to __atomic_is_lock_free when building with clang (version >= 72.1)
+if ${CXX:-g++} --version | grep clang -q; then
+ for F in common/brkeng.cpp i18n/anytrans.cpp io/locbund.cpp tools/toolutil/collationinfo.cpp tools/genrb/parse.cpp tools/genbrk/genbrk.cpp tools/gennorm2/extradata.cpp tools/gencfu/gencfu.cpp tools/icuexportdata/icuexportdata.cpp; do
+  mv $F $F.bak2 &&
+  echo "#define __atomic_is_lock_free(...) true" > $F &&
+  cat $F.bak2 >> $F
+ done
+fi
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-strict LDFLAGS="-static-libstdc++" && mkdir -p lib &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" &&
@@ -302,12 +310,11 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-data-packaging=library CC="${CC:-gcc}" CXX="${CXX:-g++}" CXXFLAGS="-fpermissive" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-data-packaging=library --disable-tests CC="${CC:-gcc}" CXX="${CXX:-g++}" CXXFLAGS="-fpermissive" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-data-packaging=library --disable-layoutex --disable-tests CC="${CC:-gcc}" CXX="${CXX:-g++}" CXXFLAGS="-fpermissive" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-data-packaging=library --disable-layoutex --disable-tests CC="${CC:-gcc}" CXX="${CXX:-g++}" CXXFLAGS="-fpermissive" PYTHON=$PYDIR/python.exe &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-data-packaging=library --disable-layoutex --disable-tests CC="${CC:-gcc}" CXX="${CXX:-g++}" CXXFLAGS="-fpermissive $(if ${CC:-gcc} --version|grep -q clang; then echo "-femulated-tls"; fi)" LDFLAGS="-pthread -latomic" PYTHON=$PYDIR/python.exe &&
- wl-showstatus build-install &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-data-packaging=library --disable-layoutex --disable-tests CC="${CC:-gcc}" CXX="${CXX:-g++}" CXXFLAGS="-fpermissive" PYTHON=$PYDIR/python.exe &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-data-packaging=library --disable-layoutex --disable-tests CC="${CC:-gcc}" CXX="${CXX:-g++}" CXXFLAGS="-fpermissive $(if ${CC:-gcc} --version|grep -q clang; then echo "-femulated-tls"; fi)" LDFLAGS="-pthread" PYTHON=$PYDIR/python.exe &&
  ## fix undefined reference to ___atomic_fetch_sub_4 (version >= 52.1)
- #mv icudefs.mk icudefs.mk.bak &&
- #sed -e "s/\(-DU_HAVE_ATOMIC=\)1/\10/" icudefs.mk.bak > icudefs.mk &&
+ #sed -i.bak -e "s/\(-DU_HAVE_ATOMIC=\)1/\10/" icudefs.mk &&
+ wl-showstatus build-install &&
  #( make -j1 all install || make -j1 all install ICUDATA_SOURCE_IS_NATIVE_TARGET=YES ) &&
  ( make all install || make -j1 all install ) &&
  #( mingw32-make all install || mingw32-make -j1 all install ) &&

@@ -306,7 +306,7 @@ export VERSIONDATE=20220412
 wl-showstatus --package-version
 #export DEPENDENCIES=zlib,libbz2,icu,expat,libiconv,pcre
 export DEPENDENCIES=zlib,libbz2,xz,zstd,icu,expat,libiconv,pcre
-export OPTIONALDEPENDENCIES=
+export OPTIONALDEPENDENCIES=libbacktrace
 export BUILDDEPENDENCIES=jwasm
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE_1_0.txt
@@ -373,6 +373,8 @@ EOF
 sed -i.bak2 -e 's/^\(\.ascii " -export:\\"\)_/\1/' libs/context/src/asm/jump_i386_ms_pe_gas.asm libs/context/src/asm/make_i386_ms_pe_gas.asm libs/context/src/asm/ontop_i386_ms_pe_gas.asm
 ## fix zlib support (version = 1.79.0)
 #sed -i.bak "s/gzio\.c//" tools/build/src/tools/zlib.jam
+# fix extensions used when building with clang (version >= 1.79.0)
+sed -i.bak -e "s/^\(.*<toolset>\)gcc\(.*\)$/&\n\1clang\2/" tools/build/src/tools/types/lib.jam tools/build/src/tools/types/lib.py
 wl-showstatus configure &&
  ## enable MPI support (does not seem to work)
  #echo "using mpi ;" >> libs/beast/tools/user-config.jam &&
@@ -382,7 +384,8 @@ wl-showstatus configure &&
  ##( sh build.sh mingw || sh build.sh gcc || ( cd .. && $COMSPEC /C "bootstrap.bat mingw" && cd engine )) &&
  #( sh build.sh mingw || sh build.sh gcc || ( cd .. && echo "bootstrap.bat mingw" | $COMSPEC && cd engine )) &&
  #cd ../../../.. &&
- $COMSPEC //C "CD tools\\build & bootstrap.bat mingw" &&
+ #$COMSPEC //C "CD tools\\build & bootstrap.bat mingw" &&
+ $COMSPEC //C "CD tools\\build & bootstrap.bat $(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi)" &&
  wl-showstatus build-install &&
  #tools/build/v2/engine/bin.ntx86$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo _64; fi)/bjam.exe --show-libraries
  #PATH=tools/build/v2/engine/bin.ntx86$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo _64; fi):$PATH &&
@@ -414,10 +417,11 @@ wl-showstatus configure &&
  #fi &&
  ## copy bjam.exe and b2.exe to tools/build/src/engine (version <= 1.69.0)
  #( cp -u tools/build/src/engine/bin.ntx86/b*.exe tools/build/src/engine/ || true ) &&
- BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/bjam.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=gcc target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=fcontext address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG" &&
- #BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/b2.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=gcc target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=fcontext address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG" &&
- #BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/bjam.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=gcc target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=fcontext address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG -O2" linkflags="-Wl,--as-needed -lgcc" &&
- #BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/bjam.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=gcc target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=winfib address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG" linkflags="-Wl,--compat-implib -Wl,--enable-auto-import -Wl,--enable-stdcall-fixup" &&
+ #BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/bjam.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=gcc target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=fcontext address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG" &&
+ BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/bjam.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=$(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi) target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=fcontext address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG -fpermissive $(if ${CC:-gcc} --version|grep -q clang; then echo "-femulated-tls"; fi)" linkflags="-lpthread" &&
+ #BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/b2.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=$(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi) target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=fcontext address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG" &&
+ #BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/bjam.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=$(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi) target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=fcontext address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG -O2" linkflags="-Wl,--as-needed -lgcc" &&
+ #BOOST_ROOT=$(pwd) MINGW=/ tools/build/src/engine/bjam.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win --build-type=complete --layout=tagged --enable-icu --disable-filesystem2 toolset=$(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi) target-os=windows abi=ms link=static,shared runtime-link=static,shared variant=release threading=single,multi threadapi=win32 context-impl=winfib address-model=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) --without-python --without-mpi release stage install cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG" linkflags="-Wl,--compat-implib -Wl,--enable-auto-import -Wl,--enable-stdcall-fixup" &&
  #alternative options: threadapi=pthread context-impl=winfib
  mkdir -p $INSTALLPREFIX/bin &&
  mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&

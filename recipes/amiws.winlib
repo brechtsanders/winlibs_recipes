@@ -1,0 +1,141 @@
+export NAME="amiws"
+export STATUS=
+export URL=https://github.com/staskobzar/amiws
+export BASENAME=amiws
+export DESCRIPTION="amiws is simple proxy from AMI to WEB. It can connect to one or more Asterisk PBXs via AMI (Asterisk Manager Interface), read messages from AMI stream and send actions/commands to it. Received messages are parsed and converted to JSON. amiws also provides HTTP/WebSocket interface and sends JSON messages to all connected users via HTTP."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=2.2.1
+#export VERSIONDATE=20220504
+export VERSION=2.3.1
+export VERSIONDATE=20230114
+wl-showstatus --package-version
+#export DEPENDENCIES=libyaml
+export DEPENDENCIES=libyaml,openssl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/staskobzar/amiws/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/staskobzar/amiws/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/lib/frozen.c (version >= 2.2.1)
+patch -ulbf src/lib/frozen.c << EOF
+@@ -41,3 +41,3 @@
+ int cs_win_vsnprintf(char *str, size_t size, const char *format, va_list ap);
+-#if _MSC_VER >= 1700
++#if (_MSC_VER >= 1700) || defined(__MINGW32__)
+ #include <stdint.h>
+EOF
+## fix missing syslog.h in src/lib/amiws.h (version >= 2.2.1)
+#patch -ulbf src/lib/amiws.h << EOF
+#@@ -32,3 +32,8 @@
+# #include <stdio.h>
+#+#ifdef _WIN32
+#+#define openlog(...)
+#+#define syslog(...)
+#+#else
+# #include <syslog.h>
+#+#endif
+# #include <yaml.h>
+#EOF
+# fix src/amiws.c (version >= 2.2.1)
+patch -ulbf src/amiws.c << EOF
+@@ -52,3 +52,5 @@
+ static void usage();
++#ifndef _WIN32
+ static void daemonize(const char *pidfile, const char *wdir);
++#endif
+ static void handle_signal(int sig);
+@@ -91,3 +93,7 @@
+
++#ifndef _WIN32
+   if (daemon == 1) daemonize(pidfile, wdir);
++#else
++  if (daemon == 1) fprintf(stderr, "Running as daemon not supported on Windows\\n");
++#endif
+
+@@ -99,3 +105,5 @@
+   signal(SIGINT, handle_signal);
++#ifdef SIGHUP
+   signal(SIGHUP, handle_signal);
++#endif
+
+@@ -109,2 +117,3 @@
+
++#ifndef _WIN32
+ static void daemonize(const char *pidfile,
+@@ -172,2 +181,3 @@
+ }
++#endif
+
+@@ -185,2 +195,3 @@
+   {
++#ifdef SIGHUP
+     case SIGHUP:
+@@ -188,2 +199,3 @@
+       break;
++#endif
+     case SIGINT:
+@@ -195,3 +207,5 @@
+         if (pidfd != -1) {
++#ifdef F_ULOCK
+         lockf(pidfd, F_ULOCK, 0);
++#endif
+         close(pidfd);
+EOF
+# fix missing syslog.h
+mkdir -p winfix
+cat > winfix/syslog.h << EOF
+#define LOG_WARNING 4
+#define LOG_INFO    6
+#define LOG_SYSLOG  (5<<3)
+#define openlog(...)
+#define syslog(...)
+#define setlogmask(...)
+EOF
+# provide missing strndup
+cat > winfix/strndup.h << EOF
+#ifndef __INCLUDED_STRNDUP_H
+#define __INCLUDED_STRNDUP_H
+#include <malloc.h>
+#include <string.h>
+inline char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+#endif
+EOF
+# avoid openssl detection issue
+sed -i.bak -e "s/as_fn_error\(.*openssl library not found\)/echo\1/" configure
+# avoid syslog.h detection issue
+sed -i.bak2 -e "s/as_fn_error\(.*syslog library header .* not found\)/echo\1/" configure
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-ssl CFLAGS="-I$PWD/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed" LIBS="-lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ssl CFLAGS="-I$PWD/winfix" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed" LIBS="-lws2_32" &&
+ # fix missing strndup
+ echo "#include \"winfix/strndup.h\"" >> config.h &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ mkdir -p $INSTALLPREFIX/etc &&
+ cp -u etc/* $INSTALLPREFIX/etc/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
