@@ -53,6 +53,7 @@ wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake
+#export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 #export LICENSEFILE=copying.txt
 #export LICENSETYPE=MIT
@@ -86,17 +87,21 @@ cd $BASENAME-$VERSION/glm
 #grep -v "add_definitions(-m64)" CMakeLists.txt.bak2 > CMakeLists.txt
 ## check if -std=c++11 option is available (version <= 0.9.9.2)
 #GLMCMAKEFLAGS=
-#if gcc --help -v 2> /dev/null | grep -q std=c++11; then
+#if ${CC:-gcc} --help -v 2> /dev/null | grep -q std=c++11; then
 # GLMCMAKEFLAGS="$GLMCMAKEFLAGS -DGLM_TEST_ENABLE_CXX_11:BOOL=ON"
-##elif gcc --help -v 2> /dev/null | grep -q std=c++0x; then
+##elif ${CC:-gcc} --help -v 2> /dev/null | grep -q std=c++0x; then
 ## GLMCMAKEFLAGS="$GLMCMAKEFLAGS -DGLM_TEST_ENABLE_CXX_0X:BOOL=ON"
 #fi
-#wl-showstatus configure &&
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON $GLMCMAKEFLAGS . &&
-cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON $GLMCMAKEFLAGS -DGLM_TEST_ENABLE_MS_EXTENSIONS:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE2:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE3:BOOL=ON . &&
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON -DGLM_TEST_ENABLE_CXX_PEDANTIC:BOOL=OFF -DGLM_TEST_ENABLE_FAST_MATH:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE2:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE3:BOOL=ON . &&
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON -DGLM_TEST_ENABLE_CXX_PEDANTIC:BOOL=OFF -DGLM_TEST_ENABLE_FAST_MATH:BOOL=OFF -DGLM_TEST_ENABLE_SIMD_SSE2:BOOL=OFF -DGLM_TEST_ENABLE_SIMD_SSE3:BOOL=OFF . &&
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-msse2 -msse3 -mavx -mavx2" . &&
+## fix test/bug/bug_ms_vec_static.cpp (version >= 0.9.9.5)
+#sed -i.bak -e "s/_swizzle/swizzle/" test/bug/bug_ms_vec_static.cpp
+# don't abort on warnings (version >= 0.9.9.5)
+sed -i.bak -e "s/add_compile_options(-Werror -Weverything)/#&/" CMakeLists.txt
+wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON $GLMCMAKEFLAGS . &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON $GLMCMAKEFLAGS -DGLM_TEST_ENABLE_MS_EXTENSIONS:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE2:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE3:BOOL=ON . &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON -DGLM_TEST_ENABLE_CXX_PEDANTIC:BOOL=OFF -DGLM_TEST_ENABLE_FAST_MATH:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE2:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE3:BOOL=ON . &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON -DGLM_TEST_ENABLE_CXX_PEDANTIC:BOOL=OFF -DGLM_TEST_ENABLE_FAST_MATH:BOOL=OFF -DGLM_TEST_ENABLE_SIMD_SSE2:BOOL=OFF -DGLM_TEST_ENABLE_SIMD_SSE3:BOOL=OFF . &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-msse2 -msse3 -mavx -mavx2" . &&
  #wl-showstatus build &&
  #make &&
  wl-showstatus build-install &&
@@ -105,6 +110,14 @@ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_
  # fix absolute link in .cmake file(s)
  sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../..?g" $INSTALLPREFIX/include/glm/cmake_install.cmake &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGLM_TEST_ENABLE:BOOL=ON $GLMCMAKEFLAGS -DGLM_TEST_ENABLE_MS_EXTENSIONS:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE2:BOOL=ON -DGLM_TEST_ENABLE_SIMD_SSE3:BOOL=ON -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+# # fix absolute link in .cmake file(s)
+# sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../..?g" $INSTALLPREFIX/include/glm/cmake_install.cmake &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 

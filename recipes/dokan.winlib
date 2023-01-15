@@ -62,15 +62,15 @@
 # # build dokan_fuse
 # for F in dokan_fuse/src/*.c; do
 #  echo CC $F
-#  gcc -c -o $F.o $F -O3 -Idokan_fuse/include -D_FILE_OFFSET_BITS=64 || break
+#  ${CC:-gcc} -c -o $F.o $F -O3 -Idokan_fuse/include -D_FILE_OFFSET_BITS=64 || break
 # done &&
 # for F in dokan_fuse/src/*.cpp; do
 #  echo CXX $F
-#  g++ -c -o $F.o $F -O3 -Idokan_fuse/include -Isys -D_FILE_OFFSET_BITS=64 || break
+#  ${CXX:-g++} -c -o $F.o $F -O3 -Idokan_fuse/include -Isys -D_FILE_OFFSET_BITS=64 || break
 # done &&
-# windres dokan_fuse/src/dokanfuse.rc -O coff -o dokan_fuse/src/dokanfuse.rc.o &&
-# ar cru libdokanfuse.a dokan_fuse/src/*.o &&
-# g++ -shared -s -mwindows -def dokan_fuse/src/dokanfuse.def -o dokanfuse1.dll -Wl,--out-implib,libdokanfuse.dll.a dokan_fuse/src/*.o &&
+# ${WINDRES:-windres} dokan_fuse/src/dokanfuse.rc -O coff -o dokan_fuse/src/dokanfuse.rc.o &&
+# ${AR:-ar} cru libdokanfuse.a dokan_fuse/src/*.o &&
+# ${CXX:-g++} -shared -s -mwindows -def dokan_fuse/src/dokanfuse.def -o dokanfuse1.dll -Wl,--out-implib,libdokanfuse.dll.a dokan_fuse/src/*.o &&
 #    echo OK
 # ####TO DO: use dokan_fuse/CMakeLists.txt
 #
@@ -78,14 +78,14 @@
 # for F in dokan/*.c; do
 #  echo CC $F
 #  #gcc -c -o $F.o $F -O3 -Idokan_fuse/include -D_FILE_OFFSET_BITS=64 || break
-#  gcc -c -o $F.o $F -municode -O3 -Isys -D_EXPORTING || break
+#  ${CC:-gcc} -c -o $F.o $F -municode -O3 -Isys -D_EXPORTING || break
 # done &&
-# ar cru libdokan.a dokan/*.o &&
-# ( echo "EXPORTS" && nm -f posix --defined-only -p libdokan.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" && echo "g_DebugMode DATA" && echo "g_UseStdErr DATA" ) > dokan.def &&
-# gcc -shared -s -mwindows -def dokan.def -o dokan.dll libdokan.a -Wl,--add-stdcall-alias -Wl,--out-implib,libdokan.dll.a &&
+# ${AR:-ar} cru libdokan.a dokan/*.o &&
+# ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libdokan.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" && echo "g_DebugMode DATA" && echo "g_UseStdErr DATA" ) > dokan.def &&
+# ${CC:-gcc} -shared -s -mwindows -def dokan.def -o dokan.dll libdokan.a -Wl,--add-stdcall-alias -Wl,--out-implib,libdokan.dll.a &&
 #    echo OK
 #
-# gcc -o dokanctl.exe dokan_control/dokanctl.c -Isys -L. -ldokan -municode -mconsole
+# ${CC:-gcc} -o dokanctl.exe dokan_control/dokanctl.c -Isys -L. -ldokan -municode -mconsole
 #
 ##mkdir -p build_win &&
 ## wl-showstatus configure &&
@@ -176,7 +176,8 @@ export VERSIONDATE=20221003
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+#export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 #export LICENSEFILE=license.gpl.txt
 export LICENSEFILE=license.lgpl.txt
@@ -233,35 +234,40 @@ sed -e "s/P*FILE_ID_EXTD_DIR_INFO/DOKAN_&/g" dokan/directory.c.bak >> dokan/dire
 ## fix missing fuse_common_compat.h
 #mv dokan_fuse/include/fuse_common.h dokan_fuse/include/fuse_common.h.bak &&
 #grep -v "fuse_common_compat.h" dokan_fuse/include/fuse_common.h.bak > dokan_fuse/include/fuse_common.h
+# avoid invalid -mwin32 compiler flag
+sed -i.bak -e "s/-mwin32/-mwindows/" dokan_fuse/CMakeLists.txt
 mkdir -p build_win_dokan_fuse &&
  wl-showstatus configure &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Sdokan_fuse -Bbuild_win_dokan_fuse &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Sdokan_fuse -Bbuild_win_dokan_fuse &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Sdokan_fuse -Bbuild_win_dokan_fuse &&
  wl-showstatus build &&
  # build dokan_fuse
- make -Cbuild_win_dokan_fuse &&
+ #make -Cbuild_win_dokan_fuse &&
+ ninja -Cbuild_win_dokan_fuse &&
  # build dokan
  touch SUCCESS &&
  for F in dokan/*.c; do
   echo CC $F
   #gcc -c -o $F.o $F -O3 -Idokan_fuse/include -D_FILE_OFFSET_BITS=64 || break
-  gcc -c -o $F.o $F -municode -O3 -Isys -D_EXPORTING || ( rm -f SUCCESS; break )
+  ${CC:-gcc} -c -o $F.o $F -municode -O3 -Isys -D_EXPORTING || ( rm -f SUCCESS; break )
  done &&
  ls -1 SUCCESS &> /dev/null &&
- ar cru libdokan.a dokan/*.o &&
- ( echo "EXPORTS" && nm -f posix --defined-only -p libdokan.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" && echo "g_DebugMode DATA" && echo "g_UseStdErr DATA" ) > dokan.def &&
- gcc -shared -s -mwindows -def dokan.def -o dokan.dll libdokan.a -Wl,--add-stdcall-alias -Wl,--out-implib,libdokan.dll.a &&
+ ${AR:-ar} cru libdokan.a dokan/*.o &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libdokan.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" && echo "g_DebugMode DATA" && echo "g_UseStdErr DATA" ) > dokan.def &&
+ ${CC:-gcc} -shared -s -mwindows -def dokan.def -o dokan.dll libdokan.a -Wl,--add-stdcall-alias -Wl,--out-implib,libdokan.dll.a &&
  # build dokanctl
- gcc -s -o dokanctl.exe dokan_control/dokanctl.c -Isys -L. -ldokan.dll -municode -mconsole &&
+ ${CC:-gcc} -s -o dokanctl.exe dokan_control/dokanctl.c -Isys -L. -ldokan.dll -municode -mconsole &&
  ## build dokan.sys
  #for F in sys/*.c; do
- # g++ -c -o $F.o $F -municode -O3 -D__in= -D__out= -I/d/Prog/winlibs64-9.2.0/mingw64/x86_64-w64-mingw32/include/ddk -fpermissive || break
+ # ${CXX:-g++} -c -o $F.o $F -municode -O3 -D__in= -D__out= -I/d/Prog/winlibs64-9.2.0/mingw64/x86_64-w64-mingw32/include/ddk -fpermissive || break
  #done &&
  ## build samples/dokan_memfs
  #for F in samples/dokan_memfs/*.cpp; do
- # g++ -c -o $F.o $F -municode -O3 -I. -Isys || break
+ # ${CXX:-g++} -c -o $F.o $F -municode -O3 -I. -Isys || break
  #done &&
  wl-showstatus build-install &&
- make -Cbuild_win_dokan_fuse install/strip &&
+ #make -Cbuild_win_dokan_fuse install/strip &&
+ ninja -Cbuild_win_dokan_fuse install/strip &&
  cp -f *.exe *.dll $INSTALLPREFIX/bin/ &&
  cp -f *.a $INSTALLPREFIX/lib/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf dokany-$VERSION
