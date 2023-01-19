@@ -51,10 +51,13 @@ export TYPE=library
 #export VERSIONDATE=20220730
 #export VERSION=4.11.0
 #export VERSIONDATE=20220819
-export VERSION=4.11.2
-export VERSIONDATE=20220904
+#export VERSION=4.11.2
+#export VERSIONDATE=20220904
 #export VERSION=4.12.0
 #export VERSIONDATE=20230115
+#### bug reported: https://github.com/Z3Prover/z3/issues/6538
+export VERSION=4.12.1
+export VERSIONDATE=20230119
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,gmp
 export OPTIONALDEPENDENCIES=
@@ -113,33 +116,33 @@ cd z3-z3-$VERSION
 #+#if defined(_WINDOWS) && !defined(_M_ARM) && !defined(_M_ARM64) && !defined(__MINGW32__)
 # // This is needed for _tzcnt_u32 and friends.
 #EOF
-# fix missing numeric_limits when using clang (version >= 4.8.14)
-####include/c++/v1/cmath:642:26: error: no template named 'numeric_limits'
-if echo $CXX|grep -q clang++; then
-for F in $(find -name '*.cpp'); do
- mv $F $F.bak &&
- echo "#include <cstdlib>" > $F &&
- echo "#include <limits>" >> $F &&
- cat $F.bak >> $F
-done
-fi
-# fix ambiguous log2() in src/ast/rewriter/seq_eq_solver.cpp (version >= 4.8.14)
-patch -ulbf src/ast/rewriter/seq_eq_solver.cpp << EOF
-@@ -286,3 +288,3 @@
-         unsigned sz = bv.get_bv_size(n);
--        if (es.size() > (sz + log2(10)-1)/log2(10)) {
-+        if (es.size() > (sz + log2(10.0)-1)/log2(10.0)) {
-             set_conflict();
-EOF
-# fix missing __control87_2 in src/util/hwf.cpp (version >= 4.11.2)
-#### bug reported: https://github.com/Z3Prover/z3/pull/6529
-patch -ulbf src/util/hwf.cpp << EOF
-@@ -50,3 +52,3 @@
- // Luckily, these are kind of standardized, at least for Windows/Linux/macOS.
--#if defined(__clang__) || defined(_M_ARM) && defined(_M_ARM64)
-+#if (defined(__clang__) && !defined(__MINGW32__)) || defined(_M_ARM) && defined(_M_ARM64)
- #undef USE_INTRINSICS
-EOF
+## fix missing numeric_limits when using clang (version >= 4.8.14 <= 4.11.2)
+#####include/c++/v1/cmath:642:26: error: no template named 'numeric_limits'
+#if echo $CXX|grep -q clang++; then
+#for F in $(find -name '*.cpp'); do
+# mv $F $F.bak &&
+# echo "#include <cstdlib>" > $F &&
+# echo "#include <limits>" >> $F &&
+# cat $F.bak >> $F
+#done
+#fi
+## fix ambiguous log2() in src/ast/rewriter/seq_eq_solver.cpp (version >= 4.8.14 <= 4.11.2)
+#patch -ulbf src/ast/rewriter/seq_eq_solver.cpp << EOF
+#@@ -286,3 +288,3 @@
+#         unsigned sz = bv.get_bv_size(n);
+#-        if (es.size() > (sz + log2(10)-1)/log2(10)) {
+#+        if (es.size() > (sz + log2(10.0)-1)/log2(10.0)) {
+#             set_conflict();
+#EOF
+## fix missing __control87_2 in src/util/hwf.cpp (version >= 4.11.2)
+##### bug reported: https://github.com/Z3Prover/z3/pull/6529
+#patch -ulbf src/util/hwf.cpp << EOF
+#@@ -50,3 +52,3 @@
+# // Luckily, these are kind of standardized, at least for Windows/Linux/macOS.
+#-#if defined(__clang__) || defined(_M_ARM) && defined(_M_ARM64)
+#+#if (defined(__clang__) && !defined(__MINGW32__)) || defined(_M_ARM) && defined(_M_ARM64)
+# #undef USE_INTRINSICS
+#EOF
 ## fix missing -mfma flag in CMakeLists.txt (version <= 4.8.9)
 #sed -i.bak -e 's/set(SSE_FLAGS.*"-msse2"/& "-mfma" "-fpermissive"/' CMakeLists.txt
 # disable SSE2 in CMakeLists.txt (version >= 4.8.10)
@@ -182,7 +185,6 @@ mkdir -p build_static build_shared &&
  ninja -Cbuild_shared install/strip &&
  #mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf z3-z3-$VERSION
-#### bug reported: https://github.com/Z3Prover/z3/issues/6538
 
 
 
