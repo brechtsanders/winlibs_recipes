@@ -266,49 +266,47 @@ wl-showstatus configure &&
 
 
 
+# avoid error: undefined symbol: __chkstk in mingw-w64-crt/crt/pseudo-reloc.c (version >= 10.0.0)
+patch -ulbf mingw-w64-crt/crt/pseudo-reloc.c << EOF
+@@ -486,3 +486,3 @@
+   static NO_COPY int was_init = 0;
+-#ifdef __MINGW64_VERSION_MAJOR
++#if defined(__MINGW64_VERSION_MAJOR) && !defined(__ARM_ARCH)
+   int mSecs;
+@@ -493,3 +493,3 @@
+   ++was_init;
+-#ifdef __MINGW64_VERSION_MAJOR
++#if defined(__MINGW64_VERSION_MAJOR) && !defined(__ARM_ARCH)
+   mSecs = __mingw_GetSectionCount ();
+@@ -507,3 +507,3 @@
+                   );
+-#ifdef __MINGW64_VERSION_MAJOR
++#if defined(__MINGW64_VERSION_MAJOR) && !defined(__ARM_ARCH)
+   restore_modified_sections ();
+EOF
 # force lib as library folder (avoiding lib32/lib64/libarm32/libarm64)
 sed -i.bak "s/\(suffx=lib\)[^ ]*/\1/" mingw-w64-crt/configure
-
-
-archlist="x86_64 i686 aarch64 armv7"
-
-
+archlist="x86_64 i686 aarch64 armv7" &&
  # build MinGW-w64 headers
- mkdir -p build_mingw-w64-headers &&
+ mkdir -p build_mingw_w64-headers &&
  wl-showstatus configure &&
- cd build_mingw-w64-headers &&
- ../mingw-w64-headers/configure --prefix=$INSTALLPREFIX/share/mingw-w64 --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrtbase"; else echo "msvcrt-os"; fi) --enable-sdk=all --enable-idl &&
+ cd build_mingw_w64-headers &&
+ ../mingw-w64-headers/configure --prefix=$INSTALLPREFIX/share/mingw-w64 \
+  --build=$BUILDPLATFORM \
+  --host=$RUNPLATFORM \
+  --with-default-win32-winnt=$(if ( echo $RUNPLATFORM | grep -q i686 ); then echo "0x0501"; else echo "0x0601"; fi) \
+  --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrtbase"; else echo "msvcrt-os"; fi) \
+  --enable-sdk=all \
+  --enable-idl \
+  &&
  cd .. &&
  wl-showstatus build-install &&
- make -Cbuild_mingw-w64-headers install-strip &&
-
-# # build MinGW-w64 headers
-# for arch in $archlist; do
-#  mkdir -p build_mingw-w64-headers-$arch &&
-#  wl-showstatus configure &&
-#  cd build_mingw-w64-headers-$arch &&
-#  PATH=$MINGWPREFIX/share/binutils/bin:$PATH \
-#   ../mingw-w64-headers/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 \
-#   --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrt"; else echo "msvcrt-os"; fi) \
-#   --enable-sdk=all \
-#   --enable-idl \
-#   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu" \
-#   CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
-#   AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
-#   AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
-#   RANLIB="$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe" \
-#   DLLTOOL="$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
-#   &&
-#  cd .. &&
-#  wl-showstatus build &&
-#  make -Cbuild_mingw-w64-headers-$arch install-strip
-# done
-
+ make -Cbuild_mingw_w64-headers install-strip &&
  # build MinGW-w64 libraries
  for arch in $archlist; do
-  mkdir -p build_mingw-w64_main_$arch &&
-  wl-showstatus configure &&
-  cd build_mingw-w64_main_$arch &&
+  mkdir -p build_mingw_w64_main_$arch &&
+  wl-showstatus configure $arch &&
+  cd build_mingw_w64_main_$arch &&
   # --without-libraries \
   # --without-tools \
   #
@@ -335,7 +333,7 @@ archlist="x86_64 i686 aarch64 armv7"
    --with-default-win32-winnt=$(if ( echo $RUNPLATFORM | grep -q i686 ); then echo "0x0501"; else echo "0x0601"; fi) \
    --enable-idl \
    --without-genlib \
-   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld" \
+   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld -fno-stack-protector -fno-stack-clash-protection" \
    CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
    AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
    AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
@@ -346,30 +344,99 @@ archlist="x86_64 i686 aarch64 armv7"
    CFLAGS="-I$INSTALLPREFIX/share/mingw-w64/include" \
    &&
   cd .. &&
-  #wl-showstatus build &&
-  #( make -Cbuild_mingw-w64_main_$arch || make -Cbuild_mingw-w64_main_$arch CC="$PWD/cross/bin/clang.exe -fuse-ld=lld -fno-integrated-as" ) &&
-  wl-showstatus build-install &&
-  #make -Cbuild_mingw-w64_main_$arch/mingw-w64-headers install-strip &&
-  #make -Cbuild_mingw-w64_main_$arch/mingw-w64-crt install-libarm32LIBRARIES CFLAGS="-target armv7-w64-mingw32 -march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2 -D__arm__" CCASFLAGS="-target armv7-w64-mingw32 -march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2" &&
-  #make -Cbuild_mingw-w64_main_$arch/mingw-w64-crt install-libarm64LIBRARIES CFLAGS="-target aarch64-w64-mingw32 -mtune=cortex-a57 -D__aarch64__" CCASFLAGS="-target aarch64-w64-mingw32 -mtune=cortex-a57" &&
-  #make -Cbuild_mingw-w64_main_$arch/mingw-w64-crt install-strip &&
-  make -Cbuild_mingw-w64_main_$arch install-strip &&
-  #make -Cbuild_mingw-w64_main_$arch install-strip DLLTOOLFLAGSARM64= &&
-  #make -Cbuild_mingw-w64_main_$arch install-strip CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" &&
+  #wl-showstatus build $arch &&
+  #( make -Cbuild_mingw_w64_main_$arch || make -Cbuild_mingw_w64_main_$arch CC="$PWD/cross/bin/clang.exe -fuse-ld=lld -fno-integrated-as" ) &&
+  wl-showstatus build-install $arch &&
+  #make -Cbuild_mingw_w64_main_$arch/mingw-w64-headers install-strip &&
+  #make -Cbuild_mingw_w64_main_$arch/mingw-w64-crt install-libarm32LIBRARIES CFLAGS="-target armv7-w64-mingw32 -march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2 -D__arm__" CCASFLAGS="-target armv7-w64-mingw32 -march=armv7-a -mtune=armv7-a+vfpv4+neon+thumb2" &&
+  #make -Cbuild_mingw_w64_main_$arch/mingw-w64-crt install-libarm64LIBRARIES CFLAGS="-target aarch64-w64-mingw32 -mtune=cortex-a57 -D__aarch64__" CCASFLAGS="-target aarch64-w64-mingw32 -mtune=cortex-a57" &&
+  #make -Cbuild_mingw_w64_main_$arch/mingw-w64-crt install-strip &&
+  make -Cbuild_mingw_w64_main_$arch install-strip &&
+  #make -Cbuild_mingw_w64_main_$arch install-strip DLLTOOLFLAGSARM64= &&
+  #make -Cbuild_mingw_w64_main_$arch install-strip CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" &&
   #( ls -1d $INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib || mv -f $INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib* $INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib ) &> /dev/null &&
   touch SUCCESS_MAIN_$arch || break
  done &&
  if [ $(ls -1 SUCCESS_MAIN_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
  rm -f SUCCESS_MAIN_* &&
+ # build MinGW-w64 winpthreads
+ for arch in $archlist; do
+  mkdir -p build_mingw_w64_winpthreads_$arch &&
+  cp -u $INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib/{dllcrt2,crtbegin,crtend}.o build_mingw_w64_winpthreads_$arch/ &&
+  wl-showstatus configure $arch &&
+  cd build_mingw_w64_winpthreads_$arch &&
+  ../mingw-w64-libraries/winpthreads/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 \
+   --build=$BUILDPLATFORM \
+   --host=$arch-w64-mingw32 \
+   --with-sysroot=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 \
+   --without-gnu-ld \
+   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld -fno-stack-protector -fno-stack-clash-protection" \
+   CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
+   AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
+   AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
+   RANLIB="$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe" \
+   LD="$MINGWPREFIX/share/llvm/bin/ld.lld.exe" \
+   RC="$MINGWPREFIX/share/llvm/bin/llvm-windres.exe --target=$arch-w64-windows-gnu -I$INSTALLPREFIX/share/mingw-w64/include" \
+   DLLTOOL="$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+   STRIP="$MINGWPREFIX/share/llvm/bin/llvm-strip.exe" \
+   CFLAGS="-I$INSTALLPREFIX/share/mingw-w64/include" \
+   LDFLAGS="-L$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+   &&
+  cd .. &&
+  #-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ 
+  #-Wl,-m,$(case $arch in i686) echo "i386pe";; x86_64) echo "i386pep";; armv7) echo "thumb2pe";; aarch64) echo "arm64pe";; esac)
+  ## fix detection of shared libraries
+  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" build_mingw_w64_winpthreads_$arch/libtool &&
+  ## fix link issues in build_mingw_w64/mingw-w64-libraries/winpthreads/
+  #sed -i.bak -e "s?\(-o \)\([^ ]*\)\(.*\) -link \(-dll\)?-shared -s -mwindows \1.libs/libwinpthread-1.dll -Wl,--out-implib,\2 \3 \4?" build_mingw_w64_winpthreads_$arch/libtool &&
+  #sed -i.bak -e "s?\$(AM_V_CCLD).*\$(libwinpthread_la_OBJECTS).*?& \&\& \$(AR) \$(ARFLAGS) .libs/libwinpthread.a \$(libwinpthread_la_OBJECTS:.lo=.o) \&\& cp -f .libs/libwinpthread.a .libs/libwinpthread.lib?" build_mingw_w64_winpthreads_$arch/Makefile &&
+  wl-showstatus build-install $arch &&
+  # build include files and make them available
+  #PATH=$PWD/prebuilt/bin:$PATH make -Cbuild_mingw_w64_winpthreads_$arch install-strip &&
+  make -Cbuild_mingw_w64_winpthreads_$arch install-strip &&
+  #make -Cbuild_mingw_w64_winpthreads_$arch install-strip CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" &&
+  #cp -u build_mingw_w64_winpthreads_$arch/fakelib/*.a stage1/$arch-w64-mingw32/lib/ &&
+  #mkdir -p stage1/$arch-w64-mingw32 &&
+  #cp -rf mingw-w64_winpthreads_$arch/* stage1/$arch-w64-mingw32/ &&
+  #mkdir -p stage1/lib/$arch-w64-mingw32 &&
+  #cp -rf mingw-w64_winpthreads_$arch/* stage1/lib/$arch-w64-mingw32/ &&
+  ##mkdir -p stage1/$arch-w64-windows-gnu/lib &&
+  ##cp -rf mingw-w64_winpthreads_$arch/lib/* stage1/$arch-w64-windows-gnu/lib/ &&
+  touch SUCCESS_PTHREADS_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_PTHREADS_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
+ rm -f SUCCESS_PTHREADS_* &&
     echo OK
 
 
 
+# # build MinGW-w64 headers
+# for arch in $archlist; do
+#  mkdir -p build_mingw_w64-headers-$arch &&
+#  wl-showstatus configure &&
+#  cd build_mingw_w64-headers-$arch &&
+#  PATH=$MINGWPREFIX/share/binutils/bin:$PATH \
+#   ../mingw-w64-headers/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 \
+#   --with-default-msvcrt=$(if [ "0$USE_UCRT" -ne 0 ]; then echo "ucrt"; else echo "msvcrt-os"; fi) \
+#   --enable-sdk=all \
+#   --enable-idl \
+#   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu" \
+#   CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
+#   AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
+#   AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
+#   RANLIB="$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe" \
+#   DLLTOOL="$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+#   &&
+#  cd .. &&
+#  wl-showstatus build &&
+#  make -Cbuild_mingw_w64-headers-$arch install-strip
+# done
+
 # # build MinGW-w64 crt
 # for arch in $archlist; do
-#  mkdir -p build_mingw-w64-crt-$arch &&
+#  mkdir -p build_mingw_w64-crt-$arch &&
 #  wl-showstatus configure &&
-#  cd build_mingw-w64-crt-$arch &&
+#  cd build_mingw_w64-crt-$arch &&
 #  PATH=$MINGWPREFIX/share/binutils/bin:$PATH \
 #   ../mingw-w64-crt/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 --build=$BUILDPLATFORM --host=$arch-w64-mingw32 \
 #   --with-sysroot=$INSTALLPREFIX/share/mingw-w64 \
@@ -393,62 +460,13 @@ archlist="x86_64 i686 aarch64 armv7"
 #  cd .. &&
 #  wl-showstatus build &&
 #  #DLLTOOLFLAGSARM64= 
-#  make -Cbuild_mingw-w64-crt-$arch install-strip &&
+#  make -Cbuild_mingw_w64-crt-$arch install-strip &&
 #  touch SUCCESS_$arch || break
 # done &&
 # if [ $(ls -1 SUCCESS_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
 # rm -f SUCCESS_* &&
 #    echo OK
 
- # build MinGW-w64 winpthreads
- for arch in $archlist; do
-  mkdir -p build_mingw-w64_winpthreads_$arch &&
-  cp -u $INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib/{dllcrt2,crtbegin,crtend}.o build_mingw-w64_winpthreads_$arch/ &&
-  wl-showstatus configure &&
-  cd build_mingw-w64_winpthreads_$arch &&
-  # STRIP="$MINGWPREFIX/share/llvm/bin/llvm-strip.exe" \
-  #
-  ../mingw-w64-libraries/winpthreads/configure --prefix=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 \
-   --build=$BUILDPLATFORM \
-   --host=$arch-w64-mingw32 \
-   --with-sysroot=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 \
-   --without-gnu-ld \
-   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld" \
-   CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
-   AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
-   AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
-   RANLIB="$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe" \
-   LD="$MINGWPREFIX/share/llvm/bin/ld.lld.exe" \
-   RC="$MINGWPREFIX/share/llvm/bin/llvm-windres.exe --target=$arch-w64-windows-gnu -I$INSTALLPREFIX/share/mingw-w64/include" \
-   DLLTOOL="$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
-   CFLAGS="-I$INSTALLPREFIX/share/mingw-w64/include" \
-   LDFLAGS="-L$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
-   &&
-  cd .. &&
-  #-rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ 
-  #-Wl,-m,$(case $arch in i686) echo "i386pe";; x86_64) echo "i386pep";; armv7) echo "thumb2pe";; aarch64) echo "arm64pe";; esac)
-  ## fix detection of shared libraries
-  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" build_mingw-w64_winpthreads_$arch/libtool &&
-  ## fix link issues in build_mingw-w64/mingw-w64-libraries/winpthreads/
-  #sed -i.bak -e "s?\(-o \)\([^ ]*\)\(.*\) -link \(-dll\)?-shared -s -mwindows \1.libs/libwinpthread-1.dll -Wl,--out-implib,\2 \3 \4?" build_mingw-w64_winpthreads_$arch/libtool &&
-  #sed -i.bak -e "s?\$(AM_V_CCLD).*\$(libwinpthread_la_OBJECTS).*?& \&\& \$(AR) \$(ARFLAGS) .libs/libwinpthread.a \$(libwinpthread_la_OBJECTS:.lo=.o) \&\& cp -f .libs/libwinpthread.a .libs/libwinpthread.lib?" build_mingw-w64_winpthreads_$arch/Makefile &&
-  wl-showstatus build-install &&
-  # build include files and make them available
-  #PATH=$PWD/prebuilt/bin:$PATH make -Cbuild_mingw-w64_winpthreads_$arch install-strip &&
-  make -Cbuild_mingw-w64_winpthreads_$arch install-strip &&
-  #make -Cbuild_mingw-w64_winpthreads_$arch install-strip CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" &&
-  #cp -u build_mingw-w64_winpthreads_$arch/fakelib/*.a stage1/$arch-w64-mingw32/lib/ &&
-  #mkdir -p stage1/$arch-w64-mingw32 &&
-  #cp -rf mingw-w64_winpthreads_$arch/* stage1/$arch-w64-mingw32/ &&
-  #mkdir -p stage1/lib/$arch-w64-mingw32 &&
-  #cp -rf mingw-w64_winpthreads_$arch/* stage1/lib/$arch-w64-mingw32/ &&
-  ##mkdir -p stage1/$arch-w64-windows-gnu/lib &&
-  ##cp -rf mingw-w64_winpthreads_$arch/lib/* stage1/$arch-w64-windows-gnu/lib/ &&
-  touch SUCCESS_PTHREADS_$arch || break
- done &&
- if [ $(ls -1 SUCCESS_PTHREADS_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
- rm -f SUCCESS_PTHREADS_* &&
-    echo OK
 
 
 

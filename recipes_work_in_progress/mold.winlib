@@ -1,3 +1,261 @@
+#export NAME="mold"
+#export STATUS=
+#export URL=https://github.com/rui314/mold
+#export BASENAME=mold
+#export DESCRIPTION="mold: A Modern Linker"
+#export CATEGORY=development
+#export TYPE=application
+##export VERSION=0.9.6
+##export VERSIONDATE=20211001
+##export VERSION=1.0.0
+##export VERSIONDATE=20211215
+##export VERSION=1.0.1
+##export VERSIONDATE=20211231
+##export VERSION=1.0.2
+##export VERSIONDATE=20220123
+##export VERSION=1.0.3
+##export VERSIONDATE=20220130
+##export VERSION=1.1
+##export VERSIONDATE=20220221
+##export VERSION=1.1.1
+##export VERSIONDATE=20220308
+##export VERSION=1.2
+##export VERSIONDATE=20220415
+##export VERSION=1.2.0
+##export VERSIONDATE=20220416
+##export VERSION=1.2.1
+##export VERSIONDATE=20220428
+##export VERSION=1.3.0
+##export VERSIONDATE=20220618
+##export VERSION=1.3.1
+##export VERSIONDATE=20220701
+##export VERSION=1.4.0
+##export VERSIONDATE=20220805
+##export VERSION=1.4.1
+##export VERSIONDATE=20220818
+##export VERSION=1.4.2
+##export VERSIONDATE=20220904
+##export VERSION=1.5.0
+##export VERSIONDATE=20220927
+##export VERSION=1.5.1
+##export VERSIONDATE=20220929
+##export VERSION=1.6.0
+##export VERSIONDATE=20221019
+##export VERSION=1.7.0
+##export VERSIONDATE=20221113
+##export VERSION=1.7.1
+##export VERSIONDATE=20221119
+##export VERSION=1.8.0
+##export VERSIONDATE=20221226
+#export VERSION=1.9.0
+#export VERSIONDATE=20230106
+#wl-showstatus --package-version
+#export DEPENDENCIES=mman-win32,libdl
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=AGPL
+#export DOWNLOADURL="https://github.com/rui314/mold/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/rui314/mold/archive/refs/tags/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix missing st.st_mtim in mold.h (version >= 1.2)
+#patch -ulbf mold.h << EOF
+#@@ -625,2 +625,4 @@
+#   mf->mtime = (u64)st.st_mtimespec.tv_sec * 1000000000 + st.st_mtimespec.tv_nsec;
+#+#elif defined(_WIN32)
+#+  mf->mtime = (u64)st.st_mtime * 1000000000;
+# #else
+#EOF
+## fix conversion issues from std::filesystem to std::string in filepath.cc (version >= 1.2)
+#patch -ulbf filepath.cc << EOF
+#@@ -9,3 +9,3 @@
+#   std::error_code ec;
+#-  std::string ret = std::filesystem::canonical(path, ec);
+#+  std::string ret = std::filesystem::canonical(path, ec).string();
+#   return ec ? std::string(path) : ret;
+#@@ -17,3 +17,3 @@
+# std::string path_clean(std::string_view path) {
+#-  return filepath(path).lexically_normal();
+#+  return filepath(path).lexically_normal().string();
+# }
+#EOF
+## fix redefinition of ERROR in elf/mold.h (version >= 1.2)
+#patch -ulbf elf/mold.h << EOF
+#@@ -314,2 +314,3 @@
+# private:
+#+#undef ERROR
+#   typedef enum : u8 { NONE, ERROR, COPYREL, PLT, CPLT, DYNREL, BASEREL } Action;
+#EOF
+## fix conversion issues from std::filesystem to std::string in main.cc (version >= 1.2)
+#patch -ulbf main.cc << EOF
+#@@ -40,3 +40,3 @@
+# int main(int argc, char **argv) {
+#-  std::string cmd = mold::filepath(argv[0]).filename();
+#+  std::string cmd = mold::filepath(argv[0]).filename().string();
+#
+#EOF
+## fix perf.cc (version >= 1.2)
+#patch -ulbf perf.cc << EOF
+#@@ -5,3 +5,5 @@
+# #include <ios>
+#+#ifndef _WIN32
+# #include <sys/resource.h>
+#+#endif
+# #include <sys/time.h>
+#@@ -36,2 +38,3 @@
+#   : name(name), parent(parent) {
+#+#ifndef _WIN32
+#   struct rusage usage;
+#@@ -45,2 +48,3 @@
+#     parent->children.push_back(this);
+#+#endif
+# }
+#@@ -48,2 +52,3 @@
+# void TimerRecord::stop() {
+#+#ifndef _WIN32
+#   if (stopped)
+#@@ -58,2 +63,3 @@
+#   sys = to_nsec(usage.ru_stime) - sys;
+#+#endif
+# }
+#@@ -61,2 +67,5 @@
+# static void print_rec(TimerRecord &rec, i64 indent) {
+#+#ifndef _WIN32
+#+  printf(" Timer not implemented on Windows\\n");
+#+#else
+#   printf(" % 8.3f % 8.3f % 8.3f  %s%s\\n",
+#@@ -74,2 +83,3 @@
+#     print_rec(*child, indent + 1);
+#+#endif
+# }
+#@@ -78,2 +88,5 @@
+#     tbb::concurrent_vector<std::unique_ptr<TimerRecord>> &records) {
+#+#ifndef _WIN32
+#+  printf("     Timer not implemented on Windows\\n");
+#+#else
+#   for (i64 i = records.size() - 1; i >= 0; i--)
+#@@ -103,2 +116,3 @@
+#   std::cout << std::flush;
+#+#endif
+# }
+#EOF
+## fix missing strerror_r in strerror.cc (version >= 1.2)
+#patch -ulbf strerror.cc << EOF
+#@@ -10,2 +10,7 @@
+# #include <string_view>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#include <ws2tcpip.h>
+#+#define strerror_r(a,b,c) (strerror_s((b),(c),(a)))
+#+#endif
+#
+#EOF
+## fix conversion issues from std::filesystem to std::string in elf/input-files.cc (version >= 1.2)
+#patch -ulbf elf/input-files.cc << EOF
+#@@ -1266,3 +1266,3 @@
+#
+#-  return filepath(this->filename).filename();
+#+  return filepath(this->filename).filename().string();
+# }
+#EOF
+## fix determination of running executable in elf/lto.cc (version >= 1.2)
+#patch -ulbf elf/lto.cc << EOF
+#@@ -89,2 +89,5 @@
+# #include <unistd.h>
+#+#ifdef _WIN32
+#+#include <windows.h>
+#+#endif
+#
+#@@ -595,3 +598,12 @@
+#
+#-  std::string self = std::filesystem::read_symlink("/proc/self/exe");
+#+#ifdef _WIN32
+#+  char exepath[MAX_PATH];
+#+  if (!GetModuleFileNameA(NULL, exepath, MAX_PATH)) {
+#+    std::cerr << "Unable to determine current .exe path\\n";
+#+    _exit(1);
+#+  }
+#+  std::string self = exepath;
+#+#else
+#+  std::string self = std::filesystem::read_symlink("/proc/self/exe").string();
+#+#endif
+#
+#EOF
+## avoid fchmod in elf/output-file.cc (version >= 1.2)
+#patch -ulbf elf/output-file.cc << EOF
+#@@ -18,3 +18,3 @@
+# open_or_create_file(C &ctx, std::string path, i64 filesize, i64 perm) {
+#-  std::string tmpl = filepath(path).parent_path() / ".mold-XXXXXX";
+#+  std::string tmpl = (filepath(path).parent_path() / ".mold-XXXXXX").string();
+#   char *path2 = (char *)save_string(ctx, tmpl).data();
+#@@ -29,3 +29,7 @@
+#     fd = ::open(path2, O_RDWR | O_CREAT, perm);
+#+#ifdef _WIN32
+#+    if (fd != -1 && !ftruncate(fd, filesize))
+#+#else
+#     if (fd != -1 && !ftruncate(fd, filesize) && !fchmod(fd, perm & ~get_umask()))
+#+#endif
+#       return {fd, path2};
+#@@ -41,4 +45,6 @@
+#
+#+#ifndef _WIN32
+#   if (fchmod(fd, (perm & ~get_umask())) == -1)
+#     Fatal(ctx) << "fchmod failed: " << errno_string();
+#+#endif
+#   return {fd, path2};
+#EOF
+## fix conversion issues from std::filesystem to std::string in elf/passes.cc (version >= 1.2)
+#patch -ulbf elf/passes.cc << EOF
+#@@ -581,3 +581,3 @@
+#
+#-  std::string cwd = std::filesystem::current_path();
+#+  std::string cwd = std::filesystem::current_path().string();
+#   out << "-C " << cwd.substr(1) << "\\n";
+#@@ -615,3 +615,3 @@
+#     if (!mf->parent) {
+#-      std::string path = to_abs_path(mf->name);
+#+      std::string path = to_abs_path(mf->name).string();
+#       if (seen.insert(path).second)
+#EOF
+## fix elf/subprocess.cc (version >= 1.2)
+#patch -ulbf elf/subprocess.cc << EOF
+#@@ -5,4 +5,8 @@
+# #include <signal.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/select.h>
+# #include <sys/socket.h>
+#+#endif
+# #include <sys/stat.h>
+#@@ -10,4 +14,6 @@
+# #include <sys/types.h>
+#+#ifndef _WIN32
+# #include <sys/un.h>
+# #include <sys/wait.h>
+#+#endif
+# #include <unistd.h>
+#EOF
+## fix already define exception_info in main.cc (version >= 1.4.1)
+#sed -i.bak -e "s/\bexception_info\b/exceptioninfo/" main.cc
+#wl-showstatus build &&
+# #make CXX=${CXX:-g++} EXTRA_CPPFLAGS="-I$MINGWPREFIX/include/mman-win32" EXTRA_LDFLAGS="-Wl,--as-needed -lmman" &&
+# #make CC=${CC:-gcc} CXX=${CXX:-g++} CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+# make CC=${CC:-gcc} CXX="${CXX:-g++} -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lmman -ldl" &&
+# wl-showstatus install &&
+# make install PREFIX=$INSTALLPREFIX &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
 export NAME="mold"
 export STATUS=
 export URL=https://github.com/rui314/mold
@@ -5,54 +263,12 @@ export BASENAME=mold
 export DESCRIPTION="mold: A Modern Linker"
 export CATEGORY=development
 export TYPE=application
-#export VERSION=0.9.6
-#export VERSIONDATE=20211001
-#export VERSION=1.0.0
-#export VERSIONDATE=20211215
-#export VERSION=1.0.1
-#export VERSIONDATE=20211231
-#export VERSION=1.0.2
-#export VERSIONDATE=20220123
-#export VERSION=1.0.3
-#export VERSIONDATE=20220130
-#export VERSION=1.1
-#export VERSIONDATE=20220221
-#export VERSION=1.1.1
-#export VERSIONDATE=20220308
-#export VERSION=1.2
-#export VERSIONDATE=20220415
-#export VERSION=1.2.0
-#export VERSIONDATE=20220416
-#export VERSION=1.2.1
-#export VERSIONDATE=20220428
-#export VERSION=1.3.0
-#export VERSIONDATE=20220618
-#export VERSION=1.3.1
-#export VERSIONDATE=20220701
-#export VERSION=1.4.0
-#export VERSIONDATE=20220805
-#export VERSION=1.4.1
-#export VERSIONDATE=20220818
-#export VERSION=1.4.2
-#export VERSIONDATE=20220904
-#export VERSION=1.5.0
-#export VERSIONDATE=20220927
-#export VERSION=1.5.1
-#export VERSIONDATE=20220929
-#export VERSION=1.6.0
-#export VERSIONDATE=20221019
-#export VERSION=1.7.0
-#export VERSIONDATE=20221113
-#export VERSION=1.7.1
-#export VERSIONDATE=20221119
-#export VERSION=1.8.0
-#export VERSIONDATE=20221226
-export VERSION=1.9.0
-export VERSIONDATE=20230106
+export VERSION=1.10.0
+export VERSIONDATE=20230120
 wl-showstatus --package-version
-export DEPENDENCIES=mman-win32,libdl
+export DEPENDENCIES=tbb
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=AGPL
@@ -65,194 +281,17 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing st.st_mtim in mold.h (version >= 1.2)
-patch -ulbf mold.h << EOF
-@@ -625,2 +625,4 @@
-   mf->mtime = (u64)st.st_mtimespec.tv_sec * 1000000000 + st.st_mtimespec.tv_nsec;
-+#elif defined(_WIN32)
-+  mf->mtime = (u64)st.st_mtime * 1000000000;
- #else
-EOF
-# fix conversion issues from std::filesystem to std::string in filepath.cc (version >= 1.2)
-patch -ulbf filepath.cc << EOF
-@@ -9,3 +9,3 @@
-   std::error_code ec;
--  std::string ret = std::filesystem::canonical(path, ec);
-+  std::string ret = std::filesystem::canonical(path, ec).string();
-   return ec ? std::string(path) : ret;
-@@ -17,3 +17,3 @@
- std::string path_clean(std::string_view path) {
--  return filepath(path).lexically_normal();
-+  return filepath(path).lexically_normal().string();
- }
-EOF
-# fix redefinition of ERROR in elf/mold.h (version >= 1.2)
-patch -ulbf elf/mold.h << EOF
-@@ -314,2 +314,3 @@
- private:
-+#undef ERROR
-   typedef enum : u8 { NONE, ERROR, COPYREL, PLT, CPLT, DYNREL, BASEREL } Action;
-EOF
-# fix conversion issues from std::filesystem to std::string in main.cc (version >= 1.2)
-patch -ulbf main.cc << EOF
-@@ -40,3 +40,3 @@
- int main(int argc, char **argv) {
--  std::string cmd = mold::filepath(argv[0]).filename();
-+  std::string cmd = mold::filepath(argv[0]).filename().string();
-
-EOF
-# fix perf.cc (version >= 1.2)
-patch -ulbf perf.cc << EOF
-@@ -5,3 +5,5 @@
- #include <ios>
-+#ifndef _WIN32
- #include <sys/resource.h>
-+#endif
- #include <sys/time.h>
-@@ -36,2 +38,3 @@
-   : name(name), parent(parent) {
-+#ifndef _WIN32
-   struct rusage usage;
-@@ -45,2 +48,3 @@
-     parent->children.push_back(this);
-+#endif
- }
-@@ -48,2 +52,3 @@
- void TimerRecord::stop() {
-+#ifndef _WIN32
-   if (stopped)
-@@ -58,2 +63,3 @@
-   sys = to_nsec(usage.ru_stime) - sys;
-+#endif
- }
-@@ -61,2 +67,5 @@
- static void print_rec(TimerRecord &rec, i64 indent) {
-+#ifndef _WIN32
-+  printf(" Timer not implemented on Windows\\n");
-+#else
-   printf(" % 8.3f % 8.3f % 8.3f  %s%s\\n",
-@@ -74,2 +83,3 @@
-     print_rec(*child, indent + 1);
-+#endif
- }
-@@ -78,2 +88,5 @@
-     tbb::concurrent_vector<std::unique_ptr<TimerRecord>> &records) {
-+#ifndef _WIN32
-+  printf("     Timer not implemented on Windows\\n");
-+#else
-   for (i64 i = records.size() - 1; i >= 0; i--)
-@@ -103,2 +116,3 @@
-   std::cout << std::flush;
-+#endif
- }
-EOF
-# fix missing strerror_r in strerror.cc (version >= 1.2)
-patch -ulbf strerror.cc << EOF
-@@ -10,2 +10,7 @@
- #include <string_view>
-+#ifdef _WIN32
-+#include <winsock2.h>
-+#include <ws2tcpip.h>
-+#define strerror_r(a,b,c) (strerror_s((b),(c),(a)))
-+#endif
-
-EOF
-# fix conversion issues from std::filesystem to std::string in elf/input-files.cc (version >= 1.2)
-patch -ulbf elf/input-files.cc << EOF
-@@ -1266,3 +1266,3 @@
-
--  return filepath(this->filename).filename();
-+  return filepath(this->filename).filename().string();
- }
-EOF
-# fix determination of running executable in elf/lto.cc (version >= 1.2)
-patch -ulbf elf/lto.cc << EOF
-@@ -89,2 +89,5 @@
- #include <unistd.h>
-+#ifdef _WIN32
-+#include <windows.h>
-+#endif
-
-@@ -595,3 +598,12 @@
-
--  std::string self = std::filesystem::read_symlink("/proc/self/exe");
-+#ifdef _WIN32
-+  char exepath[MAX_PATH];
-+  if (!GetModuleFileNameA(NULL, exepath, MAX_PATH)) {
-+    std::cerr << "Unable to determine current .exe path\\n";
-+    _exit(1);
-+  }
-+  std::string self = exepath;
-+#else
-+  std::string self = std::filesystem::read_symlink("/proc/self/exe").string();
-+#endif
-
-EOF
-# avoid fchmod in elf/output-file.cc (version >= 1.2)
-patch -ulbf elf/output-file.cc << EOF
-@@ -18,3 +18,3 @@
- open_or_create_file(C &ctx, std::string path, i64 filesize, i64 perm) {
--  std::string tmpl = filepath(path).parent_path() / ".mold-XXXXXX";
-+  std::string tmpl = (filepath(path).parent_path() / ".mold-XXXXXX").string();
-   char *path2 = (char *)save_string(ctx, tmpl).data();
-@@ -29,3 +29,7 @@
-     fd = ::open(path2, O_RDWR | O_CREAT, perm);
-+#ifdef _WIN32
-+    if (fd != -1 && !ftruncate(fd, filesize))
-+#else
-     if (fd != -1 && !ftruncate(fd, filesize) && !fchmod(fd, perm & ~get_umask()))
-+#endif
-       return {fd, path2};
-@@ -41,4 +45,6 @@
-
-+#ifndef _WIN32
-   if (fchmod(fd, (perm & ~get_umask())) == -1)
-     Fatal(ctx) << "fchmod failed: " << errno_string();
-+#endif
-   return {fd, path2};
-EOF
-# fix conversion issues from std::filesystem to std::string in elf/passes.cc (version >= 1.2)
-patch -ulbf elf/passes.cc << EOF
-@@ -581,3 +581,3 @@
-
--  std::string cwd = std::filesystem::current_path();
-+  std::string cwd = std::filesystem::current_path().string();
-   out << "-C " << cwd.substr(1) << "\\n";
-@@ -615,3 +615,3 @@
-     if (!mf->parent) {
--      std::string path = to_abs_path(mf->name);
-+      std::string path = to_abs_path(mf->name).string();
-       if (seen.insert(path).second)
-EOF
-# fix elf/subprocess.cc (version >= 1.2)
-patch -ulbf elf/subprocess.cc << EOF
-@@ -5,4 +5,8 @@
- #include <signal.h>
-+#ifdef _WIN32
-+#include <winsock2.h>
-+#else
- #include <sys/select.h>
- #include <sys/socket.h>
-+#endif
- #include <sys/stat.h>
-@@ -10,4 +14,6 @@
- #include <sys/types.h>
-+#ifndef _WIN32
- #include <sys/un.h>
- #include <sys/wait.h>
-+#endif
- #include <unistd.h>
-EOF
-# fix already define exception_info in main.cc (version >= 1.4.1)
-sed -i.bak -e "s/\bexception_info\b/exceptioninfo/" main.cc
-wl-showstatus build &&
- #make CXX=${CXX:-g++} EXTRA_CPPFLAGS="-I$MINGWPREFIX/include/mman-win32" EXTRA_LDFLAGS="-Wl,--as-needed -lmman" &&
- #make CC=${CC:-gcc} CXX=${CXX:-g++} CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
- make CC=${CC:-gcc} CXX="${CXX:-g++} -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lmman -ldl" &&
- wl-showstatus install &&
- make install PREFIX=$INSTALLPREFIX &&
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMI_BUILD_SHARED:BOOL=ON -DMOLD_USE_SYSTEM_TBB:BOOL=ON -DTBB_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$PWD/elf -fpermissive" -S. -Bbuild_win &&
+ #-DTBB_BUILD:BOOL=OFF 
+ #-DTBB_WINDOWS_DRIVER:BOOL=OFF 
+ #wl-showstatus build &&
+ #cmake.exe --build build_win &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ ninja -Cbuild_win install/strip &&
     echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-
-
-
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
