@@ -284,6 +284,20 @@ patch -ulbf mingw-w64-crt/crt/pseudo-reloc.c << EOF
 +#if defined(__MINGW64_VERSION_MAJOR) && !defined(__ARM_ARCH)
    restore_modified_sections ();
 EOF
+# fix mingw-w64-libraries/winpthreads/src/thread.c (version >= 10.0.0)
+####mingw-w64-libraries/winpthreads/src/thread.c:1525:5: error: a handler attribute must begin with '@' or '%'
+patch -ulbf mingw-w64-libraries/winpthreads/src/thread.c << EOF
+@@ -1523,3 +1522,3 @@
+       /* Provide to this thread a default exception handler.  */
+-      #ifdef __SEH__
++      #if defined(__SEH__) && !defined(__ARM_ARCH)
+        asm ("\\t.tl_start:\\n"
+@@ -1535,3 +1534,3 @@
+         trslt = (intptr_t) tv->func(tv->ret_arg);
+-      #ifdef __SEH__
++      #if defined(__SEH__) && !defined(__ARM_ARCH)
+        asm ("\\tnop\\n\\t.tl_end: nop\\n");
+EOF
 # force lib as library folder (avoiding lib32/lib64/libarm32/libarm64)
 sed -i.bak "s/\(suffx=lib\)[^ ]*/\1/" mingw-w64-crt/configure
 archlist="x86_64 i686 aarch64 armv7" &&
@@ -333,7 +347,7 @@ archlist="x86_64 i686 aarch64 armv7" &&
    --with-default-win32-winnt=$(if ( echo $RUNPLATFORM | grep -q i686 ); then echo "0x0501"; else echo "0x0601"; fi) \
    --enable-idl \
    --without-genlib \
-   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld -fno-stack-protector -fno-stack-clash-protection" \
+   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld" \
    CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
    AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
    AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
@@ -341,6 +355,7 @@ archlist="x86_64 i686 aarch64 armv7" &&
    LD="$MINGWPREFIX/share/llvm/bin/ld.lld.exe" \
    RC="$MINGWPREFIX/share/llvm/bin/llvm-windres.exe" \
    DLLTOOL="$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+   STRIP="$MINGWPREFIX/share/llvm/bin/llvm-strip.exe" \
    CFLAGS="-I$INSTALLPREFIX/share/mingw-w64/include" \
    &&
   cd .. &&
@@ -370,7 +385,7 @@ archlist="x86_64 i686 aarch64 armv7" &&
    --host=$arch-w64-mingw32 \
    --with-sysroot=$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32 \
    --without-gnu-ld \
-   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld -fno-stack-protector -fno-stack-clash-protection" \
+   CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld" \
    CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
    AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
    AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
