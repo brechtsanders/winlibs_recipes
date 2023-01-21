@@ -267,18 +267,51 @@ wl-showstatus configure &&
 
 
 # avoid error: undefined symbol: __chkstk in mingw-w64-crt/crt/pseudo-reloc.c (version >= 10.0.0)
-patch -ulbf mingw-w64-crt/crt/pseudo-reloc.c << EOF
-@@ -493,3 +493,3 @@
-   ++was_init;
--#ifdef __MINGW64_VERSION_MAJOR
-+#if defined(__MINGW64_VERSION_MAJOR) && !(defined(__ARM_ARCH) || defined(__aarch64__))
-   mSecs = __mingw_GetSectionCount ();
+####see also: https://spclgitlab.ethz.ch/open-climate-compiler/llvm-project/-/blob/370bdd3a0f12629789d3b18b4bea178ee5cf2a23/compiler-rt/lib/builtins/aarch64/chkstk.S
+#patch -ulbf mingw-w64-crt/crt/pseudo-reloc.c << EOF
+#@@ -518,3 +486,3 @@
+#   static NO_COPY int was_init = 0;
+#-#ifdef __MINGW64_VERSION_MAJOR
+#+#if defined(__MINGW64_VERSION_MAJOR) && !(defined(__ARM_ARCH) || defined(__aarch64__))
+#   int mSecs;
+#@@ -525,3 +493,3 @@
+#   ++was_init;
+#-#ifdef __MINGW64_VERSION_MAJOR
+#+#if defined(__MINGW64_VERSION_MAJOR) && !(defined(__ARM_ARCH) || defined(__aarch64__))
+#   mSecs = __mingw_GetSectionCount ();
+#@@ -539,3 +507,3 @@
+#                   );
+#-#ifdef __MINGW64_VERSION_MAJOR
+#+#if defined(__MINGW64_VERSION_MAJOR) && !(defined(__ARM_ARCH) || defined(__aarch64__))
+#   restore_modified_sections ();
+#EOF
+mv mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.bak &&
+cat > mingw-w64-crt/crt/pseudo-reloc.c << EOF
+#if defined(__clang__) && (defined(__ARM_ARCH) || defined(__aarch64__))
+void __chkstk ()
+{
+}
+#endif
 EOF
-mv -f mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.changed
-mv -f mingw-w64-crt/crt/pseudo-reloc.c.orig mingw-w64-crt/crt/pseudo-reloc.c
+cat mingw-w64-crt/crt/pseudo-reloc.c.bak >> mingw-w64-crt/crt/pseudo-reloc.c
+# fix mingw-w64-libraries/winpthreads/src/thread.c (version >= 10.0.0)
+####mingw-w64-libraries/winpthreads/src/thread.c:1525:5: error: a handler attribute must begin with '@' or '%'
+patch -ulbf mingw-w64-libraries/winpthreads/src/thread.c << EOF
+@@ -1522,3 +1522,3 @@
+       /* Provide to this thread a default exception handler.  */
+-      #ifdef __SEH__
++      #if defined(__SEH__) && !(defined(__ARM_ARCH))
+        asm ("\\t.tl_start:\\n"
+@@ -1534,3 +1534,3 @@
+         trslt = (intptr_t) tv->func(tv->ret_arg);
+-      #ifdef __SEH__
++      #if defined(__SEH__) && !(defined(__ARM_ARCH))
+        asm ("\\tnop\\n\\t.tl_end: nop\\n");
+EOF
 # force lib as library folder (avoiding lib32/lib64/libarm32/libarm64)
 sed -i.bak "s/\(suffx=lib\)[^ ]*/\1/" mingw-w64-crt/configure
-archlist="x86_64 i686 aarch64 armv7" &&
+#archlist="x86_64 i686 aarch64 armv7" &&
+archlist="x86_64 i686 aarch64" &&
  # build MinGW-w64 headers
  mkdir -p build_mingw_w64-headers &&
  wl-showstatus configure &&
@@ -340,17 +373,17 @@ archlist="x86_64 i686 aarch64 armv7" &&
    &&
   cd .. &&
   wl-showstatus build-install $arch &&
-  make -Cbuild_mingw-w64_$arch/mingw-w64-crt install-strip &&
-  ( make -Cbuild_mingw-w64_$arch || (
-   mv -f mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.orig &&
-   mv -f mingw-w64-crt/crt/pseudo-reloc.c.changed mingw-w64-crt/crt/pseudo-reloc.c &&
-   make -Cbuild_mingw-w64_$arch
-   mv -f mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.changed &&
-   mv -f mingw-w64-crt/crt/pseudo-reloc.c.orig mingw-w64-crt/crt/pseudo-reloc.c &&
-   touch mingw-w64-crt/crt/pseudo-reloc.c &&
-   make -Cbuild_mingw-w64_$arch
-  )) &&
+  #make -Cbuild_mingw-w64_$arch install-strip &&
   #make -Cbuild_mingw-w64_$arch/mingw-w64-crt install-strip &&
+  #( make -Cbuild_mingw-w64_$arch || (
+  # mv -f mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.orig &&
+  # mv -f mingw-w64-crt/crt/pseudo-reloc.c.changed mingw-w64-crt/crt/pseudo-reloc.c &&
+  # make -Cbuild_mingw-w64_$arch
+  # mv -f mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.changed &&
+  # mv -f mingw-w64-crt/crt/pseudo-reloc.c.orig mingw-w64-crt/crt/pseudo-reloc.c &&
+  # touch mingw-w64-crt/crt/pseudo-reloc.c &&
+  # make -Cbuild_mingw-w64_$arch
+  #)) &&
   make -Cbuild_mingw-w64_$arch install-strip &&
   #make -Cbuild_mingw-w64_$arch install-strip DLLTOOLFLAGSARM64= &&
   #make -Cbuild_mingw-w64_$arch install-strip CFLAGS="$(if [ "$arch" == "armv7" ] || [ "$arch" == "aarch64" ]; then echo "-femulated-tls"; fi)" &&
@@ -358,6 +391,56 @@ archlist="x86_64 i686 aarch64 armv7" &&
   touch SUCCESS_MAIN_$arch || break
  done &&
  if [ $(ls -1 SUCCESS_MAIN_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
+    echo OK
+
+
+
+ for arch in $archlist; do
+  mkdir -p build_mingw-w64_widl_$arch &&
+  cd build_mingw-w64_widl_$arch &&
+  ../mingw-w64-tools/widl/configure --prefix=$INSTALLPREFIX/share/mingw-w64 \
+  --build=$BUILDPLATFORM \
+  --host=$RUNPLATFORM \
+  CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld" \
+  CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
+  AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
+  AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
+  RANLIB="$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe" \
+  LD="$MINGWPREFIX/share/llvm/bin/ld.lld.exe" \
+  RC="$MINGWPREFIX/share/llvm/bin/llvm-windres.exe --target=$arch-w64-windows-gnu -I$INSTALLPREFIX/share/mingw-w64/include" \
+  DLLTOOL="$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+  STRIP="$MINGWPREFIX/share/llvm/bin/llvm-strip.exe" \
+  CFLAGS="-I$INSTALLPREFIX/share/mingw-w64/include" \
+  LDFLAGS="-L$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+  &&
+  cd .. &&
+  wl-showstatus build-install $arch &&
+  make -Cbuild_mingw-w64_widl_$arch install-strip &&
+  touch SUCCESS_WIDL_$arch || break
+ done &&
+ for arch in $archlist; do
+  mkdir -p build_mingw-w64_winstorecompat_$arch &&
+  cd build_mingw-w64_winstorecompat_$arch &&
+  ../mingw-w64-tools/widl/configure --prefix=$INSTALLPREFIX/share/mingw-w64 \
+  --build=$BUILDPLATFORM \
+  --host=$RUNPLATFORM \
+  CC="$MINGWPREFIX/share/llvm/bin/clang.exe --target=$arch-w64-windows-gnu -fuse-ld=lld" \
+  CXX="$MINGWPREFIX/share/llvm/bin/clang++.exe --target=$arch-w64-windows-gnu" \
+  AS="$MINGWPREFIX/share/llvm/bin/llvm-as.exe" \
+  AR="$MINGWPREFIX/share/llvm/bin/llvm-ar.exe" \
+  RANLIB="$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe" \
+  LD="$MINGWPREFIX/share/llvm/bin/ld.lld.exe" \
+  RC="$MINGWPREFIX/share/llvm/bin/llvm-windres.exe --target=$arch-w64-windows-gnu -I$INSTALLPREFIX/share/mingw-w64/include" \
+  DLLTOOL="$MINGWPREFIX/share/llvm/bin/llvm-dlltool.exe -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+  STRIP="$MINGWPREFIX/share/llvm/bin/llvm-strip.exe" \
+  CFLAGS="-I$INSTALLPREFIX/share/mingw-w64/include" \
+  LDFLAGS="-L$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+  &&
+  cd .. &&
+  wl-showstatus build-install $arch &&
+  make -Cbuild_mingw-w64_winstorecompat_$arch install-strip &&
+  touch SUCCESS_WINSTORECOMPAT_$arch || break
+ fi &&
     echo OK
 
 
@@ -398,12 +481,12 @@ EOF
 #@@ -1522,3 +1522,3 @@
 #       /* Provide to this thread a default exception handler.  */
 #-      #ifdef __SEH__
-#+      #if defined(__SEH__) && !(defined(__ARM_ARCH) || defined(__aarch64__))
+#+      #if defined(__SEH__) && !(defined(__ARM_ARCH))
 #        asm ("\\t.tl_start:\\n"
 #@@ -1534,3 +1534,3 @@
 #         trslt = (intptr_t) tv->func(tv->ret_arg);
 #-      #ifdef __SEH__
-#+      #if defined(__SEH__) && !(defined(__ARM_ARCH) || defined(__aarch64__))
+#+      #if defined(__SEH__) && !(defined(__ARM_ARCH))
 #        asm ("\\tnop\\n\\t.tl_end: nop\\n");
 #EOF
 # force lib as library folder (avoiding lib32/lib64/libarm32/libarm64)
