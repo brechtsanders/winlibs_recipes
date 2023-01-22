@@ -746,13 +746,14 @@ mkdir -p build_shared &&
  #
  PATH=$MINGWPREFIX/share/python/bin:$PATH \
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DLLVM_BUILD_STATIC=OFF \
   -DLIBCLANG_BUILD_STATIC:BOOL=OFF \
   -DLLVM_LINK_LLVM_DYLIB:BOOL=OFF \
   -DCLANG_LINK_CLANG_DYLIB:BOOL=OFF \
   -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM \
-  -DLLVM_DEFAULT_TARGET_TRIPLE=$RUNPLATFORM \
+  -DLLVM_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM \
   -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64;NVPTX;AMDGPU;WebAssembly" \
   -DLLVM_RUNTIME_TARGETS=$RUNPLATFORM \
   -DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
@@ -9014,3 +9015,119 @@ mkdir -p build_stage1 &&
  done &&
     echo OK
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#archlist="x86_64 i686 aarch64 armv7" &&
+archlist="x86_64 i686 aarch64" &&
+
+ for arch in $archlist; do
+  mkdir -p build_llvm-libgcc_$arch &&
+  wl-showstatus configure $arch &&
+  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+   -DCMAKE_SYSTEM_NAME:STRING=Windows \
+   -DBUILD_SHARED_LIBS:BOOL=ON \
+   -DLLVM_LIBGCC_EXPLICIT_OPT_IN:BOOL=ON \
+   -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$arch-w64-mingw32 \
+   -DCMAKE_C_COMPILER_TARGET:STRING=$arch-w64-mingw32 \
+   -DCOMPILER_RT_CAN_EXECUTE_TESTS:BOOL=OFF \
+   -DCMAKE_ASM_COMPILER_AR:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ar.exe \
+   -DCMAKE_ASM_COMPILER_RANLIB:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ranlib.exe \
+   -DCMAKE_C_COMPILER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/clang.exe \
+   -DCMAKE_C_COMPILER_AR:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ar.exe \
+   -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ranlib.exe \
+   -DCMAKE_CXX_COMPILER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/clang++.exe \
+   -DCMAKE_CXX_COMPILER_AR:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ar.exe \
+   -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ranlib.exe \
+   -DCMAKE_RC_COMPILER:FILEPATH="$INSTALLPREFIX/share/llvm/bin/llvm-windres.exe  -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+   -DCMAKE_LINKER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/ld.lld.exe \
+   -DGOLD_EXECUTABLE:FILEPATH=$INSTALLPREFIX/share/llvm/bin/ld.lld.exe \
+   -DCMAKE_C_COMPILER_TARGET=$arch-w64-windows-gnu \
+   -DCMAKE_CXX_COMPILER_TARGET=$arch-w64-windows-gnu \
+   -DCMAKE_C_FLAGS:STRING="--target=$arch-w64-windows-gnu -fuse-ld=lld -I$MINGWPREFIX/share/mingw-w64/include" \
+   -DCMAKE_CXX_FLAGS:STRING="--target=$arch-w64-windows-gnu -fuse-ld=lld" \
+   -DCMAKE_RC_FLAGS:STRING="--target=$arch-w64-windows-gnu -I$MINGWPREFIX/share/mingw-w64/include" \
+   -DCMAKE_MODULE_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+   -DCMAKE_EXE_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+   -DCMAKE_STATIC_LINKER_FLAGS:STRING="" \
+   -DCMAKE_SHARED_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+   -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe \
+   -Sllvm-libgcc -Bbuild_llvm-libgcc_$arch &&
+  #-DCMAKE_ASM_MASM_COMPILER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ml.exe \
+  #-DSANITIZER_CXX_ABI=libc++ \
+  # fix invalid --version-script and -lc linker flags
+  sed -i.bak -e "s/-Wl,--version-script[^ ]*//; s?\-lc\b?$(cygpath -m $MINGWPREFIX/share/mingw-w64/$arch-w64-mingw32/lib/dllcrt1.o)?" build_llvm-libgcc_$arch/build.ninja &&
+  wl-showstatus build-install $arch &&
+  ninja -Cbuild_llvm-libgcc_$arch install/strip &&
+  touch SUCCESS_LLVMLIBGCC_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_LLVMLIBGCC_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
+    echo OK
+
+
+
+#archlist="x86_64 i686 aarch64 armv7" &&
+archlist="x86_64 i686 aarch64" &&
+
+ for arch in $archlist; do
+  mkdir -p build_compiler-rt_$arch &&
+  wl-showstatus configure $arch &&
+  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+   -DBUILD_SHARED_LIBS:BOOL=ON \
+   -DLLVM_TARGETS_TO_BUILD:STRING="X86;AArch64" \
+   -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$arch-w64-mingw32 \
+   -DLLVM_MAIN_SRC_DIR:PATH=$PWD/llvm \
+   -DLLVM_CONFIG_PATH:PATH=$INSTALLPREFIX/share/llvm/bin/llvm-config.exe \
+   -DCOMPILER_RT_BUILD_SANITIZERS:BOOL=OFF \
+   -DCOMPILER_RT_DEFAULT_TARGET_ONLY=OFF \
+   -DCOMPILER_RT_USE_BUILTINS_LIBRARY=OFF \
+   -DCOMPILER_RT_INCLUDE_TESTS:BOOL=OFF \
+   -DCOMPILER_RT_CAN_EXECUTE_TESTS:BOOL=OFF \
+   -DCMAKE_ASM_COMPILER_AR:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ar.exe \
+   -DCMAKE_ASM_COMPILER_RANLIB:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ranlib.exe \
+   -DCMAKE_C_COMPILER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/clang.exe \
+   -DCMAKE_C_COMPILER_AR:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ar.exe \
+   -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ranlib.exe \
+   -DCMAKE_CXX_COMPILER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/clang++.exe \
+   -DCMAKE_CXX_COMPILER_AR:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ar.exe \
+   -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ranlib.exe \
+   -DCMAKE_RC_COMPILER:FILEPATH="$INSTALLPREFIX/share/llvm/bin/llvm-windres.exe  -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+   -DCMAKE_LINKER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/ld.lld.exe \
+   -DGOLD_EXECUTABLE:FILEPATH=$INSTALLPREFIX/share/llvm/bin/ld.lld.exe \
+   -DCMAKE_C_COMPILER_TARGET=$arch-w64-windows-gnu \
+   -DCMAKE_CXX_COMPILER_TARGET=$arch-w64-windows-gnu \
+   -DCMAKE_C_FLAGS:STRING="--target=$arch-w64-windows-gnu -fuse-ld=lld -I$MINGWPREFIX/share/mingw-w64/include" \
+   -DCMAKE_CXX_FLAGS:STRING="--target=$arch-w64-windows-gnu -fuse-ld=lld -I$MINGWPREFIX/share/mingw-w64/include" \
+   -DCMAKE_RC_FLAGS:STRING="--target=$arch-w64-windows-gnu -I$MINGWPREFIX/share/mingw-w64/include" \
+   -DCMAKE_SHARED_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+   -DCMAKE_MODULE_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+   -DCMAKE_EXE_LINKER_FLAGS:STRING="-L$MINGWPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
+   -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe \
+   -Scompiler-rt -Bbuild_compiler-rt_$arch &&
+  #-DCMAKE_ASM_MASM_COMPILER:FILEPATH=$INSTALLPREFIX/share/llvm/bin/llvm-ml.exe \
+  #-DSANITIZER_CXX_ABI=libc++ \
+  # fix invalid -lgcc and -lgcc_eh linker flags
+  sed -i.bak -e "s/\(-lgcc\|-lgcc_eh\)\b//g" build_compiler-rt_$arch/build.ninja &&
+  wl-showstatus build-install $arch &&
+  ninja -Cbuild_compiler-rt_$arch install/strip &&
+  touch SUCCESS_COMPILERRT_$arch || break
+ done &&
+ if [ $(ls -1 SUCCESS_COMPILERRT_*|wc -l) -ne $(echo $archlist|wc -w) ]; then false; fi &&
+    echo OK
