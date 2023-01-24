@@ -1,0 +1,59 @@
+export NAME="CLHEP"
+export STATUS=
+export URL=https://proj-clhep.web.cern.ch/proj-clhep/
+export BASENAME=clhep
+export DESCRIPTION="CLHEP - A Class Library for High Energy Physics"
+export CATEGORY=science
+export TYPE=library
+export VERSION=2.4.6.3
+export VERSIONDATE=20230123
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://gitlab.cern.ch/CLHEP/CLHEP/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.cern.ch/CLHEP/CLHEP/-/archive/CLHEP_$(echo $VERSION|tr . _)/CLHEP-CLHEP_$(echo $VERSION|tr . _).tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/CLHEP-CLHEP_$(echo $VERSION|tr . _).tar.bz2
+cd CLHEP-CLHEP_$(echo $VERSION|tr . _)
+# fix missing functions in Random/src/DRand48Engine.cc (version >= 2.4.6.3)
+mv Random/src/DRand48Engine.cc Random/src/DRand48Engine.cc.bak
+cat > Random/src/DRand48Engine.cc << EOF
+#include <stdlib.h>
+#define srand48(x) srand(x)
+#define drand48() (((float) rand())/((float) RAND_MAX))
+inline unsigned short* seed48(unsigned short seeddata[3]) 
+{
+  seeddata[0] = rand() & 0xFF;
+  seeddata[1] = rand() & 0xFF;
+  seeddata[2] = rand() & 0xFF;
+  return seeddata;
+}
+EOF
+cat Random/src/DRand48Engine.cc.bak >> Random/src/DRand48Engine.cc
+# fix cmake/Modules/ClhepOutOfSourceBuild.cmake (version >= 2.4.6.3)
+patch -ulbf cmake/Modules/ClhepOutOfSourceBuild.cmake << EOF
+@@ -9,3 +9,3 @@
+   if ((buildDirPath STREQUAL sourceDirPath)
+-      OR (is_subdir_pos EQUAL 0))
++      )
+   message(FATAL_ERROR "
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCLHEP_SINGLE_THREAD:BOOL=OFF -DCLHEP_BUILD_DOCS:BOOL=OFF -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf CLHEP-CLHEP_$(echo $VERSION|tr . _)
+
+
+
