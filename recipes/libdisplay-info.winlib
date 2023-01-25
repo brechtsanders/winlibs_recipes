@@ -1,0 +1,123 @@
+export NAME="libdisplay-info"
+export STATUS=
+#export URL=https://gitlab.freedesktop.org/JoshuaAshton/libdisplay-info
+export URL=https://gitlab.freedesktop.org/emersion/libdisplay-info
+export BASENAME=libdisplay-info
+export DESCRIPTION="EDID and DisplayID library"
+export CATEGORY=hardware
+export TYPE=library
+export VERSION=main
+export VERSIONDATE=20230125
+wl-showstatus --package-version
+export DEPENDENCIES=hwdata,edid-decode
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://gitlab.freedesktop.org/JoshuaAshton/libdisplay-info/-/tags"
+export DOWNLOADURL="https://gitlab.freedesktop.org/emersion/libdisplay-info/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/main/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing open_memstream() in memory-stream.c (version >= main)
+patch -ulbf memory-stream.c << EOF
+@@ -1,2 +1,6 @@
+ #include <stdlib.h>
++#ifdef _WIN32
++#include <stdio.h>
++#include <string.h>
++#endif
+
+@@ -8,3 +12,13 @@
+        *m = (struct memory_stream){ 0 };
++#ifdef _WIN32
++       if ((m->fp = tmpfile()) != NULL) {
++               if ((m->str = strdup("")) == NULL) {
++                       fclose(m->fp);
++                       errno = ENOMEM;
++                       return NULL;
++               }
++       }
++#else
+        m->fp = open_memstream(&m->str, &m->str_len);
++#endif
+
+@@ -19,2 +33,17 @@
+
++#ifdef _WIN32
++       size_t len = (size_t)ftell(m->fp);
++       if ((m->str = (char*)malloc(len + 1)) == NULL) {
++               fclose(m->fp);
++               errno = ENOMEM;
++               return NULL;
++       }
++       rewind(m->fp);
++       if (fread(m->str, 1, len, m->fp) != len) {
++               fclose(m->fp);
++               errno = ENOFILE;
++               return NULL;
++       }
++       m->str[len] = 0;
++#endif
+        ret = fclose(m->fp);
+EOF
+# fix open_memstream() di-edid-decode/edid.c (version >= main)
+patch -ulbf di-edid-decode/edid.c << EOF
+@@ -5,2 +5,3 @@
+ #include <stdlib.h>
++#include <string.h>
+
+@@ -135,18 +136,15 @@
+        char *out = NULL;
+-       size_t out_size = 0, i;
+-       FILE *f;
+-
+-       f = open_memstream(&out, &out_size);
+-       if (!f) {
+-               return NULL;
+-       }
++       size_t out_size = 0, i, len;
+
+        for (i = 0; l[i] != NULL; i++) {
+-               if (i > 0) {
+-                       fprintf(f, ", ");
+-               }
+-               fprintf(f, "%s", l[i]);
++               len = strlen(l[i]);
++               if ((out = (char*)realloc(out, out_size + len + 1)) == NULL)
++                       return NULL;
++               memcpy(out + out_size, l[i], len);
++               out_size += len;
++               out[out_size++] = ',';
+        }
++       if (out_size > 0)
++               out[out_size - 1] = 0;
+
+-       fclose(f);
+        return out;
+EOF
+# fix encoding issue in tool/gen-search-table.py (version >= main)
+patch -ulbf tool/gen-search-table.py << EOF
+@@ -45,3 +45,3 @@
+
+-with open(infile, 'r') as f:
++with open(infile, 'r', encoding='utf-8') as f:
+     for line in f:
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both . build_both &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: check if open_memstream fixes actually work
+####TO DO: test fails: ninja -Cbuild_both test
+
+
+

@@ -1,0 +1,57 @@
+export NAME="edid-decode"
+export STATUS=
+export URL=https://git.linuxtv.org/edid-decode.git
+#export URL=https://github.com/ValZapod/edid-decode
+export BASENAME=edid-decode
+export DESCRIPTION="EDID decode utility"
+export CATEGORY=hardware,fileformat
+export TYPE=application
+export VERSION=0.1-8a8d673
+export VERSIONDATE=20230125
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/ValZapod/edid-decode/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/ValZapod/edid-decode/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix edid-decode.h
+sed -i.bak -e "s/_WIN32/_MSC_VER/" edid-decode.h
+# fix vs/getopt.c (version >= 0.1-8a8d673)
+patch -ulbf vs/getopt.c << EOF
+@@ -116,3 +116,3 @@
+ #define        complain( MSG, ARG )  if( opterr ) \\
+-  fprintf( stderr, "%s: "MSG"\\n", PROGNAME, ARG )
++  fprintf( stderr, "%s: " MSG "\\n", PROGNAME, ARG )
+
+EOF
+# fix edid-decode.cpp (version >= 0.1-8a8d673)
+patch -ulbf edid-decode.cpp << EOF
+@@ -11,3 +11,7 @@
+ #include <fcntl.h>
++#ifdef __MINGW32__
++#include "vs/getopt.h"
++#else
+ #include <getopt.h>
++#endif
+ #include <math.h>
+EOF
+# fix missing getopt/getsubobt
+sed -i.bak -e "s?^SOURCES = ?&vs/getopt.o vs/getsubopt.o ?" Makefile
+wl-showstatus build &&
+ make CC=${CC:-gcc} CXX=${CXX:-g++} LD=${LD:-ld} AR=${AR:-ar} &&
+ ${STRIP:-strip} *.exe &&
+ make install DESTDIR=$INSTALLPREFIX bindir=/bin mandir=/share/man &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
