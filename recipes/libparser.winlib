@@ -1,0 +1,95 @@
+export NAME="libparser"
+export STATUS=
+export URL=https://codeberg.org/maandree/libparser
+export BASENAME=libparser
+export DESCRIPTION="Context-free grammar parsing library"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=1.1.1
+export VERSIONDATE=20230129
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=ISC
+export DOWNLOADURL="https://codeberg.org/maandree/libparser/tags"
+#export DOWNLOADURL="https://github.com/maandree/libparser/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://codeberg.org/maandree/libparser/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/maandree/libparser/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/libparser
+# fix missing stpcpy in libparser-generate.c
+mv libparser-generate.c libparser-generate.c.bak
+cat > libparser-generate.c << EOF
+inline char* stpcpy (char *dest, const char *src)
+{
+  register char *d = dest;
+  register const char *s = src;
+  do
+    *d++ = *s;
+  while (*s++);
+  return (d - 1);
+}
+EOF
+cat libparser-generate.c.bak >> libparser-generate.c
+# fix missing getline in calc-example/calc.c
+mv calc-example/calc.c calc-example/calc.c.bak
+cat > calc-example/calc.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat calc-example/calc.c.bak >> calc-example/calc.c
+wl-showstatus build-install &&
+ make install CC=${CC:-gcc} LIBFLAGS="-shared -s -mwindows -Wl,--out-implib,\$@.a" OS=windows PREFIX=$INSTALLPREFIX &&
+ cp -u *.dll.a $INSTALLPREFIX/lib/ &&
+ rm -rf $INSTALLPREFIX/lib/*.dll &&
+ cp -f *.dll $INSTALLPREFIX/bin &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
