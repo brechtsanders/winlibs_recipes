@@ -1,0 +1,54 @@
+export NAME="miptgraph"
+export STATUS=
+export URL=https://notabug.org/mooigraph/miptgraph
+export BASENAME=miptgraph
+export DESCRIPTION="GNU GPL Free C++ directed graph layout library"
+export CATEGORY=
+export TYPE=library
+export VERSION=1.1
+export VERSIONDATE=20230130
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://notabug.org/mooigraph/miptgraph/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://notabug.org/mooigraph/miptgraph/archive/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/miptgraph
+# fix missing types in src/Layout/LGraph.h
+mv src/Layout/LGraph.h src/Layout/LGraph.h.bak
+cat > src/Layout/LGraph.h << EOF
+#include <array>
+#include <vector>
+EOF
+cat src/Layout/LGraph.h.bak >> src/Layout/LGraph.h
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ ( ls -1 $INSTALLPREFIX/lib/pkgconfig/miptgraph.pc &> /dev/null || (
+  mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+  sed -e "s?@CMAKE_INSTALL_PREFIX@?\${pcfiledir}/../..?; s?@PKGCONFIG_LIBDIR@?\${prefix}/lib?; s?@PKGCONFIG_INCLUDEDIR@?\${exec_prefix}/include?; s?@PROJECT_DESCRIPTION@?$DESCRIPTION?; s?@PROJECT_VERSION@?$VERSION?; s?@PROJECT_HOMEPAGE_URL@?$URL?; s?@PKGCONFIG_LIBS_PRIVATE@??" miptgraph.pc.in > $INSTALLPREFIX/lib/pkgconfig/miptgraph.pc
+ )) &&
+ cp -u src/*/.libs/*.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build shared libraries (DLLs)
+
+
+

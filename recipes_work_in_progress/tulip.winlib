@@ -1,0 +1,69 @@
+export NAME="Tulip"
+export STATUS=
+export URL=https://tulip.labri.fr/site/
+export BASENAME=tulip
+export DESCRIPTION="Tulip is an information visualization framework dedicated to the analysis and visualization of relational data. Tulip aims to provide the developer with a complete library, supporting the design of interactive information visualization applications for relational data that can be tailored to the problems he or she is addressing."
+export CATEGORY=dataprocessing
+export TYPE=application
+export VERSION=5.7.0
+export VERSIONDATE=20230130
+wl-showstatus --package-version
+export DEPENDENCIES=quazip,qhull,coin
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://sourceforge.net/projects/auber/files/tulip/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/auber/tulip/tulip-$VERSION/$BASENAME-$VERSION\_src.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION\_src.tar.gz
+cd $BASENAME-$VERSION
+# fix cmake/FindQuaZip.cmake (version >= 5.7.0)
+patch -ulbf cmake/FindQuaZip.cmake << EOF
+@@ -21,5 +21,5 @@
+   SET(QUAZIP_INCLUDE_PATH_SUFFIXES include/quazip)
+-  SET(QUAZIP_DLL_NAMES libquazip.dll)
++  SET(QUAZIP_DLL_NAMES libquazip.dll libquazip1-qt5.dll)
+   # special case when using Qt5 on MSYS2
+-  SET(QUAZIP_INCLUDE_PATH_SUFFIXES include/quazip5 \${QUAZIP_INCLUDE_PATH_SUFFIXES})
++  SET(QUAZIP_INCLUDE_PATH_SUFFIXES include/quazip5 include/QuaZip-Qt5-1.4/quazip \${QUAZIP_INCLUDE_PATH_SUFFIXES})
+   SET(QUAZIP_DLL_NAMES libquazip5.dll \${QUAZIP_DLL_NAMES})
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DTULIP_FIXUP_BUNDLE:BOOL=OFF -DTULIP_BUILD_PYTHON_COMPONENTS:BOOL=OFF -DTULIP_USE_THIRDPARTY_QHULL:BOOL=OFF -DTULIP_USE_THIRDPARTY_QUAZIP:BOOL=OFF -DTULIP_BUILD_DEMOS:BOOL=OFF -DTULIP_BUILD_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lintl -lzstd/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DTULIP_FIXUP_BUNDLE:BOOL=OFF -DTULIP_BUILD_PYTHON_COMPONENTS:BOOL=OFF -DTULIP_USE_THIRDPARTY_QHULL:BOOL=OFF -DTULIP_USE_THIRDPARTY_QUAZIP:BOOL=OFF -DTULIP_BUILD_DEMOS:BOOL=OFF -DTULIP_BUILD_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ #wl-showstatus build &&
+ #cmake.exe --build build_static &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #cmake.exe --build build_shared &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_static --strip &&
+ #cmake.exe --build build_static --target "install/strip" &&
+ #cmake.exe --build build_static --target "library/install/strip" &&
+ ninja -Cbuild_static install/strip &&
+ #ninja -Cbuild_static library/install/strip &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_shared --strip &&
+ #cmake.exe --build build_shared --target "install/strip" &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
