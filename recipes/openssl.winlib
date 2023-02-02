@@ -760,10 +760,36 @@ patch -ulbf configdata.pm.in << EOF
 +    use OpenSSL::fallback;
 
 EOF
+# support Windows on ARM64 in Configurations/10-main.conf (version >= 3.0.7)
+patch -ulbf Configurations/10-main.conf << EOF
+@@ -1534,2 +1534,13 @@
+     },
++    "mingwarm64" => {
++        inherit_from     => [ "mingw-common" ],
++        cflags           => "",
++        sys_id           => "MINGW64",
++        bn_ops           => add("SIXTY_FOUR_BIT"),
++        asm_arch         => 'aarch64',
++        uplink_arch      => undef,
++        perlasm_scheme   => "void",
++        shared_rcflag    => "--target=aarch64",
++        multilib         => "",
++    },
+
+EOF
+# fix issues with llvm-windres when building with LLVM/CLang
+if $CC --version|grep -q clang; then
+ sed -i.bak -e "s?^#include <winver\.h>?//&?; s?\(FILEOS\|FILETYPE\) .*?//&?" util/mkrc.pl
+fi
 wl-showstatus configure &&
- PERLLIB=$(pwd)/external/perl/Text-Template-1.56/lib ./Configure --prefix=$INSTALLPREFIX threads shared zlib-dynamic -DOPENSSL_NO_CAPIENG $(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo mingw; else echo mingw64; fi) &&
+ PERLLIB=$(pwd)/external/perl/Text-Template-1.56/lib ./Configure --prefix=$INSTALLPREFIX threads shared zlib-dynamic -DOPENSSL_NO_CAPIENG mingw$(if echo $RUNPLATFORM | grep -q "^aarch64"; then echo "arm64"; else if echo $RUNPLATFORM | grep -qv "^i.86"; then echo "64"; fi fi) $(if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then echo "no-asm"; fi) &&
+ #sed -i.bak -e "s/-m32\|-m64//" configdata.pm &&
+ #if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then
+ # sed -i.bak -e "s?^#include <winver\.h>?//&?; s?FILEOS VOS__WINDOWS32?//&?; s?FILETYPE VFT_DLL?//&?" libcrypto.rc libssl.rc
+ #fi &&
  wl-showstatus build &&
- PERLLIB=$(pwd)/Configurations:$(pwd)/util/perl:$(pwd)/external/perl/Text-Template-1.56/lib PATH=$PERLDIR/bin:$PATH make build_sw &&
+ #PERLLIB=$(pwd)/Configurations:$(pwd)/util/perl:$(pwd)/external/perl/Text-Template-1.56/lib PATH=$PERLDIR/bin:$PATH make build_sw &&
+ PERLLIB=$(pwd)/Configurations:$(pwd)/util/perl:$(pwd)/external/perl/Text-Template-1.56/lib PATH=$PERLDIR/bin:$PATH make build_sw CNF_CFLAGS="--target=$(if $CC --version|grep -q clang && echo $RUNPLATFORM | grep -q "^aarch64"; then echo "$RUNPLATFORM"; fi)" &&
  wl-showstatus build-install &&
  PERLLIB=$(pwd)/Configurations:$(pwd)/util/perl:$(pwd)/external/perl/Text-Template-1.56/lib PATH=$PERLDIR/bin:$PATH make -j1 install_sw install_ssldirs LIBDIR=lib OPENSSLDIR_dev= OPENSSLDIR_dir=$INSTALLPREFIX &&
  cp -f $INSTALLPREFIX/lib/libcrypto.a $INSTALLPREFIX/lib/libeay32.a && 
