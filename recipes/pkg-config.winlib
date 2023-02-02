@@ -83,6 +83,15 @@ patch -ulbf glib/glib/gslice.c << EOF
 +      fprintf (stderr, "GSlice: MemChecker: attempt to release non-allocated block: %p size=%" PRIu64 "\\n", pointer, (uint64_t)size);
        return 0;
 EOF
+# fix Windows on ARM64 support in glib/glib/gbacktrace.h (version >= 0.29.2)
+#### Bug reported: https://gitlab.freedesktop.org/pkg-config/pkg-config/-/issues/77
+patch -ulbf glib/glib/gbacktrace.h << EOF
+@@ -55,3 +55,3 @@
+ #  define G_BREAKPOINT()        G_STMT_START{ __asm int 3h }G_STMT_END
+-#elif defined (_MSC_VER)
++#elif defined (_MSC_VER) || (defined (__MINGW64__) && defined (__aarch64__))
+ #  define G_BREAKPOINT()        G_STMT_START{ __debugbreak(); }G_STMT_END
+EOF
 # fix glib/configure when using supplied glib2 (0.29.1)
 sed -i.bak -e "s/as_fn_error\(.*Could not determine values for [A-Z_]*\)/echo\1/" glib/configure
 wl-showstatus configure &&
@@ -92,7 +101,7 @@ wl-showstatus configure &&
  #PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-installed-popt GLIB_CFLAGS="-I$MINGWPREFIX/include/glib-2.0 -I$MINGWPREFIX/lib/glib-2.0/include" GLIB_LIBS="-Wl,--enable-auto-import -Wl,--as-needed -lglib-2.0" &&
  #PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-internal-glib CFLAGS="$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo -march=i686; fi)" &&
  #PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-internal-glib CFLAGS="$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo -march=i686; fi)" &&
- PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-internal-glib CFLAGS="-Wno-int-conversion $(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo -march=i686; fi)" &&
+ PKG_CONFIG= ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-internal-glib CFLAGS="-Wno-int-conversion -DNVALGRIND $(if ( echo $RUNPLATFORM | grep -q "i686" ); then echo -march=i686; fi)" &&
  #echo "#define strcasecmp stricmp" >> glib/config.h &&
  #echo "#define strncasecmp strnicmp" >> glib/config.h &&
  wl-showstatus build-install &&
