@@ -21,8 +21,10 @@ export TYPE=library
 #export VERSIONDATE=20220211
 #export VERSION=3.13.4
 #export VERSIONDATE=20220622
-export VERSION=3.13.5
-export VERSIONDATE=20220914
+#export VERSION=3.13.5
+#export VERSIONDATE=20220914
+export VERSION=4.0.0
+export VERSIONDATE=20230208
 wl-showstatus --package-version
 export DEPENDENCIES=tbb
 #export DEPENDENCIES=tbb,ispc
@@ -43,43 +45,42 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix common/sys/intrinsics.h (version >= 3.12.1)
-patch -ulbf common/sys/intrinsics.h << EOF
-@@ -32,3 +32,5 @@
- #if defined(__WIN32__)
-+#  ifndef NOMINMAX
- #  define NOMINMAX
-+#  endif
- #  include <windows.h>
-EOF
-# fix common/math/math.h (version >= 3.12.1)
-patch -ulbf common/math/math.h << EOF
-@@ -15,3 +15,3 @@
- #if defined(__WIN32__)
--#if (__MSV_VER <= 1700)
-+#if (__MSV_VER <= 1700) && !defined(__MINGW32__)
- namespace std
-@@ -42,3 +42,3 @@
-
--#if defined(__WIN32__)
-+#if defined(__WIN32__) && !defined(__MINGW32__)
-   __forceinline bool finite ( const float x ) { return _finite(x) != 0; }
-@@ -88,3 +88,3 @@
-
--#if defined(__WIN32__) && (__MSC_VER <= 1700)
-+#if defined(__WIN32__) && (__MSC_VER <= 1700) && !defined(__MINGW32__)
-   __forceinline float nextafter(float x, float y) { if ((x<y) == (x>0)) return
-x*(1.1f+float(ulp)); else return x*(0.9f-float(ulp)); }
-EOF
-# fix common/sys/sysinfo.cpp (version >= 3.12.1)
-patch -ulbf common/sys/sysinfo.cpp << EOF
-@@ -235,3 +235,3 @@
-   {
--#if defined (__WIN32__)
-+#if defined (__WIN32__) && !defined(__MINGW32__)
-     int64_t xcr0 = 0; // int64_t is workaround for compiler bug under VS2013, Win32
-EOF
-# fix common/sys/thread.cpp (version >= 3.12.1)
+## fix common/sys/intrinsics.h (version >= 3.12.1 <= 3.13.5)
+#patch -ulbf common/sys/intrinsics.h << EOF
+#@@ -32,3 +32,5 @@
+# #if defined(__WIN32__)
+#+#  ifndef NOMINMAX
+# #  define NOMINMAX
+#+#  endif
+# #  include <windows.h>
+#EOF
+## fix common/math/math.h (version >= 3.12.1 <= 3.13.5)
+#patch -ulbf common/math/math.h << EOF
+#@@ -15,3 +15,3 @@
+# #if defined(__WIN32__)
+#-#if (__MSV_VER <= 1700)
+#+#if (__MSV_VER <= 1700) && !defined(__MINGW32__)
+# namespace std
+#@@ -42,3 +42,3 @@
+#
+#-#if defined(__WIN32__)
+#+#if defined(__WIN32__) && !defined(__MINGW32__)
+#   __forceinline bool finite ( const float x ) { return _finite(x) != 0; }
+#@@ -88,3 +88,3 @@
+#
+#-#if defined(__WIN32__) && (__MSC_VER <= 1700)
+#+#if defined(__WIN32__) && (__MSC_VER <= 1700) && !defined(__MINGW32__)
+#   __forceinline float nextafter(float x, float y) { if ((x<y) == (x>0)) return x*(1.1f+float(ulp)); else return x*(0.9f-float(ulp)); }
+#EOF
+## fix common/sys/sysinfo.cpp (version >= 3.12.1 <= 3.13.5)
+#patch -ulbf common/sys/sysinfo.cpp << EOF
+#@@ -235,3 +235,3 @@
+#   {
+#-#if defined (__WIN32__)
+#+#if defined (__WIN32__) && !defined(__MINGW32__)
+#     int64_t xcr0 = 0; // int64_t is workaround for compiler bug under VS2013, Win32
+#EOF
+# fix common/sys/thread.cpp (version >= 3.12.1 <= 3.13.5)
 mv common/sys/thread.cpp common/sys/thread.cpp.bak
 cat > common/sys/thread.cpp << EOF
 #if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601
@@ -88,7 +89,7 @@ cat > common/sys/thread.cpp << EOF
 #endif
 EOF
 cat common/sys/thread.cpp.bak >> common/sys/thread.cpp
-# fix common/sys/condition.cpp (version >= 3.12.1)
+# fix common/sys/condition.cpp (version >= 3.12.1 <= 3.13.5)
 mv common/sys/condition.cpp common/sys/condition.cpp.bak
 cat > common/sys/condition.cpp << EOF
 #if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601
@@ -97,14 +98,14 @@ cat > common/sys/condition.cpp << EOF
 #endif
 EOF
 cat common/sys/condition.cpp.bak >> common/sys/condition.cpp
-# fix common/sys/library.cpp (version >= 3.12.1)
-patch -ulbf common/sys/library.cpp << EOF
-@@ -29,3 +29,3 @@
-   void* getSymbol(lib_t lib, const std::string& sym) {
--    return GetProcAddress(HMODULE(lib),sym.c_str());
-+    return (void*)GetProcAddress(HMODULE(lib),sym.c_str());
-   }
-EOF
+## fix common/sys/library.cpp (version >= 3.12.1 <= 3.13.5)
+#patch -ulbf common/sys/library.cpp << EOF
+#@@ -29,3 +29,3 @@
+#   void* getSymbol(lib_t lib, const std::string& sym) {
+#-    return GetProcAddress(HMODULE(lib),sym.c_str());
+#+    return (void*)GetProcAddress(HMODULE(lib),sym.c_str());
+#   }
+#EOF
 ## fix CMakeLists.txt for MinGW (version <= 3.13.4)
 #patch -ulbf CMakeLists.txt << EOF
 #@@ -199,2 +199,4 @@
@@ -114,6 +115,7 @@ EOF
 #   ELSE()
 #EOF
 # fix CMakeLists.txt (version >= 3.13.5)
+#### Bug reported: https://github.com/embree/embree/pull/427
 patch -ulbf CMakeLists.txt << EOF
 @@ -230,3 +230,3 @@
      INCLUDE (intel)
@@ -121,10 +123,11 @@ patch -ulbf CMakeLists.txt << EOF
 +  ELSEIF(\${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} MATCHES "GNU" OR MINGW)
      MESSAGE("-- GNU-like Compiler detected")
 EOF
-# fix issue with UTF-16 kernels/embree.rc
-mv kernels/embree.rc kernels/embree.rc.bak &&
-iconv -f UTF-16 -t UTF-8 < kernels/embree.rc.bak > kernels/embree.rc
+## fix issue with UTF-16 kernels/embree.rc (version <= 3.13.5)
+#mv kernels/embree.rc kernels/embree.rc.bak &&
+#iconv -f UTF-16 -t UTF-8 < kernels/embree.rc.bak > kernels/embree.rc
 # avoid invalid -z linker flag
+#### Bug reported: https://github.com/embree/embree/pull/428
 sed -i.bak -e "s/-z [a-z]*//g" common/cmake/gnu.cmake
 #mkdir -p build_win &&
 # wl-showstatus configure &&
@@ -138,7 +141,8 @@ mkdir -p build_win &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEMBREE_ISPC_SUPPORT:BOOL=OFF -DEMBREE_TUTORIALS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DEMBREE_ISPC_SUPPORT:BOOL=ON -DEMBREE_TUTORIALS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
- sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lpsapi/" build_win/build.ninja &&
+ # fix missing link library (version <= 3.13.5)
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lpsapi/" build_win/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
