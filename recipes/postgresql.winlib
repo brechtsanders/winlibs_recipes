@@ -398,8 +398,8 @@ export TYPE=library
 #export VERSIONDATE=20200813
 #export VERSION=12.5
 #export VERSIONDATE=20201113
-export VERSION=12.6
-export VERSIONDATE=20210211
+#export VERSION=12.6
+#export VERSIONDATE=20210211
 #export VERSION=13.0
 #export VERSIONDATE=20200924
 #export VERSION=13.1
@@ -428,6 +428,8 @@ export VERSIONDATE=20210211
 #export VERSION=15.1
 #export VERSIONDATE=20221110
 ####ld.exe: utf8_and_iso8859.o:utf8_and_iso88:(.text+0x2d6): undefined reference to `errstart_cold'
+export VERSION=15.2
+export VERSIONDATE=20230209
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,openssl,zlib,libxml2,libxslt,icu,ossp-uuid
 #export DEPENDENCIES=pthreads,openssl,zlib,libxml2,libxslt,icu,libuuid
@@ -466,16 +468,16 @@ cd $BASENAME-$VERSION
 #+#include <ntsecapi.h>
 # #include <security.h>
 #EOF
-# fix invalid redefinition of stat in src/include/port.h (version >= 9.2.2)
-patch -ulbf src/include/port.h << EOF
---- src/include/port.h  2012-12-03 21:16:10 +0100
-+++ src/include/port.h  2013-11-18 00:14:10 +0100
-@@ -314,3 +314,3 @@
-  */
--#if defined(WIN32) && !defined(__CYGWIN__) && !defined(UNSAFE_STAT_OK)
-+#if defined(WIN32) && !defined(__CYGWIN__) && !defined(__MINGW32__) && !defined(UNSAFE_STAT_OK)
- #include <sys/stat.h>
-EOF
+## fix invalid redefinition of stat in src/include/port.h (version >= 9.2.2 <= 15.1)
+#patch -ulbf src/include/port.h << EOF
+#--- src/include/port.h  2012-12-03 21:16:10 +0100
+#+++ src/include/port.h  2013-11-18 00:14:10 +0100
+#@@ -314,3 +314,3 @@
+#  */
+#-#if defined(WIN32) && !defined(__CYGWIN__) && !defined(UNSAFE_STAT_OK)
+#+#if defined(WIN32) && !defined(__CYGWIN__) && !defined(__MINGW32__) && !defined(UNSAFE_STAT_OK)
+# #include <sys/stat.h>
+#EOF
 # remove option -Wl,--disable-auto-import (version >= 9.4.2)
 mv src/template/win32 src/template/win32.bak &&
 sed -e "s/-Wl,--disable-auto-import//" src/template/win32.bak > src/template/win32
@@ -515,15 +517,27 @@ sed -e "s/-Wl,--disable-auto-import//" src/template/win32.bak > src/template/win
 #+*/
 #
 #EOF
-## fix src/include/utils/elog.h (version >= 14.0)
-#patch -ulbf src/include/utils/elog.h << EOF
-#@@ -164,3 +164,4 @@
-# extern bool errstart(int elevel, const char *domain);
-#-extern pg_attribute_cold bool errstart_cold(int elevel, const char *domain);
-#+//extern pg_attribute_cold bool errstart_cold(int elevel, const char *domain);
-#+#define errstart_cold(elevel,domain) errstart((elevel),(domain))
-# extern void errfinish(const char *filename, int lineno, const char *funcname);
-#EOF
+# fix issues with errstart_cold() in src/include/utils/elog.h and src/backend/utils/error/elog.c (version >= 15.2)
+patch -ulbf src/include/utils/elog.h << EOF
+@@ -164,3 +164,7 @@
+ extern bool errstart(int elevel, const char *domain);
++#ifdef __MINGW32__
++#define errstart_cold(elevel,domain) errstart((elevel), (domain))
++#else
+ extern pg_attribute_cold bool errstart_cold(int elevel, const char *domain);
++#endif
+ extern void errfinish(const char *filename, int lineno, const char *funcname);
+EOF
+patch -ulbf src/backend/utils/error/elog.c << EOF
+@@ -317,2 +317,3 @@
+  */
++#ifndef errstart_cold
+ pg_attribute_cold bool
+@@ -322,2 +323,3 @@
+ }
++#endif
+
+EOF
 # fix src/backend/storage/ipc/latch.c (version >= 12.6)
 patch -ulbf src/backend/storage/ipc/latch.c << EOF
 @@ -613,3 +613,2 @@
@@ -552,7 +566,8 @@ wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=ossp --with-libxml --with-libxslt --with-icu CFLAGS="-I$(pwd)/src/backend -DBUILDING_DLL -Wno-int-conversion" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=ossp --with-libxml --with-libxslt --with-icu --disable-tap-tests CFLAGS="-I$(pwd)/src/backend -DBUILDING_DLL" &&
  wl-showstatus build &&
- ( make || make -j1 ) &&
+ #( make || make -j1 ) &&
+ ( make || ( make -i; make LDFLAGS="-L$PWD/src/backend -lpostgres" ) || make -j1 ) &&
  wl-showstatus build-install &&
  ( make -j1 install-strip || (
   make -j1 -Csrc/interfaces/libpq install-strip &&
