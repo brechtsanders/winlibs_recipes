@@ -572,8 +572,10 @@ export TYPE=library
 #export VERSIONDATE=20220607
 #export VERSION=3.2.0
 #export VERSIONDATE=20220707
-export VERSION=3.2.1
-export VERSIONDATE=20220909
+#export VERSION=3.2.1
+#export VERSIONDATE=20220909
+export VERSION=3.2.2
+export VERSIONDATE=20230210
 wl-showstatus --package-version
 export DEPENDENCIES=expat,zlib,cairo,pcre,libjpeg,libpng,libtiff,xz,nanosvg
 export OPTIONALDEPENDENCIES=
@@ -616,6 +618,32 @@ EOF
 #+        TCHAR buf[256];
 #         if (!::GetLocaleInfo(m_lcid, lctype, buf, WXSIZEOF(buf)))
 #EOF
+# fix non-Unicode issues in src/msw/main.cpp (version >= 3.2.2)
+#### Bug reported: https://github.com/wxWidgets/wxWidgets/pull/23246
+patch -ulbf src/msw/main.cpp << EOF
+@@ -199,3 +199,7 @@
+ WXDLLIMPEXP_BASE int& wxMSWCommandLineGetArgc();
++#if wxUSE_UNICODE
+ WXDLLIMPEXP_BASE wchar_t** wxMSWCommandLineGetArgv();
++#else
++WXDLLIMPEXP_BASE char** wxMSWCommandLineGetArgv();
++#endif
+
+@@ -290,3 +294,5 @@
+ {
++#if wxUSE_UNICODE
+     wxArgs.Cleanup();
++#endif
+ }
+@@ -298,3 +304,7 @@
+
++#if wxUSE_UNICODE
+ WXDLLIMPEXP_BASE wchar_t** wxMSWCommandLineGetArgv()
++#else
++WXDLLIMPEXP_BASE char** wxMSWCommandLineGetArgv()
++#endif
+ {
+EOF
 ## fix missing nanosvg (version >= 3.1.6)
 #mkdir -p 3rdparty/nanosvg/src &&
 #cp $MINGWPREFIX/include/nanosvg*.h 3rdparty/nanosvg/src/
@@ -648,7 +676,7 @@ sed -i.bak -e "s/_x64//" build/cmake/init.cmake
 for AS_SINGLE in ON OFF; do
  for AS_UNICODE in OFF ON; do
   for AS_SHARED in OFF ON; do
-   wl-showstatus configure &&
+   wl-showstatus configure SHARED=$AS_SHARED UNICODE=$AS_UNICODE MONOLITHIC=$AS_SINGLE &&
    mkdir -p build_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE &&
    #(( cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/wx -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/cmake -DwxBUILD_SHARED:BOOL=$AS_SHARED -DwxUSE_UNICODE:BOOL=$AS_UNICODE -DwxBUILD_MONOLITHIC:BOOL=$AS_SINGLE -DwxBUILD_TOOLKIT:STRING=msw -DwxBUILD_PRECOMP:BOOL=OFF -DwxBUILD_USE_STATIC_RUNTIME:BOOL=OFF -DwxBUILD_STRIPPED_RELEASE:BOOL=ON -DwxBUILD_OPTIMISE:BOOL=ON -DwxUSE_REGEX:STRING=builtin -DwxUSE_ZLIB:STRING=builtin -DwxUSE_EXPAT:STRING=builtin -DwxUSE_LIBJPEG:STRING=builtin -DwxUSE_LIBPNG:STRING=builtin -DwxUSE_LIBTIFF:STRING=builtin -DwxUSE_LIBLZMA:BOOL=ON -DwxUSE_WINSOCK2:BOOL=ON -DwxBUILD_DEMOS:BOOL=OFF -DwxBUILD_SAMPLES:STRING=OFF -DwxBUILD_TESTS:STRING=OFF -S. -Bbuild_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE && touch build_sh$AS_SHARED._un$AS_UNICODE._si$AS_SINGLE.CONFIGURED ) || break 3 ) &&
    #(( cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/wx -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/cmake -DwxBUILD_SHARED:BOOL=$AS_SHARED -DwxUSE_UNICODE:BOOL=$AS_UNICODE -DwxBUILD_MONOLITHIC:BOOL=$AS_SINGLE -DwxBUILD_TOOLKIT:STRING=msw -DwxBUILD_PRECOMP:BOOL=OFF -DwxBUILD_USE_STATIC_RUNTIME:BOOL=OFF -DwxBUILD_STRIPPED_RELEASE:BOOL=ON -DwxBUILD_OPTIMISE:BOOL=ON -DwxUSE_REGEX:STRING=sys -DwxUSE_ZLIB:STRING=sys -DwxUSE_EXPAT:STRING=sys -DwxUSE_LIBJPEG:STRING=sys -DwxUSE_LIBPNG:STRING=sys -DwxUSE_LIBTIFF:STRING=sys -DwxUSE_LIBLZMA:BOOL=ON -DwxUSE_WINSOCK2:BOOL=ON -DwxBUILD_DEMOS:BOOL=OFF -DwxBUILD_SAMPLES:STRING=OFF -DwxBUILD_TESTS:STRING=OFF -S. -Bbuild_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE && touch build_sh$AS_SHARED._un$AS_UNICODE._si$AS_SINGLE.CONFIGURED ) || break 3 ) &&
@@ -668,7 +696,7 @@ expr $(ls -1d *.CONFIGURED|wc -l) = 8 &&
 for AS_SINGLE in ON OFF; do
  for AS_UNICODE in OFF ON; do
   for AS_SHARED in OFF ON; do
-   wl-showstatus build-install &&
+   wl-showstatus build-install SHARED=$AS_SHARED UNICODE=$AS_UNICODE MONOLITHIC=$AS_SINGLE &&
    mkdir -p $INSTALLPREFIX/wx/lib/gcc_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)/wx &&
    mkdir -p $INSTALLPREFIX/wx/lib/gcc_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)d/wx &&
    ( ninja -Cbuild_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE install/strip && touch build_sh$AS_SHARED._un$AS_UNICODE._si$AS_SINGLE.BUILT ) || break 3
