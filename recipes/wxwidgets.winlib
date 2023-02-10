@@ -676,7 +676,7 @@ sed -i.bak -e "s/_x64//" build/cmake/init.cmake
 for AS_SINGLE in ON OFF; do
  for AS_UNICODE in OFF ON; do
   for AS_SHARED in OFF ON; do
-   wl-showstatus configure SHARED=$AS_SHARED UNICODE=$AS_UNICODE MONOLITHIC=$AS_SINGLE &&
+   wl-showstatus configure $(if [ "$AS_SHARED" == "ON" ]; then echo "shared"; else echo "static"; fi)$(if [ "$AS_UNICODE" == "ON" ]; then echo "-unicode"; fi)$(if [ "$AS_SINGLE" == "ON" ]; then echo "-monolithic"; fi) &&
    mkdir -p build_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE &&
    #(( cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/wx -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/cmake -DwxBUILD_SHARED:BOOL=$AS_SHARED -DwxUSE_UNICODE:BOOL=$AS_UNICODE -DwxBUILD_MONOLITHIC:BOOL=$AS_SINGLE -DwxBUILD_TOOLKIT:STRING=msw -DwxBUILD_PRECOMP:BOOL=OFF -DwxBUILD_USE_STATIC_RUNTIME:BOOL=OFF -DwxBUILD_STRIPPED_RELEASE:BOOL=ON -DwxBUILD_OPTIMISE:BOOL=ON -DwxUSE_REGEX:STRING=builtin -DwxUSE_ZLIB:STRING=builtin -DwxUSE_EXPAT:STRING=builtin -DwxUSE_LIBJPEG:STRING=builtin -DwxUSE_LIBPNG:STRING=builtin -DwxUSE_LIBTIFF:STRING=builtin -DwxUSE_LIBLZMA:BOOL=ON -DwxUSE_WINSOCK2:BOOL=ON -DwxBUILD_DEMOS:BOOL=OFF -DwxBUILD_SAMPLES:STRING=OFF -DwxBUILD_TESTS:STRING=OFF -S. -Bbuild_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE && touch build_sh$AS_SHARED._un$AS_UNICODE._si$AS_SINGLE.CONFIGURED ) || break 3 ) &&
    #(( cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/wx -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/cmake -DwxBUILD_SHARED:BOOL=$AS_SHARED -DwxUSE_UNICODE:BOOL=$AS_UNICODE -DwxBUILD_MONOLITHIC:BOOL=$AS_SINGLE -DwxBUILD_TOOLKIT:STRING=msw -DwxBUILD_PRECOMP:BOOL=OFF -DwxBUILD_USE_STATIC_RUNTIME:BOOL=OFF -DwxBUILD_STRIPPED_RELEASE:BOOL=ON -DwxBUILD_OPTIMISE:BOOL=ON -DwxUSE_REGEX:STRING=sys -DwxUSE_ZLIB:STRING=sys -DwxUSE_EXPAT:STRING=sys -DwxUSE_LIBJPEG:STRING=sys -DwxUSE_LIBPNG:STRING=sys -DwxUSE_LIBTIFF:STRING=sys -DwxUSE_LIBLZMA:BOOL=ON -DwxUSE_WINSOCK2:BOOL=ON -DwxBUILD_DEMOS:BOOL=OFF -DwxBUILD_SAMPLES:STRING=OFF -DwxBUILD_TESTS:STRING=OFF -S. -Bbuild_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE && touch build_sh$AS_SHARED._un$AS_UNICODE._si$AS_SINGLE.CONFIGURED ) || break 3 ) &&
@@ -693,18 +693,19 @@ for AS_SINGLE in ON OFF; do
 done &&
 expr $(ls -1d *.CONFIGURED|wc -l) = 8 &&
 # build and install all targets
+# Note: as of version 3.2 non-Unicode builds are no longer supported
 for AS_SINGLE in ON OFF; do
  for AS_UNICODE in OFF ON; do
   for AS_SHARED in OFF ON; do
-   wl-showstatus build-install SHARED=$AS_SHARED UNICODE=$AS_UNICODE MONOLITHIC=$AS_SINGLE &&
-   mkdir -p $INSTALLPREFIX/wx/lib/gcc_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)/wx &&
-   mkdir -p $INSTALLPREFIX/wx/lib/gcc_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)d/wx &&
+   wl-showstatus build-install $(if [ "$AS_SHARED" == "ON" ]; then echo "shared"; else echo "static"; fi)$(if [ "$AS_UNICODE" == "ON" ]; then echo "-unicode"; fi)$(if [ "$AS_SINGLE" == "ON" ]; then echo "-monolithic"; fi) &&
+   mkdir -p $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)/wx &&
+   mkdir -p $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)d/wx &&
    ( ninja -Cbuild_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE install/strip && touch build_sh$AS_SHARED._un$AS_UNICODE._si$AS_SINGLE.BUILT ) || break 3
    # copy missing setup.h
-   cp -u include/wx/msw/setup.h $INSTALLPREFIX/wx/lib/gcc_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)/wx/ &&
+   cp -u include/wx/msw/setup.h $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)/wx/ &&
    # clean up build directory
    rm -rf build_sh$AS_SHARED\_un$AS_UNICODE\_si$AS_SINGLE &&
-cat > $INSTALLPREFIX/wx/lib/gcc_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)/build.cfg << EOF
+cat > $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_$(if [ "$AS_SHARED" == "ON" ]; then echo "dll"; else echo "lib"; fi)/msw$(if [ "$AS_UNICODE" == "ON" ]; then echo "u"; fi)/build.cfg << EOF
 WXVER_MAJOR=$(echo $VERSION|sed -e "s/^\([^.]*\)\.\([^.]*\)\.\([^.]*\)$/\1/")
 WXVER_MINOR=$(echo $VERSION|sed -e "s/^\([^.]*\)\.\([^.]*\)\.\([^.]*\)$/\2/")
 WXVER_RELEASE=$(echo $VERSION|sed -e "s/^\([^.]*\)\.\([^.]*\)\.\([^.]*\)$/\3/")
@@ -759,44 +760,44 @@ done &&
  ## fix missing wx/setup.h (version >= 3.1.4)
  #( ls -1 include/wx/setup.h &> /dev/null || cp -u $INSTALLPREFIX/wx/lib/wx/include/msw-ansi-[0-9]*/wx/setup.h include/wx/setup.h ) &&
  # move library files (version >= 3.1.6)
- ( cp -rf $INSTALLPREFIX/wx/lib/gcc_x64_lib/* $INSTALLPREFIX/wx/lib/gcc_lib/ || true ) &&
- ( cp -rf $INSTALLPREFIX/wx/lib/gcc_x64_dll/* $INSTALLPREFIX/wx/lib/gcc_dll/ || true ) &&
+ ( cp -rf $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_x64_lib/* $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_lib/ || true ) &&
+ ( cp -rf $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_x64_dll/* $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/ || true ) &&
  ## build and install missing hhp2cached.exe (version >= 3.1.4 <= 3.1.5)
  #sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\|wxjpeg\|wxpng\|wxtiff\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/hhp2cached/makefile.gcc > utils/hhp2cached/makefile.mingw &&
  #sed -i.bak -e "s/\(-lwx\)\(\$(PORTNAME)\$(WXUNIVNAME)\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)_[^ ]*\)/\1_\2\3-3.1/g; s/\(-lwx\)\(base\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)[^ ]*\)/\1_\2\3-3.1/g" utils/hhp2cached/makefile.mingw &&
- #mingw32-make -Cutils/hhp2cached -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
+ #PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/hhp2cached -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
  #cp -u utils/hhp2cached/gcc_mswdll/hhp2cached.exe $INSTALLPREFIX/wx/bin/ &&
  # build and install missing hhp2cached.exe (version >= 3.1.6)
  sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\|wxjpeg\|wxpng\|wxtiff\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/hhp2cached/makefile.gcc > utils/hhp2cached/makefile.mingw &&
- mingw32-make -Cutils/hhp2cached -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 __DEBUGINFO="-L$INSTALLPREFIX/wx/lib/gcc_dll" &&
+ PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/hhp2cached -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 __DEBUGINFO="-L$INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll" &&
  cp -u utils/hhp2cached/gcc_mswdll/hhp2cached.exe $INSTALLPREFIX/wx/bin/ &&
  ## build and install missing execmon.exe (version >= 3.1.4 <= 3.1.5)
  #sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/execmon/makefile.gcc > utils/execmon/makefile.mingw &&
  #sed -i.bak -e "s/\(-lwx\)\(\$(PORTNAME)\$(WXUNIVNAME)\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)_[^ ]*\)/\1_\2\3-3.1/g; s/\(-lwx\)\(base\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)[^ ]*\)/\1_\2\3-3.1/g" utils/execmon/makefile.mingw &&
- #mingw32-make -Cutils/execmon -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
+ #PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/execmon -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
  #cp -u utils/execmon/gcc_mswdll/execmon.exe $INSTALLPREFIX/wx/bin/ &&
  # build and install missing execmon.exe (version >= 3.1.6)
  sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/execmon/makefile.gcc > utils/execmon/makefile.mingw &&
- mingw32-make -Cutils/execmon -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 __DEBUGINFO="-L$INSTALLPREFIX/wx/lib/gcc_dll" &&
+ PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/execmon -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 __DEBUGINFO="-L$INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll" &&
  cp -u utils/execmon/gcc_mswdll/execmon.exe $INSTALLPREFIX/wx/bin/ &&
  ## build and install missing helpview.exe (version >= 3.1.4 <= 3.1.5)
  #sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\|wxjpeg\|wxpng\|wxtiff\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/helpview/src/makefile.gcc > utils/helpview/src/makefile.mingw &&
  #sed -i.bak -e "s/\(-lwx\)\(\$(PORTNAME)\$(WXUNIVNAME)\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)_[^ ]*\)/\1_\2\3-3.1/g; s/\(-lwx\)\(base\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)[^ ]*\)/\1_\2\3-3.1/g" utils/helpview/src/makefile.mingw &&
- #mingw32-make -Cutils/helpview/src -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
+ #PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/helpview/src -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
  #cp -u utils/helpview/src/gcc_mswdll/helpview.exe $INSTALLPREFIX/wx/bin/ &&
  # build and install missing helpview.exe (version >= 3.1.6)
  sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\|wxjpeg\|wxpng\|wxtiff\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/helpview/src/makefile.gcc > utils/helpview/src/makefile.mingw &&
- mingw32-make -Cutils/helpview/src -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 __DEBUGINFO="-L$INSTALLPREFIX/wx/lib/gcc_dll" &&
+ PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/helpview/src -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 __DEBUGINFO="-L$INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll" &&
  cp -u utils/helpview/src/gcc_mswdll/helpview.exe $INSTALLPREFIX/wx/bin/ &&
  ## build and install missing emulator.exe (version >= 3.1.4 <= 3.1.5)
  #sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\|wxjpeg\|wxpng\|wxtiff\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/emulator/src/makefile.gcc > utils/emulator/src/makefile.mingw &&
  #sed -i.bak -e "s/\(-lwx\)\(\$(PORTNAME)\$(WXUNIVNAME)\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)_[^ ]*\)/\1_\2\3-3.1/g; s/\(-lwx\)\(base\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)[^ ]*\)/\1_\2\3-3.1/g" utils/emulator/src/makefile.mingw &&
- #mingw32-make -Cutils/emulator/src -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
+ #PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/emulator/src -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
  #cp -u utils/emulator/src/gcc_mswdll/wxemulator.exe $INSTALLPREFIX/wx/bin/ &&
  ## build and install missing screenshotgen.exe (version >= 3.1.4 <= 3.1.5)
  #sed -e "s/-l\(wxzlib\|wxregex\|wxexpat\|wxjpeg\|wxpng\|wxtiff\)\(\$(WXUNICODEFLAG)\)*\(\$(WXDEBUGFLAG)\)*//g" utils/screenshotgen/src/makefile.gcc > utils/screenshotgen/src/makefile.mingw &&
  #sed -i.bak -e "s/\(-lwx\)\(\$(PORTNAME)\$(WXUNIVNAME)\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)_[^ ]*\)/\1_\2\3-3.1/g; s/\(-lwx\)\(base\)\$(WX_RELEASE_NODOT)\(\$(WXUNICODEFLAG)\$(WXDEBUGFLAG)\$(WX_LIB_FLAVOUR)[^ ]*\)/\1_\2\3-3.1/g" utils/screenshotgen/src/makefile.mingw &&
- #mingw32-make -Cutils/screenshotgen/src -fmakefile.mingw -j1 all BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
+ #PATH=$MINGWPREFIX/share/make/bin:$PATH mingw32-make -Cutils/screenshotgen/src -fmakefile.mingw -j1 all CXX=${CXX:-g++} BUILD=release MONOLITHIC=0 SHARED=1 UNICODE=0 USE_GUI=1 CXXFLAGS="-I$INSTALLPREFIX/wx/lib" LDFLAGS="-L$INSTALLPREFIX/wx/lib" &&
  #cp -u utils/screenshotgen/src/gcc_mswdll/screenshotgen.exe $INSTALLPREFIX/wx/bin/ &&
  ## copy include/wx-3.1/wx to include/wx (version <= 3.1.5)
  #mkdir -p $INSTALLPREFIX/wx/include/wx &&
@@ -811,13 +812,13 @@ done &&
  cp -u include/wx/wxprec.h $INSTALLPREFIX/wx/include/wx &&
  ## manually copy libraries with old naming style for compatibility (version >= 3.1.4 <= 3.1.5)
  #for F in $INSTALLPREFIX/wx/lib/libwx*.a; do
- # cp $F $INSTALLPREFIX/wx/lib/gcc_$(if echo $F | grep -q "\.dll\.a$"; then echo -n "dll"; else echo -n "lib"; fi)/$(basename $F | sed -e "s/\(libwx\)_\(base\|msw\)\([ud]*\)\([^ ]*\)-\([0-9]*\)\.\([0-9]*\)\(\.a\|\.dll.a\)/\1\2\5\6\3\4\7/")
+ # cp $F $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_$(if echo $F | grep -q "\.dll\.a$"; then echo -n "dll"; else echo -n "lib"; fi)/$(basename $F | sed -e "s/\(libwx\)_\(base\|msw\)\([ud]*\)\([^ ]*\)-\([0-9]*\)\.\([0-9]*\)\(\.a\|\.dll.a\)/\1\2\5\6\3\4\7/")
  #done &&
  # create dummy libraries for backwards compatibility (version >= 3.1.6)
  for F in wxzlib wxjpeg wxpng wxtiff wxregex wxregexu wxexpat; do
   ${AR:-ar} cr lib$F.a &&
-  cp -u lib$F.a $INSTALLPREFIX/wx/lib/gcc_lib/lib$F.a &&
-  cp -u lib$F.a $INSTALLPREFIX/wx/lib/gcc_dll/lib$F.a
+  cp -u lib$F.a $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_lib/lib$F.a &&
+  cp -u lib$F.a $INSTALLPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/lib$F.a
  done &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf wxWidgets-$VERSION
 
