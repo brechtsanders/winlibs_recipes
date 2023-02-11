@@ -1,3 +1,167 @@
+#export NAME="PDAL"
+#export STATUS=
+#export URL=https://pdal.io/
+#export BASENAME=pdal
+#export DESCRIPTION="PDAL is Point Data Abstraction Library. It is a C/C++ open source library and applications for translating and processing point cloud data. It is not limited to LiDAR data, although the focus and impetus for many of the tools in the library have their origins in LiDAR."
+#export CATEGORY=math
+#export TYPE=library
+##export VERSION=1.7.2
+##export VERSIONDATE=20180914
+##export VERSION=1.8.0
+##export VERSIONDATE=20181106
+##export VERSION=1.9.0
+##export VERSIONDATE=20190412
+##export VERSION=1.9.1
+##export VERSIONDATE=20190510
+##export VERSION=2.0.0
+##export VERSIONDATE=20190823
+##export VERSION=2.0.1
+##export VERSIONDATE=20190823
+##export VERSION=2.1.0
+##export VERSIONDATE=20200321
+#####/pdal/util/FileUtils.cpp:120:49: error: no matching function for call to 'std::basic_ifstream<char>::basic_ifstream(std::__cxx11::wstring, std::ios_base::openmode&)'
+##export VERSION=2.2.0
+##export VERSIONDATE=20200909
+##export VERSION=2.3.0
+##export VERSIONDATE=20210528
+#####vendor/kazhdan/SparseMatrix.inl:310:34: error: 'omp' was not declared in this scope
+##export VERSION=2.4.0
+##export VERSIONDATE=20220326
+##export VERSION=2.4.1
+##export VERSIONDATE=20220520
+##export VERSION=2.4.2
+##export VERSIONDATE=20220607
+#export VERSION=2.4.3
+#export VERSIONDATE=20220806
+##export VERSION=2.5.0
+##export VERSIONDATE=20230114
+##export VERSION=2.5.1
+##export VERSIONDATE=20230211
+#wl-showstatus --package-version
+#export DEPENDENCIES=zstd,libxml2,openssl,laszip,gdal,libgeotiff,zlib,xz,libcurl,postgresql
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE.txt
+#export LICENSETYPE=BSD
+##export DOWNLOADURL="https://pdal.io/download.html PDAL- -src.tar.gz"
+#export DOWNLOADURL="https://github.com/PDAL/PDAL/releases/ PDAL- -src.tar.gz"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://download.osgeo.org/pdal/PDAL-$VERSION-src.tar.gz
+##export DOWNLOADSOURCEURL=https://github.com/PDAL/PDAL/releases/download/$VERSION/PDAL-$VERSION-src.tar.gz
+##export DOWNLOADSOURCEURL=https://github.com/PDAL/PDAL/releases/download/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/PDAL-$VERSION-src.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/PDAL/PDAL/releases/download/$VERSION/PDAL-$VERSION-src.tar.bz2
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+##tar xfz $TARBALLDIR/$BASENAME/PDAL-$VERSION-src.tar.gz
+#tar xfj $TARBALLDIR/$BASENAME/PDAL-$VERSION-src.tar.bz2
+#cd PDAL-$VERSION-src
+## fix missing ntohll/htonll in pdal/util/portable_endian.hpp
+#sed -i.bak -e "s/\bntohll\b/_byteswap_uint64/; s/\bhtonll\b/_byteswap_uint64/" pdal/util/portable_endian.hpp
+## fix error: 'at_quick_exit' has not been declared in '::' (version >= 2.4.0)
+#for F in io/Ilvis2MetadataReader.cpp pdal/Polygon.cpp pdal/Polygon.cpp pdal/Geometry.cpp filters/private/Point.cpp pdal/private/gdal/BaseBand.cpp pdal/private/gdal/Raster.cpp; do
+# mv $F $F.bak &&
+# echo "#include <stdlib.h>" > $F &&
+# cat $F.bak >> $F
+#done
+## fix pdal/util/FileUtils.cpp (version = 2.4.3)
+#patch -ulbf pdal/util/FileUtils.cpp << EOF
+#@@ -236,3 +236,3 @@
+#         {
+#-            files.push_back(fromNative(it->path()));
+#+            files.push_back(fromNative(it->path().string().c_str()));
+#             it++;
+#@@ -542,3 +542,3 @@
+#
+#-#ifndef _WIN32
+#+#if !defined(_WIN32) || defined(__MINGW32__)
+#     ctx.m_fd = ::open(filename.c_str(), readOnly ? O_RDONLY : O_RDWR);
+#EOF
+# fix apps/pdal.cpp (version >= 2.4.3)
+#patch -ulbf apps/pdal.cpp << EOF
+#@@ -303,3 +303,3 @@
+#
+#-#ifdef _WIN32
+#+#if defined(_WIN32) && !defined(__MINGW32__)
+# int wmain( int argc, wchar_t *argv[ ], wchar_t *envp[ ] )
+#EOF
+### fix pdal/util/pdal_util_export.hpp (version >= 2.5.0)
+##patch -ulbf pdal/util/pdal_util_export.hpp << EOF
+##@@ -44,3 +44,7 @@
+## #   define PDAL_DLL_UNIX
+##+#  ifdef __MINGW32__
+##+#   define PDAL_DLL_DEPRECATED   __declspec(dllexport) __attribute__((deprecated))
+##+#  else
+## #   define PDAL_DLL_DEPRECATED   __declspec(deprecated, dllexport)
+##+#  endif
+## #else
+##EOF
+### fix pdal/DynamicLibrary.cpp (version >= 2.5.0)
+##patch -ulbf pdal/DynamicLibrary.cpp << EOF
+##@@ -89,3 +89,4 @@
+## #ifdef _WIN32
+##-    handle = ::LoadLibraryW(FileUtils::toNative(name).c_str());
+##+    std::wstring libname = FileUtils::toNative(name);
+##+    handle = ::LoadLibraryW(libname.c_str());
+##     if (handle == NULL)
+##EOF
+### fix pdal/util/FileUtils.hpp (version >= 2.5.0)
+##patch -ulbf pdal/util/FileUtils.hpp << EOF
+##@@ -287,3 +287,3 @@
+##
+##-#ifdef PDAL_WIN32_STL
+##+#if defined(PDAL_WIN32_STL) || defined(__MINGW32__)
+##     PDAL_DLL std::wstring toNative(const std::string& in);
+##EOF
+### fix pdal/util/FileUtils.cpp (version >= 2.5.0)
+##patch -ulbf pdal/util/FileUtils.cpp << EOF
+##@@ -87,3 +87,3 @@
+## {
+##-#ifdef PDAL_WIN32_STL
+##+#if defined(PDAL_WIN32_STL) || defined(__MINGW32__)
+## std::wstring toNative(const std::string& in)
+##EOF
+## fix apps/CMakeLists.txt (version >= 2.4.3)
+#patch -ulbf apps/CMakeLists.txt << EOF
+#@@ -32,5 +32,5 @@
+#
+#-IF(WIN32)
+#+IF(MSVC)
+#     target_link_options(\${PDAL_APP} PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wmainCRTStartup)
+#-endif(WIN32)
+#+endif(MSVC)
+#
+#EOF
+## fix dimbuilder/CMakeLists.txt (version >= 2.4.3)
+#patch -ulbf dimbuilder/CMakeLists.txt << EOF
+#@@ -36,4 +36,4 @@
+#
+#-if (WIN32)
+#+if (MSVC)
+#     target_link_options(dimbuilder PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:mainCRTStartup)
+#-endif(WIN32)
+#+endif(MSVC)
+#EOF
+### also allow building static libraries
+##sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" cmake/macros.cmake cmake/pluginmacros.cmake
+##sed -i.bak -e "s/^set(PDAL_LIB_TYPE \"SHARED\")/#&/" cmake/libraries.cmake
+## compile with -D_USE_MATH_DEFINES to fix missing M_PI
+#mkdir -p build_static build_shared &&
+# #wl-showstatus configure &&
+# #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DWITH_LASZIP:BOOL=ON -DWITH_ZLIB:BOOL=ON -DWITH_ZSTD:BOOL=ON -DWITH_LZMA:BOOL=ON -DWITH_TESTS:BOOL=OFF -DBUILD_PLUGIN_SQLITE:BOOL=OFF -DGDAL_LIBRARY:STRING="-lgdal" -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DWITH_LASZIP:BOOL=ON -DWITH_ZLIB:BOOL=ON -DWITH_ZSTD:BOOL=ON -DWITH_LZMA:BOOL=ON -DWITH_TESTS:BOOL=OFF -DBUILD_PLUGIN_SQLITE:BOOL=OFF -DGDAL_LIBRARY:STRING="-lgdal" -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -S. -Bbuild_shared &&
+# #wl-showstatus build-install &&
+# #ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf PDAL-$VERSION-src
+#####TO DO: also build static libraries
+
+
+
 export NAME="PDAL"
 export STATUS=
 export URL=https://pdal.io/
@@ -5,36 +169,8 @@ export BASENAME=pdal
 export DESCRIPTION="PDAL is Point Data Abstraction Library. It is a C/C++ open source library and applications for translating and processing point cloud data. It is not limited to LiDAR data, although the focus and impetus for many of the tools in the library have their origins in LiDAR."
 export CATEGORY=math
 export TYPE=library
-#export VERSION=1.7.2
-#export VERSIONDATE=20180914
-#export VERSION=1.8.0
-#export VERSIONDATE=20181106
-#export VERSION=1.9.0
-#export VERSIONDATE=20190412
-#export VERSION=1.9.1
-#export VERSIONDATE=20190510
-#export VERSION=2.0.0
-#export VERSIONDATE=20190823
-#export VERSION=2.0.1
-#export VERSIONDATE=20190823
-#export VERSION=2.1.0
-#export VERSIONDATE=20200321
-####/pdal/util/FileUtils.cpp:120:49: error: no matching function for call to 'std::basic_ifstream<char>::basic_ifstream(std::__cxx11::wstring, std::ios_base::openmode&)'
-#export VERSION=2.2.0
-#export VERSIONDATE=20200909
-#export VERSION=2.3.0
-#export VERSIONDATE=20210528
-####vendor/kazhdan/SparseMatrix.inl:310:34: error: 'omp' was not declared in this scope
-#export VERSION=2.4.0
-#export VERSIONDATE=20220326
-#export VERSION=2.4.1
-#export VERSIONDATE=20220520
-#export VERSION=2.4.2
-#export VERSIONDATE=20220607
-export VERSION=2.4.3
-export VERSIONDATE=20220806
-#export VERSION=2.5.0
-#export VERSIONDATE=20230114
+export VERSION=2.5.1
+export VERSIONDATE=20230211
 wl-showstatus --package-version
 export DEPENDENCIES=zstd,libxml2,openssl,laszip,gdal,libgeotiff,zlib,xz,libcurl,postgresql
 export OPTIONALDEPENDENCIES=
@@ -46,111 +182,27 @@ export LICENSETYPE=BSD
 export DOWNLOADURL="https://github.com/PDAL/PDAL/releases/ PDAL- -src.tar.gz"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=http://download.osgeo.org/pdal/PDAL-$VERSION-src.tar.gz
-#export DOWNLOADSOURCEURL=https://github.com/PDAL/PDAL/releases/download/$VERSION/PDAL-$VERSION-src.tar.gz
-#export DOWNLOADSOURCEURL=https://github.com/PDAL/PDAL/releases/download/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/PDAL-$VERSION-src.tar.gz
 export DOWNLOADSOURCEURL=https://github.com/PDAL/PDAL/releases/download/$VERSION/PDAL-$VERSION-src.tar.bz2
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-#tar xfz $TARBALLDIR/$BASENAME/PDAL-$VERSION-src.tar.gz
 tar xfj $TARBALLDIR/$BASENAME/PDAL-$VERSION-src.tar.bz2
 cd PDAL-$VERSION-src
-# fix missing ntohll/htonll in pdal/util/portable_endian.hpp
-sed -i.bak -e "s/\bntohll\b/_byteswap_uint64/; s/\bhtonll\b/_byteswap_uint64/" pdal/util/portable_endian.hpp
-# fix error: 'at_quick_exit' has not been declared in '::' (version >= 2.4.0)
-for F in io/Ilvis2MetadataReader.cpp pdal/Polygon.cpp pdal/Polygon.cpp pdal/Geometry.cpp filters/private/Point.cpp pdal/private/gdal/BaseBand.cpp pdal/private/gdal/Raster.cpp; do
- mv $F $F.bak &&
- echo "#include <stdlib.h>" > $F &&
- cat $F.bak >> $F
-done
-# fix pdal/util/FileUtils.cpp (version >= 2.4.3)
-patch -ulbf pdal/util/FileUtils.cpp << EOF
-@@ -236,3 +236,3 @@
-         {
--            files.push_back(fromNative(it->path()));
-+            files.push_back(fromNative(it->path().string().c_str()));
-             it++;
-@@ -542,3 +542,3 @@
-
--#ifndef _WIN32
-+#if !defined(_WIN32) || defined(__MINGW32__)
-     ctx.m_fd = ::open(filename.c_str(), readOnly ? O_RDONLY : O_RDWR);
-EOF
- fix apps/pdal.cpp (version >= 2.4.3)
-patch -ulbf apps/pdal.cpp << EOF
-@@ -303,3 +303,3 @@
-
--#ifdef _WIN32
-+#if defined(_WIN32) && !defined(__MINGW32__)
- int wmain( int argc, wchar_t *argv[ ], wchar_t *envp[ ] )
-EOF
-## fix pdal/util/pdal_util_export.hpp (version >= 2.5.0)
-#patch -ulbf pdal/util/pdal_util_export.hpp << EOF
-#@@ -44,3 +44,7 @@
-# #   define PDAL_DLL_UNIX
-#+#  ifdef __MINGW32__
-#+#   define PDAL_DLL_DEPRECATED   __declspec(dllexport) __attribute__((deprecated))
-#+#  else
-# #   define PDAL_DLL_DEPRECATED   __declspec(deprecated, dllexport)
-#+#  endif
-# #else
-#EOF
-## fix pdal/DynamicLibrary.cpp (version >= 2.5.0)
-#patch -ulbf pdal/DynamicLibrary.cpp << EOF
-#@@ -89,3 +89,4 @@
-# #ifdef _WIN32
-#-    handle = ::LoadLibraryW(FileUtils::toNative(name).c_str());
-#+    std::wstring libname = FileUtils::toNative(name);
-#+    handle = ::LoadLibraryW(libname.c_str());
-#     if (handle == NULL)
-#EOF
-## fix pdal/util/FileUtils.hpp (version >= 2.5.0)
-#patch -ulbf pdal/util/FileUtils.hpp << EOF
-#@@ -287,3 +287,3 @@
+## also allow building static libraries in cmake/libraries.cmake (version >= 2.5.1)
+#patch -ulbf cmake/libraries.cmake << EOF
+#@@ -2,3 +2,5 @@
 #
-#-#ifdef PDAL_WIN32_STL
-#+#if defined(PDAL_WIN32_STL) || defined(__MINGW32__)
-#     PDAL_DLL std::wstring toNative(const std::string& in);
+#+if("\${PDAL_LIB_TYPE}" STREQUAL "")
+# set(PDAL_LIB_TYPE "SHARED")
+#+endif()
+# if (WIN32)
 #EOF
-## fix pdal/util/FileUtils.cpp (version >= 2.5.0)
-#patch -ulbf pdal/util/FileUtils.cpp << EOF
-#@@ -87,3 +87,3 @@
-# {
-#-#ifdef PDAL_WIN32_STL
-#+#if defined(PDAL_WIN32_STL) || defined(__MINGW32__)
-# std::wstring toNative(const std::string& in)
-#EOF
-# fix apps/CMakeLists.txt (version >= 2.4.3)
-patch -ulbf apps/CMakeLists.txt << EOF
-@@ -32,5 +32,5 @@
-
--IF(WIN32)
-+IF(MSVC)
-     target_link_options(\${PDAL_APP} PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wmainCRTStartup)
--endif(WIN32)
-+endif(MSVC)
-
-EOF
-# fix dimbuilder/CMakeLists.txt (version >= 2.4.3)
-patch -ulbf dimbuilder/CMakeLists.txt << EOF
-@@ -36,4 +36,4 @@
-
--if (WIN32)
-+if (MSVC)
-     target_link_options(dimbuilder PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:mainCRTStartup)
--endif(WIN32)
-+endif(MSVC)
-EOF
-## also allow building static libraries
-#sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" cmake/macros.cmake cmake/pluginmacros.cmake
-#sed -i.bak -e "s/^set(PDAL_LIB_TYPE \"SHARED\")/#&/" cmake/libraries.cmake
-# compile with -D_USE_MATH_DEFINES to fix missing M_PI
 mkdir -p build_static build_shared &&
  #wl-showstatus configure &&
- #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DWITH_LASZIP:BOOL=ON -DWITH_ZLIB:BOOL=ON -DWITH_ZSTD:BOOL=ON -DWITH_LZMA:BOOL=ON -DWITH_TESTS:BOOL=OFF -DBUILD_PLUGIN_SQLITE:BOOL=OFF -DGDAL_LIBRARY:STRING="-lgdal" -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -S. -Bbuild_static &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPDAL_LIB_TYPE:STRING=STATIC -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DWITH_ZLIB:BOOL=ON -DWITH_ZSTD:BOOL=ON -DWITH_LZMA:BOOL=ON -DGDAL_LIBRARY:STRING="-lgdal" -DENABLE_CTEST:BOOL=OFF -DWITH_TESTS:BOOL=OFF -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DWITH_LASZIP:BOOL=ON -DWITH_ZLIB:BOOL=ON -DWITH_ZSTD:BOOL=ON -DWITH_LZMA:BOOL=ON -DWITH_TESTS:BOOL=OFF -DBUILD_PLUGIN_SQLITE:BOOL=OFF -DGDAL_LIBRARY:STRING="-lgdal" -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DBUILD_PLUGIN_SQLITE:BOOL=ON -DWITH_ZLIB:BOOL=ON -DWITH_ZSTD:BOOL=ON -DWITH_LZMA:BOOL=ON -DGDAL_LIBRARY:STRING="-lgdal" -DENABLE_CTEST:BOOL=OFF -DWITH_TESTS:BOOL=OFF -S. -Bbuild_shared &&
  #wl-showstatus build-install &&
  #ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
