@@ -11,7 +11,7 @@ wl-showstatus --package-version
 export DEPENDENCIES=glib2
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=doxygen
 export LICENSEFILE=COPYING
 export LICENSETYPE=LGPL
 export DOWNLOADURL="http://sourceforge.net/projects/meanwhile/files/meanwhile/"
@@ -25,17 +25,21 @@ tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix invalid glib includes
 for F in $(grep -l "#include <glib/" src/*.c src/*.h samples/*.c); do
- mv $F $F.bak &&
- sed -e "s?\(#include <glib\)/.*\(\.h>\)?\1\2?" $F.bak > $F
+ sed -i.bak -e "s?\(#include <glib\)/.*\(\.h>\)?\1\2?" $F
 done
+# support ARM64 in config.sub
+sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
 wl-showstatus configure &&
-# fix building DLLs on 64-bit
-if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- autoreconf -f -i -I $MINGWPREFIX/share/aclocal
-fi
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # autoreconf -f -i -I $MINGWPREFIX/share/aclocal
+ #fi
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --$(if which doxygen.exe &> /dev/null; then echo "enable"; else echo "disable"; fi)-doxygen &&
+ # fix detection of shared libraries
+ sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
- make install-strip &&
+ #make install-strip &&
+ ( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.dll )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 

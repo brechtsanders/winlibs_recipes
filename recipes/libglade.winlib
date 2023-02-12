@@ -22,6 +22,8 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xfj $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
+# support ARM64 in config.sub
+sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
 wl-showstatus configure &&
 # fix building DLLs on 64-bit
 if ( echo $RUNPLATFORM | grep -q x86_64 ); then
@@ -29,10 +31,13 @@ if ( echo $RUNPLATFORM | grep -q x86_64 ); then
 fi
 #make check
 wl-showstatus build-install &&
-#PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
-PYTHON=$PY2DIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ PYTHON=$PY2DIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ # fix detection of shared libraries
+ sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
- ( make -j1 install-strip || make -j1 install-strip LIBS="-Wl,--as-needed -lgmodule-2.0" ) &&
+ #( make -j1 install-strip || make -j1 install-strip LIBS="-Wl,--as-needed -lgmodule-2.0" ) &&
+ ( make -j1 install-strip || make -j1 install-strip LIBS="-Wl,--as-needed -lgmodule-2.0" || ( make -j1 install && strip $INSTALLPREFIX/bin/*.dll )) &&
  # fix absolute path to python
  #for F in $(grep -l "^#\!$PYDIR/python.exe" $INSTALLPREFIX/bin/*); do
  for F in $(grep -l "^#\!$PY2DIR/python.exe" $INSTALLPREFIX/bin/*); do

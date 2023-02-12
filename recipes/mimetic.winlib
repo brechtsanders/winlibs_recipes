@@ -84,6 +84,14 @@ int munmap (void *start, size_t length)
 }
 #endif
 EOF
+# fix error: ordered comparison between pointer and zero in mimetic/os/mmfile.cxx (version >= 0.9.8)
+patch -ulbf mimetic/os/mmfile.cxx << EOF
+@@ -59,3 +59,3 @@
+     m_beg = (char*) mmap(0, m_st.st_size, PROT_READ, MAP_SHARED,m_fd,0);
+-    if(m_beg > 0)
++    if(m_beg)
+     {
+EOF
 # skip making test
 cat > test/Makefile.in << EOF
 clean:
@@ -94,12 +102,13 @@ EOF
 ## remove dependancy on dynamic libstdc++ (GCC 4)
 #mv libtool libtool.bak &&
 #sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool &&
+# support ARM64 in config.sub
+sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
 wl-showstatus configure &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  wl-showstatus build-install &&
  # fix building DLLs
- mv libtool libtool.bak &&
- sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ( make || make CXXFLAGS="-fpermissive" ) &&
  make install-strip &&
  cp -f mimetic/config_win32.h $INSTALLPREFIX/include/mimetic/ &&

@@ -36,15 +36,20 @@ fi &&
 #export C_INCLUDE_PATH=$MINGWDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH}
 #export CPLUS_INCLUDE_PATH=$MINGWDIR/include${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}
 #make check
-#PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" sh ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
-#PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" sh ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
-#PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
-PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/netpbm" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+# support ARM64 in config.sub
+sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
+wl-showstatus configure &&
+ #PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" sh ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" sh ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+ #PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ PKG_CONFIG="$MINGWPREFIX/bin/pkg-config" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/netpbm" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ # fix detection of shared libraries
+ sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
  # fix building DLLs
- mv libtool libtool.bak &&
- sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
- make install-strip &&
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #make install-strip &&
+ ( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 

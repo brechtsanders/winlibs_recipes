@@ -168,7 +168,6 @@ sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\
 # fix Imlib/load.c for newer libpng
 mv Imlib/load.c Imlib/load.c.bak
 sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\)/png_get_\1(png_ptr, info_ptr)/g" Imlib/load.c.bak > Imlib/load.c
-wl-showstatus configure &&
 # fix gdk_imlib/utils.c for newer libpng
 mv gdk_imlib/utils.c gdk_imlib/utils.c.bak
 sed -e "s/setjmp(\(png_ptr\)->jmpbuf)/png_jmpbuf(\1)/; s/info_ptr->\(color_type\)/png_get_\1(png_ptr, info_ptr)/g" gdk_imlib/utils.c.bak > gdk_imlib/utils.c
@@ -185,20 +184,31 @@ if grep -q "DGifCloseFile(.*ErrorCode)" $MINGWPREFIX/include/gif_lib.h; then
  mv Imlib/load.c Imlib/load.c.bak2 &&
  sed -e "s/\(DGifOpen\|DGifOpenFileName\|DGifCloseFile\)\(([^)]*([^)]*)[^)]*\|[^)]*\))/\1\2, NULL)/g" Imlib/load.c.bak2 > Imlib/load.c
 fi
+# support ARM64 in config.sub
+sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
 wl-showstatus configure &&
-#mkdir -p m4 &&
-#WANT_AUTOMAKE=latest autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtktest --with-x=no GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtktest --with-x=no GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ #mkdir -p m4 &&
+ #WANT_AUTOMAKE=latest autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtktest --with-x=no GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtktest --with-x=no GTK_CONFIG="$PKG_CONFIG gtk+-2.0" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-gtktest --with-x=no GTK_CONFIG="$PKG_CONFIG gtk+-2.0" CFLAGS="-Wno-int-conversion" LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
- sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ # fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  # fix for newer giflib where PrintGifError no longer exists
  if ! grep -wq PrintGifError $MINGWPREFIX/include/gif_lib.h; then
   #echo "#define PrintGifError GifError" >> config.h
   echo "#define PrintGifError()" >> config.h
  fi &&
- ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lws2_32 -lX11 -lpng -ljpeg -lgif -ltiff -lXext" ) &&
+ #wl-showstatus build-install &&
+ #( make install-strip || make install-strip LIBS="-Wl,--as-needed -lws2_32 -lX11 -lpng -ljpeg -lgif -ltiff -lXext" ) &&
+ wl-showstatus build &&
+ ( make || make LIBS="-Wl,--as-needed -lws2_32 -lX11 -lpng -ljpeg -lgif -ltiff -lXext" ) &&
+ wl-showstatus install &&
+ #make install-strip &&
+ ( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.dll )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 # To do: fix ugly hacks (e.g. in gdk/gdkx.h) which probably brake functionality
 

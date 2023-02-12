@@ -4,7 +4,7 @@ export URL=http://gri.sourceforge.net/
 export BASENAME=gri
 export DESCRIPTION="Gri is a language for scientific graphics programming. The word \"language\" is important: Gri is command-driven, not point/click."
 export CATEGORY=graphics
-export TYPE=library
+export TYPE=application
 export VERSION=2.12.23
 export VERSIONDATE=20181108
 wl-showstatus --package-version
@@ -57,6 +57,104 @@ EOF
 #sed -i.bak -e "s/\((long unsigned int)\)\(this\|(*\&\)/\1(uintptr_t)\2/g" src/CmdFile.hh
 #sed -i.bak -e "s/unsigned(long(this))/(unsigned long)(uintptr_t)this/g" src/GriPath.cc
 #sed -i.bak -e "s/(long unsigned int)/(uintptr_t)/g" src/DataFile.hh
+# fix src/query.cc (version >= 2.12.23)
+patch -ulbf src/query.cc << EOF
+@@ -58,3 +58,3 @@
+        }
+-       def_word[0] = '\\0';
++       def_word[0] = "";
+        chop_into_words(def, def_word, &def_words, NCHAR);
+EOF
+# fix src/DataFile.hh (version >= 2.12.23)
+patch -ulbf src/DataFile.hh << EOF
+@@ -39,5 +39,5 @@
+                         fp = _cmdFILE.end()->get_fp();
+-                         if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d construct from cmdFILE  fp= %lx  ",__FILE__,__LINE__,(long unsigned int)(fp));
++                         if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d construct from cmdFILE  fp= %lx  ",__FILE__,__LINE__,(long unsigned int)(uintptr_t(fp)));
+                 } else {
+-                         if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d construct from stdin    fp= %lx  ",__FILE__,__LINE__,(long unsigned int)(stdin));
++                         if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d construct from stdin    fp= %lx  ",__FILE__,__LINE__,(long unsigned int)(uintptr_t(stdin)));
+                         fp = stdin;
+@@ -48,3 +48,3 @@
+                 delete_when_close = false;
+-                if (superuser() & FLAG_AUT1)printf(" ... %s:%d  name= '%s'\\t fp= %lx  this= %lx\\n",__FILE__,__LINE__,name.c_str(),long(fp),long(this));
++                if (superuser() & FLAG_AUT1)printf(" ... %s:%d  name= '%s'\\t fp= %lx  this= %lx\\n",__FILE__,__LINE__,name.c_str(),long(intptr_t(fp)),long(intptr_t(this)));
+         }
+@@ -58,3 +58,3 @@
+                 delete_when_close = d.get_delete_when_close();
+-                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile(%lx)    name= '%s'\\t fp= %lx   this= %lx\\n",__FILE__,__LINE__,long(&d),name.c_str(),long(fp),long(this));
++                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile(%lx)    name= '%s'\\t fp= %lx   this= %lx\\n",__FILE__,__LINE__,long(intptr_t(&d)),name.c_str(),long(intptr_t(fp)),long(intptr_t(this)));
+         }
+@@ -67,6 +67,6 @@
+                 delete_when_close = a_delete_when_close;
+-                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile(fp= %lx, name= '%s', ...) this= %lx\\n",__FILE__,__LINE__,long(a_fp),a_name,long(this));
++                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile(fp= %lx, name= '%s', ...) this= %lx\\n",__FILE__,__LINE__,long(intptr_t(a_fp)),a_name,long(intptr_t(this)));
+         }
+         ~DataFile() {
+-                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile::~DataFile() name= '%s'\\t fp= %lx   this= %lx\\n",__FILE__,__LINE__, name.c_str(), long(fp), long(this));
++                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile::~DataFile() name= '%s'\\t fp= %lx   this= %lx\\n",__FILE__,__LINE__, name.c_str(), long(intptr_t(fp)), long(intptr_t(this)));
+ #if 0                                // BUG 2001-feb-17 -- not sure on next 2 lines
+@@ -83,3 +83,3 @@
+                 delete_when_close = d.get_delete_when_close();
+-                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile::operator=   name= '%s'\\t fp=  %lx  this= %lx\\n",__FILE__,__LINE__, name.c_str(), long(fp), long(this));
++                if (superuser() & FLAG_AUT1)printf("    DEBUG: %s:%d DataFile::operator=   name= '%s'\\t fp=  %lx  this= %lx\\n",__FILE__,__LINE__, name.c_str(), long(intptr_t(fp)), long(intptr_t(this)));
+                 return *this;
+EOF
+# fix src/CmdFile.hh (version >= 2.12.23)
+patch -ulbf src/CmdFile.hh << EOF
+@@ -46,3 +46,3 @@
+                         printf("ERROR at %s:%d -- try to CmdFile copy null  '%s'  from %lx    this %lx\\n",
+-                               __FILE__,__LINE__,name.c_str(),(long unsigned int)(&c),(long unsigned int)this);
++                               __FILE__,__LINE__,name.c_str(),(long unsigned int)(intptr_t)(&c),(long unsigned int)(uintptr_t)this);
+                         exit(1);
+@@ -62,3 +62,3 @@
+                 if (fp == (FILE*)NULL) {
+-                        printf("%s:%d try to CmdFile operator= null file this %lx\\n",__FILE__,__LINE__,(long unsigned int)this);
++                        printf("%s:%d try to CmdFile operator= null file this %lx\\n",__FILE__,__LINE__,(long unsigned int)(uintptr_t)this);
+                         exit(1);
+@@ -74,3 +74,3 @@
+                 if (fp == (FILE*)NULL) {
+-                        printf("ERROR at %s:%d -- try to CmdFile set null file this %lx\\n",__FILE__,__LINE__,(long unsigned int)this);
++                        printf("ERROR at %s:%d -- try to CmdFile set null file this %lx\\n",__FILE__,__LINE__,(long unsigned int)(uintptr_t)this);
+                         exit(1);
+EOF
+# fix src/GriPath.cc (version >= 2.12.23)
+patch -ulbf src/GriPath.cc << EOF
+@@ -401,3 +401,3 @@
+ {
+-        printf("Path @ %x is:\\n", unsigned(long(this)));
++        printf("Path @ %x is:\\n", unsigned(intptr_t(this)));
+         for (unsigned int i = 0; i < depth; i++)
+EOF
+# fix src/file.cc (version >= 2.12.23)
+patch -ulbf src/file.cc << EOF
+@@ -199,3 +199,3 @@
+ {
+-        if (((unsigned) superuser()) & FLAG_AUT1)printf("\\n  DEBUG: %s:%d pop_data_file(file= %3d) fp= %lx   stack_len= %d\\n",__FILE__,__LINE__,file, (long unsigned int)_dataFILE[file].get_fp(), int(_dataFILE.size()));
++        if (((unsigned) superuser()) & FLAG_AUT1)printf("\\n  DEBUG: %s:%d pop_data_file(file= %3d) fp= %lx   stack_len= %d\\n",__FILE__,__LINE__,file, (long unsigned int)(uintptr_t)_dataFILE[file].get_fp(), int(_dataFILE.size()));
+         if (file < 0) {
+@@ -262,3 +262,3 @@
+                 for (unsigned int i = 0; i < n; i++)
+-                        printf("   file name= '%s' type= %d delete_when_close= %d  fp= %lx\\n", _dataFILE[i].get_name(), int(_dataFILE[i].get_type()),int(_dataFILE[i].get_delete_when_close()), (unsigned long int)_dataFILE[i].get_fp());
++                        printf("   file name= '%s' type= %d delete_when_close= %d  fp= %lx\\n", _dataFILE[i].get_name(), int(_dataFILE[i].get_type()),int(_dataFILE[i].get_delete_when_close()), (unsigned long int)(uintptr_t)_dataFILE[i].get_fp());
+         }
+EOF
+# fix src/read.cc (version >= 2.12.23)
+patch -ulbf src/read.cc << EOF
+@@ -1873,3 +1873,3 @@
+         if (imMask->storage_exists) {
+-                printf("%s:%d freeing imageMask storage at %lx\\n",__FILE__,__LINE__,(long unsigned int)imMask->image);
++                printf("%s:%d freeing imageMask storage at %lx\\n",__FILE__,__LINE__,(long unsigned int)(uintptr_t)imMask->image);
+                 free(imMask->image);
+EOF
+# fix src/startup.cc (version >= 2.12.23)
+patch -ulbf src/startup.cc << EOF
+@@ -359,3 +359,3 @@
+         DataFile new_data_file;
+-        if (superuser() & FLAG_AUT1)printf("\\nDEBUG: %s:%d pushing back a datafile at address %lx\\n",__FILE__,__LINE__,(long unsigned int)(&new_data_file));
++        if (superuser() & FLAG_AUT1)printf("\\nDEBUG: %s:%d pushing back a datafile at address %lx\\n",__FILE__,__LINE__,(long unsigned int)(uintptr_t)(&new_data_file));
+         _dataFILE.push_back(new_data_file);
+EOF
 # skip making doc
 cat > doc/Makefile.in << EOF
 clean:
@@ -64,12 +162,15 @@ all:
 install:
 install-strip:
 EOF
+# support ARM64 in config.sub
+sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-std=c++11" &&
  wl-showstatus build-install &&
  make install-strip CXX="${CXX:-g++} -fpermissive" &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####GRI_DIRECTORY_LIBRARY=$MINGWPREFIX/share/gri gri
 
 
 
