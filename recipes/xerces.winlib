@@ -100,12 +100,24 @@ patch -ulbf src/xercesc/util/JanitorExports.cpp << EOF
 +#endif
 
 EOF
+# fix missing __cpuid on ARM64 in src/xercesc/util/PlatformUtils.cpp (version >= 3.2.4)
+patch -ulbf src/xercesc/util/PlatformUtils.cpp << EOF
+@@ -226,3 +226,3 @@
+     // Determine if we can use SSE2 functions
+-#if defined(XERCES_HAVE_CPUID_INTRINSIC)
++#if defined(XERCES_HAVE_CPUID_INTRINSIC) && !defined(__aarch64__)
+     int CPUInfo[4]={0};
+EOF
+# fix .lnkscript: unknown file type when building with clang
+if ${CC:-gcc} --version|grep -q "^clang"; then
+ wl-showstatus preconfigure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+fi
 # skip making samples
 cat > samples/Makefile.in << EOF
 all:
 install:
 EOF
-#autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
 ## remove dependancy on dynamic libstdc++ (GCC 4)
 #mv libtool libtool.bak
 #sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" libtool.bak > libtool
@@ -117,6 +129,8 @@ wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --without-gnu-ld LDFLAGS="-Wl,-no-undefined" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" CXXFLAGS="-static-libgcc -static-libstdc++" &&
+ #--disable-rpath 
+ #--enable-mutexmgr-windows --enable-netaccessor-winsock --enable-transcoder-windows 
  #--enable-msgloader-icu 
  #--enable-xmlch-wchar_t 
  # fix building DLLs
@@ -125,6 +139,9 @@ wl-showstatus configure &&
  sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  ## fix .lnkscript: unknown file type when building with clang
  #( ${CC:-gcc} --version|head -n1|grep -vq clang || sed -i.bak3 -e "s/^\(with_gnu_ld=\"\)yes/\1no/; s/^\(reload_flag=.*\)\-r/\1/" libtool ) &&
+ echo "#ifdef __aarch64__" >> config.h &&
+ echo "#undef XERCES_HAVE_CPUID_INTRINSIC" >> config.h &&
+ echo "#endif" >> config.h &&
  wl-showstatus build-install &&
  ( make install-strip || make install-strip CXX="${CXX:-g++} -fpermissive" ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xerces-c-$VERSION

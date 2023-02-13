@@ -1931,27 +1931,24 @@ cat magick/nt-base.c.bak >> magick/nt-base.c
 ##include <ws2tcpip.h>
 #EOF
 #cat magick/distribute-cache.c.bak >> magick/distribute-cache.c
-# fix MagickCore/distribute-cache.c (version >= 7.0.5-4)
+# fix missing addrinfo in MagickCore/distribute-cache.c (version >= 7.0.5-4)
 mv MagickCore/distribute-cache.c MagickCore/distribute-cache.c.bak
 cat > MagickCore/distribute-cache.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0501
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
 EOF
-cat MagickCore/distribute-cache.c.bak >> MagickCore/distribute-cache.c
+sed -e "s?^#include <\(netinet/in\.h\|netdb\.h\|sys/socket\.h\|arpa/inet\.h\)>?//&?" MagickCore/distribute-cache.c.bak >> MagickCore/distribute-cache.c
 # fix MagickCore/nt-base.c (version >= 7.0.5-4)
 mv MagickCore/nt-base.c MagickCore/nt-base.c.bak
 cat > MagickCore/nt-base.c << EOF
 #include <winsock2.h>
 EOF
 cat MagickCore/nt-base.c.bak >> MagickCore/nt-base.c
-# fix missing addrinfo in MagickCore/distribute-cache.c: (version >= 7.0.5-4)
-mv MagickCore/distribute-cache.c MagickCore/distribute-cache.c.bak
-cat > MagickCore/distribute-cache.c << EOF
-#define _WIN32_WINNT 0x0501
-#include <ws2tcpip.h>
-EOF
-cat MagickCore/distribute-cache.c.bak >> MagickCore/distribute-cache.c
 # fix invalid installation folder (version >= 6.8.3-10)
 mv Makefile.in Makefile.in.bak
 sed -e "s/\$(DESTDIR)\/\(\$(\)/\1/g" Makefile.in.bak > Makefile.in
@@ -2056,8 +2053,11 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-zero-configuration --with-modules=no --without-x --with-gslib --without-perl --disable-openmp --enable-hdri LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,--enable-auto-import" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-zero-configuration --with-modules --without-x --with-gslib --without-perl --disable-openmp --enable-hdri LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,--enable-auto-import" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-zero-configuration --with-modules --without-x --with-gslib --without-perl --disable-openmp --enable-hdri --without-wmf LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,--enable-auto-import" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-zero-configuration --with-modules --without-x --with-gslib --without-perl --disable-openmp --enable-hdri --without-wmf CFLAGS="-fcommon" LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,--enable-auto-import" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-zero-configuration --with-modules --without-x --with-gslib --without-perl --disable-openmp --enable-hdri --without-wmf CFLAGS="-fcommon" LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,--enable-auto-import" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-zero-configuration --with-modules --without-x --with-gslib --without-perl --disable-openmp --enable-hdri --without-wmf CFLAGS="-fcommon" LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,--enable-auto-import" LIBS="$(if $CC --version|grep -q clang && echo $RUNPLATFORM | grep -q "^aarch64"; then echo "-Wl,-lclang_rt.builtins-aarch64"; fi)" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-zero-configuration --with-modules --without-x --with-gslib --without-perl --disable-openmp --enable-hdri --without-wmf --disable-dependency-tracking CFLAGS="-fcommon" LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,--enable-auto-import" &&
+ # fix detection of shared libraries
+ sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  ## fix carg/cimag/creal errors in magick/fourier.c (version >= 6.8.7-6)
  #echo "#undef MAGICKCORE_HAVE_COMPLEX_H" >> magick/magick-baseconfig.h &&
  #echo "#undef MAGICKCORE_HAVE_CABS" >> magick/magick-baseconfig.h &&
