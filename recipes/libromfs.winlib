@@ -23,15 +23,42 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix CMakeLists.txt
+patch -ulbf CMakeLists.txt << EOF
+@@ -6,3 +6,3 @@
+ if (NOT LIBROMFS_PROJECT_NAME)
+-    message(FATAL_ERROR "LIBROMFS_PROJECT_NAME is not set")
++    message(WARNING "LIBROMFS_PROJECT_NAME is not set")
+ endif ()
+@@ -10,3 +10,3 @@
+ if (NOT LIBROMFS_RESOURCE_LOCATION)
+-    message(FATAL_ERROR "LIBROMFS_RESOURCE_LOCATION is not set")
++    message(WARNING "LIBROMFS_RESOURCE_LOCATION is not set")
+ endif ()
+@@ -18,4 +18,4 @@
+     message(FATAL_ERROR "To use libromfs, please point the variable LIBROMFS_RESOURCE_LOCATION to a valid folder path")
+-elseif (NOT EXISTS \${LIBROMFS_RESOURCE_LOCATION} OR NOT IS_DIRECTORY \${LIBROMFS_RESOURCE_LOCATION})
+-    message(FATAL_ERROR "LIBROMFS_RESOURCE_LOCATION has been defined but does not point to a valid folder")
++elseif (NOT EXISTS "\${LIBROMFS_RESOURCE_LOCATION}" OR NOT IS_DIRECTORY "\${LIBROMFS_RESOURCE_LOCATION}")
++    message(WARNING "LIBROMFS_RESOURCE_LOCATION has been defined but does not point to a valid folder")
+ endif ()
+@@ -28 +28,2 @@
+
++
+EOF
 # also allow building shared library
 sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" lib/CMakeLists.txt
+# fix missing 
+CMakeLists.txt
 # create resource folder
 mkdir -p romfs
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIBROMFS_RESOURCE_LOCATION:PATH=$PWD/romfs -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIBROMFS_RESOURCE_LOCATION:PATH=$PWD/romfs -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIBROMFS_PROJECT_NAME:STRING=$VERSION -DLIBROMFS_RESOURCE_LOCATION:PATH=$PWD/romfs -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIBROMFS_RESOURCE_LOCATION:PATH=$PWD/romfs -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIBROMFS_RESOURCE_LOCATION:PATH=$PWD/romfs -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBROMFS_PROJECT_NAME:STRING=$VERSION -DBUILD_SHARED_LIBS:BOOL=ON -DLIBROMFS_RESOURCE_LOCATION:PATH=$PWD/romfs -S. -Bbuild_shared &&
  wl-showstatus build &&
  ninja -Cbuild_static &&
  wl-showstatus build &&
@@ -45,8 +72,8 @@ mkdir -p build_static build_shared &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
  cp -rf lib/include/* $INSTALLPREFIX/include/ &&
- cp -f build_static/lib/libromfs.a $INSTALLPREFIX/lib/ &&
- cp -f build_shared/lib/liblibromfs.dll.a $INSTALLPREFIX/lib/libromfs.dll.a &&
+ cp -f build_static/lib/libromfs*.a $INSTALLPREFIX/lib/libromfs.a &&
+ cp -f build_shared/lib/liblibromfs*.dll.a $INSTALLPREFIX/lib/libromfs.dll.a &&
  cp -f build_shared/lib/*.dll $INSTALLPREFIX/bin/ &&
  #cp -f build_shared/lib/*.exe $INSTALLPREFIX/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
