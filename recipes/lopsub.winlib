@@ -1,0 +1,71 @@
+export NAME="lopsub"
+export STATUS=
+export URL=http://people.tuebingen.mpg.de/maan/lopsub/
+export BASENAME=lopsub
+export DESCRIPTION="Lopsub is an open source library written in C which aims to ease the task of creating, documenting and parsing the options of Unix command line utilities. It is suitable for simple commands as well as complex command line utilities with many subcommands where each subcommand has its own set of options. Options and documentation are kept together in a single file which can be translated to C code (to be included in the application), or to a manual page. The library supports single-character short options and GNU-style long options. The public API is well documented and stable."
+export CATEGORY=development
+export TYPE=library
+export VERSION=1.0.3
+export VERSIONDATE=20230215
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=README
+export LICENSETYPE=LGPL/GPL
+export DOWNLOADURL="http://git.tuebingen.mpg.de/?p=lopsub.git;a=tags ?p=lopsub.git;a=log;h=refs/tags/v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL="http://git.tuebingen.mpg.de/?p=lopsub.git;a=snapshot;h=4c30a6db6496718d999065e104fbf2f5a8f5bfbc;sf=tgz"
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+mv -f $TARBALLDIR/$BASENAME/*=tgz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/lopsub-*
+# fix Makefile (version >= 1.0.3)
+patch -ulbf Makefile << EOF
+@@ -27,2 +27,7 @@
+ MAJOR_VERSION := \$(firstword \$(subst ., , \$(PLAIN_VERSION)))
++ifeq (\$(OS),Windows_NT)
++STATICLIB := liblopsub.a
++SHAREDLIB := liblopsub.dll.a
++REALNAME := liblopsub.dll
++else
+ SONAME := liblopsub.so.\$(MAJOR_VERSION)
+@@ -30,2 +35,3 @@
+ LINKERNAME:=liblopsub.so
++endif
+
+@@ -87,3 +93,8 @@
+ \$(REALNAME): \$(liblopsub_objs)
+-$(echo -e '\t')\$(CC) --shared -Wl,-soname,liblopsub.so.\$(MAJOR_VERSION) -o \$@ \$^
++ifeq (\$(OS),Windows_NT)
++$(echo -e '\t')\$(AR) cr \$(STATICLIB) \$^
++$(echo -e '\t')\$(CC) -s --shared -Wl,--out-implib,\$(SHAREDLIB) -o \$@ \$^
++else
++$(echo -e '\t')\$(CC) --shared -Wl,-soname,\$(SONAME) -o \$@ \$^
++endif
+ lopsubex: \$(lopsubex_objs) \$(REALNAME)
+@@ -111,2 +122,7 @@
+$(echo -e '\t')$(echo -e '\t')  \$(DESTDIR)\$(PREFIX)/share/man/man7 \$(DESTDIR)\$(PREFIX)/bin
++ifeq (\$(OS),Windows_NT)
++$(echo -e '\t')\$(INSTALL) -m 644 \$(STATICLIB) \$(DESTDIR)\$(PREFIX)/lib
++$(echo -e '\t')\$(INSTALL) -m 644 \$(SHAREDLIB) \$(DESTDIR)\$(PREFIX)/lib
++$(echo -e '\t')\$(INSTALL) -m 644 \$(REALNAME) \$(DESTDIR)\$(PREFIX)/bin
++else
+$(echo -e '\t') \$(INSTALL) -m 644 \$(REALNAME) \$(DESTDIR)\$(PREFIX)/lib
+@@ -114,2 +130,3 @@
+$(echo -e '\t') \$(LN) -s \$(SONAME) \$(DESTDIR)\$(PREFIX)/lib/\$(LINKERNAME)
++endif
+$(echo -e '\t') \$(INSTALL) -m 755 lopsubgen \$(DESTDIR)\$(PREFIX)/bin
+EOF
+wl-showstatus build-install &&
+ make install CC=${CC:-gcc} CXX=${CXX:-g++} LD=${LD:-ld} AR=${AR:-ar} PREFIX=$INSTALLPREFIX &&
+ ${STRIP:-strip} $INSTALLPREFIX/bin/*.{dll,exe} &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
