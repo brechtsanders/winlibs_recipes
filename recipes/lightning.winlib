@@ -35,6 +35,35 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing sysconf(_SC_PAGE_SIZE) on Windows on ARM in lib/jit_aarch64.c (version >= 2.2.1)
+patch -ulbf lib/jit_aarch64.c << EOF
+@@ -1974,2 +1974,6 @@
+
++#ifdef _WIN32
++#include <windows.h>
++#endif
++
+ void
+@@ -1980,3 +1984,9 @@
+
++#ifdef _WIN32
++    SYSTEM_INFO sysinfo;
++    GetSystemInfo(&sysinfo);
++    f = sysinfo.dwPageSize;
++#else
+     s = sysconf(_SC_PAGE_SIZE);
++#endif
+     f = (jit_word_t)fptr & -s;
+EOF
+# fix undefined mprotect on Windows on ARM in lib/lightning.c (version >= 2.2.1)
+patch -ulbf lib/lightning.c << EOF
+@@ -21,2 +21,5 @@
+ #include <lightning/jit_private.h>
++#if defined(__MINGW32__) && defined(__aarch64__)
++#undef HAVE_MMAP
++#endif
+ #if HAVE_MMAP
+EOF
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman -lz" &&
  # fix building DLLs
@@ -42,7 +71,8 @@ wl-showstatus configure &&
  # fix detection of shared libraries
  sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
- make install-strip &&
+ #make install-strip &&
+ ( make install-strip || ( make install && ${STRIP:-strip} $INSTALLPREFIX/bin/*.dll )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 

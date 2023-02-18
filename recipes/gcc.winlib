@@ -1162,26 +1162,29 @@ export INSTALLPREFIX=$(pwd)/inst_$BASENAME-$VERSION
 rm -rf $INSTALLPREFIX &&
 mkdir -p $INSTALLPREFIX/$ROOTFOLDER/bin $INSTALLPREFIX/$ROOTFOLDER/lib $INSTALLPREFIX/$ROOTFOLDER/include $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM &&
 echo [Generate version information] &&
+(
 cat > $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 winlibs personal build version $VERSION
 
 This is the winlibs if ( echo $RUNPLATFORM | grep -q "aarch64" ); then echo "ARM64"; else echo "$BITS-bit"; fi standalone build of:
 EOF
+) &&
 if [ "0$WITH_GCC" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - GCC $GCCVER
 EOF
-fi
+fi &&
 if [ "0$WITH_GDB" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - GDB $(PYTHONHOME=$MINGWPREFIX/share/python PATH=$MINGWPREFIX/share/python/bin:$PATH $MINGWPREFIX/share/gdb/bin/gdb.exe --version|head -n1|sed -e "s/^.*) \([0-9][0-9. ]*\)$/\1/")
 EOF
-fi
+fi &&
 if [ "0$WITH_LLVM" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - LLVM/Clang/LLD/LLDB $($MINGWPREFIX/share/llvm/bin/clang.exe --version|head -n1|sed -e "s/^.* \([0-9][0-9.]*\)\s*$/\1/")
 EOF
-fi
+fi &&
+(
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - MinGW-w64 $MINGW64VER (linked with $(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "ucrt"; else echo -n "msvcrt"; fi))
 - GNU Binutils $($MINGWPREFIX/share/binutils/bin/dlltool.exe --version|head -n1|sed -e "s/^.*) \([0-9][0-9. ]*\)$/\1/")
@@ -1189,41 +1192,44 @@ cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - PExports $($MINGWPREFIX/bin/pexports.exe|head -n1|sed -e "s/^PExports //; s/ *;.*$//")
 - dos2unix $($MINGWPREFIX/bin/dos2unix.exe --version|head -n1|sed -e "s/^dos2unix //; s/ (.*$//")
 EOF
+) &&
 if [ "0$WITH_ASM" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - Yasm $($MINGWPREFIX/bin/yasm.exe --version|head -n1|sed -e "s/^yasm //")
 - NASM $($MINGWPREFIX/bin/nasm.exe --version|head -n1|sed -e "s/^NASM version //; s/ .*$//")
 - JWasm $($MINGWPREFIX/bin/jwasm.exe --version|head -n1|sed -e "s/^JWasm v*//; s/,* .*$//")
 EOF
-fi
+fi &&
 if [ "0$WITH_CCACHE" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - ccache $($MINGWPREFIX/bin/ccache.exe --version|head -n1|sed -e "s/^ccache //")
 EOF
-fi
+fi &&
 if [ "0$WITH_CMAKE" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - CMake $($MINGWPREFIX/bin/cmake.exe --version|head -n1|sed -ne "s/^.* version //p")
 EOF
-fi
+fi &&
 if [ "0$WITH_NINJA" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - ninja $($MINGWPREFIX/bin/ninja.exe --version)
 EOF
-fi
+fi &&
 if [ "0$WITH_DOXYGEN" -ne 0 ]; then
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - doxygen $($MINGWPREFIX/bin/doxygen.exe --version)
 EOF
-fi
+fi &&
+(
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 
 This build was compiled with $(if ${CC:-gcc} --version|grep -q clang; then echo "LLVM"; else echo "GCC"; fi) $(${CC:-gcc} --version|head -n1|sed -e "s/^clang version //"|sed -e "s/ ([a-z ]*)$//"|sed -e "s/^.*) \([0-9][0-9. ]*\)$/\1/"|sed -e "s/ /-snapshot/") and packaged on $(date +"%Y-%m-%d").
 
 Please check out http://winlibs.com/ for the latest personal build.
 EOF
+) &&
 $MINGWPREFIX/bin/unix2dos.exe < $INSTALLPREFIX/$ROOTFOLDER/version_info > $INSTALLPREFIX/$ROOTFOLDER/version_info.txt &&
-rm -f $INSTALLPREFIX/$ROOTFOLDER/version_info
+rm -f $INSTALLPREFIX/$ROOTFOLDER/version_info &&
 echo [Copying binutils] &&
 cp -r -i $MINGWPREFIX/share/binutils/* $INSTALLPREFIX/$ROOTFOLDER/ &&
 #copypedeps -r -n $MINGWPREFIX/share/binutils/bin/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
@@ -1312,8 +1318,9 @@ fi &&
 echo [Copying iconv] &&
 cp -i $MINGWPREFIX/bin/iconv.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
 echo [Copying dependancies] &&
-PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/bin/*.dll $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
-PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/bin/*.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
+#PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/bin/*.dll $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
+#PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/bin/*.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
+PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/bin/ $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
 if [ "0$WITH_GCC" -ne 0 ]; then
  copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/libexec/gcc/$RUNPLATFORM/$(echo $GCCVER|sed -e "s/-.*$//")/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/libexec/gcc/$RUNPLATFORM/$(echo $GCCVER|sed -e "s/-.*$//")/ &>/dev/null
 fi &&
