@@ -1132,7 +1132,7 @@ export BASENAME=winlibs-$(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "gcc-"; fi)$(i
 #export DEPENDENCIES=gcc,gdb,mingw-w64,binutils,make,pexports,dos2unix
 #export DEPENDENCIES=gcc,mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm,lld,clang,compiler-rt,lldb,libunwind,clang-tools-extra"; fi)
 #export DEPENDENCIES=gcc,mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm,lld,clang,compiler-rt,lldb,libunwind,clang-tools-extra"; fi)$(if [ "0$WITH_GCC_OFFLOAD" -ne 0 ]; then echo -n ",gcc-offload-nvptx,nvptx-gcc"; fi)
-export DEPENDENCIES=gcc,mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_CMAKE" -ne 0 ]; then echo -n ",cmake"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm-project,lldb-mi"; fi)$(if [ "0$WITH_GCC_OFFLOAD" -ne 0 ]; then echo -n ",gcc-offload-nvptx,nvptx-gcc"; fi)$(if [ "0$WITH_NINJA" -ne 0 ]; then echo -n ",ninja"; fi)$(if [ "0$WITH_DOXYGEN" -ne 0 ]; then echo -n ",doxygen"; fi)
+export DEPENDENCIES=$(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "gcc,"; fi)mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_CMAKE" -ne 0 ]; then echo -n ",cmake"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm-project,lldb-mi"; fi)$(if [ "0$WITH_GCC_OFFLOAD" -ne 0 ]; then echo -n ",gcc-offload-nvptx,nvptx-gcc"; fi)$(if [ "0$WITH_NINJA" -ne 0 ]; then echo -n ",ninja"; fi)$(if [ "0$WITH_DOXYGEN" -ne 0 ]; then echo -n ",doxygen"; fi)
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=pedeps
 export OPTIONALBUILDDEPENDENCIES=
@@ -1154,34 +1154,35 @@ fi
 #MINGW64VER=$(echo -e "#include <stdio.h>\nint main() {\nprintf(\"%i.%i.%i\", __MINGW64_VERSION_MAJOR, __MINGW64_VERSION_MINOR, __MINGW64_VERSION_BUGFIX);\nreturn 0;\n}" | gcc -xc -mconsole -I$MINGWPREFIX/share/mingw-w64/include - -otest_ver.exe && test_ver.exe && rm -f test_ver.exe)
 MINGW64VER=$(sed -ne "s/^#define __MINGW64_VERSION_MAJOR\s*//p" $MINGWPREFIX/share/mingw-w64/include/_mingw_mac.h).$(sed -ne "s/^#define __MINGW64_VERSION_MINOR\s*//p" $MINGWPREFIX/share/mingw-w64/include/_mingw_mac.h).$(sed -ne "s/^#define __MINGW64_VERSION_BUGFIX\s*//p" $MINGWPREFIX/share/mingw-w64/include/_mingw_mac.h)
 ARCH=$(echo $RUNPLATFORM | sed -e "s/-.*$//")
-BITS=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi)
+BITS=$(if ( echo $RUNPLATFORM | grep -q "x86_64\|aarch64" ); then echo 64; else echo 32; fi)
+ROOTFOLDER=mingw$(if ( echo $RUNPLATFORM | grep -q "aarch64" ); then echo "ARM64"; else echo "$BITS"; fi)
 export BASENAME=winlibs-$ARCH$(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "-$GCCTHREADS-$GCCEH"; fi)
 export VERSION=$(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "gcc-$GCCVER-"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n "llvm-$CLANGVER-"; fi)mingw-w64$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "ucrt"; else echo -n "msvcrt"; fi)-$MINGW64VER-r$RELEASE
 export INSTALLPREFIX=$(pwd)/inst_$BASENAME-$VERSION
 rm -rf $INSTALLPREFIX &&
-mkdir -p $INSTALLPREFIX/mingw$BITS/bin $INSTALLPREFIX/mingw$BITS/lib $INSTALLPREFIX/mingw$BITS/include $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM &&
+mkdir -p $INSTALLPREFIX/$ROOTFOLDER/bin $INSTALLPREFIX/$ROOTFOLDER/lib $INSTALLPREFIX/$ROOTFOLDER/include $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM &&
 echo [Generate version information] &&
-cat > $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat > $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 winlibs personal build version $VERSION
 
-This is the winlibs $BITS-bit standalone build of:
+This is the winlibs if ( echo $RUNPLATFORM | grep -q "aarch64" ); then echo "ARM64"; else echo "$BITS-bit"; fi standalone build of:
 EOF
 if [ "0$WITH_GCC" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - GCC $GCCVER
 EOF
 fi
 if [ "0$WITH_GDB" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - GDB $(PYTHONHOME=$MINGWPREFIX/share/python PATH=$MINGWPREFIX/share/python/bin:$PATH $MINGWPREFIX/share/gdb/bin/gdb.exe --version|head -n1|sed -e "s/^.*) \([0-9][0-9. ]*\)$/\1/")
 EOF
 fi
 if [ "0$WITH_LLVM" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - LLVM/Clang/LLD/LLDB $($MINGWPREFIX/share/llvm/bin/clang.exe --version|head -n1|sed -e "s/^.* \([0-9][0-9.]*\)\s*$/\1/")
 EOF
 fi
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - MinGW-w64 $MINGW64VER (linked with $(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "ucrt"; else echo -n "msvcrt"; fi))
 - GNU Binutils $($MINGWPREFIX/share/binutils/bin/dlltool.exe --version|head -n1|sed -e "s/^.*) \([0-9][0-9. ]*\)$/\1/")
 - GNU Make $($MINGWPREFIX/share/make/bin/mingw32-make.exe --version|head -n1|sed -e "s/^.* \([0-9][0-9. ]*\)$/\1/")
@@ -1189,161 +1190,161 @@ cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
 - dos2unix $($MINGWPREFIX/bin/dos2unix.exe --version|head -n1|sed -e "s/^dos2unix //; s/ (.*$//")
 EOF
 if [ "0$WITH_ASM" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - Yasm $($MINGWPREFIX/bin/yasm.exe --version|head -n1|sed -e "s/^yasm //")
 - NASM $($MINGWPREFIX/bin/nasm.exe --version|head -n1|sed -e "s/^NASM version //; s/ .*$//")
 - JWasm $($MINGWPREFIX/bin/jwasm.exe --version|head -n1|sed -e "s/^JWasm v*//; s/,* .*$//")
 EOF
 fi
 if [ "0$WITH_CCACHE" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - ccache $($MINGWPREFIX/bin/ccache.exe --version|head -n1|sed -e "s/^ccache //")
 EOF
 fi
 if [ "0$WITH_CMAKE" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - CMake $($MINGWPREFIX/bin/cmake.exe --version|head -n1|sed -ne "s/^.* version //p")
 EOF
 fi
 if [ "0$WITH_NINJA" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - ninja $($MINGWPREFIX/bin/ninja.exe --version)
 EOF
 fi
 if [ "0$WITH_DOXYGEN" -ne 0 ]; then
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - doxygen $($MINGWPREFIX/bin/doxygen.exe --version)
 EOF
 fi
-cat >> $INSTALLPREFIX/mingw$BITS/version_info << EOF
+cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 
 This build was compiled with GCC $(gcc.exe --version|head -n1|sed -e "s/ ([a-z]*)$//"|sed -e "s/^.*) \([0-9][0-9. ]*\)$/\1/"|sed -e "s/ /-snapshot/") and packaged on $(date +"%Y-%m-%d").
 
 Please check out http://winlibs.com/ for the latest personal build.
 EOF
-$MINGWPREFIX/bin/unix2dos.exe < $INSTALLPREFIX/mingw$BITS/version_info > $INSTALLPREFIX/mingw$BITS/version_info.txt &&
-rm -f $INSTALLPREFIX/mingw$BITS/version_info
+$MINGWPREFIX/bin/unix2dos.exe < $INSTALLPREFIX/$ROOTFOLDER/version_info > $INSTALLPREFIX/$ROOTFOLDER/version_info.txt &&
+rm -f $INSTALLPREFIX/$ROOTFOLDER/version_info
 echo [Copying binutils] &&
-cp -r -i $MINGWPREFIX/share/binutils/* $INSTALLPREFIX/mingw$BITS/ &&
-#copypedeps -r -n $MINGWPREFIX/share/binutils/bin/*.{dll,exe} $INSTALLPREFIX/mingw$BITS/bin/ &>/dev/null &&
-#copypedeps -r -n $MINGWPREFIX/share/binutils/$RUNPLATFORM/bin/*.{dll,exe} $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/bin/ &>/dev/null &&
+cp -r -i $MINGWPREFIX/share/binutils/* $INSTALLPREFIX/$ROOTFOLDER/ &&
+#copypedeps -r -n $MINGWPREFIX/share/binutils/bin/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
+#copypedeps -r -n $MINGWPREFIX/share/binutils/$RUNPLATFORM/bin/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/bin/ &>/dev/null &&
 # remove binutils libiberty (use libiberty from gcc)
-rm -rf $INSTALLPREFIX/mingw$BITS/include/libiberty &&
-rm -f $INSTALLPREFIX/mingw$BITS/lib/libiberty.a &&
+rm -rf $INSTALLPREFIX/$ROOTFOLDER/include/libiberty &&
+rm -f $INSTALLPREFIX/$ROOTFOLDER/lib/libiberty.a &&
 # fix issue where libdep.dll.a is loaded instead of libdep.dll, see: https://sourceware.org/bugzilla/show_bug.cgi?id=27113
-rm -f $INSTALLPREFIX/mingw$BITS/lib/bfd-plugins/*.a &&
-rm -f $INSTALLPREFIX/mingw$BITS/share/info/dir &&
+rm -f $INSTALLPREFIX/$ROOTFOLDER/lib/bfd-plugins/*.a &&
+rm -f $INSTALLPREFIX/$ROOTFOLDER/share/info/dir &&
 echo [Copying make] &&
-cp -r -i $MINGWPREFIX/share/make/* $INSTALLPREFIX/mingw$BITS/ &&
-#cp -i $MINGWPREFIX/share/make/bin/mingw32-make.exe $INSTALLPREFIX/mingw$BITS/bin/make.exe &&
-#copypedeps -r -n $MINGWPREFIX/share/make/bin/*.{dll,exe} $INSTALLPREFIX/mingw$BITS/bin/ &&
-rm -f $INSTALLPREFIX/mingw$BITS/share/info/dir &&
+cp -r -i $MINGWPREFIX/share/make/* $INSTALLPREFIX/$ROOTFOLDER/ &&
+#cp -i $MINGWPREFIX/share/make/bin/mingw32-make.exe $INSTALLPREFIX/$ROOTFOLDER/bin/make.exe &&
+#copypedeps -r -n $MINGWPREFIX/share/make/bin/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
+rm -f $INSTALLPREFIX/$ROOTFOLDER/share/info/dir &&
 echo [Copying pexports] &&
-copypedeps -r -n $MINGWPREFIX/bin/pexports.exe $INSTALLPREFIX/mingw$BITS/bin/ &>/dev/null &&
+copypedeps -r -n $MINGWPREFIX/bin/pexports.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
 echo [Copying dos2unix/unix2dos] &&
-copypedeps -r -n $MINGWPREFIX/bin/dos2unix.exe $MINGWPREFIX/bin/unix2dos.exe $MINGWPREFIX/bin/mac2unix.exe $MINGWPREFIX/bin/unix2mac.exe $INSTALLPREFIX/mingw$BITS/bin/ &>/dev/null &&
+copypedeps -r -n $MINGWPREFIX/bin/dos2unix.exe $MINGWPREFIX/bin/unix2dos.exe $MINGWPREFIX/bin/mac2unix.exe $MINGWPREFIX/bin/unix2mac.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
 if [ "0$WITH_GDB" -ne 0 ]; then
  echo [Copying gdb] &&
- #cp -r -i $MINGWPREFIX/share/gdb/* $INSTALLPREFIX/mingw$BITS/ &&
- #cp -r -i $MINGWPREFIX/share/gdb/{bin,include} $INSTALLPREFIX/mingw$BITS/ &&
- cp -r -i $MINGWPREFIX/share/gdb/bin $INSTALLPREFIX/mingw$BITS/ &&
- #cp -r -i $MINGWPREFIX/share/gdb/{syscalls,system-gdbinit} $INSTALLPREFIX/mingw$BITS/share/ &&
- mkdir -p $INSTALLPREFIX/mingw$BITS/share/gdb &&
- cp -rf $MINGWPREFIX/share/gdb/share/gdb/* $INSTALLPREFIX/mingw$BITS/share/gdb/
+ #cp -r -i $MINGWPREFIX/share/gdb/* $INSTALLPREFIX/$ROOTFOLDER/ &&
+ #cp -r -i $MINGWPREFIX/share/gdb/{bin,include} $INSTALLPREFIX/$ROOTFOLDER/ &&
+ cp -r -i $MINGWPREFIX/share/gdb/bin $INSTALLPREFIX/$ROOTFOLDER/ &&
+ #cp -r -i $MINGWPREFIX/share/gdb/{syscalls,system-gdbinit} $INSTALLPREFIX/$ROOTFOLDER/share/ &&
+ mkdir -p $INSTALLPREFIX/$ROOTFOLDER/share/gdb &&
+ cp -rf $MINGWPREFIX/share/gdb/share/gdb/* $INSTALLPREFIX/$ROOTFOLDER/share/gdb/
 fi &&
 echo [Copying mingw-w64] &&
-cp -f $MINGWPREFIX/share/mingw-w64/bin/*.{dll,exe} $INSTALLPREFIX/mingw$BITS/bin/ &&
-cp -r -i $MINGWPREFIX/share/mingw-w64/{lib,include} $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/ &&
-mv -i $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/lib/libmangle.a $INSTALLPREFIX/mingw$BITS/lib/ &&
-mv -i $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/include/libmangle.h $INSTALLPREFIX/mingw$BITS/include/ &&
+cp -f $MINGWPREFIX/share/mingw-w64/bin/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
+cp -r -i $MINGWPREFIX/share/mingw-w64/{lib,include} $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/ &&
+mv -i $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/lib/libmangle.a $INSTALLPREFIX/$ROOTFOLDER/lib/ &&
+mv -i $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/include/libmangle.h $INSTALLPREFIX/$ROOTFOLDER/include/ &&
 if [ "0$WITH_GCC" -ne 0 ]; then
  echo [Copying gcc] &&
- cp -rf $MINGWPREFIX/share/gcc/* $INSTALLPREFIX/mingw$BITS/ &&
- rm -f $INSTALLPREFIX/mingw$BITS/share/info/dir &&
+ cp -rf $MINGWPREFIX/share/gcc/* $INSTALLPREFIX/$ROOTFOLDER/ &&
+ rm -f $INSTALLPREFIX/$ROOTFOLDER/share/info/dir &&
  # manually copy libdl library archives
  ####see also: https://github.com/brechtsanders/winlibs_mingw/issues/62
- #cp -u $MINGWPREFIX/lib/libdl.a $MINGWPREFIX/lib/libdl.dll.a $INSTALLPREFIX/mingw$BITS/lib/ &&
- cp -u $MINGWPREFIX/lib/libdl.a $MINGWPREFIX/lib/libdl.dll.a $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/lib/ &&
+ #cp -u $MINGWPREFIX/lib/libdl.a $MINGWPREFIX/lib/libdl.dll.a $INSTALLPREFIX/$ROOTFOLDER/lib/ &&
+ cp -u $MINGWPREFIX/lib/libdl.a $MINGWPREFIX/lib/libdl.dll.a $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/lib/ &&
  # manually copy libmcfgthread library archives
  if [ "$($MINGWPREFIX/share/gcc/bin/gcc.exe -v 2>&1|sed -ne "s/^Thread model: //p")" == "mcf" ]; then
-  mkdir -p $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/include/mcfgthread &&
-  cp -rf $MINGWPREFIX/include/mcfgthread/* $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/include/mcfgthread/ &&
-  cp -f $MINGWPREFIX/lib/libmcfgthread.a $MINGWPREFIX/lib/libmcfgthread.dll.a $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/lib/
+  mkdir -p $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/include/mcfgthread &&
+  cp -rf $MINGWPREFIX/include/mcfgthread/* $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/include/mcfgthread/ &&
+  cp -f $MINGWPREFIX/lib/libmcfgthread.a $MINGWPREFIX/lib/libmcfgthread.dll.a $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/lib/
  fi
 fi &&
 if [ "0$WITH_ASM" -ne 0 ]; then
  echo [Copying yasm] &&
- cp -i $MINGWPREFIX/bin/vsyasm.exe $MINGWPREFIX/bin/yasm.exe $MINGWPREFIX/bin/ytasm.exe $INSTALLPREFIX/mingw$BITS/bin/ &&
- cp -ri $MINGWPREFIX/lib/libyasm*.a $INSTALLPREFIX/mingw$BITS/lib/ &&
- cp -ri $MINGWPREFIX/include/libyasm* $INSTALLPREFIX/mingw$BITS/include/ &&
+ cp -i $MINGWPREFIX/bin/vsyasm.exe $MINGWPREFIX/bin/yasm.exe $MINGWPREFIX/bin/ytasm.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
+ cp -ri $MINGWPREFIX/lib/libyasm*.a $INSTALLPREFIX/$ROOTFOLDER/lib/ &&
+ cp -ri $MINGWPREFIX/include/libyasm* $INSTALLPREFIX/$ROOTFOLDER/include/ &&
  echo [Copying nasm] &&
- cp -i $MINGWPREFIX/bin/nasm.exe $MINGWPREFIX/bin/ndisasm.exe $INSTALLPREFIX/mingw$BITS/bin/ &&
+ cp -i $MINGWPREFIX/bin/nasm.exe $MINGWPREFIX/bin/ndisasm.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
  echo [Copying jwasm] &&
- cp -i $MINGWPREFIX/bin/jwasm.exe $INSTALLPREFIX/mingw$BITS/bin/
+ cp -i $MINGWPREFIX/bin/jwasm.exe $INSTALLPREFIX/$ROOTFOLDER/bin/
 fi &&
 if [ "0$WITH_CCACHE" -ne 0 ]; then
  echo [Copying ccache] &&
- cp -i $MINGWPREFIX/bin/ccache.exe $INSTALLPREFIX/mingw$BITS/bin/
+ cp -i $MINGWPREFIX/bin/ccache.exe $INSTALLPREFIX/$ROOTFOLDER/bin/
 fi &&
 if [ "0$WITH_CMAKE" -ne 0 ]; then
  echo [Copying cmake] &&
- cp -i $MINGWPREFIX/bin/{cmake,cmcldeps,cpack,ctest}.exe $INSTALLPREFIX/mingw$BITS/bin/ &&
- mkdir -p $INSTALLPREFIX/mingw$BITS/share &&
- cp -rf $MINGWPREFIX/share/cmake-$(cmake --version|head -n1|sed -ne "s/^.* version \([0-9]*\.[0-9]*\).*$/\1/p") $INSTALLPREFIX/mingw$BITS/share/
+ cp -i $MINGWPREFIX/bin/{cmake,cmcldeps,cpack,ctest}.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
+ mkdir -p $INSTALLPREFIX/$ROOTFOLDER/share &&
+ cp -rf $MINGWPREFIX/share/cmake-$(cmake --version|head -n1|sed -ne "s/^.* version \([0-9]*\.[0-9]*\).*$/\1/p") $INSTALLPREFIX/$ROOTFOLDER/share/
 fi &&
 if [ "0$WITH_LLVM" -ne 0 ]; then
  echo [Copying llvm] &&
- cp -ri $MINGWPREFIX/share/llvm/{bin,libexec,share} $INSTALLPREFIX/mingw$BITS/ &&
- mkdir -p $INSTALLPREFIX/mingw$BITS/lib &&
- cp -ri $(find $MINGWPREFIX/share/llvm/lib/* -prune -type d) $INSTALLPREFIX/mingw$BITS/lib/
+ cp -ri $MINGWPREFIX/share/llvm/{bin,libexec,share} $INSTALLPREFIX/$ROOTFOLDER/ &&
+ mkdir -p $INSTALLPREFIX/$ROOTFOLDER/lib &&
+ cp -ri $(find $MINGWPREFIX/share/llvm/lib/* -prune -type d) $INSTALLPREFIX/$ROOTFOLDER/lib/
 fi &&
 if [ "0$WITH_GCC_OFFLOAD" -ne 0 ]; then
  echo [Copying nvptx-tools] &&
- cp -ri $MINGWPREFIX/share/nvptx-gcc/{bin,include,nvptx-none} $INSTALLPREFIX/mingw$BITS/ &&
- cp -rn $MINGWPREFIX/share/nvptx-gcc/{lib,libexec} $INSTALLPREFIX/mingw$BITS/
+ cp -ri $MINGWPREFIX/share/nvptx-gcc/{bin,include,nvptx-none} $INSTALLPREFIX/$ROOTFOLDER/ &&
+ cp -rn $MINGWPREFIX/share/nvptx-gcc/{lib,libexec} $INSTALLPREFIX/$ROOTFOLDER/
 fi &&
 if [ "0$WITH_GCC_TARGET_AVR" -ne 0 ]; then
  echo [Copying files for target AVR] &&
- cp -ri $MINGWPREFIX/share/avr-binutils/{bin,$RUNPLATFORM} $INSTALLPREFIX/mingw$BITS/ &&
- cp -ri $MINGWPREFIX/share/avr-gcc/{bin,include} $INSTALLPREFIX/mingw$BITS/ &&
- cp -rn $MINGWPREFIX/share/avr-gcc/{lib,libexec} $INSTALLPREFIX/mingw$BITS/
+ cp -ri $MINGWPREFIX/share/avr-binutils/{bin,$RUNPLATFORM} $INSTALLPREFIX/$ROOTFOLDER/ &&
+ cp -ri $MINGWPREFIX/share/avr-gcc/{bin,include} $INSTALLPREFIX/$ROOTFOLDER/ &&
+ cp -rn $MINGWPREFIX/share/avr-gcc/{lib,libexec} $INSTALLPREFIX/$ROOTFOLDER/
 fi &&
 echo [Copying iconv] &&
-cp -i $MINGWPREFIX/bin/iconv.exe $INSTALLPREFIX/mingw$BITS/bin/ &&
+cp -i $MINGWPREFIX/bin/iconv.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
 echo [Copying dependancies] &&
-PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/mingw$BITS/bin/*.dll $INSTALLPREFIX/mingw$BITS/bin/ &>/dev/null &&
-PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/mingw$BITS/bin/*.exe $INSTALLPREFIX/mingw$BITS/bin/ &>/dev/null &&
+PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/bin/*.dll $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
+PATH=$MINGWPREFIX/share/python/bin:$PATH copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/bin/*.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
 if [ "0$WITH_GCC" -ne 0 ]; then
- copypedeps -r -n $INSTALLPREFIX/mingw$BITS/libexec/gcc/$RUNPLATFORM/$(echo $GCCVER|sed -e "s/-.*$//")/*.{dll,exe} $INSTALLPREFIX/mingw$BITS/libexec/gcc/$RUNPLATFORM/$(echo $GCCVER|sed -e "s/-.*$//")/ &>/dev/null
+ copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/libexec/gcc/$RUNPLATFORM/$(echo $GCCVER|sed -e "s/-.*$//")/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/libexec/gcc/$RUNPLATFORM/$(echo $GCCVER|sed -e "s/-.*$//")/ &>/dev/null
 fi &&
-copypedeps -r -n $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/bin/*.{dll,exe} $INSTALLPREFIX/mingw$BITS/$RUNPLATFORM/bin/ &>/dev/null &&
-if ls -1 $INSTALLPREFIX/mingw$BITS/bin/libpython*.dll &>/dev/null; then
+copypedeps -r -n $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/bin/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/$RUNPLATFORM/bin/ &>/dev/null &&
+if ls -1 $INSTALLPREFIX/$ROOTFOLDER/bin/libpython*.dll &>/dev/null; then
  echo [Copying Python components] &&
- #copypedeps -r -n $MINGWPREFIX/share/python/bin/*.{dll,exe} $INSTALLPREFIX/mingw$BITS/bin/ &&
- cp -rf $MINGWPREFIX/share/python/include/* $INSTALLPREFIX/mingw$BITS/include/ &&
- cp -rf $MINGWPREFIX/share/python/lib/* $INSTALLPREFIX/mingw$BITS/lib/ &&
- cp -rf $MINGWPREFIX/share/python/share/* $INSTALLPREFIX/mingw$BITS/share/ &&
+ #copypedeps -r -n $MINGWPREFIX/share/python/bin/*.{dll,exe} $INSTALLPREFIX/$ROOTFOLDER/bin/ &&
+ cp -rf $MINGWPREFIX/share/python/include/* $INSTALLPREFIX/$ROOTFOLDER/include/ &&
+ cp -rf $MINGWPREFIX/share/python/lib/* $INSTALLPREFIX/$ROOTFOLDER/lib/ &&
+ cp -rf $MINGWPREFIX/share/python/share/* $INSTALLPREFIX/$ROOTFOLDER/share/ &&
  find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh
 fi &&
 if [ "0$WITH_NINJA" -ne 0 ]; then
  echo [Copying Ninja] &&
- copypedeps -r -n $MINGWPREFIX/bin/ninja.exe $INSTALLPREFIX/mingw$BITS/bin/ &>/dev/null
+ copypedeps -r -n $MINGWPREFIX/bin/ninja.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null
 fi &&
 if [ "0$WITH_DOXYGEN" -ne 0 ]; then
  echo [Copying Doxygen] &&
- copypedeps -r -n $MINGWPREFIX/bin/doxygen.exe $INSTALLPREFIX/mingw$BITS/bin/ &>/dev/null
+ copypedeps -r -n $MINGWPREFIX/bin/doxygen.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null
 fi &&
 echo [Creating archives] &&
 pushd $INSTALLPREFIX &> /dev/null &&
 rm -f $PACKAGEDESTDIR/$BASENAME-$VERSION.7z &&
-"$SEVENZIP" a -r -mx9 -t7z $PACKAGEDESTDIR/$BASENAME-$VERSION.7z mingw$BITS &&
+"$SEVENZIP" a -r -mx9 -t7z $PACKAGEDESTDIR/$BASENAME-$VERSION.7z $ROOTFOLDER &&
 if [ "0$MAKE_CHECKSUMS" -ne 0 ]; then
  sha256sum $PACKAGEDESTDIR/$BASENAME-$VERSION.7z | sed -e 's?^\\??; s? .*[/\\]? ?' > $PACKAGEDESTDIR/$BASENAME-$VERSION.7z.sha256 &&
  sha512sum $PACKAGEDESTDIR/$BASENAME-$VERSION.7z | sed -e 's?^\\??; s? .*[/\\]? ?' > $PACKAGEDESTDIR/$BASENAME-$VERSION.7z.sha512
 fi &&
 if [ "0$MAKE_ZIP" -ne 0 ]; then
  rm -f $PACKAGEDESTDIR/$BASENAME-$VERSION.zip &&
- "$SEVENZIP" a -r -mx9 -tzip $PACKAGEDESTDIR/$BASENAME-$VERSION.zip mingw$BITS &&
+ "$SEVENZIP" a -r -mx9 -tzip $PACKAGEDESTDIR/$BASENAME-$VERSION.zip $ROOTFOLDER &&
  if [ "0$MAKE_CHECKSUMS" -ne 0 ]; then
   sha256sum $PACKAGEDESTDIR/$BASENAME-$VERSION.zip | sed -e 's?^\\??; s? .*[/\\]? ?' > $PACKAGEDESTDIR/$BASENAME-$VERSION.zip.sha256 &&
   sha512sum $PACKAGEDESTDIR/$BASENAME-$VERSION.zip | sed -e 's?^\\??; s? .*[/\\]? ?' > $PACKAGEDESTDIR/$BASENAME-$VERSION.zip.sha512
@@ -1353,8 +1354,8 @@ popd &> /dev/null &&
 echo [Archives created] &&
 echo "Release tag:   $(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "$GCCVER-"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n "$CLANGVER-"; fi)$MINGW64VER-$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "ucrt"; else echo -n "msvcrt"; fi)-r$RELEASE" &&
 echo "Release title: $(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "GCC $GCCVER + "; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n "LLVM $CLANGVER + "; fi)MinGW-w64 $MINGW64VER $(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "UCRT"; else echo -n "MSVCRT"; fi) (release $RELEASE)" &&
-echo [mingw$BITS/version_info.txt] &&
-cat $INSTALLPREFIX/mingw$BITS/version_info.txt &&
+echo [$ROOTFOLDER/version_info.txt] &&
+cat $INSTALLPREFIX/$ROOTFOLDER/version_info.txt &&
 (
 cat << EOF
 

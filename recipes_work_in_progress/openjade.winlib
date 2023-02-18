@@ -23,7 +23,7 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix spgrove/GroveApp.h (version >= 1.3.2)
+# fix spgrove/GroveApp.h
 patch -ulbf spgrove/GroveApp.h << EOF
 @@ -51,3 +51,3 @@
  {
@@ -31,7 +31,7 @@ patch -ulbf spgrove/GroveApp.h << EOF
 +  return os.write((void*)str.data(), str.size() * sizeof(OpenJade_Grove::GroveChar));
  }
 EOF
-# fix grove/Node.h (version >= 1.3.2)
+# fix grove/Node.h
 patch -ulbf grove/Node.h << EOF
 @@ -36,3 +36,3 @@
  #ifdef SP_MULTI_BYTE
@@ -39,14 +39,33 @@ patch -ulbf grove/Node.h << EOF
 +#if defined(SP_WCHAR_T_USHORT) || defined(_WIN32)
  typedef wchar_t GroveChar;
 EOF
+# fix msggen.pl
+#### see also: https://sourceforge.net/p/openjade/mailman/message/29467903/
+patch -ulbf msggen.pl << EOF
+@@ -6,2 +6,3 @@
+ use POSIX;
++use Getopt::Std;
+
+@@ -20,4 +21,3 @@
+ undef \$opt_t;
+-do 'getopts.pl';
+-&Getopts('l:p:t:');
++getopts('l:p:t:');
+ \$module = \$opt_l;
+EOF
+# fix undefined reference to WinMain
+echo "void WinMain () {}" >> grove/LocNode.cxx
 # fix location of OpenSP/config.h
 sed -i.bak -e "s/@SPINCLUDEDIR@/OpenSP/" include/config.h.in
 # fix detection of opensp
 sed -i.bak -e "s?/usr/local/include/OpenSP?$MINGWPREFIX/include/OpenSP?" configure
+sed -i.bak2 -e "s?-Wl,-e,'\$dll_entry'??" configure
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-std=c++98 -fpermissive" PERL=$PERLDIR/bin/perl.exe &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM PERL=$PERLDIR/bin/perl.exe CC=${CXX:-g++} CXXFLAGS="-std=c++98 -fpermissive" &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  # avoid wide strings
  echo "#undef SP_MULTI_BYTE" >> include/config.h &&
  wl-showstatus build &&

@@ -135,7 +135,7 @@ patch -ulbf src/headers/parigen.h << EOF
 
 EOF
 ## fix src/language/init.c for 64-bit (version <= 2.5.1)
-#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#if ( echo $RUNPLATFORM | grep -q "x86_64\|aarch64" ); then
 #patch -ulbf src/language/init.c << EOF
 #--- src/language/init.c  2012-01-26 17:26:14 +0100
 #+++ src/language/init.c  2012-06-14 11:44:50 +0200
@@ -149,7 +149,7 @@ EOF
 #EOF
 #fi
 ## fix src/language/init.c for 64-bit (version >= 2.5.2 <= 2.7.0)
-#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#if ( echo $RUNPLATFORM | grep -q "x86_64\|aarch64" ); then
 #patch -ulbf src/language/init.c << EOF
 #--- src/language/init.c  2012-01-26 17:26:14 +0100
 #+++ src/language/init.c 2012-08-06 14:23:16 +0200
@@ -163,7 +163,7 @@ EOF
 #EOF
 #fi
 # fix src/language/init.c for 64-bit (version >= 2.7.1)
-if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+if ( echo $RUNPLATFORM | grep -q "x86_64\|aarch64" ); then
 patch -ulbf src/language/init.c << EOF
 --- src/language/init.c  2014-05-10 19:59:30 +0200
 +++ src/language/init.c  2014-05-20 10:01:40 +0200
@@ -198,14 +198,13 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --with-fltk=none && 
  #./configure --prefix=$INSTALLPREFIX --graphic=win32 --with-readline --with-fltk=none && 
  #./configure --prefix=$INSTALLPREFIX --graphic=win32 --with-readline --with-fltk=none --graphic=win32 --with-readline --with-gmp &&
- ./configure --prefix=$INSTALLPREFIX --host=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "i686"; fi)-mingw --graphic=win32 --with-readline --with-fltk=none --graphic=win32 --with-readline --with-gmp &&
- sed -i.bak -e "s/^\(arch *= *\).*$/\1$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "x86_64"; else echo "i686"; fi)/; s/^\(osname *= *\).*/\1mingw/" config/objdir &&
+ ./configure --prefix=$INSTALLPREFIX --host=$(echo $RUNPLATFORM|sed -e "s/-.*$//")-mingw --graphic=win32 --with-readline --with-fltk=none --graphic=win32 --with-readline --with-gmp &&
+ sed -i.bak -e "s/^\(arch *= *\).*$/\1$(echo $RUNPLATFORM|sed -e "s/-.*$//")/; s/^\(osname *= *\).*/\1mingw/" config/objdir &&
  # avoid inline assembler on 64-bit (version >= 2.11.4)
- if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ if ( echo $RUNPLATFORM | grep -q "x86_64\|aarch64" ); then
   sed -i.bak -e "s/^\(ASMINLINE='\)yes/&no/" Omingw*/pari.cfg &&
   sed -i.bak -e "s/^#define ASMINLINE/\/\/&/" Omingw*/paricfg.h
  fi &&
- wl-showstatus build-install &&
  # fix configuration issues (version >= 2.7.0)
  (
 cat >> $(ls -1d O*mingw* 2> /dev/null||ls -1d O*msys*)/paricfg.h << EOF
@@ -221,12 +220,11 @@ cat >> $(ls -1d O*mingw* 2> /dev/null||ls -1d O*msys*)/paricfg.h << EOF
 #undef HAS_DLOPEN
 EOF
  ) &&
- mv $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile.bak && 
- sed -e "s?\(\$(INSTALL_PROGRAM) gp-sta\)?\1.exe?; s/-Wall//" $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile.bak > $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile &&
- #mv $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile.bak2 && 
- #sed -e "s?^\(OBJS *= *\)?\1../src/systems/mingw/mingw\$(_O) ?; s/-Wall//" $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile.bak2 > $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile &&
- mv $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile.bak3 && 
- sed -e "s/--export-dynamic/--export-all-symbols/" $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile.bak3 > $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile &&
+ sed -i.bak -e "s?\(\$(INSTALL_PROGRAM) gp-sta\)?\1.exe?; s/-Wall//" $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile &&
+ #sed -i.bak -e "s?^\(OBJS *= *\)?\1../src/systems/mingw/mingw\$(_O) ?; s/-Wall//" $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile &&
+ sed -i.bak -e "s/--export-dynamic/--export-all-symbols/" $(ls -1d O*mingw* O*msys* 2>/dev/null | tail -n1)/Makefile &&
+ wl-showstatus build-install &&
+ #RUNPTH= RUNPTH_FINAL=
  ( make -j1 all install DLLTOOL=dlltool || (
   mkdir -p $INSTALLPREFIX/bin/gp-`echo $VERSION|sed -e "s/\([0-9]*\)\.\([0-9]*\).*$/\1.\2/"` &&
   make -j1 all install DLLTOOL=dlltool

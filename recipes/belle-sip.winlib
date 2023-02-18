@@ -120,8 +120,10 @@ export TYPE=library
 #export VERSIONDATE=20230114
 #export VERSION=5.2.16
 #export VERSIONDATE=20230121
-export VERSION=5.2.21
-export VERSIONDATE=20230215
+#export VERSION=5.2.21
+#export VERSIONDATE=20230215
+export VERSION=5.2.23
+export VERSIONDATE=20230217
 ####cpp_utils.cc:(.text+0x161): undefined reference to `bctoolbox::RNG::cRandomize()'
 wl-showstatus --package-version
 export DEPENDENCIES=belr,bctoolbox
@@ -139,6 +141,37 @@ wl-wait4deps
 wl-showstatus extract
 tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION*
+# fix src/cpp_utils.cc (version >= 5.2.23)
+patch -ulbf src/cpp_utils.cc << EOF
+@@ -24,2 +24,5 @@
+ #include "bctoolbox/crypto.hh"
++#ifdef _WIN32
++#include <wincrypt.h>
++#endif
+
+@@ -29,3 +32,11 @@
+ unsigned char * belle_sip_random_bytes(unsigned char *ret, size_t size){
++#ifdef _WIN32
++       HCRYPTPROV prov;
++       if (!CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT))
++               return NULL;
++       CryptGenRandom(prov, size, ret);
++       CryptReleaseContext(prov, 0);
++#else
+        bctoolbox::RNG::cRandomize(ret, size);
++#endif
+        return ret;
+@@ -34,3 +45,9 @@
+ uint32_t belle_sip_random(void){
++#ifdef _WIN32
++       uint32_t result;
++       belle_sip_random_bytes((unsigned char*)result, sizeof(result));
++       return result;
++#else
+        return bctoolbox::RNG::cRandomize();
++#endif
+ }
+EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS:BOOL=OFF -S. -Bbuild_win &&
@@ -146,8 +179,7 @@ mkdir -p build_win &&
  #ninja -Cbuild_win &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION*
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION*
 
 
 
