@@ -1,0 +1,89 @@
+export NAME="LLVM Core"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-core
+export DESCRIPTION="The LLVM Compiler Infrastructure - The LLVM Core libraries provide a modern source- and target-independent optimizer, along with code generation support for many popular CPUs (as well as some less common ones!) These libraries are built around a well specified code representation known as the LLVM intermediate representation (\"LLVM IR\"). The LLVM Core libraries are well documented, and it is particularly easy to invent your own language (or port an existing compiler) to use LLVM as an optimizer and code generator."
+export CATEGORY=development
+export TYPE=application
+export VERSION=15.0.7
+export VERSIONDATE=20230219
+wl-showstatus --package-version
+export DEPENDENCIES=libxml2,wineditline,z3,libffi,zlib,zstd,libcurl,cpython-mingw
+export OPTIONALDEPENDENCIES=libpfm4
+export BUILDDEPENDENCIES=cmake,ninja,llvm-cmake
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ llvm-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$VERSION/llvm-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/llvm-$VERSION.src.tar.xz
+cd llvm-$VERSION.src
+# avoid z3 version detection issue (version >= 15.0.7)
+sed -i.bak -e "s/\(find_package(Z3 \)[0-9.]*/\1/" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ PATH=$MINGWPREFIX/share/python/bin:$PATH \
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DLLVM_BUILD_STATIC=OFF \
+  -DLIBCLANG_BUILD_STATIC:BOOL=OFF \
+  -DLLVM_LINK_LLVM_DYLIB:BOOL=OFF \
+  -DCLANG_LINK_CLANG_DYLIB:BOOL=OFF \
+  -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM \
+  -DLLVM_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM \
+  -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64;NVPTX;AMDGPU;WebAssembly" \
+  -DLLVM_RUNTIME_TARGETS=$RUNPLATFORM \
+  -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=OFF \
+  -DLLVM_ENABLE_THREADS:BOOL=ON \
+  -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) \
+  -DLLVM_ENABLE_RTTI:BOOL=ON \
+  -DLLVM_ENABLE_MODULES:BOOL=OFF \
+  -DLLVM_ENABLE_ASSERTIONS:BOOL=OFF \
+  -DLLVM_ENABLE_FFI:BOOL=ON \
+  -DLLVM_OPTIMIZED_TABLEGEN:BOOL=OFF \
+  -DLLVM_ENABLE_LIBXML2:BOOL=ON \
+  -DLLVM_ENABLE_THREADS:BOOL=ON \
+  -DLLVM_ENABLE_UNWIND_TABLES:BOOL=ON \
+  -DLLVM_ENABLE_CURL:BOOL=ON \
+  -DLLVM_ENABLE_Z3_SOLVER:BOOL=ON \
+  -DLLVM_INCLUDE_TOOLS:BOOL=ON \
+  -DLLVM_INCLUDE_UTILS:BOOL=ON \
+  -DLLVM_INSTALL_UTILS:BOOL=ON \
+  -DLLVM_ENABLE_TERMINFO:BOOL=OFF \
+  -DLLVM_ENABLE_LIBEDIT:BOOL=OFF \
+  -DLLVM_INCLUDE_DOCS:BOOL=OFF \
+  -DLLVM_ENABLE_SPHINX=OFF \
+  -DLLVM_ENABLE_DOXYGEN:BOOL=ON \
+  -DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
+  -DLLVM_INCLUDE_TESTS:BOOL=OFF \
+  -DLLVM_TOOL_LLVM_C_TEST_BUILD:BOOL=OFF \
+  -DLLVM_INCLUDE_EXAMPLES:BOOL=OFF \
+  -DLLVM_INCLUDE_BENCHMARKS:BOOL=OFF \
+  -DLLVM_BUILD_BENCHMARKS:BOOL=OFF \
+  -DLLVM_BUILD_TESTS:BOOL=OFF \
+  -DLLVM_TOOL_OPENMP_BUILD:BOOL=ON \
+  -DLLVM_TOOL_PARALLEL_LIBS_BUILD:BOOL=ON \
+  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+  -DCMAKE_CROSSCOMPILING:BOOL=OFF \
+  -S$PWD -Bbuild_win &&
+ #-DLLVM_EXTERNAL_PROJECT_BUILD_TOOL_ARGS:STRING="-DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules" \
+ #wl-showstatus build &&
+ #cmake.exe --build build_win &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ PATH=$MINGWPREFIX/share/python/bin:$PATH ninja -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-$VERSION.src
+
+
+
