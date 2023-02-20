@@ -1,0 +1,70 @@
+export NAME="LLVM Clang"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-clang
+export DESCRIPTION="The LLVM Compiler Infrastructure - Clang is an "LLVM native" C/C++/Objective-C compiler, which aims to deliver amazingly fast compiles, extremely useful error and warning messages and to provide a platform for building great source level tools."
+export CATEGORY=development
+export TYPE=application
+export VERSION=15.0.7
+export VERSIONDATE=20230219
+#export VERSION=16.0.0rc2
+#export VERSIONDATE=20230220
+wl-showstatus --package-version
+export DEPENDENCIES=llvm-core,zlib,libxml2,libffi,cpython-mingw
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja,llvm-cmake
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ clang-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL="https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/clang-$VERSION.src.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/clang-tools-extra-$VERSION.src.tar.xz"
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/clang-$VERSION.src.tar.xz
+tar xfJ $TARBALLDIR/$BASENAME/clang-tools-extra-$VERSION.src.tar.xz -Cclang-$VERSION.src
+cd clang-$VERSION.src
+# fix CMakeLists.txt (version >= 16.0.0rc2)
+sed -i.bak -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DLIBCLANG_BUILD_STATIC:BOOL=OFF \
+  -DCLANG_LINK_CLANG_DYLIB:BOOL=OFF \
+  -DCLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR:PATH=$PWD/clang-tools-extra-$VERSION.src \
+  -DLLVM_TOOL_CLANG_TOOLS_EXTRA_BUILD:BOOL=ON \
+  -DCLANG_BUILD_TOOLS:BOOL=ON \
+  -DCLANG_ENABLE_PROTO_FUZZER:BOOL=OFF \
+  -DCLANG_ENABLE_STATIC_ANALYZER:BOOL=ON \
+  -DCLANG_INCLUDE_TESTS:BOOL=OFF \
+  -DCLANG_PLUGIN_SUPPORT:BOOL=ON \
+  -DCLANG_ENABLE_CLANGD:BOOL=ON \
+  -DCLANG_TOOL_APINOTES_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_ARCMT_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_CLANG_IMPORT_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_C_ARCMT_TEST_BUILD:BOOL=OFF \
+  -DCLANG_TOOL_C_INDEX_TEST_BUILD:BOOL=OFF \
+  -DCLANG_INCLUDE_DOCS:BOOL=OFF \
+  -DCLANG_TOOLS_EXTRA_INCLUDE_DOCS:BOOL=OFF \
+  -DCLANG_BUILD_EXAMPLES:BOOL=OFF \
+  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+  -S. -Bbuild_win &&
+ # -DCLANG_DEFAULT_RTLIB:STRING=libgcc \
+ # -DCLANG_DEFAULT_CXX_STDLIB:STRING=libstdc++ \
+ # -DCLANG_DEFAULT_OPENMP_RUNTIME:STRING=libgomp \
+ # -DCLANG_DEFAULT_UNWINDLIB:STRING=libgcc \
+ # -DLLVM_TABLEGEN:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+ wl-showstatus build-install &&
+ ( PATH=$PWD/build_win/bin:$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -Cbuild_win install/strip || PATH=$PWD/build_win/bin:$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -j1 -Cbuild_win install/strip ) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf clang-$VERSION.src
+
+
+

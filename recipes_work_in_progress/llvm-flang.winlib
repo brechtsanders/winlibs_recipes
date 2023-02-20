@@ -1,0 +1,55 @@
+export NAME="LLVM Flang"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-flang
+export DESCRIPTION="The LLVM Compiler Infrastructure - Flang is an "LLVM native" Fortran compiler."
+export CATEGORY=development
+export TYPE=application
+export VERSION=15.0.7
+export VERSIONDATE=20230219
+#export VERSION=16.0.0rc2
+#export VERSIONDATE=20230220
+wl-showstatus --package-version
+export DEPENDENCIES=llvm-core,llvm-clang,llvm-mlir,zlib,zstd,libxml2,libffi,cpython-mingw
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja,llvm-cmake
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ flang-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/flang-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/flang-$VERSION.src.tar.xz
+cd flang-$VERSION.src
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_INSTALL_DIR=$MINGWPREFIX/share/llvm-split \
+  -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DCLANG_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/clang \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DLIBCLANG_BUILD_STATIC:BOOL=OFF \
+  -DCLANG_LINK_CLANG_DYLIB:BOOL=OFF \
+  -DFLANG_VENDOR:STRING="(built by Brecht Sanders)" \
+  -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM \
+  -DLLVM_BUILD_LLVM_DYLIB:BOOL=ON \
+  -DCLANG_LINK_CLANG_DYLIB:BOOL=ON \
+  -DLLVM_LINK_LLVM_DYLIB:BOOL=ON \
+  -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64;NVPTX;AMDGPU;AVR;WebAssembly" \
+  -DLLVM_TARGETS_TO_BUILD:STRING=all \
+  -DLLVM_DYLIB_COMPONENTS:STRING=all \
+  -S. -Bbuild_win &&
+ # -DFLANG_STANDALONE_BUILD:BOOL=ON \
+ # -DLLVM_TABLEGEN:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+ wl-showstatus build-install &&
+ PATH=$PWD/build_win/bin:$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf flang-$VERSION.src
+
+
+

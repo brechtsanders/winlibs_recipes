@@ -7,6 +7,8 @@ export CATEGORY=development
 export TYPE=application
 export VERSION=15.0.7
 export VERSIONDATE=20230219
+#export VERSION=16.0.0rc2
+#export VERSIONDATE=20230220
 wl-showstatus --package-version
 export DEPENDENCIES=libxml2,wineditline,z3,libffi,zlib,zstd,libcurl,cpython-mingw
 export OPTIONALDEPENDENCIES=libpfm4
@@ -16,7 +18,7 @@ export LICENSEFILE=LICENSE.TXT
 export LICENSETYPE=Apache
 export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ llvm-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$VERSION/llvm-$VERSION.src.tar.xz
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/llvm-$VERSION.src.tar.xz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
@@ -25,9 +27,10 @@ tar xfJ $TARBALLDIR/$BASENAME/llvm-$VERSION.src.tar.xz
 cd llvm-$VERSION.src
 # avoid z3 version detection issue (version >= 15.0.7)
 sed -i.bak -e "s/\(find_package(Z3 \)[0-9.]*/\1/" CMakeLists.txt
+# fix CMakeLists.txt (version >= 16.0.0rc2)
+sed -i.bak2 -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- #PATH=$MINGWPREFIX/share/python/bin:$PATH \
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
   -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
   -DCMAKE_SYSTEM_NAME:STRING=Windows \
@@ -37,7 +40,6 @@ mkdir -p build_win &&
   -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM \
   -DLLVM_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM \
   -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64;NVPTX;AMDGPU;WebAssembly" \
-  -DLLVM_RUNTIME_TARGETS=$RUNPLATFORM \
   -DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS:BOOL=OFF \
   -DLLVM_ENABLE_THREADS:BOOL=ON \
   -DLLVM_ENABLE_EH:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "ON"; else echo "OFF"; fi) \
@@ -55,11 +57,9 @@ mkdir -p build_win &&
   -DLLVM_INCLUDE_UTILS:BOOL=ON \
   -DLLVM_INSTALL_UTILS:BOOL=ON \
   -DLLVM_ENABLE_TERMINFO:BOOL=OFF \
-  -DLLVM_ENABLE_LIBEDIT:BOOL=OFF \
   -DLLVM_INCLUDE_DOCS:BOOL=OFF \
   -DLLVM_ENABLE_SPHINX=OFF \
   -DLLVM_ENABLE_DOXYGEN:BOOL=$(if doxygen --version &> /dev/null; then echo "ON"; else echo "OFF"; fi) \
-  -DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
   -DLLVM_INCLUDE_TESTS:BOOL=OFF \
   -DLLVM_TOOL_LLVM_C_TEST_BUILD:BOOL=OFF \
   -DLLVM_INCLUDE_EXAMPLES:BOOL=OFF \
@@ -67,20 +67,16 @@ mkdir -p build_win &&
   -DLLVM_BUILD_BENCHMARKS:BOOL=OFF \
   -DLLVM_BUILD_TESTS:BOOL=OFF \
   -DLLVM_TOOL_OPENMP_BUILD:BOOL=ON \
-  -DLLVM_TOOL_PARALLEL_LIBS_BUILD:BOOL=ON \
   -DPython3_FIND_REGISTRY:BOOL=NEVER \
   -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
   -DCMAKE_CROSSCOMPILING:BOOL=OFF \
   -S$PWD -Bbuild_win &&
- #-DLLVM_EXTERNAL_PROJECT_BUILD_TOOL_ARGS:STRING="-DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules" \
- #wl-showstatus build &&
- #cmake.exe --build build_win &&
- #ninja -Cbuild_win &&
+  #-DLLVM_RUNTIME_TARGETS=$RUNPLATFORM \
+  #-DLLVM_ENABLE_LIBEDIT:BOOL=OFF \
+  #-DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
+  #-DLLVM_TOOL_PARALLEL_LIBS_BUILD:BOOL=ON \
  wl-showstatus build-install &&
- #cmake.exe --install build_win --strip &&
- #cmake.exe --build build_win --target "install/strip" &&
  ninja -Cbuild_win install/strip &&
- #PATH=$MINGWPREFIX/share/python/bin:$PATH ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-$VERSION.src
 
 

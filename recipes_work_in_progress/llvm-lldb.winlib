@@ -1,0 +1,65 @@
+export NAME="LLVM LLDB"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-lldb
+export DESCRIPTION="The LLVM Compiler Infrastructure - The LLDB project builds on libraries provided by LLVM and Clang to provide a great native debugger. It uses the Clang ASTs and expression parser, LLVM JIT, LLVM disassembler, etc so that it provides an experience that "just works". It is also blazing fast and much more memory efficient than GDB at loading symbols."
+export CATEGORY=development
+export TYPE=application
+export VERSION=15.0.7
+export VERSIONDATE=20230219
+#export VERSION=16.0.0rc2
+#export VERSIONDATE=20230220
+wl-showstatus --package-version
+export DEPENDENCIES=llvm-core,llvm-clang,ncurses,zlib,zstd,xz,libxml2,libffi,libcurl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja,llvm-cmake
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ lldb-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/lldb-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/lldb-$VERSION.src.tar.xz
+cd lldb-$VERSION.src
+## fix CMakeLists.txt (version >= 16.0.0rc2)
+#sed -i.bak2 -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DLLVM_TABLEGEN:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+  -DLLDB_TABLEGEN_EXE:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DLLDB_ENABLE_LIBEDIT:BOOL=ON \
+  -DLLDB_ENABLE_CURSES:BOOL=ON \
+  -DLLDB_ENABLE_LIBXML2:BOOL=ON \
+  -DLLDB_ENABLE_LZMA:BOOL=ON \
+  -DLLDB_ENABLE_LUA:BOOL=OFF \
+  -DLLDB_ENABLE_LIBEDIT:BOOL=OFF \
+  -DLLDB_INCLUDE_TESTS:BOOL=OFF \
+  -DLLDB_TOOL_LLDB_SERVER_BUILD:BOOL=ON \
+  -DLLDB_TOOL_LLDB_VSCODE_BUILD:BOOL=ON \
+  -DLLDB_DISABLE_PYTHON:BOOL=OFF \
+  -DLLDB_ENABLE_PYTHON:BOOL=ON \
+  -DLLDB_EMBED_PYTHON_HOME:BOOL=OFF \
+  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+  -DLLDB_PYTHON_RELATIVE_PATH:PATH=libexec/site-packages \
+  -DLLDB_PYTHON_EXE_RELATIVE_PATH:FILEPATH=bin/python.exe \
+  -DLLDB_PYTHON_EXT_SUFFIX:STRING=.pyd \
+  -S. -Bbuild_win &&
+ # -DFLANG_STANDALONE_BUILD:BOOL=ON \
+ # -DLLVM_TABLEGEN:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ #PATH=$PWD/build_win/bin:$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lldb-$VERSION.src
+
+
+

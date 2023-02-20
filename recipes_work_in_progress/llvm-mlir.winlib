@@ -1,0 +1,52 @@
+export NAME="LLVM MLIR"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-mlir
+export DESCRIPTION="The LLVM Compiler Infrastructure - The MLIR subproject is a novel approach to building reusable and extensible compiler infrastructure. MLIR aims to address software fragmentation, improve compilation for heterogeneous hardware, significantly reduce the cost of building domain specific compilers, and aid in connecting existing compilers together."
+export CATEGORY=development
+export TYPE=application
+export VERSION=16.0.0rc2
+export VERSIONDATE=20230220
+wl-showstatus --package-version
+export DEPENDENCIES=llvm-core,zlib,zstd,libxml2,libffi,libcurl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja,llvm-cmake,llvm-clang
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ mlir-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/mlir-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/mlir-$VERSION.src.tar.xz
+cd mlir-$VERSION.src
+## fix CMakeLists.txt (version >= 16.0.0rc2)
+#sed -i.bak2 -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DMLIR_BUILD_MLIR_C_DYLIB:BOOL=ON \
+  -DMLIR_INCLUDE_TESTS:BOOL=OFF \
+  -DCMAKE_C_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/clang.exe \
+  -DCMAKE_C_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ar.exe \
+  -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ranlib.exe \
+  -DCMAKE_CXX_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/clang++.exe \
+  -DCMAKE_CXX_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ar.exe \
+  -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ranlib.exe \
+  -S. -Bbuild_win &&
+ # -DFLANG_STANDALONE_BUILD:BOOL=ON \
+ # -DLLVM_TABLEGEN:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ #PATH=$PWD/build_win/bin:$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mlir-$VERSION.src
+
+
+

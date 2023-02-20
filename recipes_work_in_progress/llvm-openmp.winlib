@@ -1,0 +1,77 @@
+export NAME="LLVM OpenMP"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-openmp
+export DESCRIPTION="The LLVM Compiler Infrastructure - The OpenMP subproject provides an OpenMP runtime for use with the OpenMP implementation in Clang."
+export CATEGORY=development
+export TYPE=application
+export VERSION=15.0.7
+export VERSIONDATE=20230219
+#export VERSION=16.0.0rc2
+#export VERSIONDATE=20230220
+####Please put llvm-lit in your PATH, set OPENMP_LLVM_LIT_EXECUTABLE to its full path, or point OPENMP_LLVM_TOOLS_DIR to its directory.
+wl-showstatus --package-version
+export DEPENDENCIES=llvm-cmake,llvm-core,llvm-clang,hwloc,cpython-mingw
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja,llvm-cmake
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ openmp-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/openmp-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/openmp-$VERSION.src.tar.xz
+cd openmp-$VERSION.src
+## fix CMakeLists.txt (version >= 16.0.0rc2)
+#sed -i.bak2 -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
+#// The architecture to build for (x86_64/i386/arm/ppc64/ppc64le/aarch64/mic/mips/mips64/riscv64/loongarch64).
+#LIBOMP_ARCH:STRING=x86_64
+#LIBOMP_FORTRAN_MODULES:BOOL=FALSE
+#// Enable building libomptarget for offloading.
+#OPENMP_ENABLE_LIBOMPTARGET:BOOL=OFF
+# create dummuy libraries
+mkdir -p gcc_fix
+echo "void __chkstk ();" | $MINGWPREFIX/share/llvm-split/bin/clang.exe -xc - -c -o gcc_fix/__chkstk.o
+ar cr gcc_fix/libgcc.a gcc_fix/__chkstk.o
+ar cr gcc_fix/libgcc_eh.a
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ LIBRARY_PATH=$MINGWDIR/x86_64-w64-mingw32/lib:$MINGWDIR/lib${LIBRARY_PATH:+:$LIBRARY_PATH}:$PWD/gcc_fix \
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DLIBOMP_HWLOC_INSTALL_DIR:PATH=$MINGWPREFIX \
+  -DCMAKE_ASM_MASM_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ml.exe \
+  -DCMAKE_ASM_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-as.exe \
+  -DCMAKE_ASM_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ar.exe \
+  -DCMAKE_ASM_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ranlib.exe \
+  -DCMAKE_C_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/clang.exe \
+  -DCMAKE_C_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ar.exe \
+  -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ranlib.exe \
+  -DCMAKE_CXX_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/clang++.exe \
+  -DCMAKE_CXX_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ar.exe \
+  -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ranlib.exe \
+  -DCMAKE_ASM_FLAGS:STRING="-integrated-as -fuse-ld=lld" \
+  -DCMAKE_C_FLAGS:STRING="-fuse-ld=lld" \
+  -DCMAKE_CXX_FLAGS:STRING="-fuse-ld=lld" \
+  -DCMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS:STRING="-fuse-ld=lld" \
+  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+  -S. -Bbuild_win &&
+ # -DCMAKE_ASM_MASM_FLAGS:STRING="--mx86_64 --triple$RUNPLATFORM" \
+ # -DLIBOMP_ARCH:STRING=x86_64 \
+ # -DFLANG_STANDALONE_BUILD:BOOL=ON \
+ # -DLLVM_TABLEGEN:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ #PATH=$PWD/build_win/bin:$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf openmp-$VERSION.src
+
+
+

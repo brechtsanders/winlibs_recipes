@@ -1,0 +1,62 @@
+export NAME="LLVM libc++"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-libcxx
+export DESCRIPTION="The LLVM Compiler Infrastructure - The libc++ and libc++ ABI projects provide a standard conformant and high-performance implementation of the C++ Standard Library, including full support for C++11 and C++14."
+export CATEGORY=development
+export TYPE=application
+export VERSION=15.0.0
+export VERSIONDATE=20230220
+#export VERSION=16.0.0rc2
+#export VERSIONDATE=20230220
+wl-showstatus --package-version
+export DEPENDENCIES=llvm-core,llvm-clang,llvm-lld,llvm-libunwind,zlib,zstd,libxml2,libffi,libcurl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ libcxx-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/libcxx-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfJ $TARBALLDIR/$BASENAME/libcxx-$VERSION.src.tar.xz
+cd libcxx-$VERSION.src
+## fix CMakeLists.txt (version >= 16.0.0rc2)
+#sed -i.bak -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX/share/llvm-split/include \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DLIBCXX_CXX_ABI:STRING=none \
+  -DLIBCXX_HAS_WIN32_THREAD_API:BOOL=ON \
+  -DLIBCXX_INCLUDE_BENCHMARKS:BOOL=OFF \
+  -DCMAKE_C_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/clang.exe \
+  -DCMAKE_C_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ar.exe \
+  -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ranlib.exe \
+  -DCMAKE_CXX_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/clang++.exe \
+  -DCMAKE_CXX_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ar.exe \
+  -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-ranlib.exe \
+  -DCMAKE_C_FLAGS:STRING="-fuse-ld=lld" \
+  -DCMAKE_CXX_FLAGS:STRING="-fuse-ld=lld" \
+  -DCMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS:STRING="-fuse-ld=lld" \
+  -S. -Bbuild_win &&
+ #-DLIBCXX_CXX_ABI:STRING=none \
+ #-DLIBCXX_CXX_ABI:STRING=libstdc++ \
+ #-DLIBCXX_USE_COMPILER_RT:BOOL=ON \
+ #-DLIBCXX_BUILD_EXTERNAL_THREAD_LIBRARY:BOOL=OFF \
+ #-DLIBCXX_HAS_EXTERNAL_THREAD_API:BOOL=ON \
+ #-DLIBCXX_ABI_FORCE_MICROSOFT:BOOL=OFF \
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libcxx-$VERSION.src
+
+
+
