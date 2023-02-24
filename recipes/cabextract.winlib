@@ -19,8 +19,10 @@ export TYPE=application
 #export VERSIONDATE=20181106
 #export VERSION=1.9.1
 #export VERSIONDATE=20190304
-export VERSION=1.10
-export VERSIONDATE=20230206
+#export VERSION=1.10
+#export VERSIONDATE=20230206
+export VERSION=1.11
+export VERSIONDATE=20230224
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -36,15 +38,34 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing S_IFLNK in src/cabextract.c (version >= 1.10)
+## fix missing S_IFLNK in src/cabextract.c (version >= 1.10)
+#patch -ulbf src/cabextract.c << EOF
+#@@ -1228,4 +1228,6 @@
+#        * use lstat() and delete symlinks if found */
+#+#ifdef S_IFLNK
+#       ok = (lstat(path, &st_buf) == 0);
+#       if (ok && (st_buf.st_mode & S_IFMT) == S_IFLNK) unlink(path);
+#+#endif
+#       ok = S_ISDIR(st_buf.st_mode);
+#EOF
+# fix missing S_IFLNK in src/cabextract.c (version >= 1.11)
 patch -ulbf src/cabextract.c << EOF
-@@ -1228,4 +1228,6 @@
-        * use lstat() and delete symlinks if found */
+@@ -1218,3 +1218,6 @@
+     *p = '\\0';
+-    if (p < parchive || args.keep_symlinks) {
 +#ifdef S_IFLNK
-       ok = (lstat(path, &st_buf) == 0);
-       if (ok && (st_buf.st_mode & S_IFMT) == S_IFLNK) unlink(path);
++    if (p < parchive || args.keep_symlinks)
 +#endif
-       ok = S_ISDIR(st_buf.st_mode);
++    {
+       /* not in the archive-determined part of the path, or keeping symlinks:
+@@ -1223,2 +1226,3 @@
+     }
++#ifdef S_IFLNK
+     else {
+@@ -1232,2 +1236,3 @@
+     }
++#endif
+     if (!ok) ok = (mkdir(path, 0777 & ~user_umask) == 0);
 EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
