@@ -1,0 +1,62 @@
+export NAME="chmcpl"
+export STATUS=
+export URL=https://github.com/ZJUGKC/chmcpl
+export BASENAME=chmcpl
+export DESCRIPTION="A command-line chm compiler under *nix systems "
+export CATEGORY=fileformat
+export TYPE=application
+export VERSION=0.1
+export VERSIONDATE=20230225
+wl-showstatus --package-version
+export DEPENDENCIES=libconfig
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/ZJUGKC/chmcpl/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/ZJUGKC/chmcpl/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined __compar_fn_t in src/cpl/chmc.c (version >= 0.1)
+patch -ulbf src/cpl/chmc.c << EOF
+@@ -1313,2 +1313,4 @@
+
++typedef int (*__compar_fn_t)(const void *,const void *);
++
+ void chmc_entries_qsort(struct chmcFile *chm)
+EOF
+# fix undefined error in src/cpl/main.c (version >= 0.1)
+patch -ulbf src/cpl/main.c << EOF
+@@ -33,2 +33,3 @@
+ #include "err.h"
++#define error(exitcode, errorcode, fmt, args...) { fprintf(stderr, "Error %i: ", (int)(errorcode)); fprintf(stderr, fmt , ##args); exit(exitcode); }
+
+EOF
+# fix missing lstat in src/cpl/utils.c (version >= 0.1)
+patch -ulbf src/cpl/utils.c << EOF
+@@ -90,3 +90,7 @@
+        while ((dtl.entry = readdir(dtl.dp)) != NULL) {
++#ifdef _WIN32
++               stat(dtl.entry->d_name, &dtl.statbuf);
++#else
+                lstat(dtl.entry->d_name, &dtl.statbuf);
++#endif
+                if (S_ISDIR(dtl.statbuf.st_mode)) {
+EOF
+wl-showstatus build &&
+ make CC=${CC:-gcc} COPTFLAGS="-O2 -Du_char=\"unsigned char\" -DPATH_MAX=260" LIB_FLAGS= &&
+ strip bin/*.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f bin/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####cd example; ../bin/chmcpl.exe -c test.conf -o ../test.chm -t "$TEMP" || rm -f ../test.chm; cd ..
+
+
+

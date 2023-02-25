@@ -1,0 +1,79 @@
+export NAME="chmc"
+export STATUS=
+export URL=https://sourceforge.net/projects/chmc/
+export BASENAME=chmc
+export DESCRIPTION="chmc is a free CHM compiler command targeted to *nix chm viewers."
+export CATEGORY=fileformat
+export TYPE=application
+export VERSION=0.6
+export VERSIONDATE=20230225
+wl-showstatus --package-version
+export DEPENDENCIES=libconfig
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export BUILDDEPENDENCIES=meson,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://sourceforge.net/projects/chmc/files/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/chmc/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined u_char
+sed -i.bak -e "s/u_char/unsigned char/g" $(grep -lw "u_char" $(find -name '*.h' -or -name '*.c'))
+# fix undefined __compar_fn_t in src/chmc.c (version >= 0.6)
+patch -ulbf src/chmc.c << EOF
+@@ -1255,2 +1255,4 @@
+
++typedef int (*__compar_fn_t)(const void *,const void *);
++
+ void chmc_entries_qsort(struct chmcFile *chm)
+EOF
+# fix missing PATH_MAX in src/utils.h (version >= 0.6)
+patch -ulbf src/utils.h << EOF
+@@ -24,2 +24,3 @@
+ #include <sys/stat.h>
++#include <limits.h>
+ #include <dirent.h>
+EOF
+# fix missing lstat in src/utils.c (version >= 0.6)
+patch -ulbf src/utils.c << EOF
+@@ -87,3 +87,7 @@
+        while ((dtl.entry = readdir(dtl.dp)) != NULL) {
++#ifdef _WIN32
++               stat(dtl.entry->d_name, &dtl.statbuf);
++#else
+                lstat(dtl.entry->d_name, &dtl.statbuf);
++#endif
+                if (S_ISDIR(dtl.statbuf.st_mode)) {
+EOF
+# fix undefined error in src/main.c (version >= 0.6)
+patch -ulbf src/main.c << EOF
+@@ -33,2 +33,3 @@
+ #include "err.h"
++#define error(exitcode, errorcode, fmt, args...) { fprintf(stderr, "Error %i: ", (int)(errorcode)); fprintf(stderr, fmt , ##args); exit(exitcode); }
+
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --disable-shared --enable-chmchk &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-chmchk &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build &&
+ ( make || make LIBS="-L$PWD/libs -llzxcomp" ) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####cd doc; ../src/chmc.exe -c test.conf -o ../test.chm -t "$TEMP" || rm -f ../test.chm; cd ..
+
+
+
