@@ -1,0 +1,66 @@
+export NAME="Open Convert-.LIT tool"
+export STATUS=
+#export URL=https://www.kyzer.me.uk/pack/convlit/
+export URL=http://www.convertlit.com/
+export BASENAME=openclit
+export DESCRIPTION="Converting .LIT files"
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=1.8
+export VERSIONDATE=20230227
+wl-showstatus --package-version
+export DEPENDENCIES=libtommath
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=clit$(echo $VERSION|sed -e "s/\.//g")/COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://www.kyzer.me.uk/pack/convlit/"
+export DOWNLOADURL="http://www.convertlit.com/download.php"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://www.kyzer.me.uk/pack/convlit/open_c-lit-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=http://www.convertlit.com/clit$(echo $VERSION|sed -e "s/\.//g")src.zip
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+#tar xfz $TARBALLDIR/$BASENAME/open_c-lit-$VERSION.tar.gz -C$BASENAME-$VERSION
+unzip -oq $TARBALLDIR/$BASENAME/clit$(echo $VERSION|sed -e "s/\.//g")src.zip -d$BASENAME-$VERSION
+cd $BASENAME-$VERSION
+# fix support for MinGW
+sed -i.bak -e "s/\(#ifn*def \)_MSC_VER/\1_WIN32/" lib/litlib.c lib/littypes.h lib/newlzx/mspack.h lib/newlzx/system.h clit$(echo $VERSION|sed -e "s/\.//g")/clit.c clit$(echo $VERSION|sed -e "s/\.//g")/explode.c
+# fix missing lit_error
+for F in $(grep -l lit_error $(find lib -name '*.c')); do
+mv $F $F.bak2
+cat > $F << EOF
+#include <stdio.h>
+#include <stdarg.h>
+#define lit_error LOCAL_lit_error
+static inline void lit_error(int what, char * fmt, ...)
+{
+  va_list ap;
+  vfprintf(stderr, fmt, ap);
+}
+EOF
+cat $F.bak2 >> $F
+done
+# fix compiler tools and linking against libtommath
+sed -i.bak -e "s/ar /\$(AR\) /" lib/Makefile
+sed -i.bak -e "s/[^ ]*lib\(tommath\)\.a/-l\1/; s/gcc /\$(CC\) /" clit$(echo $VERSION|sed -e "s/\.//g")/Makefile
+wl-showstatus build &&
+ make -Clib CC=${CC:-gcc} &&
+ make -Cclit$(echo $VERSION|sed -e "s/\.//g") CC=${CC:-gcc} AR=${AR:-ar} &&
+ strip clit$(echo $VERSION|sed -e "s/\.//g")/*.exe &&
+ mv -f lib/openclit.a lib/libopenclit.a &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p lib/libopenclit.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > openclit.def &&
+ ${CC:-gcc} -shared -s -mwindows -def openclit.def -o openclit.dll lib/libopenclit.a -Wl,--out-implib,lib/libopenclit.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f lib/*.h $INSTALLPREFIX/include/ &&
+ cp -f lib/*.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll clit$(echo $VERSION|sed -e "s/\.//g")/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf clit$(echo $VERSION|sed -e "s/\.//g")
+
+
+
