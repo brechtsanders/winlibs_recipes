@@ -1,0 +1,50 @@
+export NAME="Movit"
+export STATUS=
+export URL=https://movit.sesse.net/
+export BASENAME=movit
+export DESCRIPTION="Movit: High-performance, high-quality video filters for the GPU"
+export CATEGORY=multimedia,dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20230304
+wl-showstatus --package-version
+export DEPENDENCIES=eigen,fftw,sdl2,sdl2image,libpng
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=README
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/sh0/movit/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/sh0/movit/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xfz $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined ffs in fft_convolution_effect.cpp
+mv fft_convolution_effect.cpp fft_convolution_effect.cpp.bak
+cat fft_convolution_effect.cpp.bak << EOF
+#ifdef __MINGW32__
+#define ffs __builtin_ffs
+#endif
+EOF
+cat fft_convolution_effect.cpp.bak >> fft_convolution_effect.cpp
+# avoid invalid linker flag -rt
+sed -i.bak -e "s/ -lrt / /" Makefile.in
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ libtoolize -i -c &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-fpermissive" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install TESTS= TEST_OBJS= &&
+ strip $INSTALLPREFIX/bin/*.dll &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
