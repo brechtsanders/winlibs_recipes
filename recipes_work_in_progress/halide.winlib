@@ -10,13 +10,13 @@ export TYPE=application
 #export VERSIONDATE=20220203
 #export VERSION=14.0.0
 #export VERSIONDATE=20220408
+####llvm-ar.exe: error: src\libHalide.a: Function not implemented
 export VERSION=15.0.0
 export VERSIONDATE=20230307
-####llvm-ar.exe: error: src\libHalide.a: Function not implemented
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libjpeg,libpng,libxml2,mman-win32
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake,ninja
+export BUILDDEPENDENCIES=cmake,ninja,llvm-project
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.txt
 export LICENSETYPE=MIT
@@ -29,19 +29,20 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd Halide-$VERSION
+# fis missing GetCurrentThreadStackLimits in src/Util.cpp
+mv src/Util.cpp src/Util.cpp.bak
+cat > src/Util.cpp << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0602
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0602
+#endif
+EOF
+cat src/Util.cpp.bak >> src/Util.cpp
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- PATH=$MINGWPREFIX/share/llvm/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DWITH_TUTORIALS:BOOL=OFF -DWITH_DOCS:BOOL=OFF -DWITH_TESTS:BOOL=OFF -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_static &&
+ PATH=$MINGWPREFIX/share/llvm/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DHalide_SHARED_LLVM:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DWITH_PYTHON_BINDINGS:BOOL=OFF -DWITH_TUTORIALS:BOOL=OFF -DWITH_DOCS:BOOL=OFF -DWITH_TESTS:BOOL=OFF -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_static &&
  wl-showstatus configure &&
- PATH=$MINGWPREFIX/share/llvm/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DWITH_TUTORIALS:BOOL=OFF -DWITH_DOCS:BOOL=OFF -DWITH_TESTS:BOOL=OFF -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_shared &&
- ## fix execution of Python scripts
- #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
- ## fix missing link libraries
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
- #wl-showstatus build &&
- #ninja -Cbuild_static &&
- #wl-showstatus build &&
- #ninja -Cbuild_shared &&
+ PATH=$MINGWPREFIX/share/llvm/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DHalide_SHARED_LLVM:BOOL=ON -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DWITH_PYTHON_BINDINGS:BOOL=OFF -DWITH_TUTORIALS:BOOL=OFF -DWITH_DOCS:BOOL=OFF -DWITH_TESTS:BOOL=OFF -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
