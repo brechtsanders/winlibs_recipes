@@ -1,0 +1,67 @@
+export NAME="Foma"
+export STATUS=
+export URL=https://fomafst.github.io/
+export BASENAME=foma
+export DESCRIPTION="Foma is a compiler, programming language, and C library for constructing finite-state automata and transducers for various uses. It has specific support for many natural language processing applications such as producing morphological analyzers. Although NLP applications are probably the main use of foma, it is sufficiently generic to use for a large number of purposes."
+export CATEGORY=development
+export TYPE=application
+export VERSION=0.9.18
+export VERSIONDATE=20230312
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://bitbucket.org/mhulden/foma/downloads/"
+#export DOWNLOADURL="https://github.com/mhulden/foma/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://bitbucket.org/mhulden/foma/downloads/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix flookup.c (version >= 0.9.18)
+patch -ulbf flookup.c << EOF
+@@ -24,4 +24,9 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <sys/socket.h>
+ #include <arpa/inet.h>
++#endif
+ #include "fomalib.h"
+@@ -355,2 +360,4 @@
+
++static WSADATA wsaData;
++
+ void server_init(void) {
+@@ -358,2 +365,10 @@
+
++#ifdef __WIN32__
++    if (WSAStartup(MAKEWORD(1, 0), &wsaData) != 0) {
++        perror("WSAStartup() failed");
++       exit(1);
++    }
++    atexit((void(*)())WSACleanup);
++#endif
++
+     if ((listen_sd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+EOF
+sed -i.bak -e "s/ln -s /echo &/" Makefile
+wl-showstatus build &&
+ make CC=${CC:-gcc} AR=${AR:-ar} DFLAG="-s,--out-implib" SHAREDLIBM="libfoma.dll.a" SHAREDLIBV="libfoma.dll" SHAREDLIB="libfoma.dll" LDFLAGS="-lreadline -lz -lws2_32 -Wl,--allow-multiple-definition" FLOOKUPLDFLAGS="libfoma.dll.a -lz -lws2_32 -Wl,--allow-multiple-definition" prefix=$INSTALLPREFIX &&
+ wl-showstatus install &&
+ make install prefix=$INSTALLPREFIX SHAREDLIBM="libfoma.dll.a" SHAREDLIBV="libfoma.dll" SHAREDLIB="libfoma.dll" &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ cp -u libfoma.dll $INSTALLPREFIX/bin/ &&
+ cp -u libfoma.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
