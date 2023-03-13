@@ -309,7 +309,7 @@ patch -ulbf python/libxml.c << EOF
 +    module = (PyObject*)Py_InitModule((char *) "libxml2mod", libxmlMethods);
  #endif
 EOF
-# fix for Python 3.8
+# fix Python 3.8 dependency DLL lookup path
 #### see also: https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
 mv python/libxml2.py python/libxml2.py.bak
 cat > python/libxml2.py << EOF
@@ -323,13 +323,13 @@ cat python/libxml2.py.bak >> python/libxml2.py
 mkdir -p pylibs &&
 pexports $PYDIR/python[0-9][0-9]*.dll > pylibs/python3.def &&
 (( grep -q Py_InitModule4_64 pylibs/python3.def && echo "Py_InitModule4 = Py_InitModule4_64" >> pylibs/python3.def ) || true ) &&
-dlltool -D $PYDIR/python[0-9][0-9]*.dll -d pylibs/python3.def -l pylibs/libpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p").dll.a
+${DLLTOOL:-dlltool} -D $PYDIR/python[0-9][0-9]*.dll -d pylibs/python3.def -l pylibs/libpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p").dll.a
 # fix missing Python2 library files
 if [ "$PYDIR" != "$PY2DIR" ]; then
  mkdir -p py2libs &&
  pexports $PY2DIR/python[0-9][0-9]*.dll > py2libs/python2.def &&
  (( grep -q Py_InitModule4_64 py2libs/python2.def && echo "Py_InitModule4 = Py_InitModule4_64" >> py2libs/python2.def ) || true ) &&
- dlltool -D $PY2DIR/python[0-9][0-9]*.dll -d py2libs/python2.def -l py2libs/libpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p").dll.a
+ ${DLLTOOL:-dlltool} -D $PY2DIR/python[0-9][0-9]*.dll -d py2libs/python2.def -l py2libs/libpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p").dll.a
 fi
 ## fix linking to Python
 #sed -i.bak -e "s/python2.[0-9]/$(ls -1 $PYDIR/libs/libpython[0-9][0-9]*.a|sed -e "s/^.*\(python[0-9]*\).*$/\1/")/" configure

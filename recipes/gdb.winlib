@@ -63,6 +63,50 @@ patch -ulbf readline/readline/terminal.c << EOF
 EOF
 ## fix pointer conversion issues in sim/common/sim-events.c (version >= 11.2)
 #sed -i.bak "s/(long)/(intptr_t)/g" sim/common/sim-events.c
+# fix missing getline in sim/m32c/opc2c.c
+mv sim/m32c/opc2c.c sim/m32c/opc2c.c.bak
+cat > sim/m32c/opc2c.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat sim/m32c/opc2c.c.bak >> sim/m32c/opc2c.c
 # manually create initialization script (version >= 11.1)
 cat > gdbinit << EOF
 python
