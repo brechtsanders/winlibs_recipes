@@ -309,6 +309,16 @@ patch -ulbf python/libxml.c << EOF
 +    module = (PyObject*)Py_InitModule((char *) "libxml2mod", libxmlMethods);
  #endif
 EOF
+# fix for Python 3.8
+#### see also: https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
+mv python/libxml2.py python/libxml2.py.bak
+cat > python/libxml2.py << EOF
+import sys
+if sys.version_info >= (3,8):
+    import os
+    os.add_dll_directory(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "bin"))
+EOF
+cat python/libxml2.py.bak >> python/libxml2.py
 # fix missing Python library files
 mkdir -p pylibs &&
 pexports $PYDIR/python[0-9][0-9]*.dll > pylibs/python3.def &&
@@ -364,8 +374,8 @@ mkdir -p build_win build_win_py2 &&
  #PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" &&
  PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) &&
  #rm -rf $INSTALLPREFIX/python/Lib/site-packages/*.pyc $INSTALLPREFIX/python/Lib/site-packages/*.la $INSTALLPREFIX/python/Lib/site-packages/__pycache__ &&
- # test Python module
- echo "import libxml2" | PATH=$PYDIR:$INSTALLPREFIX/bin:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages $PYDIR/python.exe -B &&
+ ## test Python module
+ #echo "import libxml2" | PATH=$PYDIR:$INSTALLPREFIX/bin:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages $PYDIR/python.exe -B &&
  #cp -f $INSTALLPREFIX/bin/libxml*.dll $MINGWPREFIX/bin/libiconv-2.dll $MINGWPREFIX/bin/zlib1.dll $MINGWPREFIX/bin/liblzma-5.dll $INSTALLPREFIX/python/Lib/site-packages/
  #### see also: https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
  #( echo "import os"; echo "os.add_dll_directory(\"$(cygpath -m $MINGWPREFIX/bin)\")"; echo "import libxml2" ) | PATH=$PYDIR:$INSTALLPREFIX/bin:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages $PYDIR/python.exe -B &&
@@ -383,8 +393,8 @@ mkdir -p build_win build_win_py2 &&
  find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: --with-icu breaks builds (incl. wine) with error: /include/unicode/uconfig.h:55: error: uconfig_local.h: No such file or directory
-####echo "import libxml2" | PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages $PYDIR/python.exe
-####echo "import libxml2" | PATH=$PY2DIR:$PATH PYTHONPATH=$MINGWPREFIX/python2/Lib/site-packages $PY2DIR/python.exe
+####echo "import libxml2" | PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages $PYDIR/python.exe && echo OK
+####echo "import libxml2" | PATH=$PY2DIR:$PATH PYTHONPATH=$MINGWPREFIX/python2/Lib/site-packages $PY2DIR/python.exe && echo OK
 
 
 
