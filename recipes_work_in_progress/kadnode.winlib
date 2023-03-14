@@ -1,0 +1,67 @@
+export NAME="KadNode"
+export STATUS=
+export URL=https://github.com/mwarning/KadNode
+export BASENAME=kadnode
+export DESCRIPTION="KadNode finds the IP address of other instances on the Internet or local network. It is used like DNS, but is based on the decentralized BitTorrent network."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=2.3.0
+export VERSIONDATE=20230314
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/mwarning/KadNode/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mwarning/KadNode/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <wspiapi.h>" >> winfix/sys/socket.h
+touch winfix/netdb.h winfix/netinet/in.h winfix/arpa/inet.h
+cat > winfix/syslog.h << EOF
+#ifndef __INCLUDED_SYSLOG_H
+#define __INCLUDED_SYSLOG_H
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_INFO    6
+#define LOG_USER     (1<<3)
+#define LOG_PID    0x01
+#define LOG_CONS   0x02
+#define LOG_PERROR 0x20
+static void openlog (const char *ident, int option, int facility) {}
+static void syslog (int priority, const char *format, ...) {}
+static void closelog (void) {}
+#endif
+EOF
+# fix undefined uint8_t/uint16_t
+for F in $(grep -l "int[0-9]*_t" src/*.h); do
+ mv $F $F.bak &&
+ echo "#include <stdint.h>" > $F &&
+ cat $F.bak >> $F
+done
+# fix undefined IP in src/searches.h
+mv src/searches.h src/searches.h.bak
+cat > src/searches.h << EOF
+#include <winsock2.h>
+#define IP SOCKADDR_STORAGE
+EOF
+EOF
+cat src/searches.h.bak >> src/searches.h
+wl-showstatus build &&
+ make CC=${CC:-gcc} CFLAGS="-I$PWD/winfix" &&
+ #make CC=${CC:-gcc} CXX=${CXX:-g++} LD=${LD:-ld} AR=${AR:-ar} &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
