@@ -1,0 +1,93 @@
+export NAME="LIME"
+export STATUS=
+export URL=
+export BASENAME=lime
+export DESCRIPTION="LIME is an end-to-end encryption library for one-to-one and group instant messaging, allowing users to exchange messages privately and asynchronously. It uses modern ciphering curve X448 and double ratchet algorithm for perfect forward secrecy."
+export CATEGORY=security,communication
+export TYPE=library
+#export VERSION=5.2.23
+#export VERSIONDATE=20230222
+#export VERSION=5.2.27
+#export VERSIONDATE=20230227
+#export VERSION=5.2.28
+#export VERSIONDATE=20230303
+export VERSION=5.2.30
+export VERSIONDATE=20230308
+wl-showstatus --package-version
+export DEPENDENCIES=bctoolbox,soci
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/BelledonneCommunications/lime/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/BelledonneCommunications/lime/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing bctoolbox::RNG::randomize in src/lime_crypto_primitives.cpp (version >= 5.2.30)
+patch -ulbf src/lime_crypto_primitives.cpp << EOF
+@@ -23,2 +23,5 @@
+ #include "bctoolbox/exception.hh"
++#ifdef _WIN32
++#include <wincrypt.h>
++#endif
+
+@@ -55,3 +58,5 @@
+        private :
++#ifndef _WIN32
+                bctoolbox::RNG m_context; // the bctoolbox RNG context
++#endif
+
+@@ -60,3 +65,11 @@
+                void randomize(sBuffer<lime::settings::DRrandomSeedSize> &buffer) override {
++#ifndef _WIN32
+                        m_context.randomize(buffer.data(), buffer.size());
++#else
++                        HCRYPTPROV prov;
++                        if (!CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT))
++                                return;
++                        CryptGenRandom(prov, buffer.size(), buffer.data());
++                        CryptReleaseContext(prov, 0);
++#endif
+                };
+@@ -64,3 +77,12 @@
+                uint32_t randomize() override {
++#ifndef _WIN32
+                        uint32_t ret = m_context.randomize();
++#else
++                       uint32_t ret;
++                        HCRYPTPROV prov;
++                        if (!CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT))
++                                return 0;
++                        CryptGenRandom(prov, sizeof(ret), (BYTE*)&ret);
++                        CryptReleaseContext(prov, 0);
++#endif
+                        // we are on 31 bits: keep the uint32_t MSb set to 0 (see RNG interface definition)
+@@ -70,3 +92,11 @@
+                void randomize(uint8_t *buffer, const size_t size) override {
++#ifndef _WIN32
+                        m_context.randomize(buffer, size);
++#else
++                        HCRYPTPROV prov;
++                        if (!CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT))
++                                return;
++                        CryptGenRandom(prov, size, buffer);
++                        CryptReleaseContext(prov, 0);
++#endif
+                }
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_JNI:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ sed -i.bak -e "s/-lsoci_core /-lsoci_core_4_0/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
