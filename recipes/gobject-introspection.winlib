@@ -761,7 +761,7 @@ export TYPE=library
 export VERSION=1.76.0
 export VERSIONDATE=20230314
 wl-showstatus --package-version
-export DEPENDENCIES=glib2,libffi
+export DEPENDENCIES=glib2,pcre2,libffi
 export OPTIONALDEPENDENCIES=cairo
 export BUILDDEPENDENCIES=meson,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -973,6 +973,8 @@ patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
 +            return None
 
 EOF
+# support LLVM/Clang
+sed -i.bak -e "s/self\.gcc_version <= \"2\.91\.57\"/is_cygwingcc() and (&)/; s?'gcc?'$(cygpath -m ${CC:-gcc})?; s?'g++?'$(cygpath -m ${CXX:-g++})?" winfix/distutils/cygwinccompiler.py
 ## fix subprojects/glib/meson.build (version >= 1.75.4)
 #patch -ulbf subprojects/glib/meson.build << EOF
 #@@ -270,3 +270,3 @@
@@ -981,7 +983,18 @@ EOF
 #+  warning('On Windows default_library must be "shared" or "static" but not "both"')
 # endif
 #EOF
+## fix subprojects/glib/meson.build (version >= 1.75.4)
 #sed -i.bak -e "s/error\(.*On Windows default_library must be \"shared\" or \"static\" but not \"both\"\)/warning\1/" subprojects/glib/meson.build
+# avoid building subprojects (version >= 1.76.0)
+mv -f subprojects subprojects.bak
+# fix issues locating shared libraries when building with clang in giscanner/ccompiler.py (version >= 1.76.0)
+patch -ulbf giscanner/ccompiler.py << EOF
+@@ -440,3 +440,3 @@
+         if len(not_resolved) > 0:
+-            raise SystemExit(
++            print(
+                 "ERROR: can't resolve libraries to shared libraries: " +
+EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
  PKG_CONFIG= PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild_introspection_data=true -Dcairo=disabled -Ddoctool=disabled -Dgtk_doc=false -Dpython=$PYDIR/python.exe . build_both &&
