@@ -40,6 +40,8 @@ export VERSIONDATE=20220107
 #export VERSIONDATE=20221124
 #export VERSION=2.0B2
 #export VERSIONDATE=20230202
+#export VERSION=2.0
+#export VERSIONDATE=20230316
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -174,6 +176,10 @@ cat src/dll/fuse/fuse_intf.c.bak >> src/dll/fuse/fuse_intf.c
 mv src/dll/mount.c src/dll/mount.c.bak &&
 echo "#include <ntdef.h>" > src/dll/mount.c &&
 cat src/dll/mount.c.bak >> src/dll/mount.c
+# fix missing PREPARSE_DATA_BUFFER in src/dll/debug.c (version >= 2.0)
+mv src/dll/debuglog.c src/dll/debuglog.c.bak &&
+echo "#include <ntdef.h>" > src/dll/debuglog.c &&
+cat src/dll/debuglog.c.bak >> src/dll/debuglog.c
 # fix src/dll/np.c (version >= 1.10B2)
 patch -ulbf src/dll/np.c << EOF
 @@ -401,3 +401,3 @@
@@ -263,6 +269,21 @@ EOF
 #+    //void _ReadWriteBarrier(void);
 #     VOID *v = (VOID *)FSP_INTERLOCKED__LOAD64((__int64 volatile *)(p));
 #EOF
+## fix inc/winfsp/fsctl.h (version >= 2.0)
+#patch -ulbf inc/winfsp/fsctl.h << EOF
+#@@ -754,2 +754,3 @@
+# #elif defined(_M_X64) || defined(_M_IX86)
+#+#undef _ReadWriteBarrier
+#     void _ReadWriteBarrier(void);
+#@@ -784,2 +785,3 @@
+# #elif defined(_M_X64)
+#+#undef _ReadWriteBarrier
+#     void _ReadWriteBarrier(void);
+#@@ -790,2 +792,3 @@
+# #elif defined(_M_IX86)
+#+#undef _ReadWriteBarrier
+#     void _ReadWriteBarrier(void);
+#EOF
 #wl-showstatus build &&
 # touch SUCCESS &&
 # for F in $(find -name '*.c'|grep -v cyg); do
@@ -291,6 +312,7 @@ wl-showstatus build &&
  sed -e "s?/inc/?/include/?; s?-\${arch}??" src/dll/fuse/fuse.pc.in > fuse.pc &&
  ar cr libwinfsp.a obj/*.o &&
  ${CC:-gcc} -shared -s -mwindows -o winfsp.dll obj/*.o -Wl,--out-implib,libwinfsp.dll.a -Wl,--output-def winfsp.def -lrpcrt4 -lcredui -lsecur32 -lversion -lnetapi32 -lwldap32 -lole32 &&
+ #${CC:-gcc} -shared -s -mwindows -o winfsp.dll libwinfsp.a -Wl,--out-implib,libwinfsp.dll.a -Wl,--output-def winfsp.def -lrpcrt4 -lcredui -lsecur32 -lversion -lnetapi32 -lwldap32 -lole32 -lshlwapi &&
  wl-showstatus build &&
  mkdir -p $INSTALLPREFIX/share/winfsp/include $INSTALLPREFIX/share/winfsp/lib/pkgconfig $INSTALLPREFIX/share/winfsp/bin &&
  cp -rf inc/* $INSTALLPREFIX/share/winfsp/include/ &&
