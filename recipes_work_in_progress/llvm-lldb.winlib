@@ -33,18 +33,21 @@ patch -ulbf source/API/CMakeLists.txt << EOF
 +    set(LLDB_CLANG_RESOURCE_DIR_PARENT "\${CMAKE_CURRENT_BINARY_DIR}/bin/clang")
      file(MAKE_DIRECTORY "\${LLDB_CLANG_RESOURCE_DIR_PARENT}")
 EOF
+# avoid symbolic links (version >= 16.0.0)
+sed -i.bak2 -e "s/create_symlink/copy/" source/API/CMakeLists.txt
 ## fix CMakeLists.txt (version >= 16.0.0rc2)
 #sed -i.bak2 -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
+ #PATH=$MINGWPREFIX/share/llvm-split/bin:$PATH \
+ # -DLLDB_TABLEGEN_EXE:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+ # -DCMAKE_SYSTEM_NAME:STRING=Windows \
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
   -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
   -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
   -DLLVM_COMMON_CMAKE_UTILS:PATH=$MINGWPREFIX/share/llvm-split/share/cmake \
   -DLLVM_TABLEGEN:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
-  -DLLDB_TABLEGEN_EXE:FILEPATH=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
-  -DLLDB_EXTERNAL_CLANG_RESOURCE_DIR:PATH=$MINGWPREFIX//share/llvm-split/include/clang \
-  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DLLDB_EXTERNAL_CLANG_RESOURCE_DIR:PATH=$MINGWPREFIX/share/llvm-split/include/clang \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DLLDB_BUILD_FRAMEWORK:BOOL=OFF \
   -DLLDB_ENABLE_LIBEDIT:BOOL=ON \
@@ -67,11 +70,11 @@ mkdir -p build_win &&
   -S. -Bbuild_win &&
  # -DFLANG_STANDALONE_BUILD:BOOL=ON \
  # -DLLVM_TABLEGEN:STRING=$MINGWPREFIX/share/llvm-split/bin/llvm-tblgen.exe \
+ # fix missing link libraries
+ sed -i.bak -e "s?^\s*LINK_LIBRARIES\s*=.*?& -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX/share/llvm-split/lib) -lLLVMSupport?" build_win/build.ninja &&
  wl-showstatus build-install &&
- ninja -Cbuild_win install/strip &&
- #PATH=$PWD/build_win/bin:$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -Cbuild_win install/strip &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lldb-$VERSION.src
+ PATH=$MINGWPREFIX/share/llvm-split/bin:$PATH ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lldb-$VERSION.src
 
 
 
