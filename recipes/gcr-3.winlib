@@ -1,0 +1,334 @@
+export NAME="gcr-3"
+export STATUS=
+#export URL=http://developer.gnome.org/gcr/
+export URL=https://gitlab.gnome.org/GNOME/gcr
+export BASENAME=gcr-3
+export DESCRIPTION="A library for bits of crypto UI and parsing etc."
+export CATEGORY=security
+export TYPE=library
+#export VERSION=3.35.1
+#export VERSIONDATE=20200106
+#export VERSION=3.36.0
+#export VERSIONDATE=20200311
+#export VERSION=3.37.91
+#export VERSIONDATE=20200920
+#export VERSION=3.38.0
+#export VERSIONDATE=20200929
+#export VERSION=3.38.1
+#export VERSIONDATE=20210113
+#export VERSION=3.40.0
+#export VERSIONDATE=20210327
+#export VERSION=3.41.0
+#export VERSIONDATE=20210930
+export VERSION=3.41.1
+export VERSIONDATE=20220714
+export DEPENDENCIES=glib2,gettext,p11-kit,pthreads,pango,cairo,libgcrypt,gtk3,gdk-pixbuf,mman-win32,sys_wait_h,gobject-introspection,vala
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
+export OPTIONALBUILDDEPENDENCIES=
+wl-showstatus --package-version
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://download.gnome.org/sources/gcr/"
+export DOWNLOADURL="https://gitlab.gnome.org/GNOME/gcr/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://download.gnome.org/sources/gcr/$(echo $VERSION|sed 's/^\([0-9]*\.[0-9]*\)\..*$/\1/')/gcr-$VERSION.tar.xz
+export DOWNLOADSOURCEURL=https://gitlab.gnome.org/GNOME/gcr/-/archive/$VERSION/gcr-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+#tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+tar xj --force-local -f $TARBALLDIR/$BASENAME/gcr-$VERSION.tar.bz2
+cd gcr-$VERSION
+# fix missing gmtime_r
+for F in $(grep -l gmtime_r $(find -name '*.c')); do
+ mv $F $F.bak &&
+ echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > $F &&
+ echo "#include <time.h>" >> $F &&
+ cat $F.bak >> $F
+done
+# fix missing strptime in gck/gck-slot.c (version >= 3.40.0)
+mv gck/gck-slot.c gck/gck-slot.c.bak &&
+echo "#define strptime(s,dmt,tm) NULL" > gck/gck-slot.c &&
+cat gck/gck-slot.c.bak >> gck/gck-slot.c
+# fix missing strptime in gcr/gcr-record.c (version >= 3.40.0)
+mv gcr/gcr-record.c gcr/gcr-record.c.bak &&
+echo "#define strptime(s,dmt,tm) NULL" > gcr/gcr-record.c &&
+cat gcr/gcr-record.c.bak >> gcr/gcr-record.c
+# fix invalid includes and undefine GCR_SSH_ASKPASS_TOOL in gcr/gcr-ssh-askpass.c
+sed -i.bak -e "s?#include <\(glib-unix\.h\|sys/socket\.h\|sys/un\.h\)>?#undef GCR_SSH_ASKPASS_TOOL?"
+# fix missing gdk/gdkx.h
+sed -i.bak -e "s?gdk/gdkx\.h?gdk/gdk.h?" $(grep -l gdkx.h $(find -name '*.c'))
+# fix egg/test-asn1x.c (version >= 3.40.0)
+patch -ulbf egg/test-asn1x.c << EOF
+@@ -28,3 +28,5 @@
+
++#ifndef _WIN32
+ #include <pwd.h>
++#endif
+ #include <stdlib.h>
+EOF
+# fix gcr/test-secure-memory.c (version >= 3.40.0)
+patch -ulbf gcr/test-secure-memory.c << EOF
+@@ -33,3 +33,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <sys/resource.h>
++#endif
+ #include <unistd.h>
+@@ -57,2 +59,6 @@
+ {
++#ifdef _WIN32
++       g_test_skip ("getrlimit() not available on Windows");
++       return 0;
++#else
+        struct rlimit memlock;
+@@ -85,2 +91,3 @@
+        return memlock.rlim_cur;
++#endif
+ }
+EOF
+# fix gck/gck-attributes.c (version >= 3.40.0)
+patch -ulbf gck/gck-attributes.c << EOF
+@@ -46,3 +46,5 @@
+
++#ifndef _WIN32
+ G_STATIC_ASSERT (sizeof (GckAttribute) == sizeof (CK_ATTRIBUTE));
++#endif
+
+EOF
+# fix gcr/gcr-gnupg-process.c (version >= 3.40.0)
+patch -ulbf gcr/gcr-gnupg-process.c << EOF
+@@ -35,2 +35,17 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++static int kill (DWORD pid, int sig)
++{
++ BOOL status;
++ HANDLE hProcess;
++ if ((hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid)) == NULL || hProcess == INVALID_HANDLE_VALUE)
++  return -1;
++ status = TerminateProcess(hProcess, ~0);
++ CloseHandle(hProcess);
++ return (status ? 0 : -1);
++}
++#include <fcntl.h>
++#define pipe(fds) _pipe((fds), 4096, _O_BINARY)
++#endif
+
+@@ -909,4 +924,6 @@
+                if (child_fds[i] >= 0) {
++#ifdef FD_CLOEXEC
+                        val = fcntl (child_fds[i], F_GETFD);
+                        fcntl (child_fds[i], F_SETFD, val & ~FD_CLOEXEC);
++#endif
+                }
+EOF
+# fix gcr/gcr-ssh-askpass.c (version >= 3.40.0)
+patch -ulbf gcr/gcr-ssh-askpass.c << EOF
+@@ -23,3 +23,7 @@
+
++#ifdef _WIN32
++#include <glib.h>
++#else
+ #include <glib-unix.h>
++#endif
+ #include <glib/gi18n.h>
+@@ -27,4 +31,8 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+ #include <sys/un.h>
++#endif
+
+@@ -240,2 +248,6 @@
+ {
++#ifdef _WIN32
++       g_warning ("UNIX sockets not supported on Windows");
++       return TRUE;
++#else
+        GcrSshAskpass *self = user_data;
+@@ -266,2 +278,3 @@
+        return TRUE;
++#endif
+ }
+@@ -271,2 +284,5 @@
+ {
++#ifdef _WIN32
++       g_warning ("UNIX sockets not supported on Windows");
++#else
+        GcrSshAskpass *self = GCR_SSH_ASKPASS (obj);
+@@ -309,2 +325,3 @@
+        self->source = g_unix_fd_add (self->fd, G_IO_IN, askpass_accept, self);
++#endif
+ }
+@@ -418,3 +435,5 @@
+        /* Close the control terminal */
++#ifndef _WIN32
+        setsid ();
++#endif
+ }
+@@ -455,3 +474,5 @@
+        GString *message;
++#ifndef _WIN32
+        struct sockaddr_un addr;
++#endif
+        const gchar *path;
+@@ -469,2 +490,6 @@
+
++#ifdef _WIN32
++       g_warning ("UNIX sockets not supported on Windows");
++       return -1;
++#else
+        fd = socket (AF_UNIX, SOCK_STREAM, 0);
+@@ -482,2 +507,3 @@
+        }
++#endif
+
+@@ -498,2 +524,3 @@
+
++#ifndef _WIN32
+        if (shutdown (fd, SHUT_WR) < 0) {
+@@ -502,2 +529,3 @@
+        }
++#endif
+
+EOF
+# fix missing syslog stuff in ui/gcr-prompter-tool.c (version >= 3.40.0)
+patch -ulbf ui/gcr-prompter-tool.c << EOF
+@@ -33,3 +33,14 @@
+ #include <string.h>
++#ifdef _WIN32
++#define LOG_CRIT    2
++#define LOG_ERR     3
++#define LOG_WARNING 4
++#define LOG_NOTICE  5
++#define LOG_INFO    6
++#define LOG_DEBUG   7
++#define openlog(...)
++#define syslog(...)
++#else
+ #include <syslog.h>
++#endif
+
+EOF
+## fix gcr/gcr-ssh-agent-process.c (version >= 3.41.0)
+#patch -ulbf gcr/gcr-ssh-agent-process.c << EOF
+#@@ -29,4 +29,6 @@
+#
+#+#ifndef _WIN32
+# #include <gio/gunixsocketaddress.h>
+# #include <glib-unix.h>
+#+#endif
+# #include <glib/gstdio.h>
+#@@ -180,2 +182,5 @@
+# {
+#+#ifdef _WIN32
+#+       return FALSE;
+#+#else
+#        const gchar *argv[] = { SSH_AGENT_EXECUTABLE, "-D", "-a", self->path, NULL };
+#@@ -196,2 +201,3 @@
+#        return TRUE;
+#+#endif
+# }
+#@@ -211,2 +217,5 @@
+# {
+#+#ifdef _WIN32
+#+       return NULL;
+#+#else
+#        gboolean started = FALSE;
+#@@ -255,2 +264,3 @@
+#        return connection;
+#+#endif
+# }
+#EOF
+## fix gcr/test-ssh-agent-service.c (version >= 3.41.0)
+#patch -ulbf gcr/test-ssh-agent-service.c << EOF
+#@@ -33,3 +33,5 @@
+# #include <glib/gstdio.h>
+#+#ifndef _WIN32
+# #include <gio/gunixsocketaddress.h>
+#+#endif
+#
+#@@ -74,2 +76,3 @@
+# {
+#+#ifndef _WIN32
+#        const gchar *envvar;
+#@@ -95,2 +98,3 @@
+#        g_object_unref (client);
+#+#endif
+# }
+#EOF
+## fix gcr/gcr-ssh-agent-service.c (version >= 3.41.0)
+#patch -ulbf gcr/gcr-ssh-agent-service.c << EOF
+#@@ -37,3 +37,5 @@
+#
+#+#ifndef _WIN32
+# #include <gio/gunixsocketaddress.h>
+#+#endif
+# #include <glib/gstdio.h>
+#@@ -408,2 +410,6 @@
+#        {
+#+#ifdef _WIN32
+#+               g_warning ("UNIX sockets not supported on Windows");
+#+               return FALSE;
+#+#else
+#                gchar *path;
+#@@ -430,2 +436,3 @@
+#                g_setenv ("SSH_AUTH_SOCK", g_unix_socket_address_get_path (G_UNIX_SOCKET_ADDRESS (self->address)), TRUE);
+#+#endif
+#        }
+#EOF
+# fix use of already defined name interface gck/gck.h (version >= 3.3.4)
+sed -i.bak -e "s/interface/iface/g" gck/gck.h
+# fix already defined environ in gcr/gcr-gnupg-process.c (version >= 3.41.0)
+sed -i.bak -e "s/\benviron\b/environment/" gcr/gcr-gnupg-process.c
+# fix missing gio-unix and gtk+-x11
+sed -i.bak -e "s/gio-unix-/gio-windows-/; s/gtk+-x11/gtk+-win32/" meson.build
+# fix issue updating MIME database (version >= 3.41.0)
+sed -i.bak -e "s/^subprocess.call.*update-mime-database/#&/" meson_post_install.py
+# fix unknown keyword packages (version >= 3.41.0)
+patch -ulbf gck/meson.build << EOF
+@@ -133,3 +133,3 @@
+     nsversion: '@0@'.format(gck_major_version),
+-    packages: gck_deps,
++    dependencies: gck_deps,
+     export_packages: 'gck-@0@'.format(gck_major_version),
+EOF
+patch -ulbf gcr/meson.build << EOF
+@@ -192,3 +192,3 @@
+     nsversion: '@0@'.format(gcr_major_version),
+-    packages: gcr_base_deps,
++    dependencies: gcr_base_deps,
+     export_packages: 'gcr-base-@0@'.format(gcr_major_version),
+EOF
+patch -ulbf ui/meson.build << EOF
+@@ -154,3 +154,3 @@
+     symbol_prefix: 'gcr',
+-    packages: gcr_ui_deps,
++    dependencies: gcr_ui_deps,
+     includes: [
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk=false -Dintrospection=false -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk=true -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk4=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix missing strptime (version >= 3.340.0)
+ #sed -i.bak -e "s/'-D_XOPEN_SOURCE',/& '-D__XSI_VISIBLE=1',/" gcr/meson.build gck/meson.build &&
+ # avoid backslashes in definition of GPG_EXECUTABLE
+ echo "#undef GPG_EXECUTABLE" >> build_both/config.h &&
+ echo "#define GPG_EXECUTABLE \"gpg.exe\"" >> build_both/config.h &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gcr-$VERSION
+
+
+
