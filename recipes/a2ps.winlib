@@ -6,18 +6,22 @@ export BASENAME=a2ps
 export DESCRIPTION="GNU a2ps is an Any to PostScript filter. Of course it processes plain text files, but also pretty prints quite a few popular languages."
 export CATEGORY=fileformat
 export TYPE=application
-export VERSION=4.14
-export VERSIONDATE=20220427
+#export VERSION=4.14
+#export VERSIONDATE=20220427
 #export VERSION=4.15
 #export VERSIONDATE=20230308
 #export VERSION=4.15.1
 #export VERSIONDATE=20230313
-#wexport VERSION=4.15.2
-#export VERSIONDATE=20230320
+#export DEPENDENCIES=gperf
+##export DEPENDENCIES=gperf,sys_wait_h
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+export VERSION=4.15.2
+export VERSIONDATE=20230320
 wl-showstatus --package-version
-export DEPENDENCIES=gperf
-#export DEPENDENCIES=gperf,sys_wait_h
-#export DEPENDENCIES=gperf,fnmatch-win32
+export DEPENDENCIES=gperf,fnmatch-win32
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export BUILDDEPENDENCIES=
@@ -77,31 +81,65 @@ patch -ulbf liba2ps/system.h << EOF
 +#endif
  #include <unistd.h>
 EOF
+# fix liba2ps/tterm.c (version >= 4.15.2)
+patch -ulbf liba2ps/tterm.c << EOF
+@@ -26,4 +26,6 @@
+ #include <limits.h>
++#ifndef _WIN32
+ #include <termios.h>
+ #include <sys/ioctl.h>
++#endif
+
+EOF
+# fix liba2ps/userdata.c (version >= 4.15.2)
+patch -ulbf liba2ps/userdata.c << EOF
+@@ -21,3 +21,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <pwd.h>
++#endif
+
+@@ -35,2 +37,3 @@
+
++#ifndef _WIN32
+   passwd = getpwuid (getuid ());
+@@ -102,2 +105,5 @@
+     }
++#else
++  home = getenv ("LOCALAPPDATA");
++#endif
+
+EOF
+# fix missing stpcpy (version >= 4.15.2)
+for F in $(grep -l stpcpy $(find -name '*.c')); do
+mv $F $F.bak
+cat > $F << EOF
+inline char* stpcpy (char *dest, const char *src)
+{
+  register char *d = dest;
+  register const char *s = src;
+  do
+    *d++ = *s;
+  while (*s++);
+  return (d - 1);
+}
+EOF
+cat $F.bak >> $F
+done
+## skip autoconf version detection
+#sed -i.bak "s/^AC_PREREQ/#&/" configure.ac
 # fix configure
 sed -i.bak "s?alarm (60);?#error Don't use alarm()//&?" configure
 # support ARM64 in config.sub
 sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" auxdir/config.sub
 wl-showstatus configure &&
- #mkdir -p m4 &&
- ##intltoolize -f -c &&
  #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- #./autogen.sh &&
- #    echo OK
- ## fix building DLLs on 64-bit
- #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
- # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
- #fi
- #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
- #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
- #PYTHON=$PYDIR/python.exe 
- #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
  #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-medium=A4 --with-encoding=latin1 &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-medium=A4 --with-encoding=latin1 &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-medium=A4 --with-encoding=latin1 CFLAGS="-Wno-int-conversion" &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-medium=A4 --with-encoding=latin1 CFLAGS="-Wno-int-conversion -I$MINGWPREFIX/include/fnmatch"  LDFLAGS="-Wl,--as-needed -lfnmatch" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-medium=A4 --with-encoding=latin1 CFLAGS="-Wno-int-conversion" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-medium=A4 --with-encoding=latin1 CFLAGS="-Wno-int-conversion -I$MINGWPREFIX/include/fnmatch" LDFLAGS="-Wl,--as-needed -lfnmatch -Wl,--allow-multiple-definition" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static --with-medium=A4 --with-encoding=latin1 CFLAGS="-Wno-int-conversion -I$MINGWPREFIX/win32ports/include" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-medium=A4 --with-encoding=latin1 LDFLAGS="-Wl,--as-needed -lintl" &&
  echo "#define HAVE_MEMPCPY 1" >> config.h &&
