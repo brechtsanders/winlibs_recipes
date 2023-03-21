@@ -23,7 +23,8 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd LCUI-$VERSION
-#echo '#include "../../build/windows/LCUI/resource.h"' > src/platform/resource.h
+# fix missing src/platform/resource.h
+echo '#include "../../build/windows/LCUI/resource.h"' > src/platform/resource.h
 # convert source files from UTF16 to UTF8
 for F in build/windows/LCUI/resource.h build/windows/LCUI/LCUI.rc; do
  if file -i $F|grep -q "charset=utf-16le"; then
@@ -31,6 +32,39 @@ for F in build/windows/LCUI/resource.h build/windows/LCUI/LCUI.rc; do
   iconv -f utf-16le -t utf-8 $F.bak > $F
  fi
 done
+# fix include/LCUI/platform.h (version >= 2.2.0)
+patch -ulbf include/LCUI/platform.h << EOF
+@@ -57,3 +57,3 @@
+                #define LCUI_APP_H <LCUI/platform/windows/uwp.h>
+-       #else
++       #endif
+                #define LCUI_EVENTS_H <LCUI/platform/windows/windows_events.h>
+@@ -62,3 +62,2 @@
+                #define LCUI_DISPLAY_H <LCUI/platform/windows/windows_display.h>-       #endif
+ #else
+EOF
+# fix src/platform/windows/windows_events.c (version >= 2.2.0)
+patch -ulbf src/platform/windows/windows_events.c << EOF
+@@ -140,3 +140,3 @@
+ {
+-       WNDCLASSW wndclass;
++       WNDCLASS wndclass;
+        ASSIGN(app, LCUI_AppDriver);
+@@ -154,8 +154,8 @@
+        wndclass.hIcon = LoadIcon(win.dll_instance,
+-                                 MAKEINTRESOURCE(IDI_LCUI_ICON));
+-       if (!RegisterClassW(&wndclass)) {
++                                 MAKEINTRESOURCE(IDC_ICON));
++       if (!RegisterClass(&wndclass)) {
+                wchar_t str[256];
+-               swprintf(str, 255, __FUNCTIONW__
+-                        L": error code: %d\\n", GetLastError());
+-               MessageBoxW(NULL, str, win.class_name, MB_ICONERROR);
++               swprintf(str, 255, "%s: error code: %d\\n",
++                        __FUNCTION__, GetLastError());
++               MessageBox(NULL, str, win.class_name, MB_ICONERROR);
+                return NULL;
+EOF
 wl-showstatus configure &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  #./autogen.sh &&
@@ -46,8 +80,8 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-pthread &&
- ## fix building DLLs
- #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ## fix detection of shared libraries
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
