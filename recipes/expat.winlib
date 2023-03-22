@@ -111,14 +111,19 @@ cd $BASENAME-$VERSION
 #+list(APPEND _IMPORT_CHECK_FILES_FOR_expat::expat "\${_IMPORT_PREFIX}/lib/libexpat.dll.a" "\${_IMPORT_PREFIX}/bin/libexpat.dll" )
 #
 #EOF
+# allow building shared libraries when using clang
+if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+ sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" $(find -name configure)
+fi
 mkdir -p build_normal build_utf16 build_unsignedshort &&
- wl-showstatus configure &&
+ wl-showstatus preconfigure &&
  aclocal &&
  automake -a -c -f &&
  #mkdir -p m4 &&
  #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  ## allow building shared libraries when using clang
  #sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" configure &&
+ wl-showstatus configure normal &&
  cd build_normal &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM && make install || ( ln -s $INSTALLPREFIX/bin/xmlwf.exe $INSTALLPREFIX/bin/xmlwf && make install && rm $INSTALLPREFIX/bin/xmlwf )
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--export-all" && make install || ( ln -s $INSTALLPREFIX/bin/xmlwf.exe $INSTALLPREFIX/bin/xmlwf && make install && rm $INSTALLPREFIX/bin/xmlwf )
@@ -126,14 +131,13 @@ mkdir -p build_normal build_utf16 build_unsignedshort &&
  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-xmlwf .. LDFLAGS="-s" &&
  ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-xmlwf --without-docbook .. LDFLAGS="-s" &&
  # fix .exe extension for xmlwf
- mv Makefile Makefile.bak && 
- sed -e "s?\(xmlwf/xmlwf\)\( .*/xmlwf\)?\1.exe\2.exe?" Makefile.bak > Makefile &&
+ sed -i.bak -e "s?\(xmlwf/xmlwf\)\( .*/xmlwf\)?\1.exe\2.exe?" Makefile &&
  cd .. &&
- wl-showstatus build-install &&
+ wl-showstatus build-install normal &&
  make -Cbuild_normal install &&
  #( cp $INSTALLPREFIX/bin/libexpat-1.dll $INSTALLPREFIX/bin/libexpat.dll || true ) &&
  # build version for UTF-16 output as wchar_t
- wl-showstatus configure &&
+ wl-showstatus configure utf16 &&
  for F in $(find -name Makefile.am); do
   sed -i.bak1 -e "s/\(libexpat\)\([._]la\)/\1w\2/g" $F
  done &&
@@ -144,10 +148,10 @@ mkdir -p build_normal build_utf16 build_unsignedshort &&
  cd .. &&
  #aclocal &&
  #automake -a -c -f &&
- wl-showstatus build-install &&
+ wl-showstatus build-install utf16 &&
  make -Cbuild_utf16 install &&
  # build version for UTF-16 output as unsigned short
- wl-showstatus configure &&
+ wl-showstatus configure unsignedshort &&
  for F in $(find -name Makefile.am); do
   sed -i.bak2 -e "s/\(libexpat\)w\([._]la\)/\1u\2/g" $F
  done &&
@@ -158,7 +162,7 @@ mkdir -p build_normal build_utf16 build_unsignedshort &&
  cd .. &&
  #aclocal &&
  #automake -a -c -f &&
- wl-showstatus build-install &&
+ wl-showstatus build-install unsignedshort &&
  make -Cbuild_unsignedshort install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 

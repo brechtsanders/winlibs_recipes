@@ -395,7 +395,7 @@ EOF
 # struct formatstring_parser formatstring_ruby =
 #EOF
 # fix missing __chkstk when building with CLang
-if $CC --version|grep -q clang; then
+if ${CC:-gcc} --version|grep -q clang; then
  mkdir -p winfix &&
  echo "void __chkstk() {}" | ${CC:-gcc} -c -xc -o winfix/dummy_chkstk.o - &&
  ar cr winfix/libdummy_chkstk.a winfix/dummy_chkstk.o
@@ -417,8 +417,10 @@ dlopen=''
 dlpreopen=''
 libdir='$INSTALLPREFIX/lib'
 EOF
-## allow building shared libraries when using clang
-#sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" $(find -name configure)
+# allow building shared libraries when using clang
+if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+ sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" $(find -name configure)
+fi
 wl-showstatus configure &&
  ## fix for building DLLs on 64-bit (version <= 0.18.1.1)
  #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
@@ -443,8 +445,9 @@ wl-showstatus configure &&
  # add --disable-openmp to disable dependancy (e.g. in msgmerge) on libwinpthread-1.dll via libgomp-1.dll
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-relocatable --enable-threads=win32 --without-libxml2-prefix --with-libexpat-prefix=$MINGWPREFIX --without-libpth-prefix --without-libcroco-0.6-prefix --without-libunistring-prefix --without-git --disable-openmp LDFLAGS="-lshell32" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-relocatable --enable-threads=win32 --without-libxml2-prefix --with-libexpat-prefix=$MINGWPREFIX --without-libpth-prefix --enable-curses --with-libncurses-prefix=$MINGWPREFIX --without-libcroco-0.6-prefix --without-libunistring-prefix --without-git --disable-openmp LDFLAGS="-lshell32" &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-relocatable --enable-threads=win32 --without-libxml2-prefix --with-libexpat-prefix=$MINGWPREFIX --without-libpth-prefix --enable-curses --with-libncurses-prefix=$MINGWPREFIX --without-libcroco-0.6-prefix --without-libunistring-prefix --without-git --disable-openmp LDFLAGS="-lshell32 $(if $CC --version|grep -q clang; then echo "-L$PWD/winfix -Wl,-ldummy_chkstk"; fi)" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-relocatable --enable-threads=win32 --without-libxml2-prefix --with-libexpat-prefix=$MINGWPREFIX --without-libpth-prefix --enable-curses --with-libncurses-prefix=$MINGWPREFIX --without-libcroco-0.6-prefix --without-libunistring-prefix --without-git --disable-openmp LDFLAGS="-lshell32" LIBS="$(if $CC --version|grep -q clang && echo $RUNPLATFORM | grep -q "^aarch64"; then echo "-Wl,-lclang_rt.builtins-aarch64"; fi)" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-relocatable --enable-threads=win32 --without-libxml2-prefix --with-libexpat-prefix=$MINGWPREFIX --without-libpth-prefix --enable-curses --with-libncurses-prefix=$MINGWPREFIX --without-libcroco-0.6-prefix --without-libunistring-prefix --without-git --disable-openmp LDFLAGS="-lshell32 $(if ${CC:-gcc} --version|grep -q clang; then echo "-L$PWD/winfix -Wl,-ldummy_chkstk"; fi)" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-relocatable --enable-threads=win32 --without-libxml2-prefix --with-libexpat-prefix=$MINGWPREFIX --without-libpth-prefix --enable-curses --with-libncurses-prefix=$MINGWPREFIX --without-libcroco-0.6-prefix --without-libunistring-prefix --without-git --disable-openmp LDFLAGS="-lshell32" LIBS="$(if ${CC:-gcc} --version|grep -q clang && echo $RUNPLATFORM | grep -q "^aarch64"; then echo "-Wl,-lclang_rt.builtins-aarch64"; fi)" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-relocatable --enable-threads=windows --without-included-libxml --with-libxml2-prefix=$MINGWPREFIX --enable-curses --with-libncurses-prefix=$MINGWPREFIX --without-libxcurses-prefix --with-libunistring-prefix=$MINGWPREFIX --without-git CFLAGS="-Wno-incompatible-function-pointer-types" LDFLAGS="-lshell32" LIBS="$(if ${CC:-gcc} --version|grep -q clang && echo $RUNPLATFORM | grep -q "^aarch64"; then echo "-Wl,-lclang_rt.builtins-aarch64"; fi)" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" $(find -name libtool) &&
  # fix detection of shared libraries
