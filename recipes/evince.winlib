@@ -361,6 +361,9 @@ export VERSIONDATE=20220314
 #export VERSION=44.0
 #export VERSIONDATE=20230318
 ####Command '['R:\\winlibs64-11.3.0msvcrt\\evince-43.1\\build_both\\tmp-introspectf4th2994\\EvinceView-3.0.exe', '--introspect-dump=R:\\winlibs64-11.3.0msvcrt\\evince-43.1\\build_both\\tmp-introspectf4th2994\\functions.txt,R:\\winlibs64-11.3.0msvcrt\\evince-43.1\\build_both\\tmp-introspectf4th2994\\dump.xml']' returned non-zero exit status 3221225781.
+#export VERSION=44.1
+#export VERSIONDATE=20230322
+####undefined reference to `poppler_document_new_from_fd'
 wl-showstatus --package-version
 export DEPENDENCIES=atk,cairo,pango,gail,glib2,gtk3,poppler,libxml2,zlib,gettext,libhandy
 export OPTIONALDEPENDENCIES=
@@ -453,7 +456,59 @@ EOF
 #+#if POPPLER_CHECK_VERSION (21, 12, 0) && !defined(_WIN32)
 # #define HAVE_POPPLER_LOAD_FD
 #EOF
-## fix missing ldflag in shell/meson.build (version >= 3.36.7 <= 41.4)
+## fix previewer/ev-previewer.c (version >= 44.1)
+#patch -ulbf previewer/ev-previewer.c << EOF
+#@@ -168,6 +168,11 @@
+#                 struct stat statbuf;
+#+#ifdef F_GETFL
+#                 int flags;
+#+#endif
+#
+#-                if (fstat (input_fd, &statbuf) == -1 ||
+#-                    (flags = fcntl (input_fd, F_GETFL, &flags)) == -1) {
+#+                if (fstat (input_fd, &statbuf) == -1
+#+#ifdef F_GETFL
+#+                    || (flags = fcntl (input_fd, F_GETFL, &flags)) == -1
+#+#endif
+#+                  ) {
+#                         int errsv = errno;
+#@@ -185,2 +190,3 @@
+#
+#+#ifdef F_GETFL
+#                 switch (flags & O_ACCMODE) {
+#@@ -195,2 +201,3 @@
+#                 }
+#+#endif
+#
+#EOF
+## fix libdocument/ev-document.c (version >= 44.1)
+#patch -ulbf libdocument/ev-document.c << EOF
+#@@ -598,3 +598,5 @@
+#         struct stat statbuf;
+#+#ifdef F_GETFL
+#         int fd_flags;
+#+#endif
+#
+#@@ -613,4 +615,7 @@
+#
+#-        if (fstat(fd, &statbuf) == -1 ||
+#-            (fd_flags = fcntl (fd, F_GETFL, &flags)) == -1) {
+#+        if (fstat(fd, &statbuf) == -1
+#+#ifdef F_GETFL
+#+            || (fd_flags = fcntl (fd, F_GETFL, &flags)) == -1
+#+#endif
+#+          ) {
+#                 int errsv = errno;
+#@@ -630,2 +635,3 @@
+#
+#+#ifdef F_GETFL
+#         switch (fd_flags & O_ACCMODE) {
+#@@ -641,2 +647,3 @@
+#         }
+#+#endif
+#
+#EOF
+# fix missing ldflag in shell/meson.build (version >= 3.36.7 <= 41.4)
 patch -ulbf shell/meson.build << EOF
 @@ -87,3 +87,3 @@
 
