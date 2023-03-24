@@ -22,15 +22,19 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xj --force-local -f $TARBALLDIR/$BASENAME/lzma-$VERSION.tar.bz2
 cd lzma-$VERSION
-# allow building shared libraries when using clang
-if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
- sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" configure
-fi
+## allow building shared libraries when using clang
+#if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+# sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" configure
+#fi
 # support ARM64 in config.sub
 sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
 # build and manually create DLL
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build &&
  make -C src/liblzmadec install-strip &&
  #dlltool --export-all-symbols -D lzmadec.dll -l liblzmadec.dll.a -z in.def src/liblzmadec/.libs/liblzmadec.a &&
