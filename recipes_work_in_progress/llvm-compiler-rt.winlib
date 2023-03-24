@@ -10,8 +10,8 @@ export TYPE=application
 export VERSION=16.0.0
 export VERSIONDATE=20230318
 wl-showstatus --package-version
-export DEPENDENCIES=llvm-core,llvm-clang,llvm-libunwind,zlib,zstd,libxml2,libffi,libcurl
-export OPTIONALDEPENDENCIES=
+export DEPENDENCIES=llvm-core,llvm-clang,llvm-libunwind,zlib,zstd,libxml2,libffi,libcurl,cpython-mingw
+export OPTIONALDEPENDENCIES=llvm-test-suite
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=doxygen
 export LICENSEFILE=LICENSE.TXT
@@ -29,11 +29,12 @@ cd compiler-rt-$VERSION.src
 #sed -i.bak -e "s?\(set(LLVM_COMMON_CMAKE_UTILS \)\${CMAKE_CURRENT_SOURCE_DIR}/../cmake?\1$(cygpath -m $MINGWPREFIX/share/llvm-split/share/cmake)?" CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
+ #LLVM_CONFIG_PATH deprecated, instead use: -DLLVM_CMAKE_DIR=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
   -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_CMAKE_DIR=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
   -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
   -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX/share/llvm-split/include \
-  -DLLVM_CONFIG_PATH=$MINGWPREFIX/share/llvm-split/bin/llvm-config.exe \
   -DLLVM_COMMON_CMAKE_UTILS:PATH=$MINGWPREFIX/share/llvm-split/share/cmake \
   -DCMAKE_SYSTEM_NAME:STRING=Windows \
   -DBUILD_SHARED_LIBS:BOOL=ON \
@@ -44,15 +45,19 @@ mkdir -p build_win &&
   -DCOMPILER_RT_DEFAULT_TARGET_ONLY:BOOL=OFF \
   -DCOMPILER_RT_USE_BUILTINS_LIBRARY:BOOL=OFF \
   -DCOMPILER_RT_BUILD_BUILTINS:BOOL=ON \
-  -DCOMPILER_RT_USE_LLVM_UNWINDER:BOOL=ON \
+  -DCOMPILER_RT_SANITIZERS_TO_BUILD:STRING= \
+  -DCOMPILER_RT_USE_LLVM_UNWINDER:BOOL=OFF \
   -DCOMPILER_RT_INCLUDE_TESTS:BOOL=OFF \
   -DPython3_FIND_REGISTRY:BOOL=NEVER \
   -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
   -S. -Bbuild_win &&
+ # -DCOMPILER_RT_USE_LLVM_UNWINDER:BOOL=ON \
+ # -DCOMPILER_RT_SANITIZERS_TO_BUILD:STRING=all \
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf compiler-rt-$VERSION.src
+ mkdir -p $INSTALLPREFIX/share/llvm-split/lib/clang/$(echo $VERSION|sed -e "s/\..*$//")/lib/windows/ &&
+ cp -u $INSTALLPREFIX/share/llvm-split/lib/windows/*.a $INSTALLPREFIX/share/llvm-split/lib/clang/$(echo $VERSION|sed -e "s/\..*$//")/lib/windows/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf compiler-rt-$VERSION.src
 ####TO DO: build for multiple platforms
 
 
