@@ -5,10 +5,10 @@ export BASENAME=libzld
 export DESCRIPTION="Lightweight LLDP Protocol Library"
 export CATEGORY=network
 export TYPE=library
-export VERSION=master
-export VERSIONDATE=20211005
-#export VERSION=0.1-alpha
+#export VERSION=master
 #export VERSIONDATE=20211005
+export VERSION=0.1-alpha
+export VERSIONDATE=20211005
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -19,13 +19,13 @@ export LICENSETYPE=Apache
 export DOWNLOADURL="https://github.com/memnoth/libzld/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 export DOWNLOADSOURCEURL=https://github.com/memnoth/libzld/archive/refs/heads/$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=https://github.com/memnoth/libzld/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/memnoth/libzld/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
-#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix src/include/zl-tlv-common.h
 patch -ulbf src/include/zl-tlv-common.h << EOF
@@ -71,42 +71,88 @@ patch -ulbf tools/send.c << EOF
 +#endif
 
 EOF
-# fix src/Makefile
-patch -ulbf src/Makefile << EOF
-@@ -3,3 +3,3 @@
- LDFLAGS = -shared
--TARGET_LIB = libzld.so
-+TARGET_LIB = libzld.dll
-
-@@ -13,3 +13,4 @@
- \$(TARGET_LIB): \$(OBJS)
--       \$(CC) \${LDFLAGS} -o \$@ \$^
-+$(echo -e '\t')\$(CC) \${LDFLAGS} -o \$@ \$^ -s -mwindows -Wl,--out-implib,\$@.a -lws2_32
-+$(echo -e '\t')ar cr libzld.a \$^
+# fix src/zl-tlv-core.c (version >= 0.1-alpha)
+patch -ulbf src/zl-tlv-core.c << EOF
+@@ -18,3 +18,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <arpa/inet.h>
++#endif
 
 EOF
-# fix tools/Makefile
-patch -ulbf tools/Makefile << EOF
-@@ -7,3 +7,3 @@
+## fix src/Makefile
+#patch -ulbf src/Makefile << EOF
+#@@ -3,3 +3,3 @@
+# LDFLAGS = -shared
+#-TARGET_LIB = libzld.so
+#+TARGET_LIB = libzld.dll
+#
+#@@ -13,3 +13,4 @@
+# \$(TARGET_LIB): \$(OBJS)
+#-       \$(CC) \${LDFLAGS} -o \$@ \$^
+#+$(echo -e '\t')\$(CC) \${LDFLAGS} -o \$@ \$^ -s -mwindows -Wl,--out-implib,\$@.a -lws2_32
+#+$(echo -e '\t')ar cr libzld.a \$^
+#
+#EOF
+# fix src/Makefile (version >= 0.1-alpha)
+patch -ulbf src/Makefile << EOF
+@@ -3,3 +3,5 @@
+ LDFLAGS = -shared
+-TARGET_LIB = libzlldp.so
++LIBS = -lws2_32
++TARGET_LIB = libzlldp.dll
++TARGET_STATIC_LIB = libzlldp.a
 
--TARGET = send
-+TARGET = libzld-send.exe
+@@ -10,6 +12,9 @@
+ .PHONY: all
+-all: \${TARGET_LIB}
++all: \${TARGET_LIB} \$(TARGET_STATIC_LIB)
+
+ \$(TARGET_LIB): \$(OBJS)
+-       \$(CC) \${LDFLAGS} -o \$@ \$^
++$(echo -e '\t')\$(CC) \${LDFLAGS} -s -mwindows -Wl,--out-implib,\$@.a -o \$@ \$^ \$(LIBS)
++
++\$(TARGET_STATIC_LIB): \$(OBJS)
++$(echo -e '\t')\$(AR) cr \$@ \$^
+
+EOF
+## fix tools/Makefile
+#patch -ulbf tools/Makefile << EOF
+#@@ -7,3 +7,3 @@
+#
+#-TARGET = send
+#+TARGET = libzld-send.exe
+#
+#@@ -13,3 +13,3 @@
+# \$(TARGET): \$(OBJS)
+#-       \$(CC) \${LDFLAGS} -o \$@ \$^
+#+$(echo -e '\t')\$(CC) -o \$@ \$^ \${LDFLAGS} -s -lws2_32
+#
+#EOF
+# fix tools/Makefile (version >= 0.1-alpha)
+patch -ulbf tools/Makefile << EOF
+@@ -2,3 +2,3 @@
+ CFLAGS += -g
+-LDFLAGS = -L../src -lzlldp
++LDFLAGS = -L../src -lzlldp -lws2_32
 
 @@ -13,3 +13,3 @@
  \$(TARGET): \$(OBJS)
 -       \$(CC) \${LDFLAGS} -o \$@ \$^
-+$(echo -e '\t')\$(CC) -o \$@ \$^ \${LDFLAGS} -s -lws2_32
++$(echo -e '\t')\$(CC) -o \$@ \$^ \${LDFLAGS}
 
 EOF
 # avoid -fPIC (useless on Windows and not supported by clang) in src/Makefile
 sed -i.bak -e "s/-fPIC//" src/Makefile
 wl-showstatus build &&
- make CC=${CC:-gcc} &&
+ #make CC=${CC:-gcc} AR=${AR:-ar} &&
+ make -Csrc CC=${CC:-gcc} AR=${AR:-ar} &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
  cp -f src/include/*.h $INSTALLPREFIX/include/ &&
  cp -f src/*.a $INSTALLPREFIX/lib/ &&
- cp -f src/*.dll tools/*.exe $INSTALLPREFIX/bin/ &&
+ cp -f src/*.dll $INSTALLPREFIX/bin/ &&
+ #cp -f tools/*.exe $INSTALLPREFIX/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
