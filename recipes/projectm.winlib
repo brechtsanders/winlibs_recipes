@@ -1,3 +1,126 @@
+#export NAME="projectM"
+#export STATUS=
+#export URL=https://github.com/projectM-visualizer/projectm
+#export BASENAME=projectm
+#export DESCRIPTION="projectM - cross-platform music visualization. Open-source and Milkdrop-compatible"
+#export CATEGORY=
+#export TYPE=library
+#export VERSION=3.1.12
+#export VERSIONDATE=20220316
+#wl-showstatus --package-version
+#export DEPENDENCIES=sdl,qt,pulseaudio,jack,libice,glew,glm,libdl
+#export OPTIONALDEPENDENCIES=angle
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE.txt
+#export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://github.com/projectM-visualizer/projectm/releases projectM-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/projectM-visualizer/projectm/releases/download/v$VERSION/projectM-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/projectM-$VERSION.tar.gz
+#cd projectM-$VERSION
+## fix src/libprojectM/FileScanner.cpp (version >= 3.1.12)
+#patch -ulbf src/libprojectM/FileScanner.cpp << EOF
+#@@ -7,2 +7,5 @@
+# #include "FileScanner.hpp"
+#+#ifdef _WIN32
+#+#include <windows.h>
+#+#endif
+#
+#@@ -105,2 +108,11 @@
+#
+#+#ifdef _WIN32
+#+        DWORD attr = GetFileAttributesA(fullPath.c_str());
+#+        if (attr == INVALID_FILE_ATTRIBUTES) {
+#+            continue;
+#+        } else if (attr & FILE_ATTRIBUTE_DIRECTORY) {
+#+            scanGeneric(cb, fullPath.c_str());
+#+            continue;
+#+        }
+#+#else
+#         if (dir_entry->d_type == DT_DIR) {
+#@@ -113,2 +125,3 @@
+#         }
+#+#endif
+#
+#EOF
+## fix undefined _isnan in src/libprojectM/projectM.hpp (version >= 3.1.12)
+#mv src/libprojectM/projectM.hpp src/libprojectM/projectM.hpp.bak &&
+#echo "#include <math.h>" > src/libprojectM/projectM.hpp
+#cat src/libprojectM/projectM.hpp.bak >> src/libprojectM/projectM.hpp
+## fix src/projectM-test/getConfigFilename.cpp (version >= 3.1.12)
+#patch -ulbf src/projectM-test/getConfigFilename.cpp << EOF
+#@@ -50,3 +50,7 @@
+#        projectM_home[strlen(home) + strlen("/.projectM")] = '\\0';
+#+#ifdef _WIN32
+#+       mkdir(projectM_home);
+#+#else
+#        mkdir(projectM_home, 0755);
+#+#endif
+#
+#EOF
+## fix src/projectM-sdl/projectM_SDL_main.cpp (version >= 3.1.12)
+#sed -i.bak -e "s/_MSC_VER/_WIN32/" src/projectM-sdl/projectM_SDL_main.cpp
+## fix src/projectM-sdl/pmSDL.hpp (version >= 3.1.12)
+#sed -i.bak -e "s/\(, \)\(__VA_ARGS__\)/\1##\2/" src/projectM-sdl/pmSDL.hpp
+## fix src/projectM-jack/qprojectM-jack.cpp (version >= 3.1.12)
+#patch -ulbf src/projectM-jack/qprojectM-jack.cpp << EOF
+#@@ -126,3 +126,7 @@
+#      projectM_home[strlen(home)+strlen("/.projectM")]='\\0';
+#+#ifdef _WIN32
+#+     mkdir(projectM_home);
+#+#else
+#      mkdir(projectM_home,0755);
+#+#endif
+#
+#EOF
+## fix src/projectM-pulseaudio/qprojectM-pulseaudio.cpp (version >= 3.1.12)
+#patch -ulbf src/projectM-pulseaudio/qprojectM-pulseaudio.cpp << EOF
+#@@ -201,3 +201,7 @@
+#                 }
+#+#ifdef _WIN32
+#+                mkdir(projectM_config);
+#+#else
+#                 mkdir(projectM_config, 0755);
+#+#endif
+#                 strcat(projectM_config, "/config.inp");
+#EOF
+#wl-showstatus configure &&
+# #mkdir -p m4 &&
+# ##intltoolize -f -c &&
+# #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# #./autogen.sh &&
+# #    echo OK
+# ## fix building DLLs on 64-bit
+# #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+# # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+# #fi
+# #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+# #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+# #PYTHON=$PYDIR/python.exe 
+# #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+# #QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+# PATH=$PATH:$MINGWPREFIX/qt/bin ./configure --prefix=$(cygpath -m $INSTALLPREFIX) --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-sdl --enable-qt --enable-pulseaudio --enable-jack --with-x CXXFLAGS="-DWIN32 -DprojectM_FONT_TITLE=\\\"Vera.tff\\\" -DprojectM_FONT_MENU=\\\"VeraMono.tff\\\" -I$MINGWPREFIX/include/GL -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lole32 -lksguid -lglew32 -ldl -L$MINGWPREFIX/qt/lib" &&
+# ## fix building DLLs
+# #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# ## fix detection of shared libraries
+# #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+# #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+# #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+# #wl-showstatus build &&
+# #make &&
+# wl-showstatus build-install &&
+# PATH=$PATH:$MINGWPREFIX/qt/bin make install-strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf projectM-$VERSION
+
+
+
 export NAME="projectM"
 export STATUS=
 export URL=https://github.com/projectM-visualizer/projectm
@@ -5,10 +128,10 @@ export BASENAME=projectm
 export DESCRIPTION="projectM - cross-platform music visualization. Open-source and Milkdrop-compatible"
 export CATEGORY=
 export TYPE=library
-export VERSION=3.1.12
-export VERSIONDATE=20220316
+export VERSION=4.0.0
+export VERSIONDATE=20230401
 wl-showstatus --package-version
-export DEPENDENCIES=sdl,qt,pulseaudio,jack,libice,glew,glm,libdl
+export DEPENDENCIES=pulseaudio,jack,libice,glew,glm,libdl
 export OPTIONALDEPENDENCIES=angle
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -16,107 +139,22 @@ export LICENSEFILE=LICENSE.txt
 export LICENSETYPE=LGPL
 export DOWNLOADURL="https://github.com/projectM-visualizer/projectm/releases projectM-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/projectM-visualizer/projectm/releases/download/v$VERSION/projectM-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/projectM-visualizer/projectm/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xz --force-local -f $TARBALLDIR/$BASENAME/projectM-$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd projectM-$VERSION
-# fix src/libprojectM/FileScanner.cpp (version >= 3.1.12)
-patch -ulbf src/libprojectM/FileScanner.cpp << EOF
-@@ -7,2 +7,5 @@
- #include "FileScanner.hpp"
-+#ifdef _WIN32
-+#include <windows.h>
-+#endif
-
-@@ -105,2 +108,11 @@
-
-+#ifdef _WIN32
-+        DWORD attr = GetFileAttributesA(fullPath.c_str());
-+        if (attr == INVALID_FILE_ATTRIBUTES) {
-+            continue;
-+        } else if (attr & FILE_ATTRIBUTE_DIRECTORY) {
-+            scanGeneric(cb, fullPath.c_str());
-+            continue;
-+        }
-+#else
-         if (dir_entry->d_type == DT_DIR) {
-@@ -113,2 +125,3 @@
-         }
-+#endif
-
-EOF
-# fix undefined _isnan in src/libprojectM/projectM.hpp (version >= 3.1.12)
-mv src/libprojectM/projectM.hpp src/libprojectM/projectM.hpp.bak &&
-echo "#include <math.h>" > src/libprojectM/projectM.hpp
-cat src/libprojectM/projectM.hpp.bak >> src/libprojectM/projectM.hpp
-# fix src/projectM-test/getConfigFilename.cpp (version >= 3.1.12)
-patch -ulbf src/projectM-test/getConfigFilename.cpp << EOF
-@@ -50,3 +50,7 @@
-        projectM_home[strlen(home) + strlen("/.projectM")] = '\\0';
-+#ifdef _WIN32
-+       mkdir(projectM_home);
-+#else
-        mkdir(projectM_home, 0755);
-+#endif
-
-EOF
-# fix src/projectM-sdl/projectM_SDL_main.cpp (version >= 3.1.12)
-sed -i.bak -e "s/_MSC_VER/_WIN32/" src/projectM-sdl/projectM_SDL_main.cpp
-# fix src/projectM-sdl/pmSDL.hpp (version >= 3.1.12)
-sed -i.bak -e "s/\(, \)\(__VA_ARGS__\)/\1##\2/" src/projectM-sdl/pmSDL.hpp
-# fix src/projectM-jack/qprojectM-jack.cpp (version >= 3.1.12)
-patch -ulbf src/projectM-jack/qprojectM-jack.cpp << EOF
-@@ -126,3 +126,7 @@
-      projectM_home[strlen(home)+strlen("/.projectM")]='\\0';
-+#ifdef _WIN32
-+     mkdir(projectM_home);
-+#else
-      mkdir(projectM_home,0755);
-+#endif
-
-EOF
-# fix src/projectM-pulseaudio/qprojectM-pulseaudio.cpp (version >= 3.1.12)
-patch -ulbf src/projectM-pulseaudio/qprojectM-pulseaudio.cpp << EOF
-@@ -201,3 +201,7 @@
-                 }
-+#ifdef _WIN32
-+                mkdir(projectM_config);
-+#else
-                 mkdir(projectM_config, 0755);
-+#endif
-                 strcat(projectM_config, "/config.inp");
-EOF
-wl-showstatus configure &&
- #mkdir -p m4 &&
- ##intltoolize -f -c &&
- #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- #./autogen.sh &&
- #    echo OK
- ## fix building DLLs on 64-bit
- #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
- # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
- #fi
- #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
- #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
- #PYTHON=$PYDIR/python.exe 
- #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
- #QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
- PATH=$PATH:$MINGWPREFIX/qt/bin ./configure --prefix=$(cygpath -m $INSTALLPREFIX) --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-sdl --enable-qt --enable-pulseaudio --enable-jack --with-x CXXFLAGS="-DWIN32 -DprojectM_FONT_TITLE=\\\"Vera.tff\\\" -DprojectM_FONT_MENU=\\\"VeraMono.tff\\\" -I$MINGWPREFIX/include/GL -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lole32 -lksguid -lglew32 -ldl -L$MINGWPREFIX/qt/lib" &&
- ## fix building DLLs
- #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
- ## fix detection of shared libraries
- #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
- #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
- #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
- #wl-showstatus build &&
- #make &&
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- PATH=$PATH:$MINGWPREFIX/qt/bin make install-strip &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf projectM-$VERSION
 
 
