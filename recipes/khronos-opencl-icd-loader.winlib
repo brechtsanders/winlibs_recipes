@@ -163,10 +163,16 @@ mkdir -p build_static build_shared &&
  ##sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcfgmgr32/" build_shared/build.ninja &&
  ##sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcfgmgr32/; s?\(LINK_FLAGS\s*=\s*\)\(\.\.\\\\loader\\\\windows\\\\OpenCL\.def\)?\1-Wl,--add-stdcall-alias -Wl,--kill-at \2?" build_shared/build.ninja &&
  #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcfgmgr32/; s?\(LINK_FLAGS\s*=\s*\)\(\.\.\\\\loader\\\\windows\\\\OpenCL\.def\)?\1-Wl,--add-stdcall-alias -Wl,--enable-stdcall-fixup \2?" build_shared/build.ninja &&
+ #cp loader/windows/OpenCL.def loader/windows/OpenCL-mingw-i686.def &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
- ninja -Cbuild_shared install/strip &&
+ #ninja -Cbuild_shared install/strip &&
+ ( ninja -Cbuild_shared install/strip || (
+  # avoid @-sign in exported symbols on 32-bit Windows (version >= 2023.02.06)
+  ls -1 loader/windows/OpenCL-mingw-i686.def &> /dev/null && cp -f loader/windows/OpenCL.def loader/windows/OpenCL-mingw-i686.def
+  ninja -Cbuild_shared install/strip 
+ )) &&
  #( echo "EXPORTS" && nm -f posix --defined-only -p build_static/libOpenCL.a | sed -ne "s/^\(_*cl[^ ]*\) T .*$/\1/p" | sed -e "s/^\(_\)\(cl.*\)@[0-9]*$/&\n\1\2=&\n\2=&/" ) > loader/windows/OpenCL_with_aliases.def &&
  #mkdir -p $INSTALLPREFIX/bin &&
  #gcc -shared -s -mwindows -def loader/windows/OpenCL_with_aliases.def -o $INSTALLPREFIX/bin/libOpenCL.dll build_static/libOpenCL.a -Wl,--compat-implib -Wl,--kill-at -Wl,--no-leading-underscore -Wl,--out-implib,$INSTALLPREFIX/lib/libOpenCL.dll.a -lcfgmgr32  -lruntimeobject  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 &&
