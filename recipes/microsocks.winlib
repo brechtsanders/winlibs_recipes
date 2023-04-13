@@ -1,0 +1,80 @@
+export NAME="microsocks"
+export STATUS=
+export URL=https://github.com/rofl0r/microsocks
+export BASENAME=microsocks
+export DESCRIPTION="tiny, portable SOCKS5 server with very moderate resource usage"
+export CATEGORY=communication
+export TYPE=application
+export VERSION=1.0.3
+export VERSIONDATE=20230413
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/rofl0r/microsocks/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rofl0r/microsocks/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix server.h (version >= 1.0.3)
+patch -ulbf server.h << EOF
+@@ -6,2 +6,6 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <sys/socket.h>
+@@ -9,2 +13,3 @@
+ #include <netinet/in.h>
++#endif
+
+EOF
+# fix sockssrv.c (version >= 1.0.3)
+patch -ulbf sockssrv.c << EOF
+@@ -31,4 +31,10 @@
+ #include <signal.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#define poll WSAPoll
++#define dprintf(fd, ...) fprintf(stderr, __VA_ARGS__)
++#else
+ #include <poll.h>
+ #include <arpa/inet.h>
++#endif
+ #include <errno.h>
+@@ -405,2 +411,8 @@
+        unsigned port = 1080;
++#ifdef _WIN32
++        static WSADATA wsaData;
++        if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
++                fprintf(stderr, "Attempting to initialize Winsock failed\\n");
++        atexit((void(*)())WSACleanup);
++#endif
+        while((ch = getopt(argc, argv, ":1b:i:p:u:P:")) != -1) {
+@@ -442,3 +454,5 @@
+        }
++#ifdef SIGPIPE
+        signal(SIGPIPE, SIG_IGN);
++#endif
+        struct server s;
+EOF
+wl-showstatus build &&
+ make PROG=microsocks.exe CC=${CC:-gcc} LIBS="-pthread -lws2_32" &&
+ ${STRIP:-strip} *.exe &&
+ wl-showstatus install &&
+ make install PROG=microsocks.exe prefix=$INSTALLPREFIX &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#mkdir -p microsocks &&
+# copypedeps -r $MINGWPREFIX/bin/microsocks.exe microsocks &&
+# echo Done
