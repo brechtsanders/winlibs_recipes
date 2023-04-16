@@ -36,11 +36,19 @@ cd jdk-jdk-$VERSION
 wl-download -v -d $TARBALLDIR/$BASENAME https://download.java.net/java/GA/jdk19/877d6127e982470ba2a7faa31cc93d04/36/GPL/openjdk-19_windows-x64_bin.zip
 unzip -oq $TARBALLDIR/$BASENAME/openjdk-19_windows-x64_bin.zip -dbootstrap
 BOOTSTRAPDIR=$PWD/bootstrap/jdk-19
-# fix build/.configure-support/generated-configure.sh (version >= 20-16)
-sed -i.bak -e "s/\(VALID_TOOLCHAINS_windows=\"\)\(microsoft\)/\1gcc clang \2/; s/as_fn_error\(.*\)\(Could not find a proper .*VC\|Could not find \$DLL_NAME\)/echo\1\2/" build/.configure-support/generated-configure.sh
+## fix build/.configure-support/generated-configure.sh (version >= 20-16)
+#sed -i.bak -e "s/\(VALID_TOOLCHAINS_windows=\"\)\(microsoft\)/\1gcc clang \2/; s/as_fn_error\(.*\)\(Could not find a proper .*VC\|Could not find \$DLL_NAME\)/echo\1\2/" build/.configure-support/generated-configure.sh
 #sed -i.bak -e "s/\$as_echo\(.*Toolchain type .* is not valid on this platform\)/echo\1/" build/.configure-support/generated-configure.sh
 # fix  make/scripts/fixpath.sh (version >= 20-16)
 sed -i.bak -e "s?winpath=\"\${winpath//'/'/'\\\\'}\"?winpath=\$winpath #&?" make/scripts/fixpath.sh
+# fix make/autoconf/toolchain.m4 (version >= 19-1)
+patch -ulbf make/autoconf/toolchain.m4 << EOF
+@@ -43,3 +43,3 @@
+ VALID_TOOLCHAINS_aix="xlc"
+-VALID_TOOLCHAINS_windows="microsoft"
++VALID_TOOLCHAINS_windows="gcc microsoft"
+
+EOF
 wl-showstatus configure &&
  #wl-showstatus preconfigure &&
  #mkdir -p m4 &&
@@ -100,19 +108,38 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/jdk-$(echo $VERSION|tr - +).tar.gz
 cd jdk-jdk-$VERSION
-# fix build/.configure-support/generated-configure.sh (version >= 19-1)
-patch -ulbf build/.configure-support/generated-configure.sh << EOF
-@@ -32833,3 +32833,3 @@
-       ;;
--    *msys*)
-+    *msys* | mingw*)
-       VAR_OS=windows
-@@ -33104,3 +33104,3 @@
+# downoad bootstrap JDK
+wl-download -v -d $TARBALLDIR/$BASENAME https://download.java.net/java/GA/jdk19.0.2/fdb695a9d9064ad6b064dc6df578380c/7/GPL/openjdk-19.0.2_windows-x64_bin.zip
+unzip -oq $TARBALLDIR/$BASENAME/openjdk-19.0.2_windows-x64_bin.zip -dbootstrap
+# fix make/autoconf/platform.m4 (version >= 19-1)
+patch -ulbf make/autoconf/platform.m4 << EOF
+@@ -214,3 +214,3 @@
        ;;
 -    *msys*)
 +    *msys* | mingw*)
        VAR_OS=windows
 EOF
+# fix make/autoconf/toolchain.m4 (version >= 19-1)
+patch -ulbf make/autoconf/toolchain.m4 << EOF
+@@ -43,3 +43,3 @@
+ VALID_TOOLCHAINS_aix="xlc"
+-VALID_TOOLCHAINS_windows="microsoft"
++VALID_TOOLCHAINS_windows="gcc microsoft"
+
+EOF
+## fix build/.configure-support/generated-configure.sh (version >= 19-1)
+#patch -ulbf build/.configure-support/generated-configure.sh << EOF
+#@@ -32833,3 +32833,3 @@
+#       ;;
+#-    *msys*)
+#+    *msys* | mingw*)
+#       VAR_OS=windows
+#@@ -33104,3 +33104,3 @@
+#       ;;
+#-    *msys*)
+#+    *msys* | mingw*)
+#       VAR_OS=windows
+#EOF
 wl-showstatus configure &&
  #wl-showstatus preconfigure &&
  #mkdir -p m4 &&
@@ -141,8 +168,8 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
  #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-toolchain-type=$(if ${CC:-gcc} --version|grep -q "^clang"; then echo "clang"; else echo "gcc"; fi) --with-freetype=system --with-libjpeg=system --with-giflib=system --with-libpng=system --with-zlib=system --with-lcms=system --with-harfbuzz=system --without-x &&
- #--with-boot-jdk
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-toolchain-type=$(if ${CC:-gcc} --version|grep -q "^clang"; then echo "clang"; else echo "gcc"; fi) --with-freetype=system --with-libjpeg=system --with-giflib=system --with-libpng=system --with-zlib=system --with-lcms=system --with-harfbuzz=system --without-x &&
+ ./configure --prefix=$INSTALLPREFIX --openjdk-target=$RUNPLATFORM --with-boot-jdk=$PWD/bootstrap/jdk-19.0.2 --with-toolchain-type=$(if ${CC:-gcc} --version|grep -q "^clang"; then echo "clang"; else echo "gcc"; fi) --with-msvcr-dll=$MINGWDIR/$RUNPLATFORM/lib/libmsvcrt.a --with-freetype=system --with-libjpeg=system --with-giflib=system --with-libpng=system --with-zlib=system --with-lcms=system --with-harfbuzz=system --without-x &&
  #--with-hsdis --with-binutils=
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
