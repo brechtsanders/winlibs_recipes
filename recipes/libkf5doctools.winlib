@@ -83,11 +83,11 @@ export TYPE=library
 #export VERSIONDATE=20230114
 #export VERSION=5.103.0
 #export VERSIONDATE=20230212
+####kf5.kdoctools: "D:/Prog/x86_64-7.2.0-release-posix-seh-rt_v6-rev0/custombuilt/etc/xml/common/l10n.xml" not found
 #export VERSION=5.104.0
 #export VERSIONDATE=20230311
 export VERSION=5.105.0
 export VERSIONDATE=20230408
-####kf5.kdoctools: "D:/Prog/x86_64-7.2.0-release-posix-seh-rt_v6-rev0/custombuilt/etc/xml/common/l10n.xml" not found
 wl-showstatus --package-version
 export DEPENDENCIES=qt,libkf5archive,libkf5i18n,gettext,libxml2,libxslt,docbook,xslt10-stylesheets,xslt20-stylesheets
 #export DEPENDENCIES=qt,libkf5archive,libkf5i18n,gettext,libxml2,libxslt,docbook2x,xslt10-stylesheets,xslt20-stylesheets
@@ -111,15 +111,24 @@ tar xJ --force-local -f $TARBALLDIR/$BASENAME/kdoctools-$VERSION.tar.xz
 cd kdoctools-$VERSION
 ## fix detection of docbook2x 
 #sed -i.bak -e "s?opt/docbook-xsl/docbook-xsl\b?$MINGWPREFIX/share/docbook2X/xslt &?" cmake/FindDocBookXSL.cmake
+# fix detection of docbookx in cmake/FindDocBookXML4.cmake (version >= 5.105.0)
+patch -ulbf cmake/FindDocBookXML4.cmake << EOF
+@@ -30,2 +30,3 @@
+     set (DTD_PATH_LIST
++        etc/xml
+         \${CMAKE_INSTALL_DATAROOTDIR}/xml/docbook/schema/dtd/\${version}
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DDocBookXML4_DTD_DIR:PATH=$MINGWPREFIX/etc/xml -DDocBookXSL_DIR:PATH=$MINGWPREFIX/etc/xml -DKI18N_PYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
  wl-showstatus configure &&
  PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DDocBookXML4_DTD_DIR:PATH=$MINGWPREFIX/etc/xml -DDocBookXSL_DIR:PATH=$MINGWPREFIX/etc/xml -DKI18N_PYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- PATH=$PATH:$MINGWPREFIX/qt/bin ninja -Cbuild_static install/strip &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin ninja -Cbuild_static install/strip &&
+ XML_CATALOG_FILES=$PWD/build_static/src/customization/catalog.xml PATH=$PATH:$MINGWPREFIX/qt/bin ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
- PATH=$PATH:$MINGWPREFIX/qt/bin ninja -Cbuild_shared install/strip &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin ninja -Cbuild_shared install/strip &&
+ XML_CATALOG_FILES=$PWD/build_shared/src/customization/catalog.xml PATH=$PATH:$MINGWPREFIX/qt/bin ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf kdoctools-$VERSION
 
 
