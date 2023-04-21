@@ -24,11 +24,30 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-#export BUILDDEPENDENCIES=meson,ninja
-#export OPTIONALBUILDDEPENDENCIES=
-#-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS
-## fix missing gio-unix
-#sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+# avoid clock_gettime in test/test_vtparse_performance.c (version >= master)
+patch -ulbf test/test_vtparse_performance.c << EOF
+@@ -21,3 +21,8 @@
+ #define _POSIX_C_SOURCE 199309L
++#ifdef _WIN32
++#include <sysinfoapi.h>
++#include <stdint.h>
++#else
+ #include <time.h>
++#endif
+
+@@ -32,2 +37,7 @@
+ static long long int microtime() {
++#ifdef _WIN32
++       FILETIME tp;
++       GetSystemTimeAsFileTime(&tp);
++       return (((uint64_t)tp.dwLowDateTime << 32) + tp.dwHighDateTime) / 10;
++#else
+        struct timespec tp;
+@@ -35,2 +45,3 @@
+        return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
++#endif
+ }
+EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both . build_both &&
