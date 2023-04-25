@@ -1,0 +1,49 @@
+export NAME="SeExpr"
+export STATUS=
+export URL=https://github.com/KDE/kseexpr
+export BASENAME=kseexpr
+export DESCRIPTION="The embeddable expression engine fork for Krita"
+export CATEGORY=
+export TYPE=library
+export VERSION=4.0.4.0
+export VERSIONDATE=20230425
+wl-showstatus --package-version
+export DEPENDENCIES=qt,libkf5i18n,zlib,libpng,gettext
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,extra-cmake-modules,ninja
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://invent.kde.org/graphics/kseexpr/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://invent.kde.org/graphics/kseexpr/-/archive/v$VERSION/$BASENAME-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-v$VERSION.tar.bz2
+cd kseexpr-v$VERSION
+# allow building both static and shared library
+sed -i.bak -e "s/^\(\s*\)\(add_library(\)\([^ ]*\) STATIC \(.*\)$/\1\2\3 \4/" src/KSeExpr/CMakeLists.txt ./src/KSeExprUI/CMakeLists.txt
+#sed -i.bak -e "s/^\(\s*\)\(add_library(\)\([^ ]*\) STATIC \(.*\)$/\1\2\3 \4\n\1set_target_properties(\3 PROPERTIES RUNTIME_OUTPUT_DIRECTORY \${CMAKE_INSTALL_BINDIR})/" src/KSeExpr/CMakeLists.txt ./src/KSeExprUI/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_UTILS:BOOL=ON -DBUILD_DOC:BOOL=OFF -DBUILD_DEMOS:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ #-DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe 
+ # fix missing /dev/null in Command Prompt
+ sed -i.bak -e "s?/dev/null?NUL:?" build_static/build.ninja &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_UTILS:BOOL=ON -DBUILD_DOC:BOOL=OFF -DBUILD_DEMOS:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing /dev/null in Command Prompt
+ sed -i.bak -e "s?/dev/null?NUL:?" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ sed -i -e "s?/lib\(/[^ ]*\.dll\"\)?/bin\1?g" $INSTALLPREFIX/lib/cmake/KSeExpr/KSeExprTargets-release.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf kseexpr-v$VERSION
+
+
+
