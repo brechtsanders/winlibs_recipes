@@ -20,7 +20,8 @@ export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING3
 export LICENSETYPE=GPL
-export DOWNLOADURL="https://github.com/MentorEmbedded/nvptx-tools/releases"
+#export DOWNLOADURL="https://github.com/MentorEmbedded/nvptx-tools/releases"
+export DOWNLOADURL="https://github.com/MentorEmbedded/nvptx-tools/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 export DOWNLOADSOURCEURL=https://github.com/MentorEmbedded/nvptx-tools/archive/$VERSION.tar.gz
 wl-showstatus download
@@ -66,6 +67,28 @@ patch -ulbf libiberty/strerror.c << EOF
 +#endif
 
 EOF
+# fix missing strndup/strsignal/WCOREDUMP in nvptx-as.cc (version >= master)
+mv nvptx-as.cc nvptx-as.cc.bak
+cat > nvptx-as.cc << EOF
+#include <malloc.h>
+#include <string.h>
+#define strndup MY_strndup
+static inline char* strndup (const char* s, size_t n)
+{
+  char* result;
+  size_t len = strlen(s);
+  if (len > n)
+    len = n;
+  result = (char*)malloc(len + 1);
+  if (!result)
+    return 0;
+  result[len] = 0;
+  return (char*)memcpy(result, s, len);
+}
+#define strsignal(sig) "UNKNOWN"
+#define WCOREDUMP(status) 0
+EOF
+cat nvptx-as.cc.bak >> nvptx-as.cc
 ## fix missing files
 #mkdir -p winfix
 #touch winfix/wait.h
