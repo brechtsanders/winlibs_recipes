@@ -1,0 +1,49 @@
+export NAME="preCICE"
+export STATUS=
+export URL=https://precice.org/
+export BASENAME=precice
+export DESCRIPTION="preCICE is an open-source coupling library for partitioned multi-physics simulations, including, but not restricted to fluid-structure interaction and conjugate heat transfer simulations."
+export CATEGORY=science
+export TYPE=library
+export VERSION=2.5.0
+export VERSIONDATE=20230503
+####No package 'mpi-cxx' found
+wl-showstatus --package-version
+export DEPENDENCIES=eigen,libxml2,json,fmt
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/precice/precice/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/precice/precice/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPRECICE_PETScMapping:BOOL=OFF -DPRECICE_MPICommunication:BOOL=OFF -DPRECICE_PythonActions:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ # avoid ninja error: multiple rules generate binprecice
+ sed -i.bak -e "s/^build binprecice: phony/#&/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPRECICE_PETScMapping:BOOL=OFF -DPRECICE_MPICommunication:BOOL=OFF -DPRECICE_PythonActions:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ # avoid ninja error: multiple rules generate binprecice
+ sed -i.bak -e "s/^build binprecice: phony/#&/" build_shared/build.ninja &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

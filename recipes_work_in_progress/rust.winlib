@@ -179,20 +179,34 @@ export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE-MIT
 export LICENSETYPE="Apache/MIT"
 #export DOWNLOADURL="https://www.rust-lang.org/downloads.html rustc- -src.tar.gz"
-#export DOWNLOADURL="https://github.com/rust-lang/rust/releases"
-export DOWNLOADURL="https://forge.rust-lang.org/infra/other-installation-methods.html rustc- -src.tar.gz"
+export DOWNLOADURL="https://github.com/rust-lang/rust/releases"
+#export DOWNLOADURL="https://forge.rust-lang.org/infra/other-installation-methods.html rustc- -src.tar.gz"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-#export DOWNLOADSOURCEURL=https://github.com/rust-lang/rust/archive/refs/tags/$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://static.rust-lang.org/dist/rustc-$VERSION-src.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/rust-lang/rust/archive/refs/tags/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://static.rust-lang.org/dist/rustc-$VERSION-src.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
-tar xz --force-local -f $TARBALLDIR/$BASENAME/rustc-$VERSION-src.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 #cd rustc-$VERSION
-#cd rust-$VERSION
-cd rustc-$VERSION-src
+cd rust-$VERSION
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/rustc-$VERSION-src.tar.gz
+#cd rustc-$VERSION-src
+# download prebuilt version
+mkdir -p prebuilt/download
+wl-download -v -d prebuilt/download $(sed -ne "s?^\s*\"\(.*\-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu\.tar\.xz\)\".*\$?$(sed -ne "s/^\s*\"dist_server\": \"\(.*\)\".*$/\1/p" src/stage0.json)/\1?p" src/stage0.json)
+for F in prebuilt/download/*.tar.xz; do
+ tar xfJ $F -Cprebuilt --strip-components=2
+done
+## fix .exe issue
+#mkdir prebuilt/bin/stripexe
+#mv prebuilt/bin/*.exe prebuilt/bin/stripexe/
+#for F in prebuilt/bin/stripexe/*.exe; do
+# cp -u $F prebuilt/bin/$(basename $F|sed -e "s/\.exe$//")
+#done
+#mv -f prebuilt/bin/stripexe/* prebuilt/bin/
+#rmdir prebuilt/bin/stripexe
 # fix already defined IN in src/llvm/utils/TableGen/CodeEmitterGen.cpp
 sed -i.bak -e "s/\bIN\b/it_&/g" src/llvm/utils/TableGen/CodeEmitterGen.cpp
 ## fix src/bootstrap/bootstrap.py
@@ -204,6 +218,40 @@ sed -i.bak -e "s/\bIN\b/it_&/g" src/llvm/utils/TableGen/CodeEmitterGen.cpp
 #+    return 'x86_64-w64-mingw32'
 #     """Build triple as in LLVM"""
 #EOF
+# fix src/bootstrap/configure.py (version >= 1.69.0)
+patch -ulbf src/bootstrap/configure.py << EOF
+@@ -300,2 +300,8 @@
+
++def exe_suffix():
++    """Return a suffix for executables"""
++    if sys.platform == 'win32':
++        return '.exe'
++    return ''
++
+ for key in known_args:
+@@ -331,14 +337,14 @@
+         for path in os.environ['PATH'].split(os.pathsep):
+-            if os.path.exists(path + '/rustc'):
+-                set('build.rustc', path + '/rustc')
++            if os.path.exists(path + '/rustc' + exe_suffix()):
++                set('build.rustc', path + '/rustc' + exe_suffix())
+                 break
+         for path in os.environ['PATH'].split(os.pathsep):
+-            if os.path.exists(path + '/cargo'):
+-                set('build.cargo', path + '/cargo')
++            if os.path.exists(path + '/cargo' + exe_suffix()):
++                set('build.cargo', path + '/cargo' + exe_suffix())
+                 break
+     elif option.name == 'local-rust-root':
+-        set('build.rustc', value + '/bin/rustc')
+-        set('build.cargo', value + '/bin/cargo')
++        set('build.rustc', value + '/bin/rustc' + exe_suffix())
++        set('build.cargo', value + '/bin/cargo' + exe_suffix())
+     elif option.name == 'llvm-root':
+-        set('target.{}.llvm-config'.format(build()), value + '/bin/llvm-config')
++        set('target.{}.llvm-config'.format(build()), value + '/bin/llvm-config' + exe_suffix())
+     elif option.name == 'llvm-config':
+EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --python=$PYDIR/python.exe &&
  #./configure --prefix=$INSTALLPREFIX --python=$PYDIR/python.exe --disable-clang &&
@@ -212,12 +260,13 @@ wl-showstatus configure &&
  #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --disable-debug --enable-optimize --enable-local-rust --disable-docs &&
  #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --disable-debug --enable-optimize --enable-full-bootstrap --disable-docs &&
  #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --enable-use-libcxx --enable-parallel-compiler --disable-debug --enable-optimize --disable-docs --python=$PYDIR/python.exe &&
- $PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --enable-use-libcxx --disable-debug --disable-docs --python=$PYDIR/python.exe &&
- #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --enable-ninja --enable-use-libcxx --enable-parallel-compiler --disable-debug --enable-optimize --disable-docs --python=$PYDIR/python.exe &&
- ## fix building DLLs
- #mv libtool libtool.bak &&
- #sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
- wl-showstatus build &&
+ #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --enable-use-libcxx --disable-debug --disable-docs --python=$PYDIR/python.exe &&
+ #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$TARGETPLATFORM --disable-debug --disable-llvm-assertions --disable-docs --python=$PYDIR/python.exe &&
+ $PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$TARGETPLATFORM --enable-ninja --disable-debug --disable-llvm-assertions --disable-docs --enable-local-rust --local-rust-root=$PWD/prebuilt --python=$PYDIR/python.exe &&
+ #--enable-use-libcxx 
+ # avoid colon in .d files
+ #sed -i.bak -e "s?\b\([A-Z]\):\\\\?/\1/?g" $(find build/bootstrap -name '*.d') &&
+ #wl-showstatus build &&
  # use PATH=$PATH:$ORIGINAL_PATH to be able to find PowerShell.exe (version >= 1.22.1)
  PATH=$PATH:$ORIGINAL_PATH make &&
  wl-showstatus build-install &&
@@ -225,6 +274,14 @@ wl-showstatus configure &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf rustc-$VERSION
 ####$PYDIR/python.exe x.py --help
+
+
+
+wl-showstatus configure &&
+ PATH=$PYDIR:$PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$TARGETPLATFORM --disable-llvm-assertions --disable-docs --python=$PYDIR/python.exe &&
+    echo OK
+$PYDIR/python.exe x.py --help
+
 
 
 
