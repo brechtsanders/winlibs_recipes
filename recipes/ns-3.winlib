@@ -1,0 +1,50 @@
+export NAME="ns-3"
+export STATUS=
+export URL=https://www.nsnam.org/
+export BASENAME=ns-3
+export DESCRIPTION="ns-3 is a discrete-event network simulator for Internet systems, targeted primarily for research and educational use."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=3.38
+export VERSIONDATE=20230505
+wl-showstatus --package-version
+export DEPENDENCIES=libxml2,gtk3,eigen,gsl,sqlite3
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=cppyy
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://gitlab.com/nsnam/ns-3-dev/-/tags ns-3-dev-ns-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.com/nsnam/ns-3-dev/-/archive/ns-$VERSION/ns-3-dev-ns-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/ns-3-dev-ns-$VERSION.tar.bz2
+cd ns-3-dev-ns-$VERSION
+# fix build-support/macros-and-definitions.cmake (version >= 3.38)
+patch -ulbf build-support/macros-and-definitions.cmake << EOF
+@@ -823,3 +823,3 @@
+     # If Python was not set yet, use the version found by check_deps
+-    check_deps("" "python3" python3_deps)
++    check_deps("" "python" python3_deps)
+     if(python3_deps)
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DNS3_FETCH_OPTIONAL_COMPONENTS:BOOL=OFF -DGTK3_GLIBCONFIG_INCLUDE_DIR:PATH=$MINGWPREFIX/lib/glib-2.0/include -DNS3_PYTHON_BINDINGS:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DNS3_EXAMPLES:BOOL=OFF -DNS3_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=use-after-free" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DNS3_FETCH_OPTIONAL_COMPONENTS:BOOL=OFF -DGTK3_GLIBCONFIG_INCLUDE_DIR:PATH=$MINGWPREFIX/lib/glib-2.0/include -DNS3_PYTHON_BINDINGS:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DNS3_EXAMPLES:BOOL=OFF -DNS3_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=use-after-free" -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ # fix location of .dll files
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ sed -i -e "s?/lib\(/[^/]*\.dll\"\)?/bin\1?g" $INSTALLPREFIX/lib/cmake/ns3/ns3Targets-release.cmake &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ns-3-dev-ns-$VERSION
+
+
+
