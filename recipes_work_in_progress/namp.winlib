@@ -1,0 +1,75 @@
+export NAME="namp"
+export STATUS=
+export URL=https://github.com/d99kris/namp
+export BASENAME=namp
+export DESCRIPTION="Terminal-based audio player"
+export CATEGORY=audio
+export TYPE=application
+export VERSION=2.35
+export VERSIONDATE=20230506
+wl-showstatus --package-version
+export DEPENDENCIES=qt,ncurses,taglib
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export BUILDDEPENDENCIES=meson,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/d99kris/namp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/d99kris/namp/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/audioplayer.cpp (version >= 2.35)
+patch -ulbf src/audioplayer.cpp << EOF
+@@ -22,2 +22,5 @@
+ #include <dirent.h>
++#ifdef _WIN32
++#include <sys/stat.h>
++#endif
+ #include <string.h>
+@@ -300,2 +303,6 @@
+   struct dirent* entry = NULL;
++#ifdef _WIN32
++  struct stat fileinfo;
++  std::string fullpath;
++#endif
+   while ((entry = readdir(dir)))
+@@ -306,4 +313,13 @@
+     }
++#ifdef _WIN32
++    fullpath = p_Path + '\\\\';
++    fullpath.append(entry->d_name);
++    stat(fullpath.c_str(), &fileinfo);
++#endif
+
++#ifdef _WIN32
++    if (S_ISDIR(fileinfo.st_mode))
++#else
+     if (entry->d_type == DT_DIR)
++#endif
+     {
+@@ -313,3 +329,7 @@
+
++#ifdef _WIN32
++    if (S_ISREG(fileinfo.st_mode))
++#else
+     if (entry->d_type == DT_REG)
++#endif
+     {
+EOF
+sed -i.bak -e "s?/usr\(/include/\)?$MINGWPREFIX\1?g" namp.pro
+wl-showstatus configure &&
+ $MINGWPREFIX/qt/bin/qmake -makefile namp.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
+ wl-showstatus build &&
+ mingw32-make &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

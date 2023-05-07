@@ -108,10 +108,12 @@ export TYPE=library
 #export OPTIONALDEPENDENCIES=
 #export BUILDDEPENDENCIES=cmake,ninja
 #export OPTIONALBUILDDEPENDENCIES=
-export VERSION=1.0.0
-export VERSIONDATE=20230107
+#export VERSION=1.0.0
+#export VERSIONDATE=20230107
+export VERSION=1.1.0
+export VERSIONDATE=20230507
 wl-showstatus --package-version
-export DEPENDENCIES=apr,apr-util,fmt,pthreads
+export DEPENDENCIES=boost,apr,apr-util,fmt,expat,pthreads
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -126,30 +128,38 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/apache-log4cxx-$VERSION.tar.gz
 cd apache-log4cxx-$VERSION
-# fix missing windows.h (version >= 0.13.0)
-for F in src/main/cpp/nteventlogappender.cpp src/main/cpp/loggingevent.cpp src/main/cpp/charsetdecoder.cpp src/main/cpp/charsetencoder.cpp src/main/cpp/datagramsocket.cpp src/main/cpp/inetaddress.cpp src/main/cpp/serversocket.cpp src/main/cpp/socket.cpp; do
- mv $F $F.bak &&
- echo "#include <windows.h>" > $F &&
- cat $F.bak >> $F
-done
+## fix missing windows.h (version >= 0.13.0)
+#for F in src/main/cpp/nteventlogappender.cpp src/main/cpp/loggingevent.cpp src/main/cpp/charsetdecoder.cpp src/main/cpp/charsetencoder.cpp src/main/cpp/datagramsocket.cpp src/main/cpp/inetaddress.cpp src/main/cpp/serversocket.cpp src/main/cpp/socket.cpp; do
+# mv $F $F.bak &&
+# echo "#include <windows.h>" > $F &&
+# cat $F.bak >> $F
+#done
 # fix unrecognized INFO_FILE_VERSION_STRING in src/main/resources/log4cxx.rc (version >= 0.13.0)
 sed -i.bak "s/INFO_FILE_VERSION_STRING/\"$VERSION\"/" src/main/resources/log4cxx.rc
-# avoid error: log4cxx/private/log4cxx_private.h should only be used within log4cxx implementation or tests (version >= 0.13.0)
-sed -i.bak -e "s?#error\( \"log4cxx/private/log4cxx_private.h should only be used\)?#warning \1?" src/main/include/log4cxx/private/log4cxx_private.h.in
-# fix src/main/include/log4cxx/log4cxx.h.in (version >= 1.0.0)
-patch -ulbf src/main/include/log4cxx/log4cxx.h.in << EOF
-@@ -65,3 +65,3 @@
-
--#if _WIN32
-+#if _MSC_VER
- #define LOG4CXX_DECLARE_PRIVATE_MEMBER_PTR(T, V) \\
+## avoid error: log4cxx/private/log4cxx_private.h should only be used within log4cxx implementation or tests (version >= 0.13.0)
+#sed -i.bak -e "s?#error\( \"log4cxx/private/log4cxx_private.h should only be used\)?#warning \1?" src/main/include/log4cxx/private/log4cxx_private.h.in
+## fix src/main/include/log4cxx/log4cxx.h.in (version >= 1.0.0)
+#patch -ulbf src/main/include/log4cxx/log4cxx.h.in << EOF
+#@@ -65,3 +65,3 @@
+#
+#-#if _WIN32
+#+#if _MSC_VER
+# #define LOG4CXX_DECLARE_PRIVATE_MEMBER_PTR(T, V) \\
+#EOF
+## fix missing struct sockaddr_in (version >= 1.0.0)
+#for F in src/main/cpp/aprdatagramsocket.cpp src/main/cpp/aprserversocket.cpp src/main/cpp/aprsocket.cpp; do
+# mv $F $F.bak &&
+# echo "#include <winsock2.h>" > $F
+# cat $F.bak >> $F
+#done
+# fix src/main/cpp/loggingevent.cpp (version >= 1.1.0)
+patch -ulbf src/main/cpp/loggingevent.cpp << EOF
+@@ -376,3 +376,3 @@
+        log4cxx::helpers::Transcoder::decode(reinterpret_cast<const char*>(result), thread_name);
+-#elif WIN32
++#elif defined(_WIN32)
+        typedef HRESULT (WINAPI *TGetThreadDescription)(HANDLE, PWSTR*);
 EOF
-# fix missing struct sockaddr_in (version >= 1.0.0)
-for F in src/main/cpp/aprdatagramsocket.cpp src/main/cpp/aprserversocket.cpp src/main/cpp/aprsocket.cpp; do
- mv $F $F.bak &&
- echo "#include <winsock2.h>" > $F
- cat $F.bak >> $F
-done
 # fix src/cmake/FindAPR.cmake (version >= 0.12.1)
 patch -ulbf src/cmake/FindAPR.cmake << EOF
 @@ -10,3 +10,3 @@
