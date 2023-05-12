@@ -63,9 +63,11 @@ export TYPE=library
 #export VERSIONDATE=20190430
 #export VERSION=0.14.3
 #export VERSIONDATE=20200227
-export VERSION=0.15.1
-export VERSIONDATE=20221012
-####server/red_channel.h:121:18: error: array type has incomplete element type     struct iovec vec_buf[IOV_MAX];
+#export VERSION=0.15.1
+#export VERSIONDATE=20221012
+####server/red_channel.h:121:18: error: array type has incomplete element type struct iovec vec_buf[IOV_MAX];
+export VERSION=0.15.2
+export VERSIONDATE=20230512
 wl-showstatus --package-version
 export DEPENDENCIES=glib2,spice-protocol,cegui,pixman,cyrus-sasl,pyparsing,libcacard,celt,libxinerama,libjpeg,zlib
 export OPTIONALDEPENDENCIES=glib2,gstreamer,liborc,zlib,liblz4,celt,pixman
@@ -83,7 +85,7 @@ wl-wait4deps
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
 # fix missing files
-mkdir -p sys
+mkdir -p sys arpa
 cat > sys/socket.h << EOF
 #include <winsock2.h>
 //#include <ws2tcpip.h>
@@ -96,6 +98,7 @@ struct timespec {
 */
 #include <pthread.h>
 EOF
+echo "#include <winsock2.h>" > arpa/inet.h
 touch sys/uio.h sys/wait.h
 mkdir -p netinet
 touch netinet/in.h netinet/tcp.h
@@ -112,9 +115,10 @@ EOF
 # fix already defined interface in server/red-qxl.c (version >= 0.13.1)
 #sed -i.bak -e "s/\(\*i\)nter\(face\)/\1\2/g; s/\(i\)nter\(face->\)/\1\2/g" server/red-qxl.c
 sed -i.bak -e "s/\binterface\b/iface/g" server/red-qxl.c
+# skip building docs (version >= 0.15.2)
+sed -i.bak -e "s/\(SUBDIRS =.*\) docs/\1/" Makefile.in subprojects/spice-common/Makefile.in
 # fix configure
-mv configure configure.bak
-sed -e "s/celt051/celt/g; s/\(CPPFLAGS=\"\)\(spice_save_CPPFLAGS\"\)/\1\$\2/" configure.bak > configure
+sed -i.bak -e "s/celt051/celt/g; s/\(CPPFLAGS=\"\)\(spice_save_CPPFLAGS\"\)/\1\$\2/" configure
 # avoid missing gio-unix (version >= 0.14.2)
 sed -i.bak2 -e "s/gio-unix/gio-windows/g" configure
 wl-showstatus configure &&
@@ -123,13 +127,12 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LIBS="-Wl,--as-needed -lws2_32 -ladvapi32" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-sasl &&
  #PYTHON=$PYDIR/python.exe PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/python/Lib/site-packages ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-sasl &&
- PYTHON=$PYDIR/python.exe PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/python/Lib/site-packages ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-sasl --enable-lz4 --enable-celt CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ PYTHON=$PYDIR/python.exe PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/python/Lib/site-packages ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-sasl --enable-lz4 --enable-celt --disable-tests CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" subprojects/spice-common/libtool &&
  PATH=$PYDIR:$PATH make install-strip &&
-    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
-    make install-pkgconfigDATA
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
 
 
 
