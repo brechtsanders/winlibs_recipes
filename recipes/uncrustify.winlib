@@ -14,10 +14,12 @@ export TYPE=application
 #export VERSIONDATE=20211122
 #export VERSION=0.75.0
 #export VERSIONDATE=20220506
-export VERSION=0.75.1
-export VERSIONDATE=20220514
+#export VERSION=0.75.1
+#export VERSIONDATE=20220514
 #export VERSION=0.76.0
 #export VERSIONDATE=20221130
+export VERSION=0.77.0
+export VERSIONDATE=20230512
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -25,11 +27,12 @@ export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
-export DOWNLOADURL="https://sourceforge.net/projects/uncrustify/files/"
-#export DOWNLOADURL="https://github.com/uncrustify/uncrustify/releases/"
+#export DOWNLOADURL="https://sourceforge.net/projects/uncrustify/files/"
+export DOWNLOADURL="https://github.com/uncrustify/uncrustify/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/uncrustify/uncrustify-$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\./\1-/")/$BASENAME-$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/uncrustify/uncrustify-$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/uncrustify/uncrustify-$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/uncrustify/uncrustify/archive/refs/tags/$BASENAME-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
@@ -37,7 +40,26 @@ wl-showstatus extract
 #mkdir -p $BASENAME-$VERSION
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz -C$BASENAME-$VERSION
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
-cd $BASENAME-$VERSION
+#cd $BASENAME-$VERSION
+cd uncrustify-uncrustify-$VERSION
+# fix undefined uint32_t in src/indent.cpp (version >= 0.77.0)
+#### Bug reported: https://github.com/uncrustify/uncrustify/pull/4014
+mv src/indent.cpp src/indent.cpp.bak &&
+echo "#include <cstdint>" > src/indent.cpp &&
+cat src/indent.cpp.bak >> src/indent.cpp
+# fix undefined int_fast8_t in src/unc_text.cpp (version >= 0.77.0)
+mv src/unc_text.cpp src/unc_text.cpp.bak &&
+echo "#include <cstdint>" > src/unc_text.cpp &&
+cat src/unc_text.cpp.bak >> src/unc_text.cpp
+# fix format warning in src/unc_tools.cpp (version >= 0.77.0)
+####src/unc_tools.cpp:516:50: warning: format '%ld' expects argument of type 'long int', but argument 7 has type 'size_t' {aka 'long long unsigned int'} [-Wformat=]
+patch -ulbf src/unc_tools.cpp << EOF
+@@ -515,3 +515,3 @@
+       g_a = bit_a.to_string();
+-      LOG_FMT(LDYNKW, "%s: %3zu: %18s, %14s, %12ld, %16s, %s\\n",
++      LOG_FMT(LDYNKW, "%s: %3zu: %18s, %14s, %12lld, %16s, %s\\n",
+               __func__, ii,
+EOF
 # fix install locations in CMakeLists.txt (version >= 0.72.0)
 patch -ulbf CMakeLists.txt << EOF
 @@ -501,3 +501,3 @@
@@ -52,7 +74,8 @@ mkdir -p build_win &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_TESTING:BOOL=OFF -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf uncrustify-uncrustify-$VERSION
 
 
 
