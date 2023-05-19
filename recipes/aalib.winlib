@@ -27,15 +27,28 @@ wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 mv $BASENAME-`echo $VERSION|sed -e s/rc[0-9]*$//`* $BASENAME-$VERSION
 cd $BASENAME-$VERSION
-# fix missing fd_set/readfds in src/aastdin.c
-mv src/aastdin.c src/aastdin.c.bak
-echo "#include <winsock2.h>" > src/aastdin.c
-cat src/aastdin.c.bak >> src/aastdin.c
+## fix missing fd_set/readfds in src/aastdin.c
+#mv src/aastdin.c src/aastdin.c.bak
+#echo "#include <winsock2.h>" > src/aastdin.c
+#cat src/aastdin.c.bak >> src/aastdin.c
+# fix missing fd_set/readfds/select in src/aastdin.c (version >= 1.4rc5)
+patch -ulbf src/aastdin.c << EOF
+@@ -58,2 +58,3 @@
+     if (!wait) {
++#ifndef _WIN32
+        fd_set readfds;
+@@ -74,2 +75,3 @@
+            return AA_NONE;
++#endif
+
+EOF
 # support ARM64 in config.sub
 sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
+# support building DLL files
+sed -i.bak -e "s/\(can_build_shared=\)no/\1yes/; s/-nostartfiles -Wl,-e,__cygwin_dll_entry@12/-shared -s -mwindows -Wl,--out-implib,libaa.dll.a/" ltconfig
 wl-showstatus preconfigure &&
- #( autoreconf -f -i -I $MINGWPREFIX/share/aclocal || autoreconf-2.13 -f -i ) &&
  autoreconf -f -i &&
+ #( autoreconf -f -i -I $MINGWPREFIX/share/aclocal || autoreconf-2.13 -f -i ) &&
  # remove --no-verify from configure
  sed -i.bak -e "s/--no-verify//" configure &&
  wl-showstatus configure &&
@@ -46,13 +59,17 @@ wl-showstatus preconfigure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32-dll --with-x11-driver=no --with-x=no &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
- ## fix detection of shared libraries
- #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  #make install LDFLAGS="-Wl,--as-needed -lws2_32 -Wl,-no-undefined" && ( make install-strip || true ) &&
  #( make install-strip || make install-strip LIBS="-Wl,--as-needed -Wl,-lws2_32" ) &&
  #( make install LIBS="-Wl,--as-needed -Wl,-lws2_32" ) && ( make -i install-strip LIBS="-Wl,--as-needed -Wl,-lws2_32" || true ) &&
- make install LIBS="-Wl,--as-needed -Wl,-lws2_32" LN_S="cp -f" &&
+ #make install LIBS="-Wl,--as-needed -Wl,-lws2_32" LN_S="cp -f" &&
+ make install LIBS="-Wl,--as-needed -Wl,-lws2_32" LN_S="cp -f" AUTOMAKE=true &&
+ cp -u src/libaa.dll.a $INSTALLPREFIX/lib/ &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ rm -f $INSTALLPREFIX/lib/*.la &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
