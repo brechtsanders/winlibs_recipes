@@ -12,13 +12,12 @@ export TYPE=application
 ####setlocale.c:36:10: fatal error: localename.h: No such file or directory
 #export VERSION=3.7
 #export VERSIONDATE=20190101
-export VERSION=3.8
-export VERSIONDATE=20210802
+#export VERSION=3.8
+#export VERSIONDATE=20210802
 #export VERSION=3.9
 #export VERSIONDATE=20230116
-#export VERSION=3.10
-#export VERSIONDATE=20230521
-####src/util.c:312:5: error: 'SIGHUP' undeclared here (not in a function)
+export VERSION=3.10
+export VERSIONDATE=20230521
 wl-showstatus --package-version
 export DEPENDENCIES=libiconv,gettext,gklib,libsigsegv,pcre
 export OPTIONALDEPENDENCIES=
@@ -35,55 +34,128 @@ wl-wait4deps
 wl-showstatus extract
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
-# fix missing signals in src/util.c (version <= 3.8)
+## fix missing signals in src/util.c (version <= 3.8)
+#patch -ulbf src/util.c << EOF
+#@@ -222,2 +222,3 @@
+#          default.  Instead, just raise the uncatchable SIGSTOP.  */
+#+#ifdef SIGSTOP
+#       if (stops)
+#@@ -228,2 +229,3 @@
+#       else
+#+#endif
+#         signal (sig, SIG_DFL);
+#@@ -246,6 +248,21 @@
+#       /* This one is handled specially.  */
+#+#ifdef SIGTSTP
+#       SIGTSTP,
+#+#endif
+#
+#       /* The usual suspects.  */
+#-      SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGQUIT, SIGTERM,
+#+#ifdef SIGALRM
+#+      SIGALRM,
+#+#endif
+#+#ifdef SIGHUP
+#+      SIGHUP,
+#+#endif
+#+      SIGINT,
+#+#ifdef SIGPIPE
+#+      SIGPIPE,
+#+#endif
+#+#ifdef SIGQUIT
+#+      SIGQUIT,
+#+#endif
+#+      SIGTERM,
+# #ifdef SIGPOLL
+#@@ -293,3 +310,3 @@
+#         }
+#-#else
+#+#elif defined(SIGTSTP)
+#     for (j = 0; j < nsigs; j++)
+#EOF
+## fix src/util.c (version = 3.8)
+#patch -ulbf src/util.c << EOF
+#@@ -222,2 +222,3 @@
+#          default.  Instead, just raise the uncatchable SIGSTOP.  */
+#+#ifdef SIGSTOP
+#       if (stops)
+#@@ -228,2 +229,3 @@
+#       else
+#+#endif
+#         signal (sig, SIG_DFL);
+#@@ -246,6 +248,21 @@
+#       /* This one is handled specially.  */
+#-      SIGTSTP,
+#+#ifdef SIGALRM
+#+      SIGALRM,
+#+#endif
+#
+#       /* The usual suspects.  */
+#-      SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGQUIT, SIGTERM,
+#+#ifdef SIGALRM
+#+      SIGALRM,
+#+#endif
+#+#ifdef SIGHUP
+#+      SIGHUP,
+#+#endif
+#+      SIGINT,
+#+#ifdef SIGPIPE
+#+      SIGPIPE,
+#+#endif
+#+#ifdef SIGQUIT
+#+      SIGQUIT,
+#+#endif
+#+      SIGTERM,
+# #ifdef SIGPOLL
+#@@ -290,3 +307,7 @@
+#         {
+#+#ifdef SIGTSTP
+#           act.sa_handler = sig[j] == SIGTSTP ? stophandler : sighandler;
+#+#else
+#+          act.sa_handler = sighandler;
+#+#endif
+#           sigaction (sig[j], &act, NULL);
+#@@ -299,3 +320,7 @@
+#           {
+#+#ifdef SIGTSTP
+#             signal (sig[j], sig[j] == SIGTSTP ? stophandler : sighandler);
+#+#else
+#+            signal (sig[j], sighandler);
+#+#endif
+#             siginterrupt (sig[j], 0);
+#EOF
+# fix src/util.c (version >= 3.10)
 patch -ulbf src/util.c << EOF
-@@ -222,2 +222,3 @@
+@@ -275,2 +275,3 @@
           default.  Instead, just raise the uncatchable SIGSTOP.  */
 +#ifdef SIGSTOP
        if (stops)
-@@ -228,2 +229,3 @@
+@@ -281,2 +282,3 @@
        else
 +#endif
-         signal (sig, SIG_DFL);
-@@ -246,6 +248,21 @@
-       /* This one is handled specially.  */
-+#ifdef SIGTSTP
-       SIGTSTP,
+        {
+@@ -309,3 +311,9 @@
+ #endif
+-    SIGHUP, SIGINT, SIGPIPE,
++#ifdef SIGHUP
++    SIGHUP,
++#endif
++    SIGINT,
++#ifdef SIGPIPE
++    SIGPIPE,
++#endif
+ #ifdef SIGQUIT
+EOF
+# fix missing kill in src/sdiff.c (version <= 3.7)
+patch -ulbf src/sdiff.c << EOF
+@@ -806,4 +806,6 @@
+       /* Yield an exit status indicating that a signal was received.  */
++#if HAVE_WORKING_FORK
+       untrapsig (s);
+       kill (getpid (), s);
 +#endif
 
-       /* The usual suspects.  */
--      SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGQUIT, SIGTERM,
-+#ifdef SIGALRM
-+      SIGALRM,
-+#endif
-+#ifdef SIGHUP
-+      SIGHUP,
-+#endif
-+      SIGINT,
-+#ifdef SIGPIPE
-+      SIGPIPE,
-+#endif
-+#ifdef SIGQUIT
-+      SIGQUIT,
-+#endif
-+      SIGTERM,
- #ifdef SIGPOLL
-@@ -293,3 +310,3 @@
-         }
--#else
-+#elif defined(SIGTSTP)
-     for (j = 0; j < nsigs; j++)
 EOF
-## fix missing kill in src/sdiff.c (version <= 3.7)
-#patch -ulbf src/sdiff.c << EOF
-#@@ -806,4 +806,6 @@
-#       /* Yield an exit status indicating that a signal was received.  */
-#+#if HAVE_WORKING_FORK
-#       untrapsig (s);
-#       kill (getpid (), s);
-#+#endif
-#
-#EOF
 # ignore missing localename.h in gnulib-tests/setlocale.c (version >= 3.7)
 touch gnulib-tests/localename.h
 # fix missing SA_RESTART in lib/cmpbuf.c (version >= 3.8)
@@ -110,7 +182,8 @@ wl-showstatus configure &&
  wl-showstatus build-install &&
  #make install-strip &&
  #( make install-strip || make install-strip LIBS="-Wl,--as-needed -lonig" ) &&
- ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lgklib -lgettextlib -lbcrypt" ) &&
+ #( make install-strip || make install-strip LIBS="-Wl,--as-needed -lgklib -lgettextlib -lbcrypt" ) &&
+ ( make install-strip || make install-strip LIBS="-Wl,--as-needed -lgklib -lgettextlib -lbcrypt -lpcreposix" ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
