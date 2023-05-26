@@ -1,0 +1,44 @@
+export NAME="BIND 9"
+export STATUS=
+export URL=https://www.isc.org/bind/
+export BASENAME=bind9
+export DESCRIPTION="BIND 9 has evolved to be a very flexible, full-featured DNS system."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=9.16.41
+export VERSIONDATE=20230526
+wl-showstatus --package-version
+export DEPENDENCIES=pthreads,libdl,openssl,p11-kit,libidn2,gss,libmaxminddb,libxml2,libxslt,json,zlib,readline,libuv,libcurl,lmdb,mariadb-client
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MPL
+export DOWNLOADURL="https://gitlab.isc.org/isc-projects/bind9/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.isc.org/isc-projects/bind9/-/archive/v$VERSION/bind9-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/bind9-v$VERSION.tar.bz2
+cd bind9-v$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa winfix/net
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" > winfix/netinet/in.h
+touch winfix/arpa/inet.h winfix/net/if.h netdb.h
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libidn2 --with-lmdb=$MINGWPREFIX --with-dlz-mysql=$MINGWPREFIX/bin/mariadb_config.exe --disable-chroot --disable-linux-caps --without-python PYTHON=$PYDIR/python.exe CFLAGS="-Din_port_t=uint16_t -I$PWD/winfix -I$MINGWPREFIX/include/mariadb -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,-no-undefined -ldl -lws2_32" &&
+ wl-showstatus build &&
+ make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
+    echo OK
+    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
+    make install-pkgconfigDATA
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf bind9-v$VERSION
+
+
+
