@@ -345,6 +345,23 @@ cat > lib/vquic/ngtcp2.c << EOF
 #endif
 EOF
 cat lib/vquic/ngtcp2.c.bak >> lib/vquic/ngtcp2.c
+# fix static linking with nghttp2 and ngtcp2 (version >= 8.1.1)
+mv lib/cf-h2-proxy.c lib/cf-h2-proxy.c.bak
+cat > lib/cf-h2-proxy.c << EOF
+#if defined(BUILDING_LIBCURL) && !defined(DLL_EXPORT)
+#define NGTCP2_STATICLIB
+#define NGHTTP3_STATICLIB
+#endif
+EOF
+cat lib/cf-h2-proxy.c.bak >> lib/cf-h2-proxy.c
+mv lib/vquic/curl_ngtcp2.c lib/vquic/curl_ngtcp2.c.bak
+cat > lib/vquic/curl_ngtcp2.c << EOF
+#if defined(BUILDING_LIBCURL) && !defined(DLL_EXPORT)
+#define NGTCP2_STATICLIB
+#define NGHTTP3_STATICLIB
+#endif
+EOF
+cat lib/vquic/curl_ngtcp2.c.bak >> lib/vquic/curl_ngtcp2.c
 ## fix lib/vquic/ngtcp2.c (version = 7.83.1)
 #patch -ulbf lib/vquic/ngtcp2.c << EOF
 #@@ -434,2 +438,3 @@
@@ -430,20 +447,20 @@ sed -i.bak3 -e "s/gnutls_free/free/" lib/vtls/gtls.c
 #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
 # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
 #fi
-# fix building both static and shared
-patch -ulbf configure << EOF
---- configure  2015-05-08 16:07:40.721708200 +0200
-+++ configure  2015-05-08 16:16:08.767593800 +0200
-@@ -11148,7 +11148,7 @@
- if test "x\$xc_lt_want_enable_shared" = 'xyes' &&
-   test "x\$xc_lt_want_enable_static" = 'xyes'; then
-   case \$host_os in # (
--    mingw* | pw32* | cegcc* | os2* | aix*)
-+    pw32* | cegcc* | os2* | aix*)
-       xc_lt_want_enable_static='no'
-       ;;
-   esac
-EOF
+## fix building both static and shared (version <= 8.1.0)
+#patch -ulbf configure << EOF
+#--- configure  2015-05-08 16:07:40.721708200 +0200
+#+++ configure  2015-05-08 16:16:08.767593800 +0200
+#@@ -11148,7 +11148,7 @@
+# if test "x\$xc_lt_want_enable_shared" = 'xyes' &&
+#   test "x\$xc_lt_want_enable_static" = 'xyes'; then
+#   case \$host_os in # (
+#-    mingw* | pw32* | cegcc* | os2* | aix*)
+#+    pw32* | cegcc* | os2* | aix*)
+#       xc_lt_want_enable_static='no'
+#       ;;
+#   esac
+#EOF
 ## allow building shared libraries when using clang
 #sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" configure
 wl-showstatus configure &&
