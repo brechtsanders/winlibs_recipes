@@ -206,8 +206,8 @@ export TYPE=library
 #export VERSIONDATE=20210518
 #export VERSION=4.5.20
 #export VERSIONDATE=20210615
-export VERSION=4.5.22
-export VERSIONDATE=20210625
+#export VERSION=4.5.22
+#export VERSIONDATE=20210625
 ####src/videofilters/msmfoundationcap.cpp:406:30: error: 'MF_READWRITE_DISABLE_CONVERTERS' was not declared in this scope
 #export VERSION=5.0.0
 #export VERSIONDATE=20210708
@@ -379,9 +379,9 @@ export VERSIONDATE=20210625
 #export VERSIONDATE=20230517
 #export VERSION=5.2.62
 #export VERSIONDATE=20230523
-#export VERSION=5.2.64
-#export VERSIONDATE=20230525
 ####include/mediastreamer2/msogl_functions.h:45:14: fatal error: GLES2/gl2.h: No such file or directory
+export VERSION=5.2.64
+export VERSIONDATE=20230525
 wl-showstatus --package-version
 export DEPENDENCIES=libdl,bcg729,bctoolbox,ffmpeg4,libbzrtp,libgsm,libopus,libortp,portaudio,pulseaudio,libspeex,libspeexdsp,sqlite3,srtp,libtheora,libxml2,libvpx
 #export DEPENDENCIES=libdl,bcg729,bctoolbox,ffmpeg4,libbzrtp,libgsm,libopus,libortp,portaudio,pulseaudio,libspeex,libspeexdsp,sqlite3,srtp,libtheora,libxml2,libvpx,khronos-opengl-registry
@@ -414,13 +414,24 @@ cd $BASENAME-$VERSION
 #EOF
 # fix missing src/videofilters/drawdib-display.c (version >= 4.4.24)
 sed -i.bak -e "s/GWL_USERDATA/GWLP_USERDATA/" src/videofilters/drawdib-display.c
-# fix src/videofilters/msmfoundationcap.cpp (version >= 4.5.3)
+## fix src/videofilters/msmfoundationcap.cpp (version >= 4.5.3)
+#patch -ulbf src/videofilters/msmfoundationcap.cpp << EOF
+#@@ -404,4 +404,6 @@
+#                hr = MFCreateAttributes(&attributes, 2);
+#+#ifdef MF_READWRITE_DISABLE_CONVERTERS
+#        if (SUCCEEDED(hr)) //get attributes
+#                hr = attributes->SetUINT32(MF_READWRITE_DISABLE_CONVERTERS, TRUE);
+#+#endif
+#        if (SUCCEEDED(hr)) // Set the callback pointer.
+#EOF
+# fix src/videofilters/msmfoundationcap.cpp (version >= 5.2.64)
 patch -ulbf src/videofilters/msmfoundationcap.cpp << EOF
-@@ -404,4 +404,6 @@
-                hr = MFCreateAttributes(&attributes, 2);
+@@ -1384,2 +1384,3 @@
+                ms_error("[MSMFoundationCapDesk] Cannot create source reader because of failing attributes allocation [%X]", hr);
 +#ifdef MF_READWRITE_DISABLE_CONVERTERS
         if (SUCCEEDED(hr)) //get attributes
-                hr = attributes->SetUINT32(MF_READWRITE_DISABLE_CONVERTERS, TRUE);
+@@ -1388,2 +1389,3 @@
+                ms_error("[MSMFoundationCapDesk] Cannot create source reader because of failing attributes setting [%X]", hr);
 +#endif
         if (SUCCEEDED(hr)) // Set the callback pointer.
 EOF
@@ -432,22 +443,35 @@ EOF
 #+LRESULT CALLBACK WindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 #     switch (uMsg)
 #EOF
+# fix src/utils/opengles_display.c (version >= 5.2.64)
+patch -ulbf src/utils/opengles_display.c << EOF
+@@ -1045,2 +1045,5 @@
+
++#ifndef __in
++#define __in
++#endif
+ LRESULT CALLBACK WindowProc(__in HWND hWindow,__in UINT uMsg,__in WPARAM wParam,__in LPARAM lParam) {
+EOF
 # fix invalid compiler flag -Wno-shorten-64-to-32 (version >= 4.5.0)
 sed -i.bak -e "s/-Wno-shorten-64-to-32//" CMakeLists.txt
 # avoid precompiled header issue
 sed -i.bak -e "s?videofilters/msmfoundationcap\.h??" src/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PATH=$MINGWPREFIX/ffmpeg4/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_PORTAUDIO:BOOL=ON -DENABLE_PULSEAUDIO:BOOL=ON -DENABLE_GL:BOOL=OFF -DENABLE_BV16:BOOL=ON -DENABLE_QRCODE:BOOL=OFF -DENABLE_MKV:BOOL=OFF -DENABLE_TOOLS:BOOL=ON -DENABLE_DOC:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -DTURBOJPEG_INCLUDE_DIRS:PATH=$MINGWPREFIX/share/libjpeg-turbo/include -DTURBOJPEG_LIBRARIES:STRING="-L$MINGWPREFIX/share/libjpeg-turbo/lib -lturbojpeg" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DWIN32 -I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
- #C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$MINGWPREFIX/include/khronos${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PATH=$MINGWPREFIX/ffmpeg4/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_PORTAUDIO:BOOL=ON -DENABLE_PULSEAUDIO:BOOL=ON -DENABLE_GL:BOOL=OFF -DENABLE_BV16:BOOL=ON -DENABLE_QRCODE:BOOL=OFF -DENABLE_MKV:BOOL=OFF -DENABLE_TOOLS:BOOL=ON -DENABLE_DOC:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -DTURBOJPEG_INCLUDE_DIRS:PATH=$MINGWPREFIX/share/libjpeg-turbo/include -DTURBOJPEG_LIBRARIES:STRING="-L$MINGWPREFIX/share/libjpeg-turbo/lib -lturbojpeg" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32 -I$(cygpath -m $MINGWPREFIX/include/khronos)" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DWIN32 -I$MINGWPREFIX/include/libdl-win32 -I$(cygpath -m $MINGWPREFIX/include/khronos)" -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ #C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PATH=$MINGWPREFIX/ffmpeg4/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_PORTAUDIO:BOOL=ON -DENABLE_PULSEAUDIO:BOOL=ON -DENABLE_GL:BOOL=OFF -DENABLE_BV16:BOOL=ON -DENABLE_QRCODE:BOOL=OFF -DENABLE_MKV:BOOL=OFF -DENABLE_TOOLS:BOOL=ON -DENABLE_DOC:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -DTURBOJPEG_INCLUDE_DIRS:PATH=$MINGWPREFIX/share/libjpeg-turbo/include -DTURBOJPEG_LIBRARIES:STRING="-L$MINGWPREFIX/share/libjpeg-turbo/lib -lturbojpeg" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DWIN32 -I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+ C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$MINGWPREFIX/include/khronos${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PATH=$MINGWPREFIX/ffmpeg4/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DENABLE_SHARED:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_PORTAUDIO:BOOL=ON -DENABLE_PULSEAUDIO:BOOL=ON -DENABLE_GL:BOOL=ON -DENABLE_BV16:BOOL=ON -DENABLE_QRCODE:BOOL=OFF -DENABLE_MKV:BOOL=OFF -DENABLE_TOOLS:BOOL=ON -DENABLE_DOC:BOOL=OFF -DENABLE_UNIT_TESTS:BOOL=OFF -DTURBOJPEG_INCLUDE_DIRS:PATH=$MINGWPREFIX/share/libjpeg-turbo/include -DTURBOJPEG_LIBRARIES:STRING="-L$MINGWPREFIX/share/libjpeg-turbo/lib -lturbojpeg" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32 -I$(cygpath -m $MINGWPREFIX/include/khronos)" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DWIN32 -I$MINGWPREFIX/include/libdl-win32 -I$(cygpath -m $MINGWPREFIX/include/khronos)" -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
  #-DENABLE_QRCODE:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-Dzxing=ZXing"
  #-DENABLE_MKV:BOOL=ON 
  #-DENABLE_GL:BOOL=ON
  # fix missing MFVideoFormat_NV12/MFCreateAttributes/MFEnumDeviceSources/QISearch
- sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.* -ladvapi32/& -Wl,--as-needed -lmfplat -lmf -lmfreadwrite -lmfuuid -lshlwapi/" build_win/build.ninja &&
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.* -ladvapi32/& -Wl,--as-needed -lmfplat -lmf -lmfreadwrite -lmfuuid -lshlwapi/" build_win/build.ninja &&
+ # fix missing libraries (version >= 5.2.64)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.* -ladvapi32/& -Wl,--as-needed -lmfplat -lmf -lmfreadwrite -lmfuuid -lshlwapi -lopengl32/" build_win/build.ninja &&
+ # avoid precompiled header issue (version >= 5.2.64)
+ sed -i.bak2 -e "s?^\(build src/libmediastreamer\.dll.*\) [^ ]*/msmfoundationcap\.h\.obj?\1?" build_win/build.ninja &&
  wl-showstatus build-install &&
- C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} ninja -Cbuild_win install/strip &&
- #C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$MINGWPREFIX/include/khronos${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} CXX_INCLUDE_PATH=$MINGWPREFIX/include/khronos${CXX_INCLUDE_PATH:+:$CXX_INCLUDE_PATH} ninja -Cbuild_win install/strip &&
+ #C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} ninja -Cbuild_win install/strip &&
+ C_INCLUDE_PATH=$MINGWPREFIX/ffmpeg4/include:$MINGWPREFIX/include/khronos${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} CXX_INCLUDE_PATH=$MINGWPREFIX/include/khronos${CXX_INCLUDE_PATH:+:$CXX_INCLUDE_PATH} ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: fix bcmatroska2 with -DENABLE_MKV:BOOL=ON
 ####TO DO: fix precompiled header issues with build_win/src/CMakeFiles/mediastreamer.dir/videofilters/msmfoundationcap.h.obj
