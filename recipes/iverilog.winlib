@@ -13,7 +13,7 @@ export VERSIONDATE=20230611
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=gnu-ghostscript
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
@@ -26,22 +26,10 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$(echo $VERSION|tr . _).tar.gz
 cd iverilog-$(echo $VERSION|tr . _)
-wl-showstatus configure &&
+wl-showstatus preconfigure &&
  mkdir -p m4 &&
- autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- #./autogen.sh &&
- #    echo OK
- ## fix building DLLs on 64-bit
- #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
- # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
- #fi
- #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
- #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
- #PYTHON=$PYDIR/python.exe 
- #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
- #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
@@ -49,12 +37,19 @@ wl-showstatus configure &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
- #wl-showstatus build &&
- #make &&
+ wl-showstatus build &&
+ ( make || ( make -i; make -j1 )) &&
+ # manually create shared libraries (DLL files)
+ sed -e "s/^vpi_sim_vcontrol//" vvp/vvp.def > fixed_vvp.def &&
+ ${CC:-gcc} -shared -s -mwindows -def fixed_vvp.def -o libvpi.dll vpi/libvpi.a -Wl,--out-implib,libvpi.dll.a &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libveriuser/libveriuser.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > libveriuser.def &&
+ ${CC:-gcc} -shared -s -mwindows -def libveriuser.def -o libveriuser.dll libveriuser/libveriuser.a -Wl,--out-implib,libveriuser.dll.a libvpi.dll.a &&
  wl-showstatus build-install &&
- make install-strip &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf iverilog-$(echo $VERSION|tr . _)
+ make install &&
+ strip $INSTALLPREFIX/bin/*.exe &&
+ cp -f *.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf iverilog-$(echo $VERSION|tr . _)
 
 
 
