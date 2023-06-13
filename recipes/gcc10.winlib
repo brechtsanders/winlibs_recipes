@@ -1,12 +1,12 @@
-export NAME="GCC, the GNU Compiler Collection (version 9)"
+export NAME="GCC, the GNU Compiler Collection (version 10)"
 export STATUS=
 export URL=https://gcc.gnu.org/
-export BASENAME=gcc9
+export BASENAME=gcc10
 export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom."
 export CATEGORY=development
 export TYPE=application
-export VERSION=9.5.0
-export VERSIONDATE=20220122
+export VERSION=10.4.0
+export VERSIONDATE=20221105
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl,mman-win32
 export OPTIONALDEPENDENCIES=
@@ -35,27 +35,27 @@ if [ "$USE_UCRT" == "" ]; then
 fi
 ## fix undefined reference to __intrinsic_setjmpex in gcc/fortran/parse.c
 #sed -i.bak -e "s/^\(#include <setjmp\)\(\.h>\)/\1ex\2/" gcc/fortran/parse.c
+## fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+#sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
+## fix printf format issues with MinGW-w64 >= 8.0.0
+#####See also: https://sourceforge.net/p/mingw-w64/bugs/853/
+#####See also: https://github.com/msys2/MINGW-packages-dev/blob/master/mingw-w64-gcc-git/0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch
+#sed -i.bak -e "s/^\(\s*#\s*\)include <inttypes\.h>.*$/&\n\1ifdef __MINGW32__\n\1undef HAVE_INTTYPES_H\n\1endif/" libgomp/target.c libgomp/oacc-parallel.c
 # fix error: expected identifier before string constant in gcc/system.h
 patch -ulbf gcc/system.h << EOF
-@@ -736,3 +736,5 @@
+@@ -746,3 +746,5 @@
                                          ATTRIBUTE_NORETURN ATTRIBUTE_COLD;
 +#ifndef __cplusplus
  #define abort() fancy_abort (__FILE__, __LINE__, __FUNCTION__)
 +#endif
 
 EOF
-# fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
-sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
-# fix printf format issues with MinGW-w64 >= 8.0.0
-####See also: https://sourceforge.net/p/mingw-w64/bugs/853/
-####See also: https://github.com/msys2/MINGW-packages-dev/blob/master/mingw-w64-gcc-git/0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch
-sed -i.bak -e "s/^\(\s*#\s*\)include <inttypes\.h>.*$/&\n\1ifdef __MINGW32__\n\1undef HAVE_INTTYPES_H\n\1endif/" libgomp/target.c libgomp/oacc-parallel.c
-# fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
-sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
+## fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+#sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
 # avoid looking for libiberty.a in pic subdirectory
 sed -i.bak -e "s?pic/\(libiberty\.a\)?\1?g" $(grep -l "pic/libiberty\.a" */Makefile.in)
-# fix location of /lib/cpp
-sed -i.bak -e "s?/lib/cpp?$(which cpp.exe)?" $(find -name configure)
+## fix location of /lib/cpp
+#sed -i.bak -e "s?/lib/cpp?$(which cpp.exe)?" $(find -name configure)
 # copy MinGW-w64 files
 mkdir -p build_mingw/mingw-w64/mingw/lib &&
 cp -rf $MINGWPREFIX/share/mingw-w64/include build_mingw/mingw-w64/mingw/ &&
@@ -64,7 +64,7 @@ cp -rf $MINGWPREFIX/share/mingw-w64/include build_mingw/mingw-w64/mingw/ &&
 mkdir -p build_mingw &&
  wl-showstatus configure &&
  cd build_mingw &&
- PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc9 --build=$BUILDPLATFORM --host=$RUNPLATFORM \
+ PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc10 --build=$BUILDPLATFORM --host=$RUNPLATFORM \
   --with-pkgversion="MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//")$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "-ucrt"; else echo -n "-msvcrt"; fi)-posix-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" \
   --with-tune=generic \
   --enable-checking=release \
@@ -81,7 +81,7 @@ mkdir -p build_mingw &&
   --disable-version-specific-runtime-libs \
   --with-stabs \
   --disable-symvers \
-  --enable-languages=c,c++,fortran,lto,objc,obj-c++,d \
+  --enable-languages=c,c++,fortran,lto,objc,obj-c++ \
   --disable-{gold,nls,stage1-checking,win32-registry,multilib} \
   --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,libstdcxx-time,libstdcxx-pch} \
   --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX \
@@ -103,13 +103,14 @@ mkdir -p build_mingw &&
  make -Cbuild_mingw configure-host &&
  wl-showstatus build &&
  ( make -Cbuild_mingw || make -j1 -Cbuild_mingw ) &&
+ #XCFLAGS="-Wc,-pthread -Wno-error=format-extra-args" 
  wl-showstatus build-install &&
  ( make -Cbuild_mingw install-strip || make -Cbuild_mingw install-strip LIBS="-lmman" ) &&
  # remove .la files
  rm -f $(find $INSTALLPREFIX -name '*.la') &&
  # fix absolute path
- sed -i -e "s?$INSTALLPREFIX/share/gcc?\$(realpath \$(dirname \$0)/../../../../..)?" $INSTALLPREFIX/share/gcc9/libexec/gcc/*/*/install-tools/mkheaders &&
- sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc9/lib/gcc/*/*/libstdc++.dll.a-gdb.py &&
+ sed -i -e "s?$INSTALLPREFIX/share/gcc?\$(realpath \$(dirname \$0)/../../../../..)?" $INSTALLPREFIX/share/gcc10/libexec/gcc/*/*/install-tools/mkheaders &&
+ sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc10/lib/gcc/*/*/libstdc++.dll.a-gdb.py &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gcc-$VERSION
 
 
