@@ -121,10 +121,20 @@ wl-wait4deps
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/orc-$VERSION.tar.gz
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/orc-$VERSION.tar.xz
 cd orc-$VERSION
+# fix missing AcquireSRWLockExclusive/ReleaseSRWLockExclusive in orc/orconce.c (version >= 0.4.34)
+mv orc/orconce.c orc/orconce.c.bak
+cat > orc/orconce.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+EOF
+cat orc/orconce.c.bak >> orc/orconce.c
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dexamples=disabled -Dbenchmarks=disabled -Dtests=disabled -Dorc-test=disabled . build_both &&
  PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dexamples=disabled -Dbenchmarks=disabled -Dtests=disabled -Dorc-test=disabled . build_both &&
+ #_WIN32_WINNT=0x0600
  ## add linker flag
  #sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lsynchronization\"/" build_both/build.ninja &&
  #-Dgtk_doc=enabled 
