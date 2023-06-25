@@ -1,6 +1,7 @@
 export NAME="Snownews"
 export STATUS=
-export URL=https://github.com/kouya/snownews
+#export URL=https://github.com/kouya/snownews
+export URL=https://sourceforge.net/projects/snownews/
 export BASENAME=snownews
 export DESCRIPTION="Snownews is a command-line RSS feed reader. It runs on everything Unix."
 export CATEGORY=communication
@@ -11,8 +12,10 @@ export TYPE=application
 #export VERSIONDATE=20210412
 #export VERSION=1.8
 #export VERSIONDATE=20210511
-export VERSION=1.9
-export VERSIONDATE=20211003
+#export VERSION=1.9
+#export VERSIONDATE=20211003
+export VERSION=1.11
+export VERSIONDATE=20230625
 wl-showstatus --package-version
 export DEPENDENCIES=sys_wait_h
 export OPTIONALDEPENDENCIES=
@@ -20,16 +23,19 @@ export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.md
 export LICENSETYPE=GPL
-export DOWNLOADURL="https://github.com/kouya/snownews/releases"
+#export DOWNLOADURL="https://github.com/kouya/snownews/releases"
+export DOWNLOADURL="https://sourceforge.net/projects/snownews/files/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/kouya/snownews/archive/$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://github.com/msharov/snownews/archive/refs/tags/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/msharov/snownews/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/snownews/$BASENAME-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
-tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix missing syslog.h
 mkdir -p winfix
@@ -54,6 +60,37 @@ patch -ulbf main.c << EOF
 +#endif
      signal (SIGINT, MainSignalHandler);
 @@ -242,4 +244,8 @@
+     // Un-broken pipify
++#ifdef SIGPIPE
+     signal (SIGPIPE, SIG_IGN);
++#endif
++#ifdef SIGCHLD
+     signal (SIGCHLD, sigChildHandler);
++#endif
+ #ifdef SIGWINCH
+EOF
+# fix main.c (version >= 1.11)
+patch -ulbf main.c << EOF
+@@ -227,3 +227,7 @@
+        _feed_list = _unfiltered_feed_list;
+-    MainQuit ("MainSignalHandler", (sig == SIGINT || sig == SIGQUIT || sig == SIGTERM) ? NULL : "Signal");
++    MainQuit ("MainSignalHandler", (sig == SIGINT ||
++#ifdef SIGQUIT
++                                    sig == SIGQUIT ||
++#endif
++                                   sig == SIGTERM) ? NULL : "Signal");
+ }
+@@ -239,5 +243,9 @@
+ {
++#ifdef SIGHUP
+     signal (SIGHUP, MainSignalHandler);
++#endif
+     signal (SIGINT, MainSignalHandler);
++#ifdef SIGQUIT
+     signal (SIGQUIT, MainSignalHandler);
++#endif
+     signal (SIGTERM, MainSignalHandler);
+@@ -247,4 +255,8 @@
      // Un-broken pipify
 +#ifdef SIGPIPE
      signal (SIGPIPE, SIG_IGN);
