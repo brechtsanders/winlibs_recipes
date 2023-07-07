@@ -1,0 +1,59 @@
+export NAME="libzeep"
+export STATUS=
+export URL=https://github.com/mhekkel/libzeep
+export BASENAME=libzeep
+export DESCRIPTION="C++ library for reading and writing XML and creating web and SOAP servers"
+export CATEGORY=fileformat,dataprocessing,communication
+export TYPE=library
+export VERSION=6.0.1
+export VERSIONDATE=20230707
+wl-showstatus --package-version
+export DEPENDENCIES=boost,hinnantdate
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE_1_0.txt
+export LICENSETYPE=BSL
+export DOWNLOADURL="https://github.com/mhekkel/libzeep/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mhekkel/libzeep/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix assumption only _MSC_VER is defined on Windows (version >= 6.0.1)
+sed -i.bak -e "s/_MSC_VER/_WIN32/" lib-http/src/controller-rsrc.cpp lib-http/src/daemon.cpp lib-http/src/signals.cpp
+#sed -i.bak2 -e "s/^extern \"C\" //" lib-http/src/controller-rsrc.cpp
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -lmswsock/" build_shared/build.ninja &&
+ #wl-showstatus build &&
+ #cmake.exe --build build_static &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #cmake.exe --build build_shared &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_static --strip &&
+ #cmake.exe --build build_static --target "install/strip" &&
+ #cmake.exe --build build_static --target "library/install/strip" &&
+ ninja -Cbuild_static install/strip &&
+ #ninja -Cbuild_static library/install/strip &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_shared --strip &&
+ #cmake.exe --build build_shared --target "install/strip" &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
