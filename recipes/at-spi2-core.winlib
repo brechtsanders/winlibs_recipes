@@ -590,6 +590,10 @@ export TYPE=library
 #export VERSIONDATE=20230512
 export VERSION=2.48.3
 export VERSIONDATE=20230528
+#export VERSION=2.49.1
+#export VERSIONDATE=20230718
+####atspi-device-legacy.c:(.text+0x2d1): undefined reference to `timersub'
+####atspi-device.c:(.text+0x1d1): undefined reference to `atspi_device_legacy_new'
 wl-showstatus --package-version
 export DEPENDENCIES=libx11,libxtst,dbus,libdl,glib2,libxevie,dbus-glib,libsm,xkbcommon,sys_wait_h,atk
 export OPTIONALDEPENDENCIES=
@@ -670,6 +674,23 @@ patch -ulbf atk-adaptor/bridge.c << EOF
 +#endif
 
 EOF
+## fix missing timersub in atspi/atspi-device-legacy.c (version >= 2.49.1)
+#mv atspi/atspi-device-legacy.c atspi/atspi-device-legacy.c.bak
+#cat > atspi/atspi-device-legacy.c << EOF
+##include <time.h>
+##ifndef timersub
+##define timersub(a, b, result)                      \\
+# {                                                  \\
+#   (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;    \\
+#   (result)->tv_usec = (a)->tv_usec - (b)->tv_usec; \\
+#   if ((result)->tv_usec < 0) {                     \\
+#     --(result)->tv_sec;                            \\
+#     (result)->tv_usec += 1000000;                  \\
+#   }                                                \\
+# }
+##endif
+#EOF
+#cat atspi/atspi-device-legacy.c.bak >> atspi/atspi-device-legacy.c
 # fix bus/meson.build (version >= 2.42.0)
 patch -ulbf bus/meson.build << EOF
 @@ -36,2 +36,3 @@
