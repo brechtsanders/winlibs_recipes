@@ -1,0 +1,97 @@
+export NAME="msquic"
+export STATUS=
+export URL=https://github.com/microsoft/msquic/
+export BASENAME=msquic
+export DESCRIPTION="Cross-platform, C implementation of the IETF QUIC protocol, exposed to C, C++, C# and Rust."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=2.2.2
+export VERSIONDATE=20230723
+wl-showstatus --package-version
+export DEPENDENCIES=openssl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/microsoft/msquic/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/microsoft/msquic/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix CMakeLists.txt (version >= 2.2.2)
+patch -ulbf CMakeLists.txt << EOF
+@@ -451,2 +451,3 @@
+
++if(MSVC)
+     add_custom_command(
+@@ -456,2 +457,3 @@
+         COMMAND mc.exe -um -h \${QUIC_BUILD_DIR}/inc -r \${QUIC_BUILD_DIR}/inc\${CMAKE_CURRENT_SOURCE_DIR}/src/manifest/MsQuicEtw.man)
++endif()
+     add_custom_target(MsQuicEtw_HeaderBuild
+@@ -345,3 +345,3 @@
+             string(SUBSTRING \${OPENSSL_VERSION} 0 \${VERSIONLEN}  OPENSSL_MAJORMINOR)
+-            if (OPENSSL_VERSION VERSION_EQUAL EXPECTED_OPENSSL_VERSION OR OPENSSL_MAJORMINOR VERSION_EQUAL EXPECTED_OPENSSL_VERSION)
++            if (TRUE)
+                 target_link_libraries(OpenSSLQuic INTERFACE OpenSSL::Crypto)
+EOF
+## avoid Windows stuff
+#sed -i.bak -e "s/\(if.*\)\bWIN32\b/\1MSVC/" $(grep -l "\bWIN32\b" $(find -name CMakeLists.txt))
+
+#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+#-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DQUIC_BUILD_SHARED:BOOL=ON -DQUIC_TLS:STRING=schannel -DQUIC_BUILD_TEST:BOOL=OFF -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DQUIC_BUILD_SHARED:BOOL=ON -DQUIC_TLS:STRING=openssl -DQUIC_USE_SYSTEM_LIBCRYPTO:BOOL=ON -DQUIC_BUILD_TEST:BOOL=OFF -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DQUIC_BUILD_SHARED:BOOL=ON -DQUIC_TLS:STRING=openssl3 -DQUIC_USE_SYSTEM_LIBCRYPTO:BOOL=ON -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DQUIC_BUILD_TEST:BOOL=OFF -S. -Bbuild_win &&
+ #-DQUIC_BUILD_TOOLS:BOOL=ON 
+ #wl-showstatus build &&
+ #cmake.exe --build build_win &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDENCIES=cmake,ninja
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# ## fix missing link libraries
+# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+# #wl-showstatus build &&
+# #cmake.exe --build build_static &&
+# #ninja -Cbuild_static &&
+# #wl-showstatus build &&
+# #cmake.exe --build build_shared &&
+# #ninja -Cbuild_shared &&
+# wl-showstatus build-install &&
+# #cmake.exe --install build_static --strip &&
+# #cmake.exe --build build_static --target "install/strip" &&
+# #cmake.exe --build build_static --target "library/install/strip" &&
+# ninja -Cbuild_static install/strip &&
+# #ninja -Cbuild_static library/install/strip &&
+# wl-showstatus build-install &&
+# #cmake.exe --install build_shared --strip &&
+# #cmake.exe --build build_shared --target "install/strip" &&
+# ninja -Cbuild_shared install/strip &&
+#    echo OK
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
