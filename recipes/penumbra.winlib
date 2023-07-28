@@ -1,0 +1,65 @@
+export NAME="Penumbra"
+export STATUS=
+export URL=https://github.com/bigladder/penumbra
+export BASENAME=penumbra
+export DESCRIPTION="Penumbra is a free and open source library for GPU accelerated solar shading calculations using pixel counting."
+export CATEGORY=graphics
+export TYPE=library
+export VERSION=0.3.5
+export VERSIONDATE=20230728
+wl-showstatus --package-version
+export DEPENDENCIES=glfw3,glad,libtess2,linmath_h
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/bigladder/penumbra/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/bigladder/penumbra/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix vendor/CMakeLists.txt (version >= 0.3.5)
+patch -ulbf vendor/CMakeLists.txt << EOF
+@@ -27,15 +27,4 @@
+
+-add_subdirectory(glfw)
+-target_include_directories(glfw PUBLIC
+- \${PROJECT_SOURCE_DIR}/vendor/glfw/include
+- \${PROJECT_SOURCE_DIR}/vendor/glfw/deps
+-)
+
+ # tess2 library
+-file(GLOB libtess2_sources "\${CMAKE_CURRENT_SOURCE_DIR}/libtess2/Source/[a-zA-Z]*.c")
+-
+-add_library(tess2 \${libtess2_sources})
+-
+-target_include_directories(tess2 PUBLIC \${CMAKE_CURRENT_SOURCE_DIR}/libtess2/Include)
+-target_include_directories(tess2 PRIVATE \${CMAKE_CURRENT_SOURCE_DIR}/libtess2/Source)
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -Dpenumbra_STATIC_LIB:BOOL=ON -Dpenumbra_BUILD_EXAMPLES:BOOL=OFF -Dpenumbra_BUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -Dpenumbra_STATIC_LIB:BOOL=OFF -Dpenumbra_BUILD_EXAMPLES:BOOL=OFF -Dpenumbra_BUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DGLFW_DLL" -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\(\s*LINK_LIBRARIES\s*=.*\) -lglfw \(.*\)$/\1 \2 -Wl,--as-needed -lglfw3 -lgdi32/" build_shared/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/src/libpenumbra.dll &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/penumbra $INSTALLPREFIX/include/ &&
+ cp -f build_static/src/*.a build_shared/src/*.a $INSTALLPREFIX/lib/
+ cp -f build_shared/src/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
