@@ -153,14 +153,13 @@ export TYPE=library
 #export OPTIONALBUILDDEPENDENCIES=
 #export VERSION=0.10.2
 #export VERSIONDATE=20211117
-export VERSION=0.10.3
-export VERSIONDATE=20220520
+#export VERSION=0.10.3
+#export VERSIONDATE=20220520
 #export VERSION=0.12.0
 #export VERSIONDATE=20221012
 ####src/universal-cp/device-treeview.c:635:17: error: conflicting types for 'g_free'; have 'int()'
-#export VERSION=0.12.1
-#export VERSIONDATE=20230802
-####meson.build:1:0: ERROR: Multiple wrap files provide 'gssdp-1.2' dependency: gssdp-1.2 and gssdp-1.6.wrap
+export VERSION=0.12.1
+export VERSIONDATE=20230802
 wl-showstatus --package-version
 export DEPENDENCIES=gssdp,gupnp,gupnp-av,glib2,gtk3,gdk-pixbuf,libsoup,libxml2,gnome-icon-theme,gettext
 export OPTIONALDEPENDENCIES=
@@ -202,8 +201,43 @@ patch -ulbf src/universal-cp/device-treeview.c << EOF
 +*/
 
 EOF
-# fix detection of newer gssdp/gupnp (version >= 0.10.2)
-sed -i.bak -e "s/gssdp-[0-9][0-9]*\.[0-9][0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gssdp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\(gssdp-.*\)\.pc/\1/")/; s/gupnp-[0-9][0-9]*\.[0-9][0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gupnp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\(gupnp-.*\)\.pc/\1/")/" meson.build
+# fix wrap files (version >= 0.12.1)
+####meson.build:1:0: ERROR: Multiple wrap files provide 'gssdp-1.2' dependency: gssdp-1.2 and gssdp-1.6.wrap
+####see also: https://cgit.freebsd.org/ports/commit/?id=a088dbb45bd994ff8aa98e4d50bf7e4fa3fe5fb5
+patch -ulbf subprojects/gssdp-1.6.wrap << EOF
+@@ -6,3 +6,3 @@
+ [provide]
+-dependency_names = gssdp-1.2
++dependency_names = gssdp-1.6
+
+EOF
+patch -ulbf subprojects/gupnp-1.6.wrap << EOF
+@@ -6,3 +6,3 @@
+ [provide]
+-dependency_names = gupnp-1.2
++dependency_names = gupnp-1.6
+
+EOF
+# fix src/event-dumper/event-dumper.c (version >= 0.12.1)
+patch -ulbf src/event-dumper/event-dumper.c << EOF
+@@ -5,3 +5,5 @@
+
++#ifndef _WIN32
+ #include <glib-unix.h>
++#endif
+ #include <glib.h>
+@@ -179,4 +181,6 @@
+
++#ifndef _WIN32
+         g_unix_signal_add (SIGINT, (GSourceFunc) g_main_loop_quit, loop);
+         g_unix_signal_add (SIGTERM, (GSourceFunc) g_main_loop_quit, loop);
++#endif
+
+EOF
+# fix undefined gupnp_service_action_return_success_success in src/network-light/upnp.c (version >= 0.12.1)
+sed -i.bak -e "s/\(gupnp_service_action_return_success\)_success//" src/network-light/upnp.c
+## fix detection of newer gssdp/gupnp (version >= 0.10.2 <= 0.10.3)
+#sed -i.bak -e "s/gssdp-[0-9][0-9]*\.[0-9][0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gssdp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\(gssdp-.*\)\.pc/\1/")/; s/gupnp-[0-9][0-9]*\.[0-9][0-9]*/$(ls -1 $MINGWPREFIX/lib/pkgconfig/gupnp-[0-9]*.pc|sort -V|tail -n1|sed -e "s/^.*\/\(gupnp-.*\)\.pc/\1/")/" meson.build
 mkdir -p build_win &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library static -Dav-tools=true . build_win &&
@@ -218,6 +252,6 @@ mkdir -p build_win &&
  rm -f $INSTALLPREFIX/lib/*.exe.a &&
  ( rmdir $INSTALLPREFIX/lib || true ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-
+####TO DO: also build DLL(s)
 
 
