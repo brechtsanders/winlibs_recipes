@@ -8,13 +8,15 @@ export CATEGORY=development,ide
 export TYPE=application
 #export VERSION=1.5.0
 #export VERSIONDATE=20191121
-export VERSION=1.7.2
+#export VERSION=1.7.2
+#export VERSIONDATE=20221030
+export VERSION=1.8.0
 export VERSIONDATE=20221030
 ####lib/libclangmm does not contain a CMakeLists.txt file.
 wl-showstatus --package-version
-export DEPENDENCIES=boost,tiny-process-library,aspell
+export DEPENDENCIES=llvm-project,boost,tiny-process-library,aspell
 export OPTIONALDEPENDENCIES=gtkmm3,gtksourceview3,libgit2,aspell,boost
-export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=MIT
@@ -30,8 +32,26 @@ wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/jucipp-v$VERSION.tar.bz2
 cd jucipp-v$VERSION
-#mkdir -p build_test; cd build_test; cmake.exe -G"MSYS Makefiles" .. -LH && echo OK; cd ..; rm -rf build_test
-#rm -rf CMakeCache.txt CMakeFiles; cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
+# fix missing clangmm.hpp
+sed -i.bak -e "s?clangmm\.hpp?libclangmm/clangmm.h?" $(grep -l "clangmm\.hpp" $(find -name '*.hpp' -or -name '*.cpp'))
+# fix missing files
+touch lib/tiny-process-library/CMakeLists.txt lib/libclangmm/CMakeLists.txt
+
+#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DLIBCLANG_LIBRARIES:PATH=$MINGWPREFIX/share/llvm/lib -DLIBCLANG_PATH:PATH=$MINGWPREFIX/share/llvm/bin/libclang.dll -DLIBLLDB_LIBRARIES:PATH=$MINGWPREFIX/share/llvm/lib -DLIBLLDB_PATH:PATH=$MINGWPREFIX/share/llvm/lib/liblldb.dll.a -DBUILD_FUZZING:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBCLANG_LIBRARIES:PATH=$MINGWPREFIX/share/llvm/lib -DLIBCLANG_PATH:PATH=$MINGWPREFIX/share/llvm/lib/libclang.dll.a -DLIBLLDB_LIBRARIES:PATH=$MINGWPREFIX/share/llvm/lib -DLIBLLDB_PATH:PATH=$MINGWPREFIX/share/llvm/lib/liblldb.dll.a -DBUILD_FUZZING:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/llvm/include" -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #cmake.exe --build build_win &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
 #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
 #wl-showstatus configure &&
 #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . &&
