@@ -1,155 +1,179 @@
+#export NAME="Leptonica"
+#export STATUS=
+#export URL=http://code.google.com/p/leptonica/
+#export BASENAME=leptonlib
+#export DESCRIPTION="An open source C library for efficient image processing and image analysis operations"
+#export CATEGORY=graphics
+#export TYPE=library
+##export VERSION=1.60
+##export VERSION=1.61
+##export VERSION=1.62
+##export VERSION=1.63
+##export VERSIONDATE=20091207
+##export VERSION=1.64
+##export VERSIONDATE=20100104
+##export VERSION=1.65
+##export VERSIONDATE=20100306
+##export VERSION=1.66
+##export VERSIONDATE=20100811
+##export VERSION=1.67
+##export VERSIONDATE=20101111
+##export VERSION=1.68
+##export VERSIONDATE=20110925
+##export VERSION=1.69
+##export VERSIONDATE=20120706
+##export VERSION=1.70
+##export VERSIONDATE=20140124
+##export VERSION=1.71
+##export VERSIONDATE=20140630
+##export VERSION=1.72
+##export VERSIONDATE=20150427
+##export VERSION=1.73
+##export VERSIONDATE=20160126
+##export VERSION=1.74
+##export VERSIONDATE=20161226
+##export VERSION=1.74.1
+##export VERSIONDATE=20170103
+##export VERSION=1.74.4
+##export VERSIONDATE=20170627
+##export VERSION=1.75.0
+##export VERSIONDATE=20180123
+##export VERSION=1.75.1
+##export VERSIONDATE=20180201
+##export VERSION=1.75.2
+##export VERSIONDATE=20180211
+##export VERSION=1.75.3
+##export VERSIONDATE=20180216
+##export VERSION=1.76.0
+##export VERSIONDATE=20180503
+##export VERSION=1.77.0
+##export VERSIONDATE=20181215
+#export VERSION=1.78.0
+#export VERSIONDATE=20190321
+#wl-showstatus --package-version
+#export DEPENDENCIES=giflib,libjpeg,libpng,libtiff,zlib
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=
+#export LICENSETYPE="Creative Commons Attribution 2.5 License"
+##export DOWNLOADURL="http://www.leptonica.com/source/"
+##export DOWNLOADURL="http://www.leptonica.com/download.html"
+#export DOWNLOADURL="http://www.leptonica.com/download.html leptonica-"
+##export DOWNLOADURL="https://github.com/DanBloomberg/leptonica/releases leptonica-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://www.leptonica.com/source/leptonica-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=http://www.leptonica.com/source/leptonica-$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=https://github.com/DanBloomberg/leptonica/releases/download/$VERSION/leptonica-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://www.leptonica.com/source/leptonica-$VERSION.tar.gz
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus download
+##tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+##cd $BASENAME-$VERSION
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/leptonica-$VERSION.tar.gz
+#cd leptonica-$VERSION
+##make -C src
+##make -C src shared SHARED=yes LEPTLIB_SHARED=liblept.dll LDFLAGS="-ljpeg -ltiff -lpng -lz"
+### fix undefined FILE (version <= 1.62)
+##mv src/leptprotos.h src/leptprotos.h.bak
+##echo "#include <stdio.h>" > src/leptprotos.h
+##cat src/leptprotos.h.bak >> src/leptprotos.h
+## fix redefinition of l_jpegSetNoChromaSampling in src/jpegiostub.c (version >= 1.65)
+#patch -ulbf src/jpegiostub.c << EOF
+#@@ -56,2 +56,3 @@
+#
+#+#ifndef __MINGW32__
+# l_int32 l_jpegSetNoChromaSampling(l_int32 flag)
+#@@ -60,2 +61,3 @@
+# }
+#+#endif
+#EOF
+### fix missing sleep in prog/numa_reg.c (version >= 1.67)
+##mv prog/numa_reg.c prog/numa_reg.c.bak
+##echo "#define sleep(t) _sleep((t) * 1000)" > prog/numa_reg.c
+##cat prog/numa_reg.c.bak >> prog/numa_reg.c
+## fix missing sleep on MinGW-W64 (version >= 1.67)
+#if echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
+#echo "#define sleep(t) _sleep((t) * 1000)" >> src/allheaders.h
+#fi
+## fix missing Z_DEFAULT_COMPRESSION in src/pngio.c
+#mv src/pngio.c src/pngio.c.bak
+#echo "#include <zlib.h>" > src/pngio.c
+#cat src/pngio.c.bak >> src/pngio.c
+## fix src/utils.c (version >= 1.69) (error: utils.c:2301: error: 'hfind' undeclared (first use in this function))
+#patch -ulbf src/utils.c << EOF
+#--- src/utils.c  2012-01-22 19:29:16 +0100
+#+++ src/utils.c  2012-07-08 16:16:32 +0200
+#@@ -2300,3 +2300,3 @@
+#         hFind = FindFirstFileA(dirname, &ffd);
+#-        if (hfind != INVALID_HANDLE_VALUE) {
+#+        if (hFind != INVALID_HANDLE_VALUE) {
+#             *pexists = 1;
+#EOF
+## fix extra parameter to DGifCloseFile/EGifCloseFile in giflib >= 5.0.0
+#if grep -q "GifCloseFile.*ErrorCode" $MINGWPREFIX/include/gif_lib.h; then
+# mv src/gifio.c src/gifio.c.bak &&
+# sed -e "s/\(GifCloseFile(gif\))/\1, NULL)/" src/gifio.c.bak > src/gifio.c
+#fi
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# aclocal --force -I $MINGWPREFIX/share/aclocal &&
+# libtoolize --force -i &&
+# autoconf --force &&
+# autoheader --force &&
+# automake --force-missing --add-missing
+#fi
+#wl-showstatus configure &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -lgdi32" &&
+# wl-showstatus build &&
+# ( make || make CC="${CC:-gcc} -I$(ls -1d $MINGWPREFIX/include/openjpeg-*|tail -n1)" ) &&
+# wl-showstatus build-install &&
+# ( make all install-strip || make -j1 all install-strip ) &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && ( rm -rf leptonica-$VERSION || rm -rf $BASENAME-$VERSION )
+
+
+
 export NAME="Leptonica"
 export STATUS=
-export URL=http://code.google.com/p/leptonica/
+export URL=http://www.leptonica.org/
 export BASENAME=leptonlib
-export DESCRIPTION="An open source C library for efficient image processing and image analysis operations"
+export DESCRIPTION="Leptonica is a pedagogically-oriented open source library containing software that is broadly useful for image processing and image analysis applications."
 export CATEGORY=graphics
 export TYPE=library
-#export VERSION=1.60
-#export VERSION=1.61
-#export VERSION=1.62
-#export VERSION=1.63
-#export VERSIONDATE=20091207
-#export VERSION=1.64
-#export VERSIONDATE=20100104
-#export VERSION=1.65
-#export VERSIONDATE=20100306
-#export VERSION=1.66
-#export VERSIONDATE=20100811
-#export VERSION=1.67
-#export VERSIONDATE=20101111
-#export VERSION=1.68
-#export VERSIONDATE=20110925
-#export VERSION=1.69
-#export VERSIONDATE=20120706
-#export VERSION=1.70
-#export VERSIONDATE=20140124
-#export VERSION=1.71
-#export VERSIONDATE=20140630
-#export VERSION=1.72
-#export VERSIONDATE=20150427
-#export VERSION=1.73
-#export VERSIONDATE=20160126
-#export VERSION=1.74
-#export VERSIONDATE=20161226
-#export VERSION=1.74.1
-#export VERSIONDATE=20170103
-#export VERSION=1.74.4
-#export VERSIONDATE=20170627
-#export VERSION=1.75.0
-#export VERSIONDATE=20180123
-#export VERSION=1.75.1
-#export VERSIONDATE=20180201
-#export VERSION=1.75.2
-#export VERSIONDATE=20180211
-#export VERSION=1.75.3
-#export VERSIONDATE=20180216
-#export VERSION=1.76.0
-#export VERSIONDATE=20180503
-#export VERSION=1.77.0
-#export VERSIONDATE=20181215
-export VERSION=1.78.0
-export VERSIONDATE=20190321
+export VERSION=1.83.1
+export VERSIONDATE=20230805
 wl-showstatus --package-version
-export DEPENDENCIES=giflib,libjpeg,libpng,libtiff,zlib
+export DEPENDENCIES=zlib,giflib,libjpeg,libpng,libtiff,libopenjpeg,libwebp
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
-export LICENSEFILE=
-export LICENSETYPE="Creative Commons Attribution 2.5 License"
-#export DOWNLOADURL="http://www.leptonica.com/source/"
-#export DOWNLOADURL="http://www.leptonica.com/download.html"
-export DOWNLOADURL="http://www.leptonica.com/download.html leptonica-"
-#export DOWNLOADURL="https://github.com/DanBloomberg/leptonica/releases leptonica-"
+export LICENSEFILE=leptonica-license.txt
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/DanBloomberg/leptonica/releases leptonica-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-#export DOWNLOADSOURCEURL=http://www.leptonica.com/source/leptonica-$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=http://www.leptonica.com/source/leptonica-$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=https://github.com/DanBloomberg/leptonica/releases/download/$VERSION/leptonica-$VERSION.tar.gz
-export DOWNLOADSOURCEURL=http://www.leptonica.com/source/leptonica-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/DanBloomberg/leptonica/releases/download/$VERSION/leptonica-$VERSION.tar.gz
+wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
-wl-showstatus download
-#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
-#cd $BASENAME-$VERSION
+wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/leptonica-$VERSION.tar.gz
 cd leptonica-$VERSION
-#make -C src
-#make -C src shared SHARED=yes LEPTLIB_SHARED=liblept.dll LDFLAGS="-ljpeg -ltiff -lpng -lz"
-## fix undefined FILE (version <= 1.62)
-#mv src/leptprotos.h src/leptprotos.h.bak
-#echo "#include <stdio.h>" > src/leptprotos.h
-#cat src/leptprotos.h.bak >> src/leptprotos.h
-# fix redefinition of l_jpegSetNoChromaSampling in src/jpegiostub.c (version >= 1.65)
-patch -ulbf src/jpegiostub.c << EOF
---- src/jpegiostub.c  2010-04-05 06:35:00 +0200
-+++ src/jpegiostub.c  2010-05-05 08:46:20 +0200
-@@ -56,2 +56,3 @@
-
-+#ifndef __MINGW32__
- l_int32 l_jpegSetNoChromaSampling(l_int32 flag)
-@@ -60,2 +61,3 @@
- }
-+#endif
-EOF
-## fix missing sleep in prog/numa_reg.c (version >= 1.67)
-#mv prog/numa_reg.c prog/numa_reg.c.bak
-#echo "#define sleep(t) _sleep((t) * 1000)" > prog/numa_reg.c
-#cat prog/numa_reg.c.bak >> prog/numa_reg.c
-# fix missing sleep on MinGW-W64 (version >= 1.67)
-if echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
-echo "#define sleep(t) _sleep((t) * 1000)" >> src/allheaders.h
-fi
-# fix missing Z_DEFAULT_COMPRESSION in src/pngio.c
-mv src/pngio.c src/pngio.c.bak
-echo "#include <zlib.h>" > src/pngio.c
-cat src/pngio.c.bak >> src/pngio.c
-# fix src/utils.c (version >= 1.69) (error: utils.c:2301: error: 'hfind' undeclared (first use in this function))
-patch -ulbf src/utils.c << EOF
---- src/utils.c  2012-01-22 19:29:16 +0100
-+++ src/utils.c  2012-07-08 16:16:32 +0200
-@@ -2300,3 +2300,3 @@
-         hFind = FindFirstFileA(dirname, &ffd);
--        if (hfind != INVALID_HANDLE_VALUE) {
-+        if (hFind != INVALID_HANDLE_VALUE) {
-             *pexists = 1;
-EOF
-# fix extra parameter to DGifCloseFile/EGifCloseFile in giflib >= 5.0.0
-if grep -q "GifCloseFile.*ErrorCode" $MINGWPREFIX/include/gif_lib.h; then
- mv src/gifio.c src/gifio.c.bak &&
- sed -e "s/\(GifCloseFile(gif\))/\1, NULL)/" src/gifio.c.bak > src/gifio.c
-fi
-# fix building DLLs on 64-bit
-if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- aclocal --force -I $MINGWPREFIX/share/aclocal &&
- libtoolize --force -i &&
- autoconf --force &&
- autoheader --force &&
- automake --force-missing --add-missing
-fi
-wl-showstatus configure &&
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -lgdi32" &&
- wl-showstatus build &&
- ( make || make CC="${CC:-gcc} -I$(ls -1d $MINGWPREFIX/include/openjpeg-*|tail -n1)" ) &&
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_PROG:BOOL=OFF -DSW_BUILD:BOOL=OFF -DSYM_LINK:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PROG:BOOL=OFF -DSW_BUILD:BOOL=OFF -DSYM_LINK:BOOL=OFF -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- ( make all install-strip || make -j1 all install-strip ) &&
-#export BUILDDEPENDENCIES=cmake
-#export OPTIONALBUILDDEPENDENCIES=
-#mkdir -p build_static build_shared &&
-#wl-showstatus configure &&
-# cd build_static &&
-# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release .. &&
-# cd .. &&
-#wl-showstatus configure &&
-# cd build_shared &&
-# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSTATIC:BOOL=ON .. &&
-# cd .. &&
-# wl-showstatus build-install &&
-# make -Cbuild_static install/strip &&
-# wl-showstatus build-install &&
-# make -Cbuild_shared install/strip &&
-#    echo OK
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && ( rm -rf leptonica-$VERSION || rm -rf $BASENAME-$VERSION )
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ # manually copy liblebt library for backwards compatibility
+ for F in $INSTALLPREFIX/lib/libleptonica*.a; do
+  cp -u $F $(echo $F | sed -e "s?\(liblept\)onica-[0-9.]*\(\(\.dll\)*\.a\)?\1\2?")
+ done &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf leptonica-$VERSION
 
 
 

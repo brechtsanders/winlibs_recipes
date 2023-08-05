@@ -151,6 +151,20 @@ patch -ulbf src/jbig2.cc << EOF
 -                        pixd4->data, pixd4->w, pixd4->h, pixd4->wpl, 4);
 
 EOF
+# fix for newer leptonlib/leptonica (version >= 0.29)
+sed -i.bak -e "s?#include <leptonica/allheaders\.h>?&\n#include <leptonica/pix_internal.h>\n#include <leptonica/array_internal.h>?" $(grep -l "#include <leptonica/allheaders\.h>" src/*.cc)
+# fix missing pixGetRefcount for newer leptonlib/leptonica in src/jbig2enc.cc (version >= 0.29)
+#### see also: https://git.alpinelinux.org/aports/commit/?id=10c411136beb8f2f4f36f3f236e4b3e2fda44920
+patch -ulbf src/jbig2enc.cc << EOF
+@@ -210,3 +210,7 @@
+     }
++#if (LIBLEPT_MAJOR_VERSION == 1 && LIBLEPT_MINOR_VERSION >= 83) || LIBLEPT_MAJOR_VERSION > 1
++    ctx->classer->pixat->pix[new_representant]->refcount += ctx->classer->pixat->pix[second_template]->refcount;
++#else
+     pixChangeRefcount(ctx->classer->pixat->pix[new_representant],pixGetRefcount(ctx->classer->pixat->pix[second_template]));
++#endif
+   }
+EOF
 ## fix detection of ws2_32 in configure (version = 0.28)
 #patch -ulbf configure << EOF
 #--- configure  2012-09-19 23:27:24.000000000 +0200
