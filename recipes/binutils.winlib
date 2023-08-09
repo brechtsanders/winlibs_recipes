@@ -5057,51 +5057,53 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
-# fix ld/ldlang.c (version >= 2.40)
-#### See bug reported here: https://sourceware.org/bugzilla/show_bug.cgi?id=30079
-patch -ulbf ld/ldlang.c << EOF
-@@ -651,3 +651,4 @@
-       /* Find the correct node to append this section.  */
--      if (compare_section (sec->spec.sorted, section, (*tree)->section) < 0)
-+      if (sec && sec->spec.sorted != none && sec->spec.sorted != by_none
-+         && compare_section (sec->spec.sorted, section, (*tree)->section) < 0)
-        tree = &((*tree)->left);
-EOF
-# add Windows on ARM64 support (version >= 2.40)
-patch -ulbf bfd/config.bfd << EOF
-@@ -251,3 +251,3 @@
-     ;;
--  aarch64-*-pe*)
-+  aarch64-*-pe* | aarch64-*-mingw*)
-     targ_defvec=aarch64_pe_le_vec
-EOF
-patch -ulbf ld/configure.tgt << EOF
-@@ -120,3 +120,3 @@
-                        ;;
--aarch64-*-pe*)
-+aarch64-*-pe* | aarch64-*-mingw*)
-                        targ_emul=aarch64pe
-EOF
-patch -ulbf gas/configure.tgt << EOF
-@@ -137,3 +137,3 @@
-   aarch64*-*-openbsd*)                 fmt=elf;;
--  aarch64*-*-pe*)                      fmt=coff em=pepaarch64 ;;
-+  aarch64*-*-pe* | aarch64*-*-mingw*)  fmt=coff em=pepaarch64 ;;
-   alpha-*-*vms*)                       fmt=evax ;;
-EOF
+## fix ld/ldlang.c (version = 2.40)
+##### See bug reported here: https://sourceware.org/bugzilla/show_bug.cgi?id=30079
+#patch -ulbf ld/ldlang.c << EOF
+#@@ -651,3 +651,4 @@
+#       /* Find the correct node to append this section.  */
+#-      if (compare_section (sec->spec.sorted, section, (*tree)->section) < 0)
+#+      if (sec && sec->spec.sorted != none && sec->spec.sorted != by_none
+#+         && compare_section (sec->spec.sorted, section, (*tree)->section) < 0)
+#        tree = &((*tree)->left);
+#EOF
+## add Windows on ARM64 support (version >= 2.40)
+#patch -ulbf bfd/config.bfd << EOF
+#@@ -251,3 +251,3 @@
+#     ;;
+#-  aarch64-*-pe*)
+#+  aarch64-*-pe* | aarch64-*-mingw*)
+#     targ_defvec=aarch64_pe_le_vec
+#EOF
+#patch -ulbf ld/configure.tgt << EOF
+#@@ -120,3 +120,3 @@
+#                        ;;
+#-aarch64-*-pe*)
+#+aarch64-*-pe* | aarch64-*-mingw*)
+#                        targ_emul=aarch64pe
+#EOF
+#patch -ulbf gas/configure.tgt << EOF
+#@@ -137,3 +137,3 @@
+#   aarch64*-*-openbsd*)                 fmt=elf;;
+#-  aarch64*-*-pe*)                      fmt=coff em=pepaarch64 ;;
+#+  aarch64*-*-pe* | aarch64*-*-mingw*)  fmt=coff em=pepaarch64 ;;
+#   alpha-*-*vms*)                       fmt=evax ;;
+#EOF
 ## fix building DLLs
 #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" ltmain.sh &&
 # fix error when --with-pkgversion value contains a comma
 sed -i.bak -e 's/\(-e "s\),\([^,]*\),\([^,]*\),/\1?\2?\3?/' bfd/Makefile.in
-# avoid linking with -lc which doesn't exist with MinGW-w64 (version >= 2.39)
-sed -i.bak -e "s/-Wl,-lc,--as-needed/-Wl,--as-needed/" bfd/configure opcodes/configure
+## avoid linking with -lc which doesn't exist with MinGW-w64 (version >= 2.39 <= 2.40)
+#sed -i.bak -e "s/-Wl,-lc,--as-needed/-Wl,--as-needed/" bfd/configure opcodes/configure
 mkdir -p build_win &&
  wl-showstatus configure &&
  cd build_win &&
  #../configure --prefix=$INSTALLPREFIX/share/binutils --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM --enable-targets=all --with-pkgversion="Binutils for MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//"), built by Brecht Sanders" --enable-shared --enable-host-shared --enable-serial-configure --disable-bootstrap --enable-{libada,libssp,lto,gold,plugins,vtable-verify,64-bit-bfd,install-libbfd,install-libiberty,multilib} --disable-rpath --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --with-{system-zlib,mmap} CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lmman" AR=ar &&
  #../configure --prefix=$INSTALLPREFIX/share/binutils --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM --enable-targets=$(for arch in i686 x86_64 aarch64; do if [ "$arch-w64-mingw32" != "$RUNPLATFORM" ]; then echo -n $arch-w64-mingw32,; fi; done | sed -e "s/,$//") --with-pkgversion="Binutils for MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//"), built by Brecht Sanders" --enable-shared --enable-host-shared --enable-serial-configure --disable-bootstrap --enable-{libada,libssp,lto,gold,plugins,vtable-verify,64-bit-bfd,install-libbfd,install-libiberty,multilib} --disable-rpath --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --with-{system-zlib,mmap} CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lmman" AR=ar &&
  #../configure --prefix=$INSTALLPREFIX/share/binutils --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM --enable-targets=$(for arch in i686 x86_64 aarch64; do if [ "$arch-w64-mingw32" != "$RUNPLATFORM" ]; then echo -n $arch-w64-mingw32,; fi; done | sed -e "s/,$//") --with-pkgversion="Binutils for MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//"), built by Brecht Sanders" --enable-shared --enable-host-shared --enable-serial-configure --disable-bootstrap --enable-{libada,libssp,lto,gold,plugins,vtable-verify,64-bit-bfd,install-libbfd,install-libiberty,multilib} --disable-rpath --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --with-{system-zlib,mmap} CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,-no-undefined -Wl,--allow-multiple-definition -Wl,--as-needed -lmman" AR=${AR:-ar} &&
- ../configure --prefix=$INSTALLPREFIX/share/binutils --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM --enable-targets=$(for arch in i686 x86_64 aarch64; do if [ "$arch-w64-mingw32" != "$RUNPLATFORM" ]; then echo -n $arch-w64-mingw32,; fi; done | sed -e "s/,$//") --with-pkgversion="Binutils for MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//"), built by Brecht Sanders" --enable-shared --enable-host-shared --enable-serial-configure --disable-bootstrap --enable-{libada,libssp,lto,gold,plugins,vtable-verify,64-bit-bfd,install-libbfd,install-libiberty,multilib,gprofng-tools} --disable-rpath --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --with-{system-zlib,mmap} CFLAGS="-I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" LDFLAGS="-Wl,--no-insert-timestamp -Wl,-no-undefined -Wl,--allow-multiple-definition -Wl,--as-needed -lmman" AR=${AR:-ar} &&
+ #../configure --prefix=$INSTALLPREFIX/share/binutils --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM --enable-targets=$(for arch in i686 x86_64 aarch64; do if [ "$arch-w64-mingw32" != "$RUNPLATFORM" ]; then echo -n $arch-w64-mingw32,; fi; done | sed -e "s/,$//") --with-pkgversion="Binutils for MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//"), built by Brecht Sanders" --enable-shared --enable-host-shared --enable-serial-configure --disable-bootstrap --enable-{libada,libssp,lto,gold,plugins,vtable-verify,64-bit-bfd,install-libbfd,install-libiberty,multilib,gprofng-tools} --disable-rpath --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --with-{system-zlib,mmap} CFLAGS="-I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" LDFLAGS="-Wl,--no-insert-timestamp -Wl,-no-undefined -Wl,--allow-multiple-definition -Wl,--as-needed -lmman" AR=${AR:-ar} &&
+ ../configure --prefix=$INSTALLPREFIX/share/binutils --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM --with-pkgversion="Binutils for MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//"), built by Brecht Sanders" --enable-shared --enable-host-shared --enable-serial-configure --disable-bootstrap --enable-{libada,libssp,lto,gold,plugins,vtable-verify,64-bit-bfd,install-libbfd,install-libiberty,multilib,gprofng-tools} --disable-rpath --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX --with-{system-zlib,mmap} CFLAGS="-I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" CXXFLAGS="-I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" LDFLAGS="-Wl,--no-insert-timestamp -Wl,-no-undefined -Wl,--allow-multiple-definition -Wl,--as-needed -lmman" AR=${AR:-ar} &&
+ #--enable-targets=$(for arch in i686 x86_64 aarch64; do if [ "$arch-w64-mingw32" != "$RUNPLATFORM" ]; then echo -n $arch-w64-mingw32,; fi; done | sed -e "s/,$//") 
  cd .. &&
  ( ls -1 build_win/libsframe &> /dev/null || (
   mkdir -p build_win/libsframe &&
