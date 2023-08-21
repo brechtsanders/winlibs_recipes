@@ -270,8 +270,58 @@ git clone --branch $VERSION https://gn.googlesource.com/gn
 mv gn/src/base/files/file_enumerator_win.cc gn/src/base/files/file_enumerator_win.cc.bak &&
 echo "#include <limits>" > gn/src/base/files/file_enumerator_win.cc &&
 cat gn/src/base/files/file_enumerator_win.cc.bak >> gn/src/base/files/file_enumerator_win.cc
-# don't abort on warnings
-sed -i.bak -e "s/'\(-Wall\|-Wextra\)',//g" gn/build/gen.py &&
+# avoid MSVC /DEF: flag in gn/src/gn/ninja_binary_target_writer.cc (version >= master)
+sed -i.bak -e "s?/DEF:??" gn/src/gn/ninja_binary_target_writer.cc
+# support ARM64 in gn/src/util/sys_info.cc (version >= master)
+patch -ulbf gn/src/util/sys_info.cc << EOF
+@@ -46,2 +46,4 @@
+   switch (system_info.wProcessorArchitecture) {
++    case PROCESSOR_ARCHITECTURE_ARM64:
++      return "arm64";
+     case PROCESSOR_ARCHITECTURE_INTEL:
+EOF
+# fix gn/build/build_linux.ninja.template (version >= master)
+patch -ulbf gn/build/build_linux.ninja.template << EOF
+@@ -7,3 +7,3 @@
+ rule alink_thin
+-  command = rm -f \$out && \$ar rcsT \$out \$in
++  command = \$ar rcsT \$out \$in
+   description = AR \$out
+EOF
+# fix gn/build/gen.py (version >= master)
+patch -ulbf gn/build/gen.py << EOF
+@@ -43,2 +43,6 @@
+       self._platform = 'msvc'
++      if 'MSC' in sys.version:
++        self._platform = 'msvc'
++      else:
++        self._platform = 'mingw'
+     elif self._platform.startswith('aix'):
+@@ -303,3 +307,3 @@
+     executable_ext = '.exe'
+-    library_ext = '.lib'
++    library_ext = '.a'
+     object_ext = '.obj'
+@@ -381,4 +385,8 @@
+   elif platform.is_msys() or platform.is_mingw():
+-    cxx = os.environ.get('CXX', 'g++')
+-    ld = os.environ.get('LD', 'g++')
++    if 'Clang' in sys.version:
++      cxx = os.environ.get('CXX', 'clang++')
++      ld = os.environ.get('LD', 'clang++')
++    else:
++      cxx = os.environ.get('CXX', 'g++')
++      ld = os.environ.get('LD', 'g++')
+     ar = os.environ.get('AR', 'ar')
+@@ -471,2 +479,5 @@
+
++    if cxx == 'g++':
++      cflags.append('-Wno-restrict')
++
+     # flags not supported by gcc/g++.
+EOF
+## don't abort on warnings
+#sed -i.bak -e "s/'\(-Wall\|-Wextra\)',//g" gn/build/gen.py
 ## avoid invalid linker flag -Wl,--gc-sections
 #sed -i.bak2 -e "s/-Wl,--gc-sections//" gn/build/gen.py &&
 ## avoid invalid linker flag -Wl,--as-needed
@@ -281,7 +331,8 @@ sed -i.bak -e "s/'\(-Wall\|-Wextra\)',//g" gn/build/gen.py &&
 wl-showstatus configure &&
  cd gn &&
  #$PYDIR/python.exe build/gen.py --host=mingw --platform=msys --out-path=build_win &&
- $PYDIR/python.exe build/gen.py --host=mingw --platform=mingw --out-path=build_win &&
+ #$PYDIR/python.exe build/gen.py --host=mingw --platform=mingw --out-path=build_win &&
+ $PYDIR/python.exe build/gen.py --host=mingw --platform=mingw --out-path=build_win --allow-warnings --no-static-libstdc++ &&
  #CC=${CC:-gcc.exe} CXX=${CXX:-g++.exe} AR=${AR:-ar} $PYDIR/python.exe build/gen.py --host=mingw --platform=mingw --out-path=build_win &&
  # fix for building with GCC, use .a instead of .lib as library extenstion, avoid rm -f
  sed -i.bak -e "s/clang++/g++/; s/\([^ ]*\.\)lib/lib\1a/g; s/rm -f \$out \&\& //" build_win/build.ninja &&
