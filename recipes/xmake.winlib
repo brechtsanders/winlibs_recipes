@@ -89,7 +89,8 @@ export TYPE=application
 export VERSION=2.8.2
 export VERSIONDATE=20230823
 wl-showstatus --package-version
-export DEPENDENCIES=lua,luajit,lua-cjson,tbox,libsv,pdcurses
+#export DEPENDENCIES=lua,lua-cjson,tbox,libsv,ncurses,liblz4
+export DEPENDENCIES=tbox,libsv,luajit,liblz4,ncurses
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -104,35 +105,31 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-mv core/src/sv/makefile core/src/sv/makefile.bak &&
-cat > core/src/sv/makefile << EOF
-clean:
-all:
-EOF
-mv core/src/luajit/makefile core/src/luajit/makefile.bak &&
-cat > core/src/luajit/makefile << EOF
-clean:
-all:
-EOF
-#mv core/src/tbox/makefile core/src/tbox/makefile.bak &&
-#cat > core/src/tbox/makefile << EOF
-#clean:
-#all:
+## fix luajit include path in core/src/xmake/prefix.h (version >= 2.8.2)
+#patch -ulbf core/src/xmake/prefix.h << EOF
+#@@ -35,5 +35,5 @@
+# #ifdef USE_LUAJIT
+#-#   include "luajit.h"
+#-#   include "lualib.h"
+#-#   include "lauxlib.h"
+#+#   include "$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit|sed -e "s?^.*/??")/luajit.h"
+#+#   include "$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit|sed -e "s?^.*/??")/lualib.h"
+#+#   include "$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit|sed -e "s?^.*/??")/lauxlib.h"
+# #else
 #EOF
-# use existing lua-cjson
-cp -f $MINGWPREFIX/lib/lua/$(lua -v|sed -ne "s/^.*Lua \([0-9]\+\.[0-9]\+\).*$/\1/p")/cjson.dll core/src/lua-cjson/
-cat > core/src/lua-cjson/makefile << EOF
-build:
-clean:
-install:
-test:
-EOF
-wl-showstatus build &&
- make -j1 build CFLAG="-I$MINGWPREFIX/include/luajit-2.0" &&
- wl-showstatus install &&
- make -j1 install prefix=$INSTALLPREFIX &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# skip building tbox
+mkdir -p core/src/tbox/tbox/src
+touch core/src/tbox/tbox/src/xmake.sh
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --mode=release --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --generator=gmake --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --runtime=luajit --external=yes --buildir=build_win &&
+ #--generator=ninja 
+ #--kind=shared 
+ #sed -i.bak -e "s/\(-o [^ ]*xmake\.exe .*\$(\)demo_ldflags/\1xmake_ldflags/" makefile &&
+ # make sure luajit path is included first
+ sed -i.bak -e "s?^[^ ]*cflags=?&$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit) ?" makefile &&
+ wl-showstatus build-install &&
+ make -f makefile install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 
