@@ -16,7 +16,7 @@ export TYPE=application
 export VERSION=3.88b
 export VERSIONDATE=20220226
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,libbz2,libjpeg,zmusic
+export DEPENDENCIES=zlib,libbz2,libjpeg,libgme,zmusic,asmjit
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -43,6 +43,16 @@ cat src/math/isnan.c.bak >> src/math/isnan.c
 mv src/scripting/types.cpp src/scripting/types.cpp.bak &&
 echo "#include <limits>" > src/scripting/types.cpp &&
 cat src/scripting/types.cpp.bak >> src/scripting/types.cpp
+# fix undefined int32_t in libraries/music_common/fileio.h (version >= 3.88b)
+mv libraries/music_common/fileio.h libraries/music_common/fileio.h.bak &&
+echo "#include <cstdint>" > libraries/music_common/fileio.h &&
+cat libraries/music_common/fileio.h.bak >> libraries/music_common/fileio.h
+# fix undefined std::runtime_error (version >= 3.88b)
+for F in $(grep -l "std::runtime_error" $(find -name '*.h' -or -name '*.cpp')); do
+ mv $F $F.bak &&
+ echo "#include <stdexcept>" > $F &&
+ cat $F.bak >> $F
+done
 # fix redefinition of isnan in src/math/isnan.c (version >= 3.88b)
 patch -ulbf src/math/isnan.c << EOF
 @@ -143,2 +143,3 @@
@@ -50,10 +60,15 @@ patch -ulbf src/math/isnan.c << EOF
 +#define isnan rpl_isnan
  int isnan(x)
 EOF
+# fix src/files_decompress.cpp (version >= 3.88b)
+sed -i.bak -e "s?\(#include \"\)\(LzmaDec\.h\"\)?\1$(cygpath -m $PWD)/libraries/lzma/C/\2?" src/files_decompress.cpp
+# avoid conflict with md5.h from libmd (version >= 3.88b)
+sed -i.bak -e "s?\(#include \"\)\(md5\.h\"\)?\1$(cygpath -m $PWD)/src/\2?" $(grep -l "^#include \"md5\.h\"" $(find -name '*.cpp'))
 mkdir -p build_win &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/lzdoom -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/lzdoom -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-Wno-c++11-narrowing" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/lzdoom -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-Wno-c++11-narrowing" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/lzdoom -DCMAKE_BUILD_TYPE:STRING=Release -DFORCE_INTERNAL_ZLIB:BOOL=OFF -DFORCE_INTERNAL_JPEG:BOOL=OFF -DFORCE_INTERNAL_BZIP2:BOOL=OFF -DFORCE_INTERNAL_GME:BOOL=OFF -DFORCE_INTERNAL_ASMJIT:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-c++11-narrowing" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -ldxguid/" build_win/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
