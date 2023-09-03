@@ -42,26 +42,44 @@ patch -ulbf src/commonpp/core/string_date.cpp << EOF
 +#ifdef __MINGW64__
      _gmtime64_s(&tm, &sec);
 EOF
+# fix undefined uint8_t in include/commonpp/core/string/encode.hpp (version >= master)
+mv include/commonpp/core/string/encode.hpp include/commonpp/core/string/encode.hpp.bak &&
+echo "#include <cstdint>" > include/commonpp/core/string/encode.hpp &&
+cat include/commonpp/core/string/encode.hpp.bak >> include/commonpp/core/string/encode.hpp
+# fix cmake/FindTBB.cmake (version >= master)
+# fix cmake/FindTBB.cmake (version >= master)
+patch -ulbf cmake/FindTBB.cmake << EOF
+@@ -277,3 +277,3 @@
+
+-if (TBB_FOUND)
++if (FALSE AND TBB_FOUND)
+        set(TBB_INTERFACE_VERSION 0)
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCH:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DCOMMONPP_STATIC_DEFINE -fpermissive" -S. -Bbuild_static &&
- #wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCH:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DCOMMONPP_STATIC_DEFINE -fpermissive" -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCH:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DTBB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DTBB_LIBRARY:STRING="$(${PKG_CONFIG:-pkg-config} --libs-only-l tbb)" -DCMAKE_CXX_FLAGS:STRING="-DCOMMONPP_STATIC_DEFINE -fpermissive" -S. -Bbuild_static &&
+ wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCH:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCH:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DTBB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DTBB_LIBRARY:STRING="$(${PKG_CONFIG:-pkg-config} --libs-only-l tbb)" -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_shared &&
  #sed -i.bak -e "s/\(libboost[^. ]*\)\(\.a\)/\1.dll\2/g" build_shared/build.ninja &&
  wl-showstatus build &&
  ninja -Cbuild_static &&
- #wl-showstatus build &&
- #ninja -Cbuild_shared &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/src/commonpp/*.dll &&
  #wl-showstatus build-install &&
  #ninja -Cbuild_static install/strip &&
  #wl-showstatus build-install &&
  #ninja -Cbuild_shared install/strip &&
  wl-showstatus build-install &&
- mkdir -p $INSTALLPREFIX/include/commonpp $INSTALLPREFIX/lib &&
+ mkdir -p $INSTALLPREFIX/include/commonpp $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
  cp -rf include/commonpp/* $INSTALLPREFIX/include/commonpp/ &&
  cp -rf build_static/include/commonpp/* $INSTALLPREFIX/include/commonpp/ &&
  rm -f $INSTALLPREFIX/include/commonpp/core/config.hpp.in &&
  cp -f build_static/src/commonpp/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/src/commonpp/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/src/commonpp/*.dll $INSTALLPREFIX/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: build shared library
 
