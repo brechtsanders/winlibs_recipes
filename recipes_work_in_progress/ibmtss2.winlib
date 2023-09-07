@@ -42,12 +42,11 @@ patch -ulbf utils/ibmtss/tpmtypes12.h << EOF
  #include <netinet/in.h>         /* for byte order conversions */
 EOF
 # fix utils/ibmtss/TpmBuildSwitches.h (version >= 2.1.0)
-#sed -i.bak -e "s/_MSC_VER/_WIN32/" utils/ibmtss/TpmBuildSwitches.h
 patch -ulbf utils/ibmtss/TpmBuildSwitches.h << EOF
 @@ -73,6 +73,10 @@
 
 -#ifdef  _MSC_VER
-+#ifdef  _WIN32
++#if defined(_WIN32) && !defined(STATIC)
  // This macro is used to handle LIB_EXPORT of function and variable names in lieu of a .def
  // file. Visual Studio requires that functions be explicity exported and imported.
 +# if defined(TPM_WINDOWS) && defined(DLL_EXPORT)
@@ -56,6 +55,31 @@ patch -ulbf utils/ibmtss/TpmBuildSwitches.h << EOF
 +#   define LIB_EXPORT __declspec(dllimport)
 +# endif
  #endif
+EOF
+# fix utils/tssdev.h (version >= 2.1.0)
+patch -ulbf utils/tssdev.h << EOF
+@@ -51,2 +51,3 @@
+
++    LIB_EXPORT
+     TPM_RC TSS_Dev_Transmit(TSS_CONTEXT *tssContext,
+@@ -55,2 +56,3 @@
+                            const char *message);
++    LIB_EXPORT
+     TPM_RC TSS_Dev_Close(TSS_CONTEXT *tssContext);
+EOF
+# fix utils/tssdev.c (version >= 2.1.0)
+patch -ulbf utils/tssdev.c << EOF
+@@ -1 +1,2 @@
++#include "ibmtss/TpmBuildSwitches.h"
+ /********************************************************************************/
+@@ -75,2 +76,3 @@
+
++LIB_EXPORT
+ TPM_RC TSS_Dev_Transmit(TSS_CONTEXT *tssContext,
+@@ -221,2 +223,3 @@
+
++LIB_EXPORT
+ TPM_RC TSS_Dev_Close(TSS_CONTEXT *tssContext)
 EOF
 wl-showstatus configure &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
@@ -71,6 +95,7 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe 
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static CFLAGS="-DTPM_WINDOWS -DSTATIC" LDFLAGS="-Wl,--as-needed -lws2_32" &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static CFLAGS="-DTPM_WINDOWS" LDFLAGS="-Wl,--as-needed -lws2_32" &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
