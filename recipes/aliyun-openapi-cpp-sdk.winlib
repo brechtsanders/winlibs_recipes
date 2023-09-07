@@ -1,0 +1,64 @@
+export NAME="Alibaba Cloud SDK for C++"
+export STATUS=
+export URL=https://github.com/aliyun/aliyun-openapi-cpp-sdk
+export BASENAME=aliyun-openapi-cpp-sdk
+export DESCRIPTION="Alibaba Cloud SDK for C++ allows you to access Alibaba Cloud services such as Elastic Compute Service (ECS), Server Load Balancer (SLB), and CloudMonitor. You can access Alibaba Cloud services without the need to handle API related tasks, such as signing and constructing your requests."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=1.36.1752
+export VERSIONDATE=20230907
+wl-showstatus --package-version
+export DEPENDENCIES=jsoncpp,libcurl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/aliyun/aliyun-openapi-cpp-sdk/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/aliyun/aliyun-openapi-cpp-sdk/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# avoid building dependencies (version >= 1.36.1752)
+sed -i.bak -e "s/if(CMAKE_HOST_WIN32/& AND NOT MINGW/" 3rdparty/CMakeLists.txt core/CMakeLists.txt
+# fix undefined uint16_t in core/include/alibabacloud/core/NetworkProxy.h (version >= 1.36.1752)
+mv core/include/alibabacloud/core/NetworkProxy.h core/include/alibabacloud/core/NetworkProxy.h.bak &&
+echo "#include <cstdint>" > core/include/alibabacloud/core/NetworkProxy.h &&
+cat core/include/alibabacloud/core/NetworkProxy.h.bak >> core/include/alibabacloud/core/NetworkProxy.h
+# fix undefined uint16_t in core/src/HmacSha1Signer.cc (version >= 1.36.1752)
+mv core/src/HmacSha1Signer.cc core/src/HmacSha1Signer.cc.bak &&
+echo "#include <windows.h>" > core/src/HmacSha1Signer.cc &&
+cat core/src/HmacSha1Signer.cc.bak >> core/src/HmacSha1Signer.cc
+# fix missing _dupenv_s in core/src/Utils.cc (version >= 1.36.1752)
+patch -ulbf core/src/Utils.cc << EOF
+@@ -194,3 +194,3 @@
+ std::string AlibabaCloud::GetEnv(const std::string env) {
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+   char *buf = nullptr;
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_PRODUCT:STRING=core -DBUILD_UNIT_TESTS:BOOL=OFF -DBUILD_FUNCTION_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lcrypt32 -lrpcrt4/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PRODUCT:STRING=core -DBUILD_UNIT_TESTS:BOOL=OFF -DBUILD_FUNCTION_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lcrypt32 -lrpcrt4/" build_shared/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
