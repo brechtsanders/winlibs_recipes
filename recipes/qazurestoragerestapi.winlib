@@ -1,0 +1,70 @@
+export NAME="QAzureStorageRestApi"
+export STATUS=
+export URL=https://github.com/QuentinCG/QAzureStorageRestApi
+export BASENAME=qazurestoragerestapi
+export DESCRIPTION="Standalone Azure Storage REST API client for Qt"
+export CATEGORY=security
+export TYPE=library
+export VERSION=3.0.0
+export VERSIONDATE=20230908
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=qt6
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/QuentinCG/QAzureStorageRestApi/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/QuentinCG/QAzureStorageRestApi/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix ambiguous endl in test/main.cpp (version >= 3.0.0)
+patch -ulbf test/main.cpp << EOF
+@@ -74,3 +74,3 @@
+         QTextStream stream(&file);
+-        stream << "Dummy information" << endl;
++        stream << "Dummy information" << Qt::endl;
+     }
+EOF
+# fix lib/include/QAzureStorageRestApi_global.h (version >= 3.0.0)
+patch -ulbf lib/include/QAzureStorageRestApi_global.h << EOF
+@@ -5,3 +5,5 @@
+
+-#if defined(QAZURESTORAGERESTAPI_LIBRARY)
++#if defined(STATIC)
++#  define QAZURESTORAGERESTAPISHARED_EXPORT
++#elif defined(QAZURESTORAGERESTAPI_LIBRARY)
+ #  define QAZURESTORAGERESTAPISHARED_EXPORT Q_DECL_EXPORT
+EOF
+# don't set C++11 standard
+sed -i.bak -e "s/-std=c++11//" $(grep -l "\-std=c++11" $(Find -name '*.pro'))
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ $MINGWPREFIX/qt6/bin/qmake -makefile ../QAzureStorageRestApi.pro -spec $MINGWPREFIX/qt6/mkspecs/win32-g++ CONFIG+=staticlib QMAKE_CXXFLAGS+="-DSTATIC" &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ $MINGWPREFIX/qt6/bin/qmake -makefile ../QAzureStorageRestApi.pro -spec $MINGWPREFIX/qt6/mkspecs/win32-g++ &&
+ cd .. &&
+ wl-showstatus build &&
+ mingw32-make -Cbuild_static &&
+ wl-showstatus build &&
+ mingw32-make -Cbuild_shared &&
+ mv -f build_shared/lib/release/libQAzureStorageRestApi.a build_shared/lib/release/libQAzureStorageRestApi.dll.a &&
+ #wl-showstatus test &&
+ #PATH=$MINGWPREFIX/qt6/bin:$PATH build_shared/test/release/test.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f lib/include/*.h $INSTALLPREFIX/include/ &&
+ cp -f build_{static,shared}/lib/release/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/lib/release/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
