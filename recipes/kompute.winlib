@@ -1,0 +1,66 @@
+export NAME="Kompute"
+export STATUS=
+export URL=https://kompute.cc/
+export BASENAME=kompute
+export DESCRIPTION="The general purpose GPU compute framework for cross vendor graphics cards (AMD, Qualcomm, NVIDIA & friends)"
+export CATEGORY=math,hardware
+export TYPE=library
+export VERSION=0.8.1
+export VERSIONDATE=20230915
+wl-showstatus --package-version
+export DEPENDENCIES=vulkan-loader,fmt
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/KomputeProject/kompute/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/KomputeProject/kompute/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined uint64_t in src/include/kompute/Sequence.hpp (version >= 0.8.1)
+mv src/include/kompute/Sequence.hpp src/include/kompute/Sequence.hpp.bak &&
+echo "#include <cstdint>" > src/include/kompute/Sequence.hpp &&
+cat src/include/kompute/Sequence.hpp.bak >> src/include/kompute/Sequence.hpp
+# fix fmt argument issues (version >= 0.8.1)
+####/include/fmt/core.h:1581:7: error: static assertion failed: Cannot format an argument. To make type T formattable provide a formatter<T> specialization: https://fmt.dev/latest/api.html#udt
+patch -ulbf src/Manager.cpp << EOF
+@@ -319,5 +319,5 @@
+
+-    KP_LOG_INFO("Using physical device index {} found {}",
++       KP_LOG_INFO("Using physical device index {} found {}",
+                 physicalDeviceIndex,
+-                physicalDeviceProperties.deviceName);
++                (char*)physicalDeviceProperties.deviceName);
+
+EOF
+patch -ulbf src/OpTensorCopy.cpp << EOF
+@@ -23,4 +23,4 @@
+               "Attempting to copy tensors of different types from {} to {}",
+-              dataType,
+-              tensor->dataType()));
++              (char*)dataType,
++              (char*)tensor->dataType()));
+         }
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DKOMPUTE_OPT_BUILD_AS_SHARED_LIB:BOOL=OFF -DKOMPUTE_OPT_INSTALL:BOOL=ON -DKOMPUTE_OPT_DEPENDENCIES_SHARED_LIBS:BOOL=OFF -DKOMPUTE_OPT_BUILD_PYTHON:BOOL=OFF -DKOMPUTE_OPT_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DKOMPUTE_CREATE_PIPELINE_RESULT_VALUE" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DKOMPUTE_OPT_BUILD_AS_SHARED_LIB:BOOL=ON -DKOMPUTE_OPT_INSTALL:BOOL=ON -DKOMPUTE_OPT_DEPENDENCIES_SHARED_LIBS:BOOL=ON -DKOMPUTE_OPT_BUILD_PYTHON:BOOL=OFF -DKOMPUTE_OPT_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DKOMPUTE_CREATE_PIPELINE_RESULT_VALUE" -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/src/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_shared/src/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
