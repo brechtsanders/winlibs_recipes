@@ -1,3 +1,66 @@
+#export NAME="OpenCSG"
+#export STATUS=
+#export URL=http://opencsg.org/
+#export BASENAME=opencsg
+#export DESCRIPTION="OpenCSG is a library that does image-based CSG rendering using OpenGL. OpenCSG is written in C++ and supports most modern graphics hardware using Microsoft Windows or the Linux operating system."
+#export CATEGORY=graphics,fileformat
+#export TYPE=library
+##export VERSION=1.4.2
+##export VERSIONDATE=20211206
+##export DEPENDENCIES=glew
+###export DEPENDENCIES=qt,glew
+##export OPTIONALDEPENDENCIES=
+##export BUILDDEPENDENCIES=
+##export OPTIONALBUILDDEPENDENCIES=
+##export VERSION=1.5.0
+##export VERSIONDATE=20220411
+#export VERSION=1.5.1
+#export VERSIONDATE=20220421
+#wl-showstatus --package-version
+#export DEPENDENCIES=glew,freeglut
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=license.txt
+#export LICENSETYPE=GPL
+##export DOWNLOADURL="https://github.com/openscad/OpenCSG/releases"
+#export DOWNLOADURL="http://opencsg.org/ OpenCSG-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.opencsg.org/OpenCSG-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/OpenCSG-$VERSION.tar.gz
+#cd OpenCSG-$VERSION
+## fix undefined size_t in src/batch.h (version >= 1.5.0)
+#mv src/batch.h src/batch.h.bak &&
+#echo "#include <stddef.h>" > src/batch.h &&
+#cat src/batch.h.bak >> src/batch.h
+## fix example/main.cpp (version >= 1.5.0)
+#patch -ulbf example/main.cpp << EOF
+#@@ -40,3 +40,3 @@
+# // https://www.transmissionzero.co.uk/software/freeglut-devel)
+#-#include <../freeglut/include/GL/glut.h>
+#+#include <GL/freeglut.h>
+# #else
+#EOF
+## fix OpenGL libraries
+#sed -i.bak -e "s/-lGLEW /-lglew32 /g; s/-lGLU/-lglu32/g; s/-lGL/-lopengl32 -Wl,--as-needed -lgdi32/" src/Makefile example/Makefile
+## fix building DLL
+#sed -i.bak2 -e "s/-Wl,-soname,\(libopencsg\)\.so[^ ]*/-s -Wl,--out-implib,\1.dll.a -Wl,--output-def,\1.def/; s/^\(TARGET\s*=\s*\)\(libopencsg\)\.so.*$/\1\2.dll/; s/ln -s /echo &/" src/Makefile
+#wl-showstatus build &&
+# #make QMAKE=$MINGWPREFIX/qt/bin/qmake.exe &&
+# make -Csrc all staticlib &&
+# make &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp -f include/*.h $INSTALLPREFIX/include/ &&
+# cp -f lib/*.a src/*.a src/*.def $INSTALLPREFIX/lib/ &&
+# cp -f lib/*.dll $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
 export NAME="OpenCSG"
 export STATUS=
 export URL=http://opencsg.org/
@@ -5,19 +68,10 @@ export BASENAME=opencsg
 export DESCRIPTION="OpenCSG is a library that does image-based CSG rendering using OpenGL. OpenCSG is written in C++ and supports most modern graphics hardware using Microsoft Windows or the Linux operating system."
 export CATEGORY=graphics,fileformat
 export TYPE=library
-#export VERSION=1.4.2
-#export VERSIONDATE=20211206
-#export DEPENDENCIES=glew
-##export DEPENDENCIES=qt,glew
-#export OPTIONALDEPENDENCIES=
-#export BUILDDEPENDENCIES=
-#export OPTIONALBUILDDEPENDENCIES=
-#export VERSION=1.5.0
-#export VERSIONDATE=20220411
-export VERSION=1.5.1
-export VERSIONDATE=20220421
+export VERSION=1.6.0
+export VERSIONDATE=20230916
 wl-showstatus --package-version
-export DEPENDENCIES=glew,freeglut
+export DEPENDENCIES=glew,freeglut,qt
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -33,57 +87,33 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/OpenCSG-$VERSION.tar.gz
 cd OpenCSG-$VERSION
-# fix undefined size_t in src/batch.h (version >= 1.5.0)
-mv src/batch.h src/batch.h.bak &&
-echo "#include <stddef.h>" > src/batch.h &&
-cat src/batch.h.bak >> src/batch.h
-# fix example/main.cpp (version >= 1.5.0)
-patch -ulbf example/main.cpp << EOF
-@@ -40,3 +40,3 @@
- // https://www.transmissionzero.co.uk/software/freeglut-devel)
--#include <../freeglut/include/GL/glut.h>
-+#include <GL/freeglut.h>
- #else
+# fix example/includeGl.h (version >= 1.6.0)
+patch -ulbf example/includeGl.h << EOF
+@@ -32,3 +32,3 @@
+ #include <GLUT/glut.h>
+-#elif  _WIN32
++#elif defined(_WIN32) && !defined(__MINGW32__)
+ // glut include under windows, assuming that freeglut binary has been
 EOF
-# fix OpenGL libraries
-sed -i.bak -e "s/-lGLEW /-lglew32 /g; s/-lGLU/-lglu32/g; s/-lGL/-lopengl32 -Wl,--as-needed -lgdi32/" src/Makefile example/Makefile
-# fix building DLL
-sed -i.bak2 -e "s/-Wl,-soname,\(libopencsg\)\.so[^ ]*/-s -Wl,--out-implib,\1.dll.a -Wl,--output-def,\1.def/; s/^\(TARGET\s*=\s*\)\(libopencsg\)\.so.*$/\1\2.dll/; s/ln -s /echo &/" src/Makefile
-wl-showstatus build &&
- #make QMAKE=$MINGWPREFIX/qt/bin/qmake.exe &&
- make -Csrc all staticlib &&
- make &&
- wl-showstatus install &&
- mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
- cp -f include/*.h $INSTALLPREFIX/include/ &&
- cp -f lib/*.a src/*.a src/*.def $INSTALLPREFIX/lib/ &&
- cp -f lib/*.dll $INSTALLPREFIX/bin/ &&
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-
-
-#wl-showstatus configure &&
-# $MINGWPREFIX/qt/bin/qmake -makefile *.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
-# wl-showstatus build &&
-# mingw32-make &&
-#    echo OK
-
-#export DEPENDENCIES=qt
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure &&
-# cd build_static &&
-# $MINGWPREFIX/qt/bin/qmake -makefile ../*.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ CONFIG+=staticlib &&
-# cd .. &&
-# wl-showstatus configure &&
-# cd build_shared &&
-# $MINGWPREFIX/qt/bin/qmake -makefile ../*.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
-# cd .. &&
-# wl-showstatus build &&
-# mingw32-make -Cbuild_static &&
-# wl-showstatus build &&
-# mingw32-make -Cbuild_shared &&
-#    echo OK
-
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenCSG-$VERSION
+# don't build example (version >= 1.6.0)
+sed -i.bak -e "s/ example//" opencsg.pro
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cd build_static &&
+ $MINGWPREFIX/qt/bin/qmake -makefile ../*.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ INSTALLDIR=$INSTALLPREFIX CONFIG+=staticlib &&
+ cd .. &&
+ wl-showstatus configure &&
+ cd build_shared &&
+ $MINGWPREFIX/qt/bin/qmake -makefile ../*.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ INSTALLDIR=$INSTALLPREFIX &&
+ cd .. &&
+ wl-showstatus build-install &&
+ mingw32-make -Cbuild_static install &&
+ wl-showstatus build-install &&
+ mingw32-make -Cbuild_shared install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f $INSTALLPREFIX/lib/libopencsg[0-9]*.a $INSTALLPREFIX/lib/libopencsg.dll.a &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenCSG-$VERSION
 
 
 
