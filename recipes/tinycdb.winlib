@@ -1,0 +1,69 @@
+export NAME="TinyCDB"
+export STATUS=
+export URL=http://www.corpit.ru/mjt/tinycdb.html
+export BASENAME=tinycdb
+export DESCRIPTION="TinyCDB is a very fast and simple package for creating and reading constant data bases, a data structure introduced by Dan J. Bernstein in his cdb package."
+export CATEGORY=database
+export TYPE=library
+#export VERSION=0.78
+#export VERSIONDATE=20150723
+export VERSION=0.79
+export VERSIONDATE=20230917
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://www.corpit.ru/mjt/tinycdb.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.corpit.ru/mjt/tinycdb/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing fsync in cdb_make.c (version >= 0.79)
+patch -ulbf cdb_make.c << EOF
+@@ -10,2 +10,5 @@
+ #include "cdb_int.h"
++#ifdef _WIN32
++#define fsync(fd) _commit(fd)
++#endif
+
+EOF
+# fix Makefile (version >= 0.79)
+patch -ulbf Makefile << EOF
+@@ -43,3 +43,3 @@
+ CFLAGS_PIC = -fPIC
+-LDFLAGS_SHARED = -shared
++LDFLAGS_SHARED = -shared -s -Wl,--out-implib,\$@.a
+ LDFLAGS_SONAME = -Wl,--soname=
+@@ -85,4 +85,2 @@
+ \$(SHAREDLIB): \$(LIB_OBJS_PIC) \$(LIBMAP)
+-       -rm -f \$(SOLIB)
+-       ln -s \$@ \$(SOLIB)
+        \$(LD) \$(LDFLAGS) \$(LDFLAGS_SHARED) -o \$@ \\
+@@ -156,3 +154,3 @@
+        \$(do_install) ; \\
+-       ln -sf \$(SHAREDLIB) \$(DESTDIR)\$(libdir)/\$(LIBBASE).so
++
+ install-piclib: piclib
+EOF
+wl-showstatus build &&
+ #make nss CC=${CC:-gcc} NSS_CDB=libnss_cdb.dll CFLAGS="-I$MINGWPREFIX/include/nss -I$MINGWPREFIX/include/nspr" &&
+ #make piclib CC=${CC:-gcc} &&
+ make staticlib CC=${CC:-gcc} &&
+ make shared CC=${CC:-gcc} SHAREDLIB=libcdb.dll LDFLAGS="-s" &&
+ mv -f cdb-shared.exe cdb.exe &&
+ wl-showstatus install &&
+ make install prefix=$INSTALLPREFIX &&
+ make install-sharedlib prefix=$INSTALLPREFIX SHAREDLIB=libcdb.dll &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f *.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
