@@ -1,0 +1,133 @@
+export NAME="libcups"
+export STATUS=
+export URL=https://openprinting.github.io/cups/cups3.html
+export BASENAME=libcups
+export DESCRIPTION="The CUPS library (libcups) provides a common C API for HTTP/HTTPS and IPP communications on Unix(R)-like operating systems and Microsoft Windows(R). It is used by many printing-related projects such as CUPS and PAPPL."
+export CATEGORY=printing
+export TYPE=library
+export VERSION=2.3.3
+export VERSIONDATE=20230918
+wl-showstatus --package-version
+export DEPENDENCIES=libiconv,zlib,pcre,gnutls,libpaper,dbus
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/OpenPrinting/libcups/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/OpenPrinting/libcups/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix redefinition of ssize_t in cups/cups.h (version >= 2.3.3)
+patch -ulbf cups/cups.h << EOF
+@@ -18,3 +18,3 @@
+ #  include <sys/types.h>
+-#  if defined(_WIN32) && !defined(__CUPS_SSIZE_T_DEFINED)
++#  if defined(_WIN32) && !defined(__MINGW32__) && !defined(__CUPS_SSIZE_T_DEFINED)
+ #    define __CUPS_SSIZE_T_DEFINED
+EOF
+# fix redefinition of ssize_t in cups/string-private.h (version >= 2.3.3)
+patch -ulbf cups/string-private.h << EOF
+@@ -40,3 +40,3 @@
+
+-#  if defined(_WIN32) && !defined(__CUPS_SSIZE_T_DEFINED)
++#  if defined(_WIN32) && !defined(__MINGW32__) && !defined(__CUPS_SSIZE_T_DEFINED)
+ #    define __CUPS_SSIZE_T_DEFINED
+EOF
+# fix redefinition of ssize_t in cups/sidechannel.h (version >= 2.3.3)
+patch -ulbf cups/sidechannel.h << EOF
+@@ -18,3 +18,3 @@
+ #  include <sys/types.h>
+-#  if defined(_WIN32) && !defined(__CUPS_SSIZE_T_DEFINED)
++#  if defined(_WIN32) && !defined(__MINGW32__) && !defined(__CUPS_SSIZE_T_DEFINED)
+ #    define __CUPS_SSIZE_T_DEFINED
+EOF
+# fix number of arguments to mkdir() in cups/dest.c (version >= 2.3.3)
+patch -ulbf cups/dest.c << EOF
+@@ -2074,3 +2074,7 @@
+     if (access(filename, 0))
++#ifdef _WIN32
++      mkdir(filename);
++#else
+       mkdir(filename, 0700);
++#endif
+
+EOF
+# fix missing fchmod() and number of arguments to mkdir() in cups/tls-gnutls.c (version >= 2.3.3)
+patch -ulbf cups/tls-gnutls.c << EOF
+@@ -869,3 +869,5 @@
+
++#ifndef _WIN32
+   fchmod(cupsFileNumber(fp), 0600);
++#endif
+
+@@ -947,3 +949,7 @@
+       DEBUG_printf(("1http_gnutls_default_path: Making directory \\"%s\\".", buffer));
++#ifdef _WIN32
++      if (mkdir(buffer))
++#else
+       if (mkdir(buffer, 0700))
++#endif
+       {
+@@ -958,3 +964,7 @@
+       DEBUG_printf(("1http_gnutls_default_path: Making directory \\"%s\\".", buffer));
++#ifdef _WIN32
++      if (mkdir(buffer))
++#else
+       if (mkdir(buffer, 0700))
++#endif
+       {
+EOF
+# avoid IPv6 in cups/http-addr.c (version >= 2.3.3)
+patch -ulbf cups/http-addr.c << EOF
+@@ -26,2 +26,6 @@
+ #endif /* __APPLE__ */
++#ifdef _WIN32
++#undef AF_INET6
++#undef IPV6_V6ONLY
++#endif
+
+EOF
+# avoid undefined struct ifaddrs in cups/getifaddrs.c (version >= 2.3.3)
+patch -ulbf cups/getifaddrs.c << EOF
+@@ -17,3 +17,8 @@
+
+-#ifndef HAVE_GETIFADDRS
++#ifdef _WIN32
++int _cups_getifaddrs(struct ifaddrs **addrs)
++{
++  return -1;
++}
++#elif !defined(HAVE_GETIFADDRS)
+ /*
+EOF
+# fix building DLLs in cups/Makefile (version >= 2.3.3)
+patch -ulbf cups/Makefile << EOF
+@@ -367,2 +367,5 @@
+
++libcups.dll:   \$(LIBOBJS)
++$(echo -e '\t')echo Linking \$@...
++$(echo -e '\t')\$(DSO) \$(ARCHFLAGS) \$(ALL_DSOFLAGS) -s -o \$@ \$(LIBOBJS) -Wl,--out-implib,\$@.a \$(LIBS)
+ libcups.so.2:  \$(LIBOBJS)
+@@ -433,2 +436,5 @@
+
++libcupsimage.dll:      \$(IMAGEOBJS) libcups.dll
++$(echo -e '\t')echo Linking \$@...
++$(echo -e '\t')\$(DSO) \$(ARCHFLAGS) \$(ALL_DSOFLAGS) -s -o \$@ \$(IMAGEOBJS) -Wl,--out-implib,\$@.a \$(LINKCUPS)
+ libcupsimage.so.2:     \$(IMAGEOBJS) libcups.so.2
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-components=libcups --enable-libpaper --enable-gnutls --disable-threads --disable-webif --disable-launchd --disable-systemd CFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS" LDFLAGS="-Wl,--as-needed" LIBS="-lpcreposix -lws2_32" &&
+ wl-showstatus build-install &&
+ make install LIBCUPS=libcups.dll LIBCUPSIMAGE=libcupsimage.dll &&
+ cp -u cups/*.dll.a $INSTALLPREFIX/lib/ &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

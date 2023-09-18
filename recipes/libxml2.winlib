@@ -43,10 +43,10 @@ export TYPE=library
 #export VERSIONDATE=20190104
 #export VERSION=2.9.10
 #export VERSIONDATE=20191031
-export VERSION=2.9.12
-export VERSIONDATE=20210514
-#export VERSION=2.11.5
-#export VERSIONDATE=20230917
+#export VERSION=2.9.12
+#export VERSIONDATE=20210514
+export VERSION=2.11.5
+export VERSIONDATE=20230917
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libiconv
 #export DEPENDENCIES=zlib,libiconv,icu
@@ -278,20 +278,20 @@ cd $BASENAME-v$VERSION
 #  ( ls -1 $INSTALLPREFIX/python2/Lib/site-packages/libxml2mod.pyd &>/dev/null || cp -f $INSTALLPREFIX/python2/Lib/site-packages/libxml2mod.dll $INSTALLPREFIX/python2/Lib/site-packages/libxml2mod.pyd )
 # fi &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-# fix for Python 3 (version >= 2.9.10)
-patch -ulbf python/types.c << EOF
-@@ -33,2 +33,6 @@
-     fd = PyObject_AsFileDescriptor(f);
-+#ifdef __MINGW32__
-+    if ((res = fdopen(fd, "rwb")) == NULL)
-+      res = fdopen(fd, "rb");
-+#else
-     /*
-@@ -77,2 +81,3 @@
-     }
-+#endif
-     return(res);
-EOF
+## fix for Python 3 (version >= 2.9.10)
+#patch -ulbf python/types.c << EOF
+#@@ -33,2 +33,6 @@
+#     fd = PyObject_AsFileDescriptor(f);
+#+#ifdef __MINGW32__
+#+    if ((res = fdopen(fd, "rwb")) == NULL)
+#+      res = fdopen(fd, "rb");
+#+#else
+#     /*
+#@@ -77,2 +81,3 @@
+#     }
+#+#endif
+#     return(res);
+#EOF
 # fix missing TRUE in encoding.c when building with --with-icu (version >= 2.9.10)
 patch -ulbf encoding.c << EOF
 @@ -24,2 +24,3 @@
@@ -318,14 +318,22 @@ patch -ulbf python/libxml.c << EOF
 EOF
 # fix Python 3.8 dependency DLL lookup path
 #### see also: https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
-mv python/libxml2.py python/libxml2.py.bak
-cat > python/libxml2.py << EOF
+#mv python/libxml2.py python/libxml2.py.bak
+#cat > python/libxml2.py << EOF
+#import sys
+#if sys.version_info >= (3,8):
+#    import os
+#    os.add_dll_directory(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "bin"))
+#EOF
+#cat python/libxml2.py.bak >> python/libxml2.py
+mv python/libxml.py python/libxml.py.bak
+cat > python/libxml.py << EOF
 import sys
 if sys.version_info >= (3,8):
     import os
     os.add_dll_directory(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "bin"))
 EOF
-cat python/libxml2.py.bak >> python/libxml2.py
+cat python/libxml.py.bak >> python/libxml.py
 # fix missing Python library files
 mkdir -p pylibs &&
 pexports $PYDIR/python[0-9][0-9]*.dll > pylibs/python3.def &&
@@ -357,8 +365,8 @@ wl-showstatus preconfigure &&
  mkdir -p build_win build_win_py2 &&
  wl-showstatus configure &&
  cd build_win &&
- ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --without-icu --with-python=$PYDIR CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
- #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python PYTHON=$PYDIR/python.exe PYTHON_CFLAGS="-I$PYDIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
+ #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --without-icu --with-python=$PYDIR CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
+ ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python PYTHON=$PYDIR/python.exe PYTHON_CFLAGS="-I$PYDIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --with-icu --with-python=$PYDIR CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
  #CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,--enable-auto-import"
  #sed -i.bak -e "s/\(-lpython[0-9][0-9]*\)\.\([0-9][0-9]*\)/\1\2/" python/Makefile &&
@@ -371,8 +379,8 @@ wl-showstatus preconfigure &&
  if [ "$PYDIR" != "$PY2DIR" ]; then
   wl-showstatus configure python2 &&
   cd build_win_py2 &&
-  ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --without-icu --with-python=$PY2DIR CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
-  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python2 PYTHON=$PY2DIR/python.exe PYTHON_CFLAGS="-I$PY2DIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")"  CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
+  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --without-icu --with-python=$PY2DIR CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
+  ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python2 PYTHON=$PY2DIR/python.exe PYTHON_CFLAGS="-I$PY2DIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
   #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --with-icu --with-python=$PY2DIR CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
   #CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,--enable-auto-import"
   #sed -i.bak -e "s/\(-lpython[0-9][0-9]*\)\.\([0-9][0-9]*\)/\1\2/" python/Makefile &&
@@ -386,11 +394,12 @@ wl-showstatus preconfigure &&
  fi &&
  wl-showstatus build-install &&
  #PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" &&
- PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) &&
- #PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) pythondir=$INSTALLPREFIX/python/Lib/site-packages pyexecdir=$INSTALLPREFIX/python/Lib/site-packages &&
+ #PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) &&
+ PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) pythondir=$INSTALLPREFIX/python/Lib/site-packages pyexecdir=$INSTALLPREFIX/python/Lib/site-packages &&
  #rm -rf $INSTALLPREFIX/python/Lib/site-packages/*.pyc $INSTALLPREFIX/python/Lib/site-packages/*.la $INSTALLPREFIX/python/Lib/site-packages/__pycache__ &&
  ## test Python module
- #echo "import libxml2" | PATH=$PYDIR:$INSTALLPREFIX/bin:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages $PYDIR/python.exe -B &&
+ #echo "import libxml2" | PATH=$PYDIR:$INSTALLPREFIX/bin:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages PYTHONDONTWRITEBYTECODE=1 $PYDIR/python.exe -B &&
+ #echo -e "import os\nos.add_dll_directory('$(cygpath -m $MINGWPREFIX/bin)')\nimport libxml2" | PATH=$PYDIR:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages PYTHONDONTWRITEBYTECODE=1 $PYDIR/python.exe -B &&
  #copypedeps.exe -r $MINGWPREFIX/bin/libxml2*.dll $INSTALLPREFIX/python/Lib/site-packages/
  #### see also: https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
  #( echo "import os"; echo "os.add_dll_directory(\"$(cygpath -m $MINGWPREFIX/bin)\")"; echo "import libxml2" ) | PATH=$PYDIR:$INSTALLPREFIX/bin:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages $PYDIR/python.exe -B &&
@@ -399,10 +408,10 @@ wl-showstatus preconfigure &&
   cp build_win/libxml2.la build_win_py2/ &&
   mkdir -p build_win_py2/.libs &&
   cp build_win/.libs/libxml2.dll.a build_win_py2/.libs &&
-  ## fix issue with backslashes (version >= 2.11.5)
-  #sed -i.bak -e 's?\\\(Lib\)\\\(site-packages\)?/\1/\2?' build_win_py2/python/Makefile &&
-  PATH=$PYDIR:$PATH make -Cbuild_win_py2/python install-strip PYTHON_VERSION=$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python2/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/py2libs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" &&
-  #PATH=$PYDIR:$PATH make -Cbuild_win_py2/python install-strip PYTHON_VERSION=$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python2/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/py2libs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) pythondir=$INSTALLPREFIX/python2/Lib/site-packages pyexecdir=$INSTALLPREFIX/python2/Lib/site-packages &&
+  # fix issue with backslashes (version >= 2.11.5)
+  sed -i.bak -e 's?\\\(Lib\)\\\(site-packages\)?/\1/\2?' build_win_py2/python/Makefile &&
+  #PATH=$PYDIR:$PATH make -Cbuild_win_py2/python install-strip PYTHON_VERSION=$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python2/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/py2libs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" &&
+  PATH=$PYDIR:$PATH make -Cbuild_win_py2/python install-strip PYTHON_VERSION=$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python2/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/py2libs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) pythondir=$INSTALLPREFIX/python2/Lib/site-packages pyexecdir=$INSTALLPREFIX/python2/Lib/site-packages &&
   #rm $INSTALLPREFIX/python2/Lib/site-packages/*.pyc $INSTALLPREFIX/python2/Lib/site-packages/*.la $INSTALLPREFIX/python2/Lib/site-packages/__pycache__ &&
   # test Python2 module
   echo "import libxml2" | PATH=$PY2DIR:$INSTALLPREFIX/bin:$PATH PYTHONPATH=$INSTALLPREFIX/python2/Lib/site-packages $PY2DIR/python.exe -B
