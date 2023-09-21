@@ -15,8 +15,10 @@ export TYPE=library
 #export VERSIONDATE=20230102
 #export VERSION=0.31
 #export VERSIONDATE=20230123
-export VERSION=0.32
-export VERSIONDATE=20230220
+#export VERSION=0.32
+#export VERSIONDATE=20230220
+export VERSION=0.33.1
+export VERSIONDATE=20230921
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libbz2,libxml2,libtar,icu
 export OPTIONALDEPENDENCIES=
@@ -33,6 +35,36 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing realpath in src/StringOps.cxx (version >= 0.33.1)
+patch -ulbf src/StringOps.cxx << EOF
+@@ -35,2 +35,8 @@
+ #include "ticcutils/Version.h"
++#ifdef __MINGW32__
++static char* realpath(const char* relpath, char* abspath)
++{
++  return _fullpath(abspath,relpath,_MAX_PATH);
++}
++#endif
+
+EOF
+# fix missing timeradd in src/Timer.cxx (version >= 0.33.1)
+patch -ulbf src/Timer.cxx << EOF
+@@ -33,2 +33,14 @@
+ #include <cstdlib>
++#ifdef _WIN32
++#define timeradd(a, b, result)                          \\
++  do {                                                  \\
++    (result)->tv_sec = (a)->tv_sec + (b)->tv_sec;       \\
++    (result)->tv_usec = (a)->tv_usec + (b)->tv_usec;    \\
++    if ((result)->tv_usec >= 1000000)                   \\
++      {                                                 \\
++        ++(result)->tv_sec;                             \\
++        (result)->tv_usec -= 1000000;                   \\
++      }                                                 \\
++  } while (0)
++#endif
+
+EOF
 wl-showstatus configure &&
  #mkdir -p m4 &&
  #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
