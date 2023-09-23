@@ -977,6 +977,12 @@ patch -ulbf winfix/distutils/cygwinccompiler.py << EOF
 +            return None
 
 EOF
+## fix invalid -mdll flag when building with LLVM
+if ${CC:-gcc} --version|grep -q "^clang"; then 
+ mkdir -p winfix/setuptools
+ cp -rf $PYDIR/Lib/site-packages/setuptools/* winfix/setuptools/
+ sed -i.bak2 -e "s/-mdll //" winfix/setuptools/_distutils/cygwinccompiler.py
+fi
 # support LLVM/Clang
 sed -i.bak -e "s/self\.gcc_version <= \"2\.91\.57\"/is_cygwingcc() and (&)/; s?'gcc?'$(cygpath -m ${CC:-gcc})?; s?'g++?'$(cygpath -m ${CXX:-g++})?" winfix/distutils/cygwinccompiler.py
 ## fix subprojects/glib/meson.build (version >= 1.75.4)
@@ -1002,7 +1008,8 @@ EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild_introspection_data=true -Dcairo=disabled -Ddoctool=disabled -Dgtk_doc=false -Dpython=$PYDIR/python.exe . build_both &&
- PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild_introspection_data=true -Dcairo=disabled -Ddoctool=disabled -Dgtk_doc=false -Dpython=$PYDIR/python.exe . build_both &&
+ #PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild_introspection_data=true -Dcairo=disabled -Ddoctool=disabled -Dgtk_doc=false -Dpython=$PYDIR/python.exe . build_both &&
+ PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dbuild_introspection_data=true -Dcairo=disabled -Ddoctool=disabled -Dgtk_doc=false -Dpython=$PYDIR/python.exe -Dc_args="-Qunused-arguments" . build_both &&
  #-Dbuild_introspection_data=false 
  # fix slash/backslash path issue when calling Python from Ninja
  #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
