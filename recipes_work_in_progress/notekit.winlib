@@ -1,0 +1,87 @@
+export NAME="NoteKit"
+export STATUS=
+export URL=https://github.com/blackhole89/notekit
+export BASENAME=notekit
+export DESCRIPTION="A GTK3 hierarchical markdown notetaking application with tablet support."
+export CATEGORY=office
+export TYPE=library
+export VERSION=0.2.0
+export VERSIONDATE=20230923
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,gtkmm3,gtksourceview3,fontconfig,jsoncpp
+#clatexmath
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+#export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/blackhole89/notekit/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/blackhole89/notekit/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix notebook_highlight.hpp (version >= 0.2.0)
+patch -ulbf notebook_highlight.hpp << EOF
+@@ -2,2 +2,6 @@
+ {
++#ifdef _WIN32
++       printf("Temporary directory for syntax highlighting data not implemented yet on Windows.\\n");
++       return "";
++#else
+        if(mkdir("/tmp/notekit.gsv",0777) && errno!=EEXIST) {
+@@ -68,2 +72,3 @@
+        return "/tmp/notekit.gsv";
++#endif
+ }
+EOF
+
+#export BUILDDEPENDENCIES=cmake,ninja
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+#-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHAVE_CLATEXMATH:BOOL=OFF -DHAVE_LASEM:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #cmake.exe --build build_win &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+#export BUILDDEPENDENCIES=meson,ninja
+#-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS -Dcpp_link_args=$LDFLAGS
+## fix location of Perl
+#sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix detection of Python
+#sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix missing gio-unix
+##sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+#sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dclatexmath=false . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install/strip &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ #PATH=$PERLDIR/../c/bin:$PERLDIR/bin:$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
+
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
