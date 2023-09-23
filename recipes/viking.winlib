@@ -1,0 +1,81 @@
+export NAME="Viking"
+export STATUS=
+export URL=https://github.com/viking-gps/viking
+export BASENAME=viking
+export DESCRIPTION="Viking is a free/open source program to manage GPS data (inc GPX, FIT, TCX and KML files). You can import and plot tracks, routes and waypoints, show OpenStreetMaps (OSM), Bing Aerial and other maps, generate Mapnik maps, geotag images, make new tracks, routes and waypoints, see real-time GPS position, etc."
+export CATEGORY=
+export TYPE=library
+export VERSION=1.10
+export VERSIONDATE=20230923
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,libbz2,expat,file,gettext,glib2,gtk3,gdk-pixbuf,pango,cairo,geoclue,gexiv2,libcurl,libjson-glib,liboauth,libzip,sqlite3,libx11
+#mapnik
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/viking-gps/viking/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/viking-gps/viking/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd viking-viking-$VERSION
+# fix src/vik_compat.h (version >= 1.10)
+patch -ulbf src/vik_compat.h << EOF
+@@ -30,3 +30,5 @@
+ // GLIB compatibility
++#ifndef __MINGW32__
+ typedef struct stat GStatBuf;
++#endif
+
+EOF
+# fix undefined VIK_TYPE_VIEWPORT_DRAW_MODE in src/vikmapsourcedefault.c (version >= 1.10)
+patch -ulbf src/vikmapsourcedefault.c << EOF
+@@ -366,2 +366,3 @@
+
++#ifdef VIK_TYPE_VIEWPORT_DRAW_MODE
+        pspec = g_param_spec_enum("drawmode",
+@@ -372,2 +373,3 @@
+                               G_PARAM_READWRITE);
++#endif
+     g_object_class_install_property(object_class, PROP_DRAWMODE, pspec);
+
+EOF
+# fix missing realpath in src/fileutils.c (version >= 1.10)
+patch -ulbf src/fileutils.c << EOF
+@@ -55,3 +55,7 @@
+ {
++#ifdef _WIN32
++  return _fullpath ( real, path ,_MAX_PATH );
++#else
+   return realpath ( path, real );
++#endif
+ }
+EOF
+# manually compile resource file
+${WINDRES:-windres} -F $RUNPLATFORM -o windows/installer/pixmaps/viking_icon.o windows/installer/pixmaps/viking_icon.rc
+wl-showstatus preconfigure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-windows --disable-realtime-gps-tracking --disable-mapnik &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ PATH=$PYDIR:$PATH make install-strip &&
+ #( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p src/libviking.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > libviking.def &&
+ #${CC:-gcc} -shared -s -mwindows -def libviking.def -o libviking.dll src/libviking.a -Wl,--out-implib,libviking.dll.a $(sed -ne "s/^\([A-Z_]*\)\s*=\s*\(-[Ll]\)/ \2/p" src/Makefile) &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf viking-viking-$VERSION
+####$MINGWPREFIX/bin/viking.exe
+
+
+
