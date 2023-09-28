@@ -86,8 +86,10 @@ export TYPE=library
 #export VERSIONDATE=20170411
 #export VERSION=0.4.6
 #export VERSIONDATE=20171007
-export VERSION=0.4.7
-export VERSIONDATE=20181003
+#export VERSION=0.4.7
+#export VERSIONDATE=20181003
+export VERSION=0.4.9
+export VERSIONDATE=20230928
 wl-showstatus --package-version
 export DEPENDENCIES=libsndfile,libsamplerate,fftw
 export OPTIONALDEPENDENCIES=jack,puredata
@@ -97,13 +99,16 @@ export OPTIONALBUILDDEPENDENCIES=
 #export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
-export DOWNLOADURL="http://aubio.org/download"
+#export DOWNLOADURL="http://aubio.org/download"
+export DOWNLOADURL="https://github.com/aubio/aubio/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=http://aubio.org/pub/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://aubio.org/pub/$BASENAME-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://github.com/aubio/aubio/archive/refs/tags/$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
-tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
 ## fix missing strnlen in src/io/sink_sndfile.c (version = 0.4.3)
 #if ( ! gcc --version | grep -q "MinGW-W64" ); then
@@ -115,6 +120,14 @@ cd $BASENAME-$VERSION
 #fi
 # fix missing pause in examples/utils.c (version >= 0.4.6)
 sed -i.bak -e "s/pause *()/Sleep (10000)/g" examples/utils.c
+# fix missing strerror_r (version >= 0.4.9)
+mv src/aubio_priv.h src/aubio_priv.h.bak &&
+if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
+echo "#define strerror_r(a,b,c) (strerror_s((b),(c),(a)))" > src/aubio_priv.h
+else
+echo "#define strerror_r(a,b,c) (strncpy(b,strerror(a),c-1),b[c-1]=0,b)" > src/aubio_priv.h
+fi &&
+cat src/aubio_priv.h.bak >> src/aubio_priv.h
 #wl-showstatus configure &&
 ##PATH=$PYDIR:$PATH ./waf configure --prefix=$INSTALLPREFIX --destdir=$INSTALLPREFIX &&
 #WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $(which waf) configure --prefix=$INSTALLPREFIX --destdir=$INSTALLPREFIX &&
@@ -124,13 +137,14 @@ sed -i.bak -e "s/pause *()/Sleep (10000)/g" examples/utils.c
 # PATH=$PYDIR:$PATH ./waf install &&
 #    echo OK
 # fix invalid detection of Doxygen
-mv wscript wscript.bak &&
-sed -e "s/'doxygen/&.exe/" wscript.bak > wscript
+sed -i.bak -e "s/'doxygen/&.exe/" wscript
 #DOXYGEN="$(which doxygen.exe)" WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf configure build install --prefix=$INSTALLPREFIX &&
 wl-showstatus configure &&
- CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf configure --prefix=$INSTALLPREFIX &&
+ #CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf configure --prefix=$INSTALLPREFIX &&
+ CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf configure --prefix=$INSTALLPREFIX --disable-examples --disable-tests --notests &&
  wl-showstatus build-install &&
- CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf build install &&
+ #CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf $PYDIR/python.exe $MINGWPREFIX/bin/waf build install &&
+ CC=$(which gcc.exe) WAFDIR=$MINGWPREFIX/share/waf PATH=$PYDIR:$PATH $PYDIR/python.exe $MINGWPREFIX/bin/waf build install &&
  mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
  # replace backslash(es) with forward slash(es) in .pc file
  sed -i -e 's?\\?/?g' $INSTALLPREFIX/lib/pkgconfig/*.pc &&

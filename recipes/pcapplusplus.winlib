@@ -1,3 +1,111 @@
+#export NAME="PcapPlusPlus"
+#export STATUS=
+#export URL=https://seladb.github.io/PcapPlusPlus-Doc/
+##export URL=https://github.com/seladb/PcapPlusPlus
+#export BASENAME=pcapplusplus
+#export DESCRIPTION="PcapPlusPlus is a multiplatform C++ network sniffing and packet parsing and manipulation framework. It's meant to be lightweight, efficient and easy to use."
+#export CATEGORY=communication
+#export TYPE=library
+##export VERSION=17.02
+##export VERSIONDATE=20170330
+##export VERSION=17.11
+##export VERSIONDATE=20171106
+##export VERSION=18.08
+##export VERSIONDATE=20180807
+##export VERSION=19.04
+##export VERSIONDATE=20190402
+##export VERSION=19.12
+##export VERSIONDATE=20191204
+##export VERSION=20.08
+##export VERSIONDATE=20200825
+##export VERSION=21.05
+##export VERSIONDATE=20210519
+##export VERSION=21.11
+##export VERSIONDATE=20211109
+##export VERSION=22.05
+##export VERSIONDATE=20220509
+#export VERSION=22.11
+#export VERSIONDATE=20221108
+#export DEPENDENCIES=winpcap
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#wl-showstatus --package-version
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/seladb/PcapPlusPlus/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/seladb/PcapPlusPlus/archive/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+##mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#wl-wait4deps
+#wl-showstatus extract
+##tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd PcapPlusPlus-$VERSION
+## fix 3rdParty/debug-new/debug_new.cpp
+#patch -ulbf 3rdParty/debug-new/debug_new.cpp << EOF
+#@@ -40,3 +40,3 @@
+# #ifndef DEBUG_NEW_HASH
+#-#define DEBUG_NEW_HASH(p) (((unsigned long)(p) >> 8) % DEBUG_NEW_HASHTABLESIZE)
+#+#define DEBUG_NEW_HASH(p) (((uintptr_t)(p) >> 8) % DEBUG_NEW_HASHTABLESIZE)
+# #endif
+#EOF
+## fix 3rdParty/MemPlumber/MemPlumber/memplumber.cpp (version >= 19.12)
+#patch -ulbf 3rdParty/MemPlumber/MemPlumber/memplumber.cpp << EOF
+#@@ -17 +17 @@
+#-#define MEMPLUMBER_HASH(p) (((unsigned long)(p) >> 8) % MEMPLUMBER_HASHTABLE_SIZE)
+#+#define MEMPLUMBER_HASH(p) (((uintptr_t)(p) >> 8) % MEMPLUMBER_HASHTABLE_SIZE)
+#EOF
+### fix already defined inet_ntop/inet_pton in Common++/header/IpUtils.h (version >= 21.11)
+##patch -ulbf Common++/header/IpUtils.h << EOF
+##@@ -23,3 +23,3 @@
+##
+##-#if defined(WIN32) && !defined(_MSC_VER)
+##+#if defined(WIN32) && !defined(_MSC_VER) && !defined(__MINGW32__)
+## /**
+##EOF
+### fix already defined inet_ntop/inet_pton in Common++/src/IpUtils.cpp (version >= 21.11)
+##patch -ulbf Common++/src/IpUtils.cpp << EOF
+##@@ -64,3 +64,3 @@
+##
+##-#if defined(WIN32) && !defined(_MSC_VER)
+##+#if defined(WIN32) && !defined(_MSC_VER) && !defined(__MINGW32__)
+## /* const char *
+##EOF
+### determine Windows paths
+##pushd /
+##MSYSDIR=$(pwd -W|tr '/' '\\')
+##popd
+##pushd $MINGWDIR
+##MINGWDIR=$(pwd -W|tr '/' '\\')
+##popd
+##pushd $MINGWPREFIX/share/winpcap
+##WINPCAPDIR=$(pwd -W|tr '/' '\\')
+##popd
+#wl-showstatus configure &&
+# sed -e "s?{{INSTALL_DIR}}?$INSTALLPREFIX?" mk/install.sh.template > mk/install.sh &&
+# #./configure-linux.sh &&
+# #$COMSPEC /C "configure-windows-mingw.bat $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo mingw-w64; else echo mingw32; fi) -m $MINGWDIR -s $MSYSDIR -w $WINPCAPDIR" &&
+# #echo "configure-windows-mingw.bat $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo mingw-w64; else echo mingw32; fi) -m $MINGWDIR -s $MSYSDIR -w $WINPCAPDIR" | $COMSPEC &&
+# echo "configure-windows-mingw.bat -m $(cygpath -w $MINGWDIR) -s $(cygpath -w /) -w $(cygpath -w $MINGWPREFIX/share/winpcap)" | $COMSPEC &&
+# # fix missing -lPacket
+# sed -i.bak -e "s/-lPacket/-lpacket.dll/; s/-lpacket.dll++/-lpacket++/" mk/PcapPlusPlus.mk &&
+# # fix for Windows
+# sed -i.bak -e "s/^\(LIB_PREFIX := *\).*$/\1lib/; s/^\(LIB_EXT := *\).*$/\1.a/" mk/platform.mk &&
+# wl-showstatus build &&
+# #make PCAPPP_INCLUDES="-I$MINGWPREFIX/include -I$MINGWPREFIX/share/winpcap/include/pcap" &&
+# make CXX="${CXX:-g++} -fpermissive -I$MINGWPREFIX/include -I$MINGWPREFIX/share/winpcap/include/pcap" &&
+# wl-showstatus install &&
+# cd Dist &&
+# ../mk/install.sh &&
+# cd .. &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf PcapPlusPlus-$VERSION
+#####TO DO: build DLLs
+
+
+
 export NAME="PcapPlusPlus"
 export STATUS=
 export URL=https://seladb.github.io/PcapPlusPlus-Doc/
@@ -6,39 +114,13 @@ export BASENAME=pcapplusplus
 export DESCRIPTION="PcapPlusPlus is a multiplatform C++ network sniffing and packet parsing and manipulation framework. It's meant to be lightweight, efficient and easy to use."
 export CATEGORY=communication
 export TYPE=library
-#export VERSION=17.02
-#export VERSIONDATE=20170330
-#export VERSION=17.11
-#export VERSIONDATE=20171106
-#export VERSION=18.08
-#export VERSIONDATE=20180807
-#export VERSION=19.04
-#export VERSIONDATE=20190402
-#export VERSION=19.12
-#export VERSIONDATE=20191204
-#export VERSION=20.08
-#export VERSIONDATE=20200825
-#export VERSION=21.05
-#export VERSIONDATE=20210519
-#export VERSION=21.11
-#export VERSIONDATE=20211109
-#export VERSION=22.05
-#export VERSIONDATE=20220509
-export VERSION=22.11
-export VERSIONDATE=20221108
-export DEPENDENCIES=winpcap
-export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
-#export VERSION=23.09
-#export VERSIONDATE=20230927
-####Could NOT find Packet (missing: Packet_LIBRARY Packet_INCLUDE_DIR) CMake Error at CMakeLists.txt:127 (message): Please specify Packet library -DPacket_ROOT=<NPCAP_SDK_PATH>
+export VERSION=23.09
+export VERSIONDATE=20230927
 wl-showstatus --package-version
-#export DEPENDENCIES=winpcap
-#export OPTIONALDEPENDENCIES=
-#export BUILDDEPENDENCIES=cmake,ninja
-#export OPTIONALBUILDDEPENDENCIES=
-#export LICENSEFILE=COPYING
+export DEPENDENCIES=winpcap,zstd
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=BSD
 export DOWNLOADURL="https://github.com/seladb/PcapPlusPlus/releases"
@@ -46,101 +128,20 @@ export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 export DOWNLOADSOURCEURL=https://github.com/seladb/PcapPlusPlus/archive/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
-#mv $TARBALLDIR/$BASENAME/v$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 wl-wait4deps
 wl-showstatus extract
-#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd PcapPlusPlus-$VERSION
-# fix 3rdParty/debug-new/debug_new.cpp
-patch -ulbf 3rdParty/debug-new/debug_new.cpp << EOF
-@@ -40,3 +40,3 @@
- #ifndef DEBUG_NEW_HASH
--#define DEBUG_NEW_HASH(p) (((unsigned long)(p) >> 8) % DEBUG_NEW_HASHTABLESIZE)
-+#define DEBUG_NEW_HASH(p) (((uintptr_t)(p) >> 8) % DEBUG_NEW_HASHTABLESIZE)
- #endif
-EOF
-# fix 3rdParty/MemPlumber/MemPlumber/memplumber.cpp (version >= 19.12)
-patch -ulbf 3rdParty/MemPlumber/MemPlumber/memplumber.cpp << EOF
-@@ -17 +17 @@
--#define MEMPLUMBER_HASH(p) (((unsigned long)(p) >> 8) % MEMPLUMBER_HASHTABLE_SIZE)
-+#define MEMPLUMBER_HASH(p) (((uintptr_t)(p) >> 8) % MEMPLUMBER_HASHTABLE_SIZE)
-EOF
-## fix already defined inet_ntop/inet_pton in Common++/header/IpUtils.h (version >= 21.11)
-#patch -ulbf Common++/header/IpUtils.h << EOF
-#@@ -23,3 +23,3 @@
-#
-#-#if defined(WIN32) && !defined(_MSC_VER)
-#+#if defined(WIN32) && !defined(_MSC_VER) && !defined(__MINGW32__)
-# /**
-#EOF
-## fix already defined inet_ntop/inet_pton in Common++/src/IpUtils.cpp (version >= 21.11)
-#patch -ulbf Common++/src/IpUtils.cpp << EOF
-#@@ -64,3 +64,3 @@
-#
-#-#if defined(WIN32) && !defined(_MSC_VER)
-#+#if defined(WIN32) && !defined(_MSC_VER) && !defined(__MINGW32__)
-# /* const char *
-#EOF
-## determine Windows paths
-#pushd /
-#MSYSDIR=$(pwd -W|tr '/' '\\')
-#popd
-#pushd $MINGWDIR
-#MINGWDIR=$(pwd -W|tr '/' '\\')
-#popd
-#pushd $MINGWPREFIX/share/winpcap
-#WINPCAPDIR=$(pwd -W|tr '/' '\\')
-#popd
-wl-showstatus configure &&
- sed -e "s?{{INSTALL_DIR}}?$INSTALLPREFIX?" mk/install.sh.template > mk/install.sh &&
- #./configure-linux.sh &&
- #$COMSPEC /C "configure-windows-mingw.bat $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo mingw-w64; else echo mingw32; fi) -m $MINGWDIR -s $MSYSDIR -w $WINPCAPDIR" &&
- #echo "configure-windows-mingw.bat $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo mingw-w64; else echo mingw32; fi) -m $MINGWDIR -s $MSYSDIR -w $WINPCAPDIR" | $COMSPEC &&
- echo "configure-windows-mingw.bat -m $(cygpath -w $MINGWDIR) -s $(cygpath -w /) -w $(cygpath -w $MINGWPREFIX/share/winpcap)" | $COMSPEC &&
- # fix missing -lPacket
- sed -i.bak -e "s/-lPacket/-lpacket.dll/; s/-lpacket.dll++/-lpacket++/" mk/PcapPlusPlus.mk &&
- # fix for Windows
- sed -i.bak -e "s/^\(LIB_PREFIX := *\).*$/\1lib/; s/^\(LIB_EXT := *\).*$/\1.a/" mk/platform.mk &&
- wl-showstatus build &&
- #make PCAPPP_INCLUDES="-I$MINGWPREFIX/include -I$MINGWPREFIX/share/winpcap/include/pcap" &&
- make CXX="${CXX:-g++} -fpermissive -I$MINGWPREFIX/include -I$MINGWPREFIX/share/winpcap/include/pcap" &&
- wl-showstatus install &&
- cd Dist &&
- ../mk/install.sh &&
- cd .. &&
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIGHT_PCAPNG_ZSTD:BOOL=ON -DMEMPLUMBER_DISABLE_BACKTRACE:BOOL=ON -DPacket_ROOT=$MINGWPREFIX/share/winpcap -DPacket_INCLUDE_DIR=$MINGWPREFIX/share/winpcap/include -DPCAPPP_BUILD_TUTORIALS:BOOL=OFF -DPCAPPP_BUILD_EXAMPLES:BOOL=OFF -DPCAPPP_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/winpcap/include/pcap" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIGHT_PCAPNG_ZSTD:BOOL=ON -DMEMPLUMBER_DISABLE_BACKTRACE:BOOL=ON -DPacket_ROOT=$MINGWPREFIX/share/winpcap -DPacket_INCLUDE_DIR=$MINGWPREFIX/share/winpcap/include -DPCAPPP_BUILD_TUTORIALS:BOOL=OFF -DPCAPPP_BUILD_EXAMPLES:BOOL=OFF -DPCAPPP_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/winpcap/include/pcap" -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf PcapPlusPlus-$VERSION
-####TO DO: build DLLs
-
-
-
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIGHT_PCAPNG_ZSTD:BOOL=ON -DMEMPLUMBER_DISABLE_BACKTRACE:BOOL=ON -DPacket_ROOT=$MINGWPREFIX/share/winpcap -DPacket_INCLUDE_DIR=$MINGWPREFIX/share/winpcap/include -DPCAPPP_BUILD_TUTORIALS:BOOL=OFF -DPCAPPP_BUILD_EXAMPLES:BOOL=OFF -DPCAPPP_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/winpcap/include/pcap" -S. -Bbuild_static &&
-# #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIGHT_PCAPNG_ZSTD:BOOL=ON -DMEMPLUMBER_DISABLE_BACKTRACE:BOOL=ON -DPacket_ROOT=$MINGWPREFIX/share/winpcap -DPacket_INCLUDE_DIR=$MINGWPREFIX/share/winpcap/include -DPCAPPP_BUILD_TUTORIALS:BOOL=OFF -DPCAPPP_BUILD_EXAMPLES:BOOL=OFF -DPCAPPP_BUILD_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/winpcap/include/pcap" -S. -Bbuild_shared &&
-# ## fix execution of Python scripts
-# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
-# ## fix missing link libraries
-# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
-# #wl-showstatus build &&
-# #cmake.exe --build build_static &&
-# #ninja -Cbuild_static &&
-# #wl-showstatus build &&
-# #cmake.exe --build build_shared &&
-# #ninja -Cbuild_shared &&
-# wl-showstatus build-install &&
-# #cmake.exe --install build_static --strip &&
-# #cmake.exe --build build_static --target "install/strip" &&
-# #cmake.exe --build build_static --target "library/install/strip" &&
-# ninja -Cbuild_static install/strip &&
-# #ninja -Cbuild_static library/install/strip &&
-# wl-showstatus build-install &&
-# #cmake.exe --install build_shared --strip &&
-# #cmake.exe --build build_shared --target "install/strip" &&
-# ninja -Cbuild_shared install/strip &&
-#    echo OK
 
 
 
