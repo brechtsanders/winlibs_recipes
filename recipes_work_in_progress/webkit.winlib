@@ -629,6 +629,162 @@ mkdir -p build_win &&
 
 
 
+export NAME="WebKit"
+export STATUS=
+export URL=https://github.com/WebKit/WebKit
+export BASENAME=webkit
+export DESCRIPTION="A fast, open source web browser engine. WebKit is the web browser engine used by Safari, Mail, App Store, and many other apps on macOS, iOS, and Linux."
+export CATEGORY=
+export TYPE=library
+export VERSION=7616.1.27.211.1
+export VERSIONDATE=20230928
+wl-showstatus --package-version
+export DEPENDENCIES=cairo,libcurl,icu,libjpeg,libxml2,openssl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/WebKit/WebKit/releases Safari-"
+#export DOWNLOADURL="https://github.com/WebKit/WebKit/tags Safari-"
+#export DOWNLOADURL="https://github.com/WebKit/WebKit/tags"
+export DOWNLOADURL="https://github.com/apple-oss-distributions/WebKit/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/WebKit/WebKit/archive/refs/tags/Safari-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/WebKit/WebKit/archive/refs/tags/WebKit-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/apple-oss-distributions/WebKit/archive/refs/tags/WebKit-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/Safari-$VERSION.tar.gz
+#cd WebKit-Safari-$VERSION
+tar xz --force-local -f $TARBALLDIR/$BASENAME/WebKit-$VERSION.tar.gz
+cd WebKit-WebKit-$VERSION
+
+  ./configure --help 2> /dev/null
+  cat meson_options.txt 2> /dev/null
+  head COPYING* LICENSE* LICENCE* COPYRIGHT*
+  ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
+
+
+## fix Source/WTF/CMakeLists.txt (version >= 7616.1.27.211.1)
+#mv Source/WTF/CMakeLists.txt Source/WTF/CMakeLists.txt.bak
+#cat > Source/WTF/CMakeLists.txt << EOF
+#cmake_minimum_required(VERSION 3.3)
+#include("WebKitCommon")
+#EOF
+#cat Source/WTF/CMakeLists.txt.bak >> Source/WTF/CMakeLists.txt
+## fix Source/cmake/WebKitStaticAnalysis.cmake (version >= 7616.1.27.211.1)
+#sed -i.bak -e "s/[^( ]* IN_LIST ANALYZERS/FALSE/" Source/cmake/WebKitStaticAnalysis.cmake
+## fix Source/cmake/FindWOFF2.cmake (version >= 7616.1.27.211.1)
+#sed -i.bak -e "s/[^( ]* IN_LIST WOFF2_FIND_COMPONENTS/FALSE/" Source/cmake/FindWOFF2.cmake
+
+cat > CMakeLists.txt << EOF
+cmake_minimum_required(VERSION 3.3)
+include("WebKitCommon")
+add_subdirectory("Source/ThirdParty/ANGLE")
+add_subdirectory("Source/bmalloc")
+add_subdirectory("Source/WTF")
+add_subdirectory("Source/WebInspectorUI")
+add_subdirectory("Source/WebCore")
+add_subdirectory("Source/JavaScriptCore")
+add_subdirectory("Source/WebKit")
+EOF
+mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_WEBGL:BOOL=OFF -DUSE_ANGLE_EGL:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -SSource/WTF -Bbuild_test -LH && echo OK; rm -rf build_test
+#mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -SSource/bmalloc -Bbuild_test -LH && echo OK; rm -rf build_test
+#mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -SSource/WebCore -Bbuild_test -LH && echo OK; rm -rf build_test
+
+# fix Source/WTF/wtf/RetainPtr.h (version >= 7615.1.12.8)                       
+patch -ulbf Source/WTF/wtf/RetainPtr.h << EOF
+@@ -57,2 +57,3 @@
+ // both ways, we need a separate copy of our code when ARC is enabled.
++#ifdef __OBJC__
+ #if __has_feature(objc_arc)
+@@ -60,2 +61,3 @@
+ #endif
++#endif
+
+EOF
+## fix Source/ThirdParty/ANGLE/src/common/mathutil.h (version >= 7615.1.16.2)
+#patch -ulbf Source/ThirdParty/ANGLE/src/common/mathutil.h << EOF
+#@@ -1108,3 +1108,3 @@
+#
+#-#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__)
+#+#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__) || defined(__MINGW32__) inline int BitCount(uint32_t bits)
+#EOF
+patch -ulbf Source/ThirdParty/ANGLE/src/libANGLE/renderer/d3d/d3d11/renderer11_utils.cpp << EOF
+@@ -1709,2 +1709,5 @@
+     extensions->clipCullDistanceEXT       = true;
++#if !defined(D3D11_CLIP_OR_CULL_DISTANCE_COUNT) && defined(D3D10_CLIP_OR_CULL_DISTANCE_COUNT)
++#define D3D11_CLIP_OR_CULL_DISTANCE_COUNT D3D10_CLIP_OR_CULL_DISTANCE_COUNT
++#endif
+     caps->maxClipDistances                = D3D11_CLIP_OR_CULL_DISTANCE_COUNT;
+EOF
+# fix using __builtin_popcount/__builtin_popcountll in Source/ThirdParty/ANGLE/src/common/mathutil.h (version >= 7616.1.12.3)
+patch -ulbf Source/ThirdParty/ANGLE/src/common/mathutil.h << EOF
+@@ -1034,3 +1034,3 @@
+ // Count the 1 bits.
+-#if defined(_MSC_VER) && !defined(__clang__)
++#if defined(_MSC_VER) && !defined(__clang__) && !defined(__MINGW32__)
+ #    if defined(_M_IX86) || defined(_M_X64)
+@@ -1113,3 +1113,3 @@
+
+-#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__)
++#if defined(ANGLE_PLATFORM_POSIX) || defined(__clang__) || defined(__MINGW32__) inline int BitCount(uint32_t bits)
+EOF
+# fix Source/JavaScriptCore/offlineasm/generate_offset_extractor.rb (version >= 7616.1.12.3)
+patch -ulbf Source/JavaScriptCore/offlineasm/generate_offset_extractor.rb << EOF
+@@ -64,3 +64,2 @@
+     \$stderr.puts "OffsetExtractor: No magic values found. Skipping offsets extractor file generation."
+-    exit 1
+ end
+EOF
+
+cat >> Source/ThirdParty/ANGLE/PlatformWin.cmake << EOF
+set(ANGLE_LIBRARY_TYPE SHARED)
+set(GLESv2_LIBRARY_TYPE SHARED)
+set(EGL_LIBRARY_TYPE SHARED)
+EOF
+
+#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
+#mkdir -p build_test && cmake.exe -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+#mkdir -p build_test && cmake.exe -GNinja -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+#-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_MEDIA_STATISTICS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPORT:STRING=WinCairo -DENABLE_WEBCORE:BOOL=ON -DENABLE_JAVASCRIPTCORE:BOOL=ON -DENABLE_MEDIA_CONTROLS_SCRIPT:BOOL=OFF -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_MEDIA_STATISTICS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ #-DENABLE_WEB_AUDIO:BOOL=ON 
+ #-DENABLE_MEDIA_SOURCE:BOOL=ON 
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=GTK -DUSE_GTK4:BOOL=ON -DENABLE_GAMEPAD:BOOL=OFF -DENABLE_INTROSPECTION:BOOL=OFF -DUSE_GBM:BOOL=OFF -DENABLE_JOURNALD_LOG:BOOL=OFF -DENABLE_MEDIA_STATISTICS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=Efl -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WPE -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
+ #-DPORT:STRING= choose which WebKit port to build (one of AppleWin;Efl;FTW;GTK;JSCOnly;Mac;PlayStation;WPE;WinCairo)
+ # remove invalid linker flag -Wl,--disable-new-dtags
+ sed -i.bak -e "s/-Wl,--disable-new-dtags//" build_win/build.ninja &&
+ # fix missing link library
+ sed -i.bak2 -e "s?\([^ ]*\)libicudata\.dll\.a?& \1libicuin.dll.a?" build_win/build.ninja &&
+ # fix invalid link flag
+ sed -i.bak3 -e "s?\"/manifestdependency[^\"]*\"??" build_win/build.ninja &&
+ # fix missing link library
+ sed -i.bak4 -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ld3d9 -ldxgi/" build_win/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf WebKit-WebKit-$VERSION
+
+
+
 if [ ! -f $TARBALLDIR/$BASENAME/git-v$VERSION.tar.xz ]; then
  git clone https://github.com/WebKit/WebKit.git WebKit -b Safari-$VERSION &&
  tar cfJ $TARBALLDIR/$BASENAME/git-v$VERSION.tar.xz WebKit
