@@ -648,7 +648,7 @@ export LICENSETYPE=
 #export DOWNLOADURL="https://github.com/WebKit/WebKit/releases Safari-"
 #export DOWNLOADURL="https://github.com/WebKit/WebKit/tags Safari-"
 #export DOWNLOADURL="https://github.com/WebKit/WebKit/tags"
-export DOWNLOADURL="https://github.com/apple-oss-distributions/WebKit/tags"
+export DOWNLOADURL="https://github.com/apple-oss-distributions/WebKit/tags WebKit-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/WebKit/WebKit/archive/refs/tags/Safari-$VERSION.tar.gz
 #export DOWNLOADSOURCEURL=https://github.com/WebKit/WebKit/archive/refs/tags/WebKit-$VERSION.tar.gz
@@ -668,34 +668,84 @@ cd WebKit-WebKit-$VERSION
   ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
 
 
-## fix Source/WTF/CMakeLists.txt (version >= 7616.1.27.211.1)
-#mv Source/WTF/CMakeLists.txt Source/WTF/CMakeLists.txt.bak
-#cat > Source/WTF/CMakeLists.txt << EOF
-#cmake_minimum_required(VERSION 3.3)
-#include("WebKitCommon")
-#EOF
-#cat Source/WTF/CMakeLists.txt.bak >> Source/WTF/CMakeLists.txt
-## fix Source/cmake/WebKitStaticAnalysis.cmake (version >= 7616.1.27.211.1)
-#sed -i.bak -e "s/[^( ]* IN_LIST ANALYZERS/FALSE/" Source/cmake/WebKitStaticAnalysis.cmake
-## fix Source/cmake/FindWOFF2.cmake (version >= 7616.1.27.211.1)
-#sed -i.bak -e "s/[^( ]* IN_LIST WOFF2_FIND_COMPONENTS/FALSE/" Source/cmake/FindWOFF2.cmake
+# fix Source/WTF/CMakeLists.txt (version >= 7616.1.27.211.1)
+mv Source/WTF/CMakeLists.txt Source/WTF/CMakeLists.txt.bak
+cat > Source/WTF/CMakeLists.txt << EOF
+cmake_minimum_required(VERSION 3.3)
+include("WebKitCommon")
+EOF
+# fix Source/bmalloc/CMakeLists.txt (version >= 7616.1.27.211.1)
+mv Source/bmalloc/CMakeLists.txt Source/bmalloc/CMakeLists.txt.bak
+cat > Source/bmalloc/CMakeLists.txt << EOF
+cmake_minimum_required(VERSION 3.3)
+include("WebKitCommon")
+EOF
+# fix Source/WebKit/CMakeLists.txt (version >= 7616.1.27.211.1)
+mv Source/WebKit/CMakeLists.txt Source/WebKit/CMakeLists.txt.bak
+cat > Source/WebKit/CMakeLists.txt << EOF
+cmake_minimum_required(VERSION 3.3)
+include("WebKitCommon")
+EOF
 
 cat > CMakeLists.txt << EOF
 cmake_minimum_required(VERSION 3.3)
 include("WebKitCommon")
-add_subdirectory("Source/ThirdParty/ANGLE")
+#add_subdirectory("Source/ThirdParty/ANGLE")
 add_subdirectory("Source/bmalloc")
 add_subdirectory("Source/WTF")
-add_subdirectory("Source/WebInspectorUI")
+#add_subdirectory("Source/WebInspectorUI")
 add_subdirectory("Source/WebCore")
 add_subdirectory("Source/JavaScriptCore")
 add_subdirectory("Source/WebKit")
 EOF
 mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_WEBGL:BOOL=OFF -DUSE_ANGLE_EGL:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
 
+mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -SSource/bmalloc -Bbuild_test -LH && echo OK; rm -rf build_test
+mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -SSource/WebKit -Bbuild_test -LH && echo OK; rm -rf build_test
+
 mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -SSource/WTF -Bbuild_test -LH && echo OK; rm -rf build_test
 #mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -SSource/bmalloc -Bbuild_test -LH && echo OK; rm -rf build_test
 #mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -SSource/WebCore -Bbuild_test -LH && echo OK; rm -rf build_test
+
+mkdir -p build_win_wtf &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $PWD/Source/WTF) -I$(cygpath -m $PWD/Source/WTF/wtf)" -SSource/WTF -Bbuild_win_wtf &&
+ wl-showstatus build &&
+ ninja -Cbuild_win_wtf &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win_wtf install/strip &&
+    echo OK
+
+#mkdir -p build_win_bmalloc &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -SSource/bmalloc -Bbuild_win_bmalloc &&
+# wl-showstatus build &&
+# ninja -Cbuild_win_bmalloc &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win_bmalloc install/strip &&
+#    echo OK
+
+#mkdir -p build_win_WebKit &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -SSource/WebKit -Bbuild_win_WebKit &&
+# wl-showstatus build &&
+# ninja -Cbuild_win_WebKit &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win_WebKit install/strip &&
+#    echo OK
+
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_WEBGL:BOOL=OFF -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $PWD/Source/WTF) -I$(cygpath -m $PWD/Source/WTF/wtf)" -S. -Bbuild_win &&
+ wl-showstatus &&
+ ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+
+
+
+
 
 # fix Source/WTF/wtf/RetainPtr.h (version >= 7615.1.12.8)                       
 patch -ulbf Source/WTF/wtf/RetainPtr.h << EOF
