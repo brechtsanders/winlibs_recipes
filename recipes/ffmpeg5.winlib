@@ -51,6 +51,67 @@ cd ffmpeg-$VERSION
 #+    mingw32*|mingw64*|msys*)
 #         if test \$target_os = "mingw32ce"; then
 #EOF
+# fix error when building with binutils 2.41 (version >= 5.1.3)
+#### operandtype mismatch for `shr'
+#### See also: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108941
+#### See also: https://gitweb.gentoo.org/repo/gentoo.git/commit/?id=1deddd92c7791033da96aff0c8f9098c0ae95e15
+patch -ulbf libavcodec/x86/mathops.h << EOF
+@@ -35,12 +35,20 @@
+ static av_always_inline av_const int MULL(int a, int b, unsigned shift)
+ {
+     int rt, dummy;
++    if (__builtin_constant_p(shift))
+     __asm__ (
+         "imull %3               \n\t"
+         "shrdl %4, %%edx, %%eax \n\t"
+         :"=a"(rt), "=d"(dummy)
+-        :"a"(a), "rm"(b), "ci"((uint8_t)shift)
++        :"a"(a), "rm"(b), "i"(shift & 0x1F)
+     );
++    else
++        __asm__ (
++            "imull %3               \n\t"
++            "shrdl %4, %%edx, %%eax \n\t"
++            :"=a"(rt), "=d"(dummy)
++            :"a"(a), "rm"(b), "c"((uint8_t)shift)
++        );
+     return rt;
+ }
+ 
+@@ -113,19 +121,31 @@ __asm__ volatile(\
+ // avoid +32 for shift optimization (gcc should do that ...)
+ #define NEG_SSR32 NEG_SSR32
+ static inline  int32_t NEG_SSR32( int32_t a, int8_t s){
++    if (__builtin_constant_p(s))
+     __asm__ ("sarl %1, %0\n\t"
+          : "+r" (a)
+-         : "ic" ((uint8_t)(-s))
++         : "i" (-s & 0x1F)
+     );
++    else
++        __asm__ ("sarl %1, %0\n\t"
++               : "+r" (a)
++               : "c" ((uint8_t)(-s))
++        );
+     return a;
+ }
+ 
+ #define NEG_USR32 NEG_USR32
+ static inline uint32_t NEG_USR32(uint32_t a, int8_t s){
++    if (__builtin_constant_p(s))
+     __asm__ ("shrl %1, %0\n\t"
+          : "+r" (a)
+-         : "ic" ((uint8_t)(-s))
++         : "i" (-s & 0x1F)
+     );
++    else
++        __asm__ ("shrl %1, %0\n\t"
++               : "+r" (a)
++               : "c" ((uint8_t)(-s))
++        );
+     return a;
+ }
+EOF
 # build both static and shared libraries
 sed -i.bak -e "s/^\(\s*\)\(disable static\)/\1echo \2/" configure
 wl-showstatus configure &&
@@ -59,8 +120,8 @@ wl-showstatus configure &&
  # --enable-nonfree --enable-libfaac
  # --enable-libnut --enable-libdc1394 --enable-libdirac --enable-libopenjpeg --enable-libopencv --enable-libvo-amrwbenc 
  # avoid -framework linker flag (version >= 5.1.3)
-####gcc.exe: error: unrecognized command-line option '-framework'
-  sed -i.bak -e "s/-framework /-l/" ffbuild/config.mak &&
+ ####gcc.exe: error: unrecognized command-line option '-framework'
+ sed -i.bak -e "s/-framework /-l/" ffbuild/config.mak &&
  wl-showstatus build-install &&
  make all install EXESUF=".exe" &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ffmpeg-$VERSION
