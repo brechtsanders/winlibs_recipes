@@ -125,6 +125,67 @@ for F in libavformat/*.c libavcodec/*.c; do
  echo "#undef near" >> $F &&
  cat $F.bak >> $F
 done
+# fix error when building with binutils 2.41 (version >= 1.2.12)
+#### operandtype mismatch for `shr'
+#### See also: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108941
+#### See also: https://gitweb.gentoo.org/repo/gentoo.git/commit/?id=1deddd92c7791033da96aff0c8f9098c0ae95e15
+patch -ulbf libavcodec/x86/mathops.h << EOF
+@@ -35,12 +35,20 @@
+ static av_always_inline av_const int MULL(int a, int b, unsigned shift)
+ {
+     int rt, dummy;
++    if (__builtin_constant_p(shift))
+     __asm__ (
+         "imull %3               \n\t"
+         "shrdl %4, %%edx, %%eax \n\t"
+         :"=a"(rt), "=d"(dummy)
+-        :"a"(a), "rm"(b), "ci"((uint8_t)shift)
++        :"a"(a), "rm"(b), "i"(shift & 0x1F)
+     );
++    else
++        __asm__ (
++            "imull %3               \n\t"
++            "shrdl %4, %%edx, %%eax \n\t"
++            :"=a"(rt), "=d"(dummy)
++            :"a"(a), "rm"(b), "c"((uint8_t)shift)
++        );
+     return rt;
+ }
+ 
+@@ -113,19 +121,31 @@ __asm__ volatile(\
+ // avoid +32 for shift optimization (gcc should do that ...)
+ #define NEG_SSR32 NEG_SSR32
+ static inline  int32_t NEG_SSR32( int32_t a, int8_t s){
++    if (__builtin_constant_p(s))
+     __asm__ ("sarl %1, %0\n\t"
+          : "+r" (a)
+-         : "ic" ((uint8_t)(-s))
++         : "i" (-s & 0x1F)
+     );
++    else
++        __asm__ ("sarl %1, %0\n\t"
++               : "+r" (a)
++               : "c" ((uint8_t)(-s))
++        );
+     return a;
+ }
+ 
+ #define NEG_USR32 NEG_USR32
+ static inline uint32_t NEG_USR32(uint32_t a, int8_t s){
++    if (__builtin_constant_p(s))
+     __asm__ ("shrl %1, %0\n\t"
+          : "+r" (a)
+-         : "ic" ((uint8_t)(-s))
++         : "i" (-s & 0x1F)
+     );
++    else
++        __asm__ ("shrl %1, %0\n\t"
++               : "+r" (a)
++               : "c" ((uint8_t)(-s))
++        );
+     return a;
+ }
+EOF
 # fix invalid use of lib.exe (version >= 0.8)
 mv configure configure.bak
 sed -e "s/\(SLIB_EXTRA_CMD=\)'-lib\.exe.*'/\1/" configure.bak > configure
@@ -135,15 +196,15 @@ sed -e "s/\(mingw32\*\)/\1\|msys*\|mingw64*/" configure.bak2 > configure
 #mv configure configure.bak
 #sed -e "s/^E2=.*$/E2=1/" configure.bak > configure
 wl-showstatus configure &&
-#./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=i586 --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-avfilter --enable-memalign-hack --disable-devices &&
-#./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=i586 --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug &&
-#./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=i586 --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --extra-ldflags="-Wl,--allow-multiple-definition" &&
-#./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo i586; else echo x86_64; fi) --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --extra-ldflags="-Wl,--allow-multiple-definition" &&
-./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo i586; else echo x86_64; fi) --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --enable-zlib --enable-bzlib --enable-version3 --enable-avisynth --enable-frei0r --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libfreetype --enable-libgsm --enable-libmp3lame --enable-librtmp --enable-libschroedinger --enable-libspeex --enable-libtheora --enable-libvorbis --disable-libvpx --disable-libx264 --enable-libxavs --extra-cflags="-I$MINGWPREFIX/include/libdl-win32" --extra-ldflags="-Wl,--allow-multiple-definition" &&
-#./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo i586; else echo x86_64; fi) --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-incompatible-libav-abi --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --enable-zlib --enable-bzlib --enable-version3 --enable-avisynth --enable-frei0r --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libfreetype --enable-libgsm --enable-libmp3lame --enable-librtmp --enable-libschroedinger --enable-libspeex --enable-libtheora --enable-libvorbis --disable-libvpx --disable-libx264 --enable-libxavs --extra-cflags="-I$MINGWPREFIX/include/libdl-win32" --extra-ldflags="-Wl,--allow-multiple-definition" &&
-# --enable-libcelt
-# --enable-nonfree --enable-libaacplus --enable-libfaac
-# --enable-libnut --enable-libdc1394 --enable-libdirac --enable-libopencv --enable-libopenjpeg --enable-libvo-aacenc --enable-libvo-amrwbenc --enable-libxvid
+ #./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=i586 --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-avfilter --enable-memalign-hack --disable-devices &&
+ #./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=i586 --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug &&
+ #./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=i586 --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --extra-ldflags="-Wl,--allow-multiple-definition" &&
+ #./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo i586; else echo x86_64; fi) --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --extra-ldflags="-Wl,--allow-multiple-definition" &&
+ ./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo i586; else echo x86_64; fi) --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --enable-zlib --enable-bzlib --enable-version3 --enable-avisynth --enable-frei0r --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libfreetype --enable-libgsm --enable-libmp3lame --enable-librtmp --enable-libschroedinger --enable-libspeex --enable-libtheora --enable-libvorbis --disable-libvpx --disable-libx264 --enable-libxavs --extra-cflags="-I$MINGWPREFIX/include/libdl-win32" --extra-ldflags="-Wl,--allow-multiple-definition" &&
+ #./configure --prefix=$INSTALLPREFIX/ffmpeg1 --arch=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo i586; else echo x86_64; fi) --enable-static --enable-shared --enable-w32threads --enable-gpl --enable-incompatible-libav-abi --enable-postproc --enable-swscale --enable-avfilter --enable-memalign-hack --disable-devices --enable-runtime-cpudetect --disable-debug --enable-zlib --enable-bzlib --enable-version3 --enable-avisynth --enable-frei0r --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libfreetype --enable-libgsm --enable-libmp3lame --enable-librtmp --enable-libschroedinger --enable-libspeex --enable-libtheora --enable-libvorbis --disable-libvpx --disable-libx264 --enable-libxavs --extra-cflags="-I$MINGWPREFIX/include/libdl-win32" --extra-ldflags="-Wl,--allow-multiple-definition" &&
+ # --enable-libcelt
+ # --enable-nonfree --enable-libaacplus --enable-libfaac
+ # --enable-libnut --enable-libdc1394 --enable-libdirac --enable-libopencv --enable-libopenjpeg --enable-libvo-aacenc --enable-libvo-amrwbenc --enable-libxvid
  wl-showstatus build-install &&
  ( make all install || make all install SLIB_INSTALL_EXTRA_SHLIB='lib$(SLIBNAME:$(SLIBSUF)=.dll.a)' ) &&
  for F in $INSTALLPREFIX/lib/lib*.a; do
