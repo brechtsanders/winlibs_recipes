@@ -19,10 +19,10 @@ export TYPE=library
 #export VERSIONDATE=20190107
 #export VERSION=8.1
 #export VERSIONDATE=20201207
-export VERSION=8.1.2
-export VERSIONDATE=20220106
-#export VERSION=8.2
-#export VERSIONDATE=20220927
+#export VERSION=8.1.2
+#export VERSIONDATE=20220106
+export VERSION=8.2
+export VERSIONDATE=20220927
 wl-showstatus --package-version
 #export DEPENDENCIES=termcap
 #export OPTIONALDEPENDENCIES=
@@ -121,24 +121,46 @@ patch -ulbf signals.c << EOF
 +#endif
  #if defined (SIGQUIT)
 EOF
-# fix undefined SIGHUP/SIGQUIT in input.c (version >= 6.3)
+## fix undefined SIGHUP/SIGQUIT in input.c (version >= 6.3 <= 8.1.2)
+#patch -ulbf input.c << EOF
+#--- input.c  2014-01-10 21:07:08 +0100
+#+++ input.c  2014-02-26 21:26:02 +0100
+#@@ -534,5 +534,13 @@
+#        return (RL_ISSTATE (RL_STATE_READCMD) ? READERR : EOF);
+#+#if defined (SIGHUP)
+#       else if (_rl_caught_signal == SIGHUP || _rl_caught_signal == SIGTERM)
+#+#else
+#+      else if (_rl_caught_signal == SIGTERM)
+#+#endif
+#        return (RL_ISSTATE (RL_STATE_READCMD) ? READERR : EOF);
+#+#if defined (SIGQUIT)
+#       else if (_rl_caught_signal == SIGINT || _rl_caught_signal == SIGQUIT)
+#+#else
+#+      else if (_rl_caught_signal == SIGINT)
+#+#endif
+#         RL_CHECK_SIGNALS ();
+#EOF
+# fix input.c (version >= 8.2)
 patch -ulbf input.c << EOF
---- input.c  2014-01-10 21:07:08 +0100
-+++ input.c  2014-02-26 21:26:02 +0100
-@@ -534,5 +534,13 @@
-        return (RL_ISSTATE (RL_STATE_READCMD) ? READERR : EOF);
-+#if defined (SIGHUP)
-       else if (_rl_caught_signal == SIGHUP || _rl_caught_signal == SIGTERM)
-+#else
-+      else if (_rl_caught_signal == SIGTERM)
+@@ -153,3 +153,5 @@
+ int _rl_timeout_sigalrm_handler (void);
++#if !defined(_WIN32)
+ int _rl_timeout_select (int, fd_set *, fd_set *, fd_set *, const struct timeval *, const sigset_t *);
 +#endif
-        return (RL_ISSTATE (RL_STATE_READCMD) ? READERR : EOF);
-+#if defined (SIGQUIT)
-       else if (_rl_caught_signal == SIGINT || _rl_caught_signal == SIGQUIT)
-+#else
-+      else if (_rl_caught_signal == SIGINT)
-+#endif
-         RL_CHECK_SIGNALS ();
+
+@@ -819,3 +821,3 @@
+
+-#if defined (__MINGW32__)
++#if 0
+       if (isatty (fd)
+EOF
+# fix rlprivate.h (version >= 8.2)
+patch -ulbf rlprivate.h << EOF
+@@ -305,3 +305,3 @@
+ extern int _rl_timeout_handle_sigalrm (void);
+-#if defined (_POSIXSELECT_H_)
++#if defined (_POSIXSELECT_H_) && !defined(_WIN32)
+ /* use as a sentinel for fd_set, struct timeval,  and sigset_t definitions */
 EOF
 # fix colors.c (version >= 6.3)
 mv colors.c colors.c.bak
