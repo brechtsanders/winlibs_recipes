@@ -1,0 +1,56 @@
+export NAME="LLVM runtimes"
+export STATUS=
+export URL=https://llvm.org/
+export BASENAME=llvm-runtimes
+export DESCRIPTION="The LLVM Compiler Infrastructure - Runtimes."
+export CATEGORY=development
+export TYPE=application
+export VERSION=17.0.2
+export VERSIONDATE=20231013
+wl-showstatus --package-version
+export DEPENDENCIES=llvm-cmake,libffi,zlib,zstd,libxml2,libcurl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.TXT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/llvm/llvm-project/releases/ runtimes-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$(echo $VERSION|sed -e "s/rc/-&/")/runtimes-$VERSION.src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xJ --force-local -f $TARBALLDIR/$BASENAME/runtimes-$VERSION.src.tar.xz
+cd runtimes-$VERSION.src
+# fix CMakeLists.txt (version >= 17.0.2)
+sed -i.bak -e "s?\${CMAKE_CURRENT_SOURCE_DIR}/\.\.?$(cygpath -m $MINGWPREFIX/share/llvm-split/share)?" CMakeLists.txt
+# fix missing GetHostTriple.cmake in CMakeLists.txt (version >= 17.0.2)
+sed -i.bak2 -e "s/^include(GetHostTriple)/#&/; s/get_host_triple(\(LLVM_HOST_TRIPLE\))/set(\1 \"$RUNPLATFORM\")/" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #LLVM_CONFIG_PATH deprecated, instead use: -DLLVM_CMAKE_DIR=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm-split -DCMAKE_BUILD_TYPE:STRING=MinSizeRel \
+  -DCMAKE_MODULE_PATH:PATH=$MINGWPREFIX/share/llvm-split/share/cmake/Modules \
+  -DLLVM_CMAKE_DIR=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm-split/lib/cmake/llvm \
+  -DLLVM_MAIN_SRC_DIR:PATH=$MINGWPREFIX/share/llvm-split/include \
+  -DLLVM_COMMON_CMAKE_UTILS:PATH=$MINGWPREFIX/share/llvm-split/share/cmake \
+  -DCMAKE_SYSTEM_NAME:STRING=Windows \
+  -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE:STRING=$RUNPLATFORM \
+  -DLLVM_TARGET_TRIPLE:STRING=$RUNPLATFORM \
+  -DLLVM_TARGET_TRIPLE_LIST:STRING="$(for arch in i686 x86_64 armv7 aarch64; do echo -n "$arch-w64-mingw32;"; done)" \
+  -DPython3_FIND_REGISTRY:BOOL=NEVER \
+  -DPython3_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/python/bin/python.exe \
+  -DLLVM_ENABLE_RUNTIMES:STRING=all \
+  -DLLVM_INCLUDE_TESTS:BOOL=OFF \
+  -S. -Bbuild_win &&
+ #Supported runtimes are libc;libunwind;libcxxabi;pstl;libcxx;compiler-rt;openmp;llvm-libgcc
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf runtimes-$VERSION.src
+
+
+
