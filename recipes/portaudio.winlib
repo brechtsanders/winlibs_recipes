@@ -41,9 +41,6 @@ wl-wait4deps
 mkdir -p $BASENAME-$VERSION
 tar xz --force-local -f $TARBALLDIR/$BASENAME/pa_stable_v$VERSION.tgz -C$BASENAME-$VERSION
 cd $BASENAME-$VERSION/portaudio
-# fix for errors on empty $(SUBDIRS) in for
-mv Makefile.in Makefile.in.bak
-sed -e 's/^\(.*$(SUBDIRS).*\)$/#\1/' Makefile.in.bak > Makefile.in
 ## fix missing swprintf and vswprintf
 #mv include/portaudio.h include/portaudio.h.bak
 #echo "#include <stdio.h>" > include/portaudio.h
@@ -52,9 +49,15 @@ sed -e 's/^\(.*$(SUBDIRS).*\)$/#\1/' Makefile.in.bak > Makefile.in
 #echo "#include <stdio.h>" > bindings/cpp/include/portaudiocpp/Device.hxx
 #cat bindings/cpp/include/portaudiocpp/Device.hxx.bak >> bindings/cpp/include/portaudiocpp/Device.hxx
 ## remove dependancy on dynamic libstdc++ (GCC 4)
-#mv bindings/cpp/libtool bindings/cpp/libtool.bak
-#sed -e "s/-lstdc++/-lstdc++_s -lsupc++/" bindings/cpp/libtool.bak > bindings/cpp/libtool
-wl-showstatus configure &&
+#sed -i.bak -e "s/-lstdc++/-lstdc++_s -lsupc++/" bindings/cpp/libtool
+# fix for errors on empty $(SUBDIRS)
+sed -i.bak -e 's/^\(.*$(SUBDIRS).*\)$/#\1/' Makefile.in
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ mv depcomp depcomp.bak &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ mv -u depcomp.bak depcomp &&
+ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme --enable-cxx=yes &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-winapi=wmme --enable-cxx=yes LDFLAGS="-static-libstdc++" &&
@@ -63,6 +66,8 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-winapi=wmme,wdmks,directx$(if [ -f $MINGWPREFIX/share/rtaudio/asiosdk/common/asiosys.h ]; then echo ",asio"; fi) --enable-cxx --with-asiodir=$MINGWPREFIX/share/rtaudio/asiosdk LDFLAGS="-static-libstdc++" &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-winapi=wmme,wdmks,directx$(if [ -f $MINGWPREFIX/share/rtaudio/asiosdk/common/asiosys.h ]; then echo ",asio"; fi) --enable-cxx --with-asiodir=$MINGWPREFIX/share/rtaudio/asiosdk LDFLAGS="-pthread" &&
  #--with-winapi=wasapi
+ # fix detection of shared libraries
+ sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  # manually build static library
  sed -i.bak -e "s/\$(C[CX]*) \$(PA_LDFLAGS).*$/& \&\& ar cr libportaudio.a \$(LTOBJS)/" Makefile &&
  wl-showstatus build-install &&
