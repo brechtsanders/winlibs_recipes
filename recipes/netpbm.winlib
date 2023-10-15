@@ -264,12 +264,31 @@ patch -ulbf converter/other/pstopnm.c << EOF
          signal(SIGPIPE, SIG_IGN);
 +#endif
 EOF
-# fix missing pipe in pm_config.in.h (version >= 10.73.28)
+## fix missing pipe in pm_config.in.h (version >= 10.73.28 <= 10.73.42)
+#patch -ulbf pm_config.in.h << EOF
+#@@ -338,3 +338,8 @@
+#
+#-#if MSVCRT
+#+#if __MINGW32__
+#+  #include <fcntl.h>
+#+  #define pm_pipe(fds) _pipe(fds, 4096, _O_BINARY)
+#+  #define fork() -1
+#+  #define waitpid(p,s,o) -1
+#+#elif MSVCRT
+#   #define pm_pipe _pipe
+#EOF
+# fix missing pipe in pm_config.in.h (version >= 10.73.43)
 patch -ulbf pm_config.in.h << EOF
-@@ -338,3 +338,8 @@
+@@ -332,3 +332,4 @@
 
 -#if MSVCRT
-+#if __MINGW32__
++#ifdef _WIN32
++  #include <direct.h>
+   #define pm_mkdir(dir, perm) _mkdir(dir)
+@@ -338,3 +339,8 @@
+
+-#if MSVCRT
++#ifdef _WIN32
 +  #include <fcntl.h>
 +  #define pm_pipe(fds) _pipe(fds, 4096, _O_BINARY)
 +  #define fork() -1
@@ -456,8 +475,6 @@ touch winfix/sys/wait.h
 #mkdir -p lib/importinc/netpbm
 #cp -f lib/*.h lib/importinc/netpbm/
 #echo '#include "../pm_config.h"' > lib/importinc/netpbm/pm_config.h
-# fix missing atty in converter/pbm/thinkjettopbm.c (version >= 10.73.43)
-sed -i.bak -e "s/isatty( fileno(file) )/0/" converter/pbm/thinkjettopbm.c
 # fix converter/ppm/ppmtompeg/bitio.c (version >= 10.73.43)
 patch -ulbf converter/ppm/ppmtompeg/bitio.c << EOF
 @@ -42,2 +42,9 @@
@@ -500,10 +517,12 @@ cat converter/ppm/ppmtompeg/psearch.c.bak >> converter/ppm/ppmtompeg/psearch.c
 mv converter/ppm/ppmtompeg/bsearch.c converter/ppm/ppmtompeg/bsearch.c.bak
 echo "#include <string.h>" > converter/ppm/ppmtompeg/bsearch.c
 cat converter/ppm/ppmtompeg/bsearch.c.bak >> converter/ppm/ppmtompeg/bsearch.c
-# fix undefined lseek in converter/ppm/ppmtompeg/jpeg.c (version >= 10.73.43)
-mv converter/ppm/ppmtompeg/jpeg.c converter/ppm/ppmtompeg/jpeg.c.bak
-echo "#include <io.h>" > converter/ppm/ppmtompeg/jpeg.c
-cat converter/ppm/ppmtompeg/jpeg.c.bak >> converter/ppm/ppmtompeg/jpeg.c
+## fix undefined lseek in converter/ppm/ppmtompeg/jpeg.c (version >= 10.73.43)
+#mv converter/ppm/ppmtompeg/jpeg.c converter/ppm/ppmtompeg/jpeg.c.bak
+#echo "#include <io.h>" > converter/ppm/ppmtompeg/jpeg.c
+#cat converter/ppm/ppmtompeg/jpeg.c.bak >> converter/ppm/ppmtompeg/jpeg.c
+# fix undefined lseek (version >= 10.73.43)
+echo "#include_next <io.h>" >> lib/util/io.h
 # fix incorrect HAVE_FORK (version >= 10.73.28)
 sed -i.bak -e "s/\(#define HAVE_FORK \)1/\10/" GNUmakefile
 # fix install issues (version >= 10.73.31)
@@ -589,6 +608,9 @@ wl-showstatus configure &&
  #make -j1 CC=${CC:-gcc} LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" < answers &&
  #( make CC=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" < answers || make lib/all lib/util/all CC=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" < answers ) &&
  #( make CC=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" || make -j1 CC=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" || make lib/all lib/util/all CC=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" ) &&
+ # fix missing isatty in converter/pbm/thinkjettopbm.c (version >= 10.73.43)
+ make -Cconverter/pbm thinkjettopbm.c &&
+ sed -i.bak -e "s/isatty( fileno(file) )/0/" converter/pbm/thinkjettopbm.c &&
  ( make CC=${CC:-gcc} WINDRES=${WINDRES:-windres} LD=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" ZLIB=-lz JBIGLIB=-ljbig JBIGHDR_DIR=$MINGWPREFIX/include JASPERLIB=-ljasper JASPERHDR_DIR=$MINGWPREFIX/include/jasper || make -j1 CC=${CC:-gcc} WINDRES=${WINDRES:-windres} LD=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" ZLIB=-lz JBIGLIB=-ljbig JBIGHDR_DIR=$MINGWPREFIX/include JASPERLIB=-ljasper JASPERHDR_DIR=$MINGWPREFIX/include/jasper ) &&
  wl-showstatus build-install &&
  #make install.lib install.sharedlibstub install.staticlib install.hdr pkgdir=$INSTALLPREFIX &&
