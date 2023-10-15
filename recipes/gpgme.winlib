@@ -174,7 +174,9 @@ done
 #EOF
 ## fix missing iconv.dll
 #cp $MINGWPREFIX/bin/libiconv-2.dll iconv.dll
-wl-showstatus configure &&
+wl-showstatus preconfigure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--allow-multiple-definition" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX LDFLAGS="-Wl,--allow-multiple-definition" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX CFLAGS="`$PKG_CONFIG --cflags glib-2.0`" LDFLAGS="`$PKG_CONFIG --libs glib-2.0`" LDFLAGS="-Wl,--allow-multiple-definition" &&
@@ -182,11 +184,13 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX CFLAGS="`$PKG_CONFIG --cflags glib-2.0`" LDFLAGS="`$PKG_CONFIG --libs glib-2.0`" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lshell32" &&
  #PATH=$PYDIR:$PATH ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX CFLAGS="`$PKG_CONFIG --cflags glib-2.0`" LDFLAGS="`$PKG_CONFIG --libs glib-2.0`" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lshell32 -L$PYDIR/libs" PYTHON_EXTRA_LDFLAGS= PYTHON=$PYDIR/python.exe &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-languages="cpp" --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX CFLAGS="$($PKG_CONFIG --cflags glib-2.0)" LDFLAGS="$($PKG_CONFIG --libs glib-2.0)" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lshell32" PYTHON=$PYDIR/python.exe &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-languages="cpp" --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX --disable-gpgconf-test --disable-gpg-test --disable-gpgsm-test --disable-g13-test CFLAGS="$($PKG_CONFIG --cflags glib-2.0)" LDFLAGS="$($PKG_CONFIG --libs glib-2.0)" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lshell32" PYTHON=$PYDIR/python.exe &&
- wl-showstatus build-install &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-languages="cpp" --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX --disable-gpgconf-test --disable-gpg-test --disable-gpgsm-test --disable-g13-test CFLAGS="$($PKG_CONFIG --cflags glib-2.0)" LDFLAGS="$($PKG_CONFIG --libs glib-2.0)" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lshell32" PYTHON=$PYDIR/python.exe &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-languages="cpp" --enable-w32-glib --with-libassuan-prefix=$MINGWPREFIX --disable-gpgconf-test --disable-gpg-test --disable-gpgsm-test --disable-g13-test CFLAGS="$($PKG_CONFIG --cflags glib-2.0)" LDFLAGS="$($PKG_CONFIG --libs glib-2.0)" CFLAGS="$(if ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-function-pointer-types -Wno-int-conversion"; fi)" LDFLAGS="-Wl,--allow-multiple-definition -Wl,--as-needed -lshell32" PYTHON=$PYDIR/python.exe &&
+ # fix detection of shared libraries
+ sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  # fix redefinition of off_t and ssize_t in src/gpgme.h
- mv src/gpgme.h src/gpgme.h.bak &&
- sed -e "s/^\(typedef long off_t;\)/\/\/\1/; s?\(typedef long ssize_t;\)?//\1?" src/gpgme.h.bak > src/gpgme.h &&
+ sed -i.bak -e "s/^\(typedef long off_t;\)/\/\/\1/; s?\(typedef long ssize_t;\)?//\1?" src/gpgme.h &&
+ wl-showstatus build-install &&
  ( ( make && make install-strip ) || make -j1 install-strip LIBS="-Wl,--as-needed -lglib-2.0 -lshell32" || make -j1 install-strip LIBS="-Wl,--as-needed -lglib-2.0 -lshell32 -largp" || make -j1 install-strip ) &&
  ( cp -f $MINGWPREFIX/libexec/gpgme-w32spawn.exe $MINGWPREFIX/bin/ || true) &&
  # fix absolute link in .cmake file(s)

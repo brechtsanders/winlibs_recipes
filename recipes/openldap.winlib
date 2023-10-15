@@ -300,6 +300,15 @@ patch -ulbf servers/slapd/logging.c << EOF
 +#endif
  }
 EOF
+# fix include/ac/socket.h (version >= 2.6.6)
+patch -ulbf include/ac/socket.h << EOF
+@@ -102,3 +102,5 @@
+ #define EINPROGRESS WSAEINPROGRESS
++#ifndef ETIMEDOUT
+ #define ETIMEDOUT      WSAETIMEDOUT
++#endif
+
+EOF
 # fix missing ber_pvt_wsa_err2string in libraries/liblber/lber.map (version >= 2.6.1)
 patch -ulbf libraries/liblber/lber.map << EOF
 @@ -104,2 +104,3 @@
@@ -342,6 +351,8 @@ EOF
 #        fi
 #EOF
 #make test
+## avoid linker flag --base-file (version >= 2.6.6)
+#sed -i.bak -e "s/--base-file slapd\.base\|-Wl,--base-file,slapd\.base//" servers/slapd/Makefile.in
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,--as-needed -lws2_32 -lpthread" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lws2_32" &&
@@ -353,14 +364,17 @@ wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-threads --with-tls=gnutls --with-odbc=odbc32 --with-argon2=libargon2 --with-cyrus-sasl --enable-slapd --enable-spasswd --enable-modules --enable-ldap --enable-mdb --enable-meta --disable-sql --disable-syslog --without-systemd CFLAGS="-DHAVE_CLOCK_GETTIME=1" LDFLAGS="-Wl,--as-needed -lws2_32 -lgcrypt -lpthread -Wl,--enable-auto-import" &&
  #--enable-sql 
  # fix building DLLs
- sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  # fix redefinition of socklen_t (version >= 2.4.27)
  echo "#undef socklen_t" >> include/portable.h &&
  # fix undefined reference to __imp__snprintf.constprop.0 (version >= 2.4.57)
  echo "#undef snprintf" >> include/portable.h &&
  echo "#define HAVE_GETADDRINFO 1" >> include/portable.h &&
+ echo "#define HAVE_WINSOCK2 1" >> include/portable.h &&
  wl-showstatus build-install &&
  #make install &&
+ #SYMBOL_VERSION_FLAGS= 
  ( make install || (
   # fix .refptr. issue on 64-bit (version >= 2.4.44)
   sed -i.bak -e 's/"\.refptr\.\(.*\)"/\1/' servers/slapd/slapd.def &&
