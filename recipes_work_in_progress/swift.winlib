@@ -12,8 +12,8 @@ export TYPE=application
 export VERSION=5.9.1
 export VERSIONDATE=20231020
 wl-showstatus --package-version
-export DEPENDENCIES=swift-syntax
-export OPTIONALDEPENDENCIES=
+export DEPENDENCIES=libffi,zlib,zstd,libxml2,wineditline
+export OPTIONALDEPENDENCIES=swift-syntax
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.txt
@@ -27,10 +27,45 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/swift-$VERSION-RELEASE.tar.gz
 cd swift-swift-$VERSION-RELEASE
+# fix cmake/modules/SwiftConfigureSDK.cmake (version >= 5.9.1)
+patch -ulbf cmake/modules/SwiftConfigureSDK.cmake << EOF
+@@ -17,3 +17,3 @@
+
+-  if("\${prefix}" STREQUAL "WINDOWS")
++  if("\${prefix}" STREQUAL "WINDOWS" AND NOT MINGW)
+     message(STATUS "  UCRT Version: \${UCRTVersion}")
+EOF
+# fix cmake/modules/SwiftWindowsSupport.cmake (version >= 5.9.1)
+patch -ulbf cmake/modules/SwiftWindowsSupport.cmake << EOF
+@@ -52,2 +52,3 @@
+ function(swift_windows_get_sdk_vfs_overlay overlay)
++ if (NOT MINGW)
+   get_filename_component(VCToolsInstallDir \${VCToolsInstallDir} ABSOLUTE)
+@@ -62,2 +63,3 @@
+     PARENT_SCOPE)
++ endif()
+ endfunction()
+@@ -71,2 +73,3 @@
+ function(swift_windows_cache_VCVARS)
++ if (NOT MINGW)
+   swift_verify_windows_VCVAR(VCToolsInstallDir)
+@@ -74,2 +77,3 @@
+   swift_verify_windows_VCVAR(UCRTVersion)
++ endif()
+
+EOF
+# fix stdlib/CMakeLists.txt (version >= 5.9.1)
+patch -ulbf stdlib/CMakeLists.txt << EOF
+@@ -34,3 +34,3 @@
+ endfunction()
+-if(WINDOWS IN_LIST SWIFT_SDKS)
++if(WINDOWS IN_LIST SWIFT_SDKS AND NOT MINGW)
+   generate_windows_vfs_overlay()
+EOF
 
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
 
-mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DBOOTSTRAPPING_MODE:BOOL=BOOTSTRAPPING -DLLVM_DIR:FILEPATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DSWIFT_INCLUDE_TESTS:BOOL=OFF -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DBOOTSTRAPPING_MODE:BOOL=BOOTSTRAPPING -DSWIFT_ENABLE_DISPATCH:BOOL=OFF -DSWIFT_INCLUDE_DOCS:BOOL=OFF -DLibEdit_INCLUDE_DIRS:FILEPATH=$MINGWPREFIX/include -DLLVM_DIR:FILEPATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DLLVM_MAIN_INCLUDE_DIR:PATH=$MINGWPREFIX/share/llvm/include -DLLVM_BUILD_LIBRARY_DIR:PATH=$MINGWPREFIX/share/llvm/lib -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang -DSWIFT_INCLUDE_TESTS:BOOL=OFF -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
 
 -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE
 -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE
