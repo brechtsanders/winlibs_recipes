@@ -12,8 +12,8 @@ export TYPE=application
 export VERSION=5.9.1
 export VERSIONDATE=20231020
 wl-showstatus --package-version
-export DEPENDENCIES=libffi,zlib,zstd,libxml2,wineditline
-export OPTIONALDEPENDENCIES=swift-syntax
+export DEPENDENCIES=llvm-project,swift-syntax,libffi,zlib,zstd,libxml2,wineditline
+export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.txt
@@ -54,6 +54,15 @@ patch -ulbf cmake/modules/SwiftWindowsSupport.cmake << EOF
 + endif()
 
 EOF
+# fix lib/Basic/CMakeLists.txt (version >= 5.9.1)
+patch -ulbf lib/Basic/CMakeLists.txt << EOF
+@@ -24,3 +24,5 @@
+
++ if(NOT MINGW)
+   set(generate_vcs_version_script "\${LLVM_MAIN_SRC_DIR}/cmake/modules/GenerateVersionFromVCS.cmake")
++ endif()
+
+EOF
 # fix stdlib/CMakeLists.txt (version >= 5.9.1)
 patch -ulbf stdlib/CMakeLists.txt << EOF
 @@ -34,3 +34,3 @@
@@ -62,14 +71,39 @@ patch -ulbf stdlib/CMakeLists.txt << EOF
 +if(WINDOWS IN_LIST SWIFT_SDKS AND NOT MINGW)
    generate_windows_vfs_overlay()
 EOF
+# fix cmake/modules/AddSwift.cmake (version >= 5.9.1)
+patch -ulbf cmake/modules/AddSwift.cmake << EOF
+@@ -268,3 +268,3 @@
+       target_compile_options(\${target} PRIVATE \$<\$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:/GR->)
+-    else()
++    elseif(NOT MINGW)
+       target_compile_options(\${target} PRIVATE
+EOF
+# fix stdlib/cmake/modules/AddSwiftStdlib.cmake (version >= 5.9.1)
+patch -ulbf stdlib/cmake/modules/AddSwiftStdlib.cmake << EOF
+@@ -1404,3 +1404,3 @@
+
+-    if(NOT \${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
++    if(NOT \${CMAKE_C_COMPILER_ID} STREQUAL MSVC AND NOT MINGW)
+       swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+EOF
+# fix lib/Option/CMakeLists.txt (version >= 5.9.1)
+patch -ulbf lib/Option/CMakeLists.txt << EOF
+@@ -10,3 +10,5 @@
+ set(features_file_swift_src "\${CMAKE_CURRENT_SOURCE_DIR}/features.json")
++if(NOT MINGW)
+ set(features_file_clang_src "\${LLVM_BINARY_DIR}/share/clang/features.json")
++endif()
+ set(features_file_dest "\${CMAKE_BINARY_DIR}/share/swift/features.json")
+EOF
 
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
 
-mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DBOOTSTRAPPING_MODE:BOOL=BOOTSTRAPPING -DSWIFT_ENABLE_DISPATCH:BOOL=OFF -DSWIFT_INCLUDE_DOCS:BOOL=OFF -DLibEdit_INCLUDE_DIRS:FILEPATH=$MINGWPREFIX/include -DLLVM_DIR:FILEPATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DLLVM_MAIN_INCLUDE_DIR:PATH=$MINGWPREFIX/share/llvm/include -DLLVM_BUILD_LIBRARY_DIR:PATH=$MINGWPREFIX/share/llvm/lib -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang -DSWIFT_INCLUDE_TESTS:BOOL=OFF -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DBOOTSTRAPPING_MODE:BOOL=BOOTSTRAPPING -DSWIFT_ENABLE_DISPATCH:BOOL=OFF -DSWIFT_INCLUDE_DOCS:BOOL=OFF -DLibEdit_INCLUDE_DIRS:FILEPATH=$MINGWPREFIX/include -DLLVM_DIR:FILEPATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm -DLLVM_MAIN_INCLUDE_DIR:PATH=$MINGWPREFIX/share/llvm/include -DLLVM_BUILD_LIBRARY_DIR:PATH=$MINGWPREFIX/share/llvm/lib -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang -DSWIFT_INCLUDE_TESTS:BOOL=OFF -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:FILEPATH=$MINGWPREFIX/share/swift-syntax -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_test -LH && echo OK; rm -rf build_test
 
--DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE
--DSWIFT_PATH_TO_LIBDISPATCH_SOURCE
--DSWIFT_VENDOR:STRING=""
+#-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE
+#-DSWIFT_PATH_TO_LIBDISPATCH_SOURCE
+#-DSWIFT_VENDOR:STRING=""
 
 
 #export BUILDDEPENDENCIES=cmake
@@ -89,17 +123,39 @@ mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DBOOTSTRAPPING_MODE:BOOL=BO
 #export BUILDDEPENDENCIES=cmake,ninja
 #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
 #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
-# #wl-showstatus build &&
-# #cmake.exe --build build_win &&
-# #ninja -Cbuild_win &&
-# wl-showstatus build-install &&
-# #cmake.exe --install build_win --strip &&
-# #cmake.exe --build build_win --target "install/strip" &&
-# ninja -Cbuild_win install/strip &&
-#    echo OK
+
+# fix missing file
+mkdir -p src
+touch src/cmarkTargets.cmake
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release \
+  -DBOOTSTRAPPING_MODE:BOOL=BOOTSTRAPPING \
+  -DSWIFT_ENABLE_DISPATCH:BOOL=OFF \
+  -DSWIFT_INCLUDE_DOCS:BOOL=OFF \
+  -DLibEdit_INCLUDE_DIRS:FILEPATH=$MINGWPREFIX/include \
+  -DLLVM_DIR:FILEPATH=$MINGWPREFIX/share/llvm/lib/cmake/llvm \
+  -DLLVM_MAIN_INCLUDE_DIR:PATH=$MINGWPREFIX/share/llvm/include \
+  -DLLVM_BUILD_LIBRARY_DIR:PATH=$MINGWPREFIX/share/llvm/lib \
+  -DClang_DIR:PATH=$MINGWPREFIX/share/llvm/lib/cmake/clang \
+  -DSWIFT_INCLUDE_TESTS:BOOL=OFF \
+  -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:FILEPATH=$MINGWPREFIX/share/swift-syntax \
+  -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe \
+  -S. -Bbuild_win &&
+#  -DCMAKE_ASM_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm/bin/llvm-ar.exe \
+#  -DCMAKE_ASM_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe \
+#  -DCMAKE_C_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm/bin/clang.exe \
+#  -DCMAKE_C_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm/bin/llvm-ar.exe \
+#  -DCMAKE_C_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe \
+#  -DCMAKE_CXX_COMPILER:FILEPATH=$MINGWPREFIX/share/llvm/bin/clang++.exe \
+#  -DCMAKE_CXX_COMPILER_AR:FILEPATH=$MINGWPREFIX/share/llvm/bin/llvm-ar.exe \
+#  -DCMAKE_CXX_COMPILER_RANLIB:FILEPATH=$MINGWPREFIX/share/llvm/bin/llvm-ranlib.exe \
+#  -DCMAKE_RC_COMPILER:FILEPATH="$MINGWPREFIX/share/llvm/bin/llvm-windres.exe  -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
+#  -DCMAKE_LINKER:FILEPATH=$MINGWPREFIX/share/llvm/bin/ld.lld.exe \
+#  -DGOLD_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/llvm/bin/ld.lld.exe \
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
 
 #export BUILDDEPENDENCIES=cmake,ninja
 #mkdir -p build_static build_shared &&
