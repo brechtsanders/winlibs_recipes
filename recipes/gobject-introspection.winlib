@@ -985,6 +985,25 @@ if ${CC:-gcc} --version|grep -q "^clang"; then
  cp -rf $PYDIR/Lib/site-packages/setuptools/* winfix/setuptools/
  sed -i.bak2 -e "s/-mdll //" winfix/setuptools/_distutils/cygwinccompiler.py
 fi
+# fix Python 3.8 dependency DLL lookup path (e.g. needed to be able to load libgcc_s_dw2-1.dll)
+#### see also: https://docs.python.org/3/whatsnew/3.8.html#bpo-36085-whatsnew
+mv giscanner/scannermain.py giscanner/scannermain.py.bak
+cat > giscanner/scannermain.py << EOF
+import sys
+if sys.version_info >= (3,8):
+    import os
+    os.add_dll_directory(os.path.dirname(__file__))
+    if os.path.isdir(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "bin")):
+        os.add_dll_directory(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "bin"))
+    if 'MINGWPREFIX' in os.environ and os.path.isdir(os.path.join(os.environ['MINGWPREFIX'], 'bin')):
+        os.add_dll_directory(os.path.join(os.environ['MINGWPREFIX'], 'bin'))
+    if 'MINGWDIR' in os.environ:
+        if 'RUNPLATFORM' in os.environ and os.path.isdir(os.path.join(os.path.join(os.environ['MINGWDIR'], os.environ['RUNPLATFORM']), 'bin')):
+            os.add_dll_directory(os.path.join(os.path.join(os.environ['MINGWDIR'], os.environ['RUNPLATFORM']), 'bin'))
+        if os.path.isdir(os.path.join(os.environ['MINGWDIR'], 'bin')):
+            os.add_dll_directory(os.path.join(os.environ['MINGWDIR'], 'bin'))
+EOF
+cat giscanner/scannermain.py.bak >> giscanner/scannermain.py
 ## fix subprojects/glib/meson.build (version >= 1.75.4)
 #patch -ulbf subprojects/glib/meson.build << EOF
 #@@ -270,3 +270,3 @@
