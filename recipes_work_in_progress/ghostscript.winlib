@@ -85,6 +85,8 @@ export VERSIONDATE=20220405
 #export VERSIONDATE=20230622
 #export VERSION=10.02.0
 #export VERSIONDATE=20230913
+#export VERSION=10.02.1
+#export VERSIONDATE=20231102
 ####obj/gscdefs.c:90:41: error: incomplete universal character name \u
 wl-showstatus --package-version
 export DEPENDENCIES=libjpeg,zlib,libpng
@@ -145,12 +147,33 @@ patch -ulbf base/pipe_.h << EOF
 -#ifdef __WIN32__
 +#if defined(__WIN32__) && !defined(__MINGW32__)
 EOF
+# fix base/gscdef.c (version >= 10.02.1)
+patch -ulbf base/gscdef.c << EOF
+@@ -72,3 +72,3 @@
+ /* Define the default library search path. */
+-const char *const gs_lib_default_path = GS_LIB_DEFAULT;
++const char *const gs_lib_default_path = ".";
+
+EOF
+# fix base/gp_mswin.c (version >= 10.02.1)
+patch -ulbf base/gp_mswin.c << EOF
+@@ -108,2 +108,3 @@
+ #ifndef METRO
++FILE *mswin_popen(const char *cmd, const char *mode);
+ static int gp_printfile(const gs_memory_t *mem, const char *, const char *);
+@@ -744,2 +745,3 @@
+ #  define STDC99
++#elif defined(__MINGW32__) /* MinGW-w64 has snprintf */
+ #else
+EOF
 # use Windows instead of Unix sources (version >= 9.52)
 mv base/gp_unix.c base/gp_unix.c.bak &&
-cat base/gp_win32.c base/gp_unix.c
+#echo '#include "gp_win32.c"' > base/gp_unix.c
+echo -e '#include "gp_win32.c"\n#include "gssprintf.c"\n#include "gp_mswin.c"\n' > base/gp_unix.c
 #cat base/gp_mswin.c base/gp_win32.c > base/gp_unix.c
 mv base/gp_unifs.c base/gp_unifs.c.bak &&
-cat base/gp_wutf8.c base/gp_winfs.c base/gp_ntfs.c > base/gp_unifs.c
+#cat base/gp_wutf8.c base/gp_winfs.c base/gp_ntfs.c > base/gp_unifs.c
+echo -e '#include "gp_utf8.c"\n#include "gp_winfs.c"\n#include "gp_ntfs.c"\n' > base/gp_unifs.c
 mv base/gp_unifn.c base/gp_unifn.c.bak &&
 touch base/gp_unifn.c
 ## fix missing base/gp_unix.c (version >= 9.53.0)
@@ -165,12 +188,12 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --without-ijs --without-jasper --without-x --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --without-local-zlib --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --without-local-zlib --with-drivers=FILES --without-tesseract LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --without-local-zlib --with-drivers=FILES --without-tesseract CFLAGS="-I$PWD/base" LDFLAGS="-Wl,--as-needed -lwinspool -Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
  ## remove static paths with backslashes from obj/gconfigd.h (version >= 9.52 <= 9.53.3)
  #sed -i.bak -e "s?^\(#define GS_LIB_DEFAULT \).*\$?\1\"\"?; s?^\(#define GS_CACHE_DIR \).*\$?\1\".ghostscript/cache/\"?; s?^\(#define GS_DOCDIR \).*\$?\1\"\"?" obj/gconfigd.h &&
  wl-showstatus build-install &&
  # redefine AUXDIR because aux is a reserved device name in Windows
- make all install AUXDIR=$(pwd)/obj/auxdir &&
+ make all install AUXDIR=$PWD/obj/auxdir &&
  make so soinstall GS=gs GS_SOEXT=dll &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ghostscript-$VERSION

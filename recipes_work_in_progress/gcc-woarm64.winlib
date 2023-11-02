@@ -1,0 +1,99 @@
+export NAME="gcc-woarm64"
+export STATUS=
+export URL=https://github.com/ZacWalk/gcc-woarm64
+export BASENAME=gcc-woarm64
+export DESCRIPTION="Fork of gcc containing fixes for Windows on ARM64."
+export CATEGORY=
+export TYPE=application
+export VERSION=woarm64
+export VERSIONDATE=20231101
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,zstd,pthreads,mcfgthread,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl,mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=binutils
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/ZacWalk/gcc-woarm64/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/ZacWalk/gcc-woarm64/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# set to 0 to build Dwarf2 (32-bit) or SEH (64-bit) C++ exception handling (or to 1 to use SJLJ)
+if [ "$USE_SJLJ" == "" ]; then
+ USE_SJLJ=0
+fi
+# set to 0 to use msvcrt or to 1 to use ucrt
+if [ "$USE_UCRT" == "" ]; then
+ USE_UCRT=0
+fi
+# set to 0 to use POSIX threads or to 1 to use MCF GThread library
+if [ "$USE_MCF" == "" ]; then
+ USE_MCF=0
+fi
+# fix missing syslog in libssp/ssp.c
+sed -i.bak -e "s?#ifdef HAVE_SYSLOG_H?#if 0 //&?" libssp/ssp.c
+# fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
+# fix missing sys/wait.h fixincludes/fixincl.c (version >= 9.3.0)
+patch -ulbf fixincludes/fixincl.c << EOF
+@@ -28,4 +28,12 @@
+ #ifndef SEPARATE_FIX_PROC
++#ifdef _WIN32
++#include <Windows.h>
++#define wait(p) Sleep(0)
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#else
+ #include <sys/wait.h>
+ #endif
++#endif
+
+EOF
+# fix missing pipe in fixincludes/procopen.c (version >= 9.3.0)
+patch -ulbf fixincludes/procopen.c << EOF
+@@ -50,2 +50,7 @@
+ #include "server.h"
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#define fork() -1
++#endif
+
+EOF
+# fix missing kill/alarm in fixincludes/server.c (version >= 9.3.0)
+patch -ulbf fixincludes/server.c << EOF
+@@ -50,2 +50,6 @@
+ #include "server.h"
++#ifdef _WIN32
++#define kill(pid,sig) -1
++#define alarm(n) 0
++#endif
+
+EOF
+# fix detection of GMP/MPFR/MPC
+sed -i.bak -e  "s/#include [<\"]\(gmp\|mpc\|mpfr\|isl\)\.h[>\"]/#include <stdio.h>\n&/" configure
+# copy MinGW-w64 files
+mkdir -p build_mingw/mingw-w64/mingw/lib &&
+cp -rf $MINGWPREFIX/share/mingw-w64/include build_mingw/mingw-w64/mingw &&
+( cp -rf $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/lib/* build_mingw/mingw-w64/mingw/lib/ || cp -rf $MINGWPREFIX/share/mingw-w64/lib build_mingw/mingw-w64/mingw/ ) &&
+mkdir -p build_mingw &&
+ wl-showstatus configure &&
+ cd build_mingw &&
+ PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc --build=$BUILDPLATFORM --host=$RUNPLATFORM $(if echo $VERSION|grep -q "^1[0-9]\."; then echo "--enable-offload-targets=nvptx-none"; fi) --with-pkgversion="MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//")$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "-ucrt"; else echo -n "-msvcrt"; fi)-$(if [ "0$USE_MCF" -ne 0 ]; then echo -n "mcf"; else echo -n "posix"; fi)-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" $(if echo $RUNPLATFORM | grep -vq "aarch64"; then echo "--with-tune=generic"; fi) --enable-checking=release --enable-threads=$(if [ "0$USE_MCF" -ne 0 ]; then echo -n "mcf"; else echo -n "posix"; fi) $(if [ "0$USE_SJLJ" -ne 0 ]; then if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--without-dwarf2 "; fi; echo "--enable-sjlj-exceptions"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--with-dwarf2 "; fi; echo "--disable-sjlj-exceptions"; fi) --disable-libunwind-exceptions --disable-serial-configure --disable-bootstrap --enable-host-shared $(if echo $VERSION|grep -q "^[1-7]\."; then echo "--disable-plugin"; else echo "--enable-plugin"; fi) --disable-default-ssp --disable-rpath --disable-libstdcxx-debug --disable-version-specific-runtime-libs --with-stabs --disable-symvers --enable-languages=c --disable-{gold,nls,stage1-checking,win32-registry,multilib} --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,libstdcxx-time,libstdcxx-pch} --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) --disable-libstdcxx-backtrace --enable-install-libiberty --enable-__cxa_atexit --without-included-gettext --with-diagnostics-color=auto --enable-clocale=generic --with-libiconv --with-system-zlib --with-build-sysroot=$PWD/mingw-w64 CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -Wno-int-conversion $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" CXXFLAGS="-Wno-int-conversion $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" LDFLAGS="-pthread -Wl,--no-insert-timestamp $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--dynamicbase &> /dev/null; then echo "-Wl,--dynamicbase"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--high-entropy-va &> /dev/null; then echo "-Wl,--high-entropy-va"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--nxcompat &> /dev/null; then echo "-Wl,--nxcompat"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--tsaware &> /dev/null; then echo "-Wl,--tsaware"; fi)" LD=$MINGWPREFIX/share/binutils/bin/ld.exe &&
+ #--enable-languages=c,c++,fortran,lto,objc,obj-c++$(if echo $VERSION|grep -q "^1[1-9][.\-]" && [ $(echo $VERSION|sed -e "s/^\([0-9]*\)\..*$/\1/") -lt 13 ]; then echo ",jit"; fi) 
+ cd .. &&
+ make -Cbuild_mingw configure-host &&
+ wl-showstatus build &&
+ #make -C build_mingw/gcc CXXFLAGS="-I$PWD/libstdc++-v3/include -I$PWD/libstdc++-v3/include/std" &&
+ ( PATH=$MINGWPREFIX/share/binutils/bin:$PATH:$PWD/build_mingw/gcc make -Cbuild_mingw || ( PATH=$MINGWPREFIX/share/binutils/bin:$PATH:$PWD/build_mingw/gcc make -Cbuild_mingw $(echo $RUNPLATFORM | sed -e "s/-.*$//")-w64-mingw32/libstdc++-v3/src CXXFLAGS="-D__CRT__NO_INLINE" && PATH=$MINGWPREFIX/share/binutils/bin:$PATH:$PWD/build_mingw/gcc make -Cbuild_mingw ) || PATH=$MINGWPREFIX/share/binutils/bin:$PATH:$PWD/build_mingw/gcc make -j1 -Cbuild_mingw ) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
