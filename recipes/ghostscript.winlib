@@ -73,8 +73,8 @@ export TYPE=library
 #export VERSIONDATE=20210927
 #export VERSION=9.56.0
 #export VERSIONDATE=20220329
-export VERSION=9.56.1
-export VERSIONDATE=20220405
+#export VERSION=9.56.1
+#export VERSIONDATE=20220405
 #export VERSION=10.0.0
 #export VERSIONDATE=20220921
 #export VERSION=10.01.0
@@ -85,16 +85,16 @@ export VERSIONDATE=20220405
 #export VERSIONDATE=20230622
 #export VERSION=10.02.0
 #export VERSIONDATE=20230913
-#export VERSION=10.02.1
-#export VERSIONDATE=20231102
 ####obj/gscdefs.c:90:41: error: incomplete universal character name \u
+export VERSION=10.02.1
+export VERSIONDATE=20231102
 wl-showstatus --package-version
-export DEPENDENCIES=libjpeg,zlib,libpng
+export DEPENDENCIES=zlib,libjpeg,libpng,libopenjpeg,jbig2dec,freetype2,libpaper
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
-export LICENSETYPE=GPL2
+export LICENSETYPE="AGPL/Commercial"
 #export DOWNLOADURL="http://ghostscript.com/releases/ ghostscript-"
 #export DOWNLOADURL="http://downloads.ghostscript.com/public/ ghostscript-"
 #export DOWNLOADURL="https://github.com/ArtifexSoftware/ghostpdl-downloads/releases ghostscript-"
@@ -166,10 +166,25 @@ patch -ulbf base/gp_mswin.c << EOF
 +#elif defined(__MINGW32__) /* MinGW-w64 has snprintf */
  #else
 EOF
+# fix base/mkromfs.c (version >= 10.02.1)
+patch -ulbf base/mkromfs.c << EOF
+@@ -167,4 +167,5 @@
+  */
+ #ifdef _WIN32
++#ifndef __MINGW32__
+ int gp_stat_impl(const gs_memory_t *mem, const char *path, struct _stat64 *buf)
+ {
+@@ -174,4 +175,5 @@
+     return 0;
+ }
++#endif
+ #ifdef MEMENTO
+ #undef malloc
+EOF
 # use Windows instead of Unix sources (version >= 9.52)
 mv base/gp_unix.c base/gp_unix.c.bak &&
 #echo '#include "gp_win32.c"' > base/gp_unix.c
-echo -e '#include "gp_win32.c"\n#include "gssprintf.c"\n#include "gp_mswin.c"\n' > base/gp_unix.c
+echo -e '#include "gp_win32.c"\n#include "gssprintf.c"\n#include "gp_mswin.c"\n#include "gp_wgetv.c"\n' > base/gp_unix.c
 #cat base/gp_mswin.c base/gp_win32.c > base/gp_unix.c
 mv base/gp_unifs.c base/gp_unifs.c.bak &&
 #cat base/gp_wutf8.c base/gp_winfs.c base/gp_ntfs.c > base/gp_unifs.c
@@ -183,39 +198,25 @@ rm -rf zlib jpeg libpng tiff freetype jbig2dec openjpeg ijs
 # fix error: Mixing local libtiff with shared libjpeg not supported
 sed -i.bak -e "s/as_fn_error\( .*Mixing local libtiff with shared libjpeg not supported\)/echo \1/" configure
 #./autogen
-#./autogen.sh --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --without-ijs --without-jasper --without-x --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import" &&
+#./autogen.sh --prefix=$INSTALLPREFIX/share/ghostscript --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --without-ijs --without-jasper --without-x --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import" &&
 wl-showstatus configure &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --without-ijs --without-jasper --without-x --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import" &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --without-local-zlib --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --without-local-zlib --with-drivers=FILES --without-tesseract CFLAGS="-I$PWD/base" LDFLAGS="-Wl,--as-needed -lwinspool -Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
- ## remove static paths with backslashes from obj/gconfigd.h (version >= 9.52 <= 9.53.3)
- #sed -i.bak -e "s?^\(#define GS_LIB_DEFAULT \).*\$?\1\"\"?; s?^\(#define GS_CACHE_DIR \).*\$?\1\".ghostscript/cache/\"?; s?^\(#define GS_DOCDIR \).*\$?\1\"\"?" obj/gconfigd.h &&
+ #./configure --prefix=$INSTALLPREFIX/share/ghostscript --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-cups --disable-gtk --without-ijs --without-jasper --without-x --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import" &&
+ #./configure --prefix=$INSTALLPREFIX/share/ghostscript --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
+ #./configure --prefix=$INSTALLPREFIX/share/ghostscript --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --without-local-zlib --with-drivers=FILES LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
+ ./configure --prefix=$INSTALLPREFIX/share/ghostscript --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threading --enable-gtk --enable-fontconfig --enable-freetype --enable-openjpeg --with-libtiff --with-system-libtiff --with-jbig2dec --with-libpaper --with-libidn --with-libiconv=native --disable-dbus --without-x --disable-cups --without-ijs --without-local-zlib --with-drivers=FILES --without-tesseract CFLAGS="-I$PWD/base" LDFLAGS="-Wl,--enable-auto-import -Wl,--allow-multiple-definition" &&
+ # remove static paths with backslashes from obj/gconfigd.h (version >= 9.52)
+ ( make obj/gconfigd.h; sed -i.bak -e "s?^\(#define GS_LIB_DEFAULT \).*\$?\1\"\"?; s?^\(#define GS_CACHE_DIR \).*\$?\1\".ghostscript/cache/\"?; s?^\(#define GS_DOCDIR \).*\$?\1\"\"?" obj/gconfigd.h ) &&
+ #( make soobj/gconfigd.h SHARED=1 GS=gs GS_SOEXT=dll; sed -i.bak -e "s?^\(#define GS_LIB_DEFAULT \).*\$?\1\"\"?; s?^\(#define GS_CACHE_DIR \).*\$?\1\".ghostscript/cache/\"?; s?^\(#define GS_DOCDIR \).*\$?\1\"\"?" soobj/gconfigd.h ) &&
  wl-showstatus build-install &&
  # redefine AUXDIR because aux is a reserved device name in Windows
- make all install AUXDIR=$PWD/obj/auxdir &&
- make so soinstall GS=gs GS_SOEXT=dll &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ghostscript-$VERSION
+ make all install AUXDIR=$PWD/obj/auxdir XTRALIBS="-Wl,--as-needed -lwinspool -Wl,--allow-multiple-definition" &&
+ #make so soinstall GS=gs GS_SOEXT=dll AUXDIR=$PWD/obj/auxdir XTRALIBS="-Wl,--as-needed -lwinspool -Wl,--allow-multiple-definition" &&
+ #mv -f $INSTALLPREFIX/share/ghostscript/lib/*-$(echo $VERSION|sed -e "s/^\([0-9]*\)\..*/\1/").dll $INSTALLPREFIX/share/ghostscript/bin/ &&
+ #rm -rf $INSTALLPREFIX/share/ghostscript/lib/*.dll &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ghostscript-$VERSION
+####$MINGWPREFIX/share/ghostscript/bin/gs.exe --version
+####TO DO: build shared version
 ####See also: gnu-ghostscript
 
 
 
-# fix base/gscdef.c (version >= 9.55.0)
-patch -ulbf base/gscdef.c << EOF
-@@ -72,3 +72,7 @@
- /* Define the default library search path. */
-+#ifdef _WIN32
-+const char *const gs_lib_default_path = NULL;
-+#else
- const char *const gs_lib_default_path = GS_LIB_DEFAULT;
-+#endif
-
-EOF
-# fix missing base/gp_unix.c (version >= 9.55.0)
-#cp -f base/gp_win32.c base/gp_unix.c
-touch base/gp_unix.c
-
- make CCAUX="gcc -Wl,--allow-multiple-definition" &&
- make so soinstall GS=gs GS_SOEXT=dll CCAUX="gcc -Wl,--allow-multiple-definition" &&
-    echo OK
