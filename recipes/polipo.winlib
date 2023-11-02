@@ -1,12 +1,153 @@
+#export NAME="Polipo"
+#export STATUS=
+##export URL=http://www.pps.jussieu.fr/~jch/software/polipo/
+#export URL=https://www.pps.jussieu.fr/~jch/software/polipo/
+##export URL=https://github.com/jech/polipo
+#export BASENAME=polipo
+#export DESCRIPTION="Polipo is a small and fast caching web proxy (a web cache, an HTTP proxy, a proxy server). While Polipo was designed to be used by one person or a small group of people, there is nothing that prevents it from being used by a larger group."
+#export CATEGORY=internet
+#export TYPE=application
+#export VERSION=1.0.4.1
+#export VERSIONDATE=20111201
+##export VERSION=1.1.1
+##export VERSIONDATE=20231102
+#wl-showstatus --package-version
+#export DEPENDENCIES=pcre
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+##export DOWNLOADURL="http://freehaven.net/~chrisd/polipo/"
+#export DOWNLOADURL="https://github.com/jech/polipo/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://freehaven.net/~chrisd/polipo/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/jech/polipo/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+##cd polipo-polipo-$VERSION
+## fix polipo.h for 64-bit
+#patch -ulbf polipo.h << EOF
+#--- polipo.h  2010-02-01 00:13:20 +0100
+#+++ polipo.h  2011-12-01 15:30:38 +0100
+#@@ -28,3 +28,3 @@
+#
+#-#ifdef __MINGW32_VERSION
+#+#if defined(__MINGW32__)
+# #define MINGW
+#EOF
+### fix mingw.h for 64-bit
+##patch -ulbf mingw.h << EOF
+##--- mingw.h  2010-02-01 00:13:20 +0100
+##+++ mingw.h  2011-12-01 21:32:34 +0100
+##@@ -93,3 +93,5 @@
+## #define inet_aton(x, y)      mingw_inet_aton(x, y)
+##+#ifndef __MINGW64__
+## #define gettimeofday(x, y)   mingw_gettimeofday(x, y)
+##+#endif
+## #define stat(x, y)           mingw_stat(x, y)
+##@@ -104,3 +106,5 @@
+## int     mingw_inet_aton(const char *, struct in_addr *);
+##+#ifndef __MINGW64__
+## int     mingw_gettimeofday(struct timeval *, char *);
+##+#endif
+## int     mingw_poll(struct pollfd *, unsigned int, int);
+##EOF
+#patch -ulbf mingw.h << EOF
+#--- mingw.h  2010-02-01 00:13:20 +0100
+#+++ mingw.h  2013-09-23 15:06:10 +0200
+#@@ -50,11 +50,27 @@
+# #include <winsock.h>
+#+#ifndef ENOTCONN
+# #define ENOTCONN        WSAENOTCONN
+#+#endif
+#+#ifndef EWOULDBLOCK
+# #define EWOULDBLOCK     WSAEWOULDBLOCK
+#+#endif
+#+#ifndef ENOBUFS
+# #define ENOBUFS         WSAENOBUFS
+#+#endif
+#+#ifndef ECONNRESET
+# #define ECONNRESET      WSAECONNRESET
+#+#endif
+# #define ESHUTDOWN       WSAESHUTDOWN
+#+#ifndef EAFNOSUPPORT
+# #define EAFNOSUPPORT    WSAEAFNOSUPPORT
+#+#endif
+#+#ifndef EPROTONOSUPPORT
+# #define EPROTONOSUPPORT WSAEPROTONOSUPPORT
+#+#endif
+#+#ifndef EINPROGRESS
+# #define EINPROGRESS     WSAEINPROGRESS
+#+#endif
+#+#ifndef EISCONN
+# #define EISCONN         WSAEISCONN
+#+#endif
+#
+#@@ -93,3 +109,5 @@
+# #define inet_aton(x, y)      mingw_inet_aton(x, y)
+#+#if !defined(__MINGW64__) && !`if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
+# #define gettimeofday(x, y)   mingw_gettimeofday(x, y)
+#+#endif
+# #define stat(x, y)           mingw_stat(x, y)
+#@@ -104,3 +122,5 @@
+# int     mingw_inet_aton(const char *, struct in_addr *);
+#+#if !defined(__MINGW64__) && !`if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
+# int     mingw_gettimeofday(struct timeval *, char *);
+#+#endif
+# int     mingw_poll(struct pollfd *, unsigned int, int);
+#EOF
+## fix mingw.c for 64-bit
+#patch -ulbf mingw.c << EOF
+#--- mingw.c  2010-02-01 00:13:20 +0100
+#+++ mingw.c  2011-12-01 21:36:16 +0100
+#@@ -155,4 +155,5 @@
+# }
+#
+#+#if !defined(__MINGW64__) && !`if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
+# int
+# mingw_gettimeofday(struct timeval *tv, char *tz)
+#@@ -183,4 +184,5 @@
+#     return 0;
+# }
+#+#endif
+#
+# int mingw_poll(struct pollfd *fds, unsigned int nfds, int timo)
+#EOF
+## fix event.h for 64-bit
+#patch -ulbf event.h << EOF
+#--- event.h  2010-02-01 00:13:20 +0100
+#+++ event.h  2011-12-01 21:34:42 +0100
+#@@ -22,2 +22,5 @@
+#
+#+#if defined(__MINGW64__) || `if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
+#+typedef uintptr_t sigset_t;
+#+#endif
+# extern struct timeval current_time;
+#EOF
+## fix Makefile
+#sed -i.bak -e "s/\(cp -f polipo\) /\1.exe /; s/\(install-info --info-dir=\$(TARGET)\$(INFODIR) polipo.info\)/#\1/" Makefile
+#wl-showstatus build-install &&
+# make install CC=${CC:-gcc} EXE=.exe EXTRA_DEFINES=-DHAVE_REGEX LDLIBS="-Wl,--as-needed -lws2_32 -lregex -s" PREFIX=$INSTALLPREFIX LOCAL_ROOT=$MINGWPREFIX/share/polipo/www DISK_CACHE_ROOT=$MINGWPREFIX/var/cache/polipo &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf polipo-polipo-$VERSION
+##### to configure browse to: http://localhost:8123/polipo/config
+
+
+
 export NAME="Polipo"
 export STATUS=
-export URL=http://www.pps.jussieu.fr/~jch/software/polipo/
+export URL=https://www.pps.jussieu.fr/~jch/software/polipo/
+#export URL=https://github.com/jech/polipo
 export BASENAME=polipo
 export DESCRIPTION="Polipo is a small and fast caching web proxy (a web cache, an HTTP proxy, a proxy server). While Polipo was designed to be used by one person or a small group of people, there is nothing that prevents it from being used by a larger group."
 export CATEGORY=internet
 export TYPE=application
-export VERSION=1.0.4.1
-export VERSIONDATE=20111201
+export VERSION=1.1.1
+export VERSIONDATE=20231102
 wl-showstatus --package-version
 export DEPENDENCIES=pcre
 export OPTIONALDEPENDENCIES=
@@ -14,46 +155,24 @@ export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=
-export DOWNLOADURL="http://freehaven.net/~chrisd/polipo/"
+export DOWNLOADURL="https://github.com/jech/polipo/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-wl-wait4deps
-export DOWNLOADSOURCEURL=http://freehaven.net/~chrisd/polipo/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/jech/polipo/archive/refs/tags/$BASENAME-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
-cd $BASENAME-$VERSION
-# fix polipo.h for 64-bit
-patch -ulbf polipo.h << EOF
---- polipo.h  2010-02-01 00:13:20 +0100
-+++ polipo.h  2011-12-01 15:30:38 +0100
-@@ -28,3 +28,3 @@
-
--#ifdef __MINGW32_VERSION
-+#if defined(__MINGW32__)
- #define MINGW
-EOF
-## fix mingw.h for 64-bit
-#patch -ulbf mingw.h << EOF
-#--- mingw.h  2010-02-01 00:13:20 +0100
-#+++ mingw.h  2011-12-01 21:32:34 +0100
-#@@ -93,3 +93,5 @@
-# #define inet_aton(x, y)      mingw_inet_aton(x, y)
-#+#ifndef __MINGW64__
-# #define gettimeofday(x, y)   mingw_gettimeofday(x, y)
-#+#endif
-# #define stat(x, y)           mingw_stat(x, y)
-#@@ -104,3 +106,5 @@
-# int     mingw_inet_aton(const char *, struct in_addr *);
-#+#ifndef __MINGW64__
-# int     mingw_gettimeofday(struct timeval *, char *);
-#+#endif
-# int     mingw_poll(struct pollfd *, unsigned int, int);
-#EOF
+cd polipo-polipo-$VERSION
+# fix mingw.h (version >= 1.1.1)
 patch -ulbf mingw.h << EOF
---- mingw.h  2010-02-01 00:13:20 +0100
-+++ mingw.h  2013-09-23 15:06:10 +0200
-@@ -50,11 +50,27 @@
- #include <winsock.h>
+@@ -60,3 +60,5 @@
+
++#ifndef S_IROTH
+ #define S_IROTH S_IREAD
++#endif
+
+@@ -90,11 +92,27 @@
+ #endif
 +#ifndef ENOTCONN
  #define ENOTCONN        WSAENOTCONN
 +#endif
@@ -80,54 +199,29 @@ patch -ulbf mingw.h << EOF
  #define EISCONN         WSAEISCONN
 +#endif
 
-@@ -93,3 +109,5 @@
- #define inet_aton(x, y)      mingw_inet_aton(x, y)
-+#if !defined(__MINGW64__) && !`if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
- #define gettimeofday(x, y)   mingw_gettimeofday(x, y)
+@@ -110,2 +128,3 @@
+  */
++#ifndef __MINGW64_VERSION_MAJOR
+ #define POLLIN      0x0001    /* There is data to read */
+@@ -121,2 +140,3 @@
+ };
 +#endif
- #define stat(x, y)           mingw_stat(x, y)
-@@ -104,3 +122,5 @@
- int     mingw_inet_aton(const char *, struct in_addr *);
-+#if !defined(__MINGW64__) && !`if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
- int     mingw_gettimeofday(struct timeval *, char *);
-+#endif
- int     mingw_poll(struct pollfd *, unsigned int, int);
-EOF
-# fix mingw.c for 64-bit
-patch -ulbf mingw.c << EOF
---- mingw.c  2010-02-01 00:13:20 +0100
-+++ mingw.c  2011-12-01 21:36:16 +0100
-@@ -155,4 +155,5 @@
- }
-
-+#if !defined(__MINGW64__) && !`if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
- int
- mingw_gettimeofday(struct timeval *tv, char *tz)
-@@ -183,4 +184,5 @@
-     return 0;
- }
+ #define poll(x, y, z)        win32_poll(x, y, z)
+@@ -153,2 +173,5 @@
+ /* Winsock uses int instead of the usual socklen_t */
++#ifdef __MINGW64_VERSION_MAJOR
++#include <wspiapi.h>
++#else
+ typedef int socklen_t;
+@@ -156,2 +179,3 @@
+ typedef int pid_t;
 +#endif
 
- int mingw_poll(struct pollfd *fds, unsigned int nfds, int timo)
 EOF
-# fix event.h for 64-bit
-patch -ulbf event.h << EOF
---- event.h  2010-02-01 00:13:20 +0100
-+++ event.h  2011-12-01 21:34:42 +0100
-@@ -22,2 +22,5 @@
-
-+#if defined(__MINGW64__) || `if ${CC:-gcc} --version|grep "MinGW-W64">/dev/null; then echo 1; else echo 0; fi`
-+typedef uintptr_t sigset_t;
-+#endif
- extern struct timeval current_time;
-EOF
-# fix Makefile
-mv Makefile Makefile.bak
-sed -e "s/\(cp -f polipo\) /\1.exe /; s/\(install-info --info-dir=\$(TARGET)\$(INFODIR) polipo.info\)/#\1/" Makefile.bak > Makefile
 wl-showstatus build-install &&
- make CC=${CC:-gcc} EXE=.exe EXTRA_DEFINES=-DHAVE_REGEX LDLIBS="-Wl,--as-needed -lws2_32 -lregex -s" PREFIX=$INSTALLPREFIX LOCAL_ROOT=$MINGWPREFIX/share/polipo/www DISK_CACHE_ROOT=$MINGWPREFIX/var/cache/polipo install &&
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-# to configure browse to: http://localhost:8123/polipo/config
+ make install CC=${CC:-gcc} EXE=.exe EXTRA_DEFINES=-DHAVE_REGEX LDLIBS="-Wl,--as-needed -lws2_32 -lregex -s" PREFIX=$INSTALLPREFIX LOCAL_ROOT=$MINGWPREFIX/share/polipo/www DISK_CACHE_ROOT=$MINGWPREFIX/var/cache/polipo &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf polipo-polipo-$VERSION
+#### to configure browse to: http://localhost:8123/polipo/config
 
 
 
