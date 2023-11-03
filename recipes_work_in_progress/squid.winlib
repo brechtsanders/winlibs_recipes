@@ -250,8 +250,7 @@ static void syslog (int priority, const char *format, ...) {}
 static void closelog (void) {}
 EOF
 # fix obsolete lm.h in helpers/basic_auth/SSPI/valid.h
-mv helpers/basic_auth/SSPI/valid.h helpers/basic_auth/SSPI/valid.h.bak
-sed -e "s/lm\.h/lmaccess.h/" helpers/basic_auth/SSPI/valid.h.bak > helpers/basic_auth/SSPI/valid.h
+sed -i.bak -e "s/lm\.h/lmaccess.h/" helpers/basic_auth/SSPI/valid.h
 #sed -i.bak -e "s/\(#include <\)lm\.h\(>\)/\1lmaccess.h\2/" $(grep -l "#include <lm\.h>" $(find -name '*.h' -or -name '*.cc'))
 # fix missing inet_pton in compat/os/mswindows.h (version >= 4.0.17)
 mv compat/os/mswindows.h compat/os/mswindows.h.bak
@@ -281,6 +280,8 @@ cat > src/acl/forward.h << EOF
 #endif
 EOF
 cat src/acl/forward.h.bak >> src/acl/forward.h
+# fix already defined near in src/errorpage.h (version >= 4.6)
+sed -i.bak -e "s/\bnear\b/&by/" src/errorpage.h
 # fix missing PWKSTA_INFO_100 in ofstd/libsrc/ofstd.cc (version >= 5.0.4)
 ####error lm.h is deprecated, please use levmar.h instead!
 echo "#include <levmar.h>" | gcc -E -xc - &> /dev/null && sed -i.bak -e "s/#include <lm\.h>/#include <levmar.h>\n#include <lmerr.h>\n#include <lmaccess.h>\n#include <lmapibuf.h>\n#include <lmwksta.h>\n#include <winsvc.h>\n#include <lmserver.h>/" $(grep -l "#include <lm\.h>" $(find -name '*.h' -or -name '*.cc'))
@@ -298,10 +299,19 @@ EOF
 mv src/comm/ModSelectWin32.cc src/comm/ModSelectWin32.cc.bak &&
 echo "#include \"SquidConfig.h\"" > src/comm/ModSelectWin32.cc &&
 cat src/comm/ModSelectWin32.cc.bak >> src/comm/ModSelectWin32.cc
-# fix missing uint32_t in src/base/Lock.h (version >= 6.4)
+# fix missing uint32_t/assert in src/base/Lock.h (version >= 6.4)
 mv src/base/Lock.h src/base/Lock.h.bak &&
 echo "#include <stdint.h>" > src/base/Lock.h &&
+echo "#include <assert.h>" >> src/base/Lock.h &&
 cat src/base/Lock.h.bak >> src/base/Lock.h
+# fix missing xassert in src/debug/Stream.h (version >= 6.4)
+mv src/debug/Stream.h src/debug/Stream.h.bak &&
+echo "#include \"compat/assert.h\"" > src/debug/Stream.h &&
+cat src/debug/Stream.h.bak >> src/debug/Stream.h
+# fix missing SQUIDCEXTERN in include/hash.h (version >= 6.4)
+mv include/hash.h include/hash.h.bak &&
+echo "#include \"squid.h\"" > include/hash.h &&
+cat include/hash.h.bak >> include/hash.h
 # remove -Wall/-Werror compiler options to continue building on compiler warnings
 sed -i.bak -e "s/-Wall//; s/-Werror//" configure
 wl-showstatus configure &&
