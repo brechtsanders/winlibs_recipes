@@ -1,0 +1,80 @@
+export NAME="hwinfo"
+export STATUS=
+export URL=https://github.com/lfreist/hwinfo
+export BASENAME=hwinfo
+export DESCRIPTION="hwinfo provides an easy-to-use and modern C++ API for retrieving hardware information of your systems components such as CPU, RAM, GPU, Disks, Mainboard, ..."
+export CATEGORY=hardware
+export TYPE=library
+export VERSION=main
+export VERSIONDATE=20231104
+wl-showstatus --package-version
+export DEPENDENCIES=khronos-opencl-headers,khronos-opencl-icd-loader
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/lfreist/hwinfo/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/lfreist/hwinfo/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined reference to _com_util::ConvertStringToBSTR in src/windows/utils/wmi_wrapper.cpp
+patch -ulbf src/windows/utils/wmi_wrapper.cpp << EOF
+@@ -17,3 +17,3 @@
+   res &= CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_IWbemLocator, (LPVOID*)&locator);
+-  res &= locator->ConnectServer(_bstr_t("ROOT\\\\CIMV2"), nullptr, nullptr, nullptr, 0, nullptr, nullptr, &service);
++  res &= locator->ConnectServer(SysAllocString(L"ROOT\\\\CIMV2"), nullptr, nullptr, nullptr, 0, nullptr, nullptr, &service);
+   res &= CoSetProxyBlanket(service, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr, RPC_C_AUTHN_LEVEL_CALL,
+@@ -32,3 +32,3 @@
+ bool _WMI::execute_query(const std::wstring& query) {
+-  return SUCCEEDED(service->ExecQuery(bstr_t(L"WQL"), bstr_t(std::wstring(query.begin(), query.end()).c_str()),
++  return SUCCEEDED(service->ExecQuery(SysAllocString(L"WQL"), SysAllocString(std::wstring(query.begin(), query.end()).c_str()),
+                                       WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, nullptr, &enumerator));
+EOF
+## fix missing missocl
+#sed -i.bak -e "s?missocl\(/opencl\.h\)?CL\1?" src/windows/gpu.cpp
+## fix missing missocl in CMakeLists.txt
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -22,2 +22,3 @@
+# if (NOT DEFINED NO_OCL)
+#+  if (NOT MINGW)
+#     set(OPENCL_SDK_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+#@@ -28,2 +29,3 @@
+#     endif ()
+#+  endif ()
+#
+#EOF
+## skip building examples
+#sed -i.bak -e "s/^\( *\)\(add.*examples\)/\1#\2/" CMakeLists.txt
+# also allow building shared library
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" src/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DNO_OCL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DNO_OCL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/src/*.dll &&
+ strip build_shared/examples/Example.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -rf build_static/lib/*.a build_shared/lib/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/src/*.dll $INSTALLPREFIX/bin/ &&
+ cp -f build_shared/examples/Example.exe $INSTALLPREFIX/bin/hwinfo.exe &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
