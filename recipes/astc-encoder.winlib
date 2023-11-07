@@ -5,14 +5,14 @@ export BASENAME=astc-encoder
 export DESCRIPTION="The Arm ASTC Encoder, a compressor for the Adaptive Scalable Texture Compression data format."
 export CATEGORY=fileformat,compression
 export TYPE=library,application
-export VERSION=4.3.1
-export VERSIONDATE=20230306
+#export VERSION=4.3.1
+#export VERSIONDATE=20230306
 #export VERSION=4.4.0
 #export VERSIONDATE=20230401
 #export VERSION=4.5.0
 #export VERSIONDATE=20230620
-#export VERSION=4.6.0
-#export VERSIONDATE=20231107
+export VERSION=4.6.0
+export VERSIONDATE=20231107
 ####undefined reference to `astcenc_main(int, char**)'
 wl-showstatus --package-version
 export DEPENDENCIES=
@@ -30,13 +30,16 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DDIAGNOSTICS:BOOL=OFF -DUNITTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
-# #-DISA_NATIVE:BOOL=ON -DISA_NONE:BOOL=ON -DISA_SSE2:BOOL=ON -DISA_SSE41:BOOL=ON -DISA_AVX2:BOOL=ON -DISA_NEON:BOOL=ON 
-# wl-showstatus build-install &&
-# ninja -Cbuild_win install/strip &&
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# don't include main() in shared library Source/astcenccli_entry.cpp (version >= 4.6.0)
+patch -ulbf Source/astcenccli_entry.cpp << EOF
+@@ -265,2 +265,3 @@
+
++#ifndef astcenc_native_veneer_EXPORTS
+ int main(
+@@ -276 +277,2 @@
+ }
++#endif
+EOF
 # fix Source/cmake_core.cmake
 patch -ulbf Source/cmake_core.cmake << EOF
 @@ -29,3 +29,2 @@
@@ -44,6 +47,23 @@ patch -ulbf Source/cmake_core.cmake << EOF
 -    STATIC
          astcenc_averages_and_directions.cpp
 EOF
+# don't abort on warnings Source/cmake_core.cmake (version >= 4.6.0)
+patch -ulbf Source/cmake_core.cmake << EOF
+@@ -162,6 +162,2 @@
+             # G++ and Clang++ compiler defines
+-            \$<\${is_gnu_fe}:-Wall>
+-            \$<\${is_gnu_fe}:-Wextra>
+-            \$<\${is_gnu_fe}:-Wpedantic>
+-            \$<\${is_gnu_fe}:-Werror>
+             \$<\${is_gnu_fe}:-Wshadow>
+EOF
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DDIAGNOSTICS:BOOL=OFF -DUNITTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_win &&
+# #-DISA_NATIVE:BOOL=ON -DISA_NONE:BOOL=ON -DISA_SSE2:BOOL=ON -DISA_SSE41:BOOL=ON -DISA_AVX2:BOOL=ON -DISA_NEON:BOOL=ON 
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DDIAGNOSTICS:BOOL=OFF -DUNITTEST:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
@@ -53,7 +73,8 @@ mkdir -p build_static build_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
- ninja -Cbuild_shared install/strip &&
+ #ninja -Cbuild_shared install/strip &&
+ ( ninja -Cbuild_shared install/strip || ( ninja -Cbuild_shared libastcenc-native-veneer.dll && ( ninja -Cbuild_shared install/strip -k0 || true ))) &&
  strip build_shared/Source/*.dll &&
  mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib &&
  cp -f Source/astcenc*.h $INSTALLPREFIX/include/ &&

@@ -175,11 +175,10 @@ export TYPE=library
 #export VERSIONDATE=20220713
 #export VERSION=1.45.0
 #export VERSIONDATE=20220519
-export VERSION=1.46.0
-export VERSIONDATE=20230701
-#export VERSION=1.47.0
-#export VERSIONDATE=20231107
-####src/win/util.c:1462:(.text+0x27a1): undefined reference to `uv__get_handle'
+#export VERSION=1.46.0
+#export VERSIONDATE=20230701
+export VERSION=1.47.0
+export VERSIONDATE=20231107
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -203,57 +202,71 @@ wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-patch -ulbf src/win/process.c << EOF
---- src/win/process.c  2014-11-20 19:34:12.000000000 +0100
-+++ src/win/process.c  2015-03-29 21:53:59.219782200 +0200
-@@ -91,6 +91,12 @@
-   info.BasicLimitInformation.LimitFlags =
-+#ifdef JOB_OBJECT_LIMIT_BREAKAWAY_OK
-       JOB_OBJECT_LIMIT_BREAKAWAY_OK |
-+#endif
-+#ifdef JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-+      JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
-+#endif
-+#ifdef JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK
-       JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK |
--      JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION |
--      JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-+#endif
-+      JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
-
-EOF
-# fix missing _InterlockedOr in src/win/tty.c (version >= 1.13.1)
-if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
-mv src/win/tty.c src/win/tty.c.bak
-cat > src/win/tty.c << EOF
-#include <windows.h>
-LONG _InterlockedOr(LONG volatile *Destination, LONG Value)
-{
-  __asm__ __volatile__("lock ; orl %0,%1" : : "r"(Value),"m"(*Destination) : "memory");
-  return *Destination;
-}
-EOF
-cat src/win/tty.c.bak >> src/win/tty.c
-fi
-# fix UV__UNUSED issue in include/uv/tree.h (version >= 1.21.0)
-patch -ulbf include/uv/tree.h << EOF
-@@ -29,3 +29,3 @@
- #ifndef UV__UNUSED
--# if __GNUC__
-+# if defined(__GNUC__) && !defined(__MINGW32__)
- #  define UV__UNUSED __attribute__((unused))
-EOF
-# fix src/win/util.c (version >= 1.42.0)
+#patch -ulbf src/win/process.c << EOF
+#--- src/win/process.c  2014-11-20 19:34:12.000000000 +0100
+#+++ src/win/process.c  2015-03-29 21:53:59.219782200 +0200
+#@@ -91,6 +91,12 @@
+#   info.BasicLimitInformation.LimitFlags =
+#+#ifdef JOB_OBJECT_LIMIT_BREAKAWAY_OK
+#       JOB_OBJECT_LIMIT_BREAKAWAY_OK |
+#+#endif
+#+#ifdef JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+#+      JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
+#+#endif
+#+#ifdef JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK
+#       JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK |
+#-      JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION |
+#-      JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+#+#endif
+#+      JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
+#
+#EOF
+## fix missing _InterlockedOr in src/win/tty.c (version >= 1.13.1)
+#if ! echo -e "#include<_mingw.h>\nint v=__MINGW64_VERSION_MAJOR;" | ${CC:-gcc} -c -xc - -o /dev/null &> /dev/null; then
+#mv src/win/tty.c src/win/tty.c.bak
+#cat > src/win/tty.c << EOF
+##include <windows.h>
+#LONG _InterlockedOr(LONG volatile *Destination, LONG Value)
+#{
+#  __asm__ __volatile__("lock ; orl %0,%1" : : "r"(Value),"m"(*Destination) : "memory");
+#  return *Destination;
+#}
+#EOF
+#cat src/win/tty.c.bak >> src/win/tty.c
+#fi
+## fix UV__UNUSED issue in include/uv/tree.h (version >= 1.21.0)
+#patch -ulbf include/uv/tree.h << EOF
+#@@ -29,3 +29,3 @@
+# #ifndef UV__UNUSED
+#-# if __GNUC__
+#+# if defined(__GNUC__) && !defined(__MINGW32__)
+# #  define UV__UNUSED __attribute__((unused))
+#EOF
+## fix src/win/util.c (version >= 1.42.0 <= 1.46.0)
+#patch -ulbf src/win/util.c << EOF
+#@@ -1666,2 +1666,6 @@
+# int uv_os_gethostname(char* buffer, size_t* size) {
+#+#ifdef __MINGW32__
+#+  uv__once_init(); /* Initialize winsock */
+#+  return gethostname(buffer, size);
+#+#else
+#   WCHAR buf[UV_MAXHOSTNAMESIZE];
+#@@ -1695,2 +1699,3 @@
+#   return 0;
+#+#endif
+# }
+#EOF
+# fix src/win/util.c (version >= 1.47.0)
 patch -ulbf src/win/util.c << EOF
-@@ -1666,2 +1666,6 @@
+@@ -1358,2 +1358,6 @@
  int uv_os_gethostname(char* buffer, size_t* size) {
 +#ifdef __MINGW32__
 +  uv__once_init(); /* Initialize winsock */
 +  return gethostname(buffer, size);
 +#else
    WCHAR buf[UV_MAXHOSTNAMESIZE];
-@@ -1695,2 +1699,3 @@
-   return 0;
+@@ -1372,2 +1376,3 @@
+   return uv__copy_utf16_to_utf8(buf, -1, buffer, size);
 +#endif
  }
 EOF
@@ -271,15 +284,13 @@ wl-showstatus preconfigure &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 #mkdir -p build_win &&
 # wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DQEMU:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DLIBUV_BUILD_TESTS:BOOL=OFF -DLIBUV_BUILD_BENCH:BOOL=OFF -S. -Bbuild_win &&
-# #wl-showstatus build &&
-# #ninja -Cbuild_win &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DQEMU:BOOL=OFF -DLIBUV_BUILD_BENCH:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DLIBUV_BUILD_TESTS:BOOL=OFF -S. -Bbuild_win &&
 # wl-showstatus build-install &&
 # ninja -Cbuild_win install/strip &&
 # mkdir -p $INSTALLPREFIX/bin &&
-# cp -u build_win/*.dll.a $INSTALLPREFIX/lib/ &&
-# cp -u $INSTALLPREFIX/lib/libuv_a.a $INSTALLPREFIX/lib/libuv.a &&
-# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# #cp -u build_win/*.dll.a $INSTALLPREFIX/lib/ &&
+# #cp -u $INSTALLPREFIX/lib/libuv_a.a $INSTALLPREFIX/lib/libuv.a &&
+# #mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
