@@ -35,8 +35,10 @@ export TYPE=library
 #export VERSIONDATE=20210323
 #export VERSION=0.4.6
 #export VERSIONDATE=20220531
-export VERSION=0.4.7
-export VERSIONDATE=20221211
+#export VERSION=0.4.7
+#export VERSIONDATE=20221211
+export VERSION=0.4.8
+export VERSIONDATE=20231111
 wl-showstatus --package-version
 export DEPENDENCIES=protobuf
 export OPTIONALDEPENDENCIES=
@@ -57,21 +59,21 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix building DLL
-patch -ulbf CMakeLists.txt << EOF
-@@ -68,2 +68,11 @@
-         pb_decode.c)
-+    add_library(protobuf-nanopb_shared SHARED
-+        pb.h
-+        pb_common.h
-+        pb_common.c
-+        pb_encode.h
-+        pb_encode.c
-+        pb_decode.h
-+        pb_decode.c)
-+    set_target_properties(protobuf-nanopb_shared PROPERTIES OUTPUT_NAME protobuf-nanopb)
-
-EOF
+## fix building DLL (version <= 0.4.7)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -68,2 +68,11 @@
+#         pb_decode.c)
+#+    add_library(protobuf-nanopb_shared SHARED
+#+        pb.h
+#+        pb_common.h
+#+        pb_common.c
+#+        pb_encode.h
+#+        pb_encode.c
+#+        pb_decode.h
+#+        pb_decode.c)
+#+    set_target_properties(protobuf-nanopb_shared PROPERTIES OUTPUT_NAME protobuf-nanopb)
+#
+#EOF
 #wl-showstatus configure &&
 # #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe . &&
 # cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe . &&
@@ -93,17 +95,29 @@ EOF
 # # fix missing py in bin/protoc-gen-nanopb.bat
 # sed -i -e "s/^py -3 /python.exe /" $INSTALLPREFIX/bin/protoc-gen-nanopb.bat &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-mkdir -p build_win &&
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+# wl-showstatus build-install &&
+# mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# PATH=$PYDIR:$PATH ninja -Cbuild_win install/strip &&
+# cp -f build_win/*.dll.a $INSTALLPREFIX/lib/ &&
+# strip build_win/*.dll &&
+# cp -f build_win/*.dll $INSTALLPREFIX/bin/ &&
+# # fix missing py in bin/protoc-gen-nanopb.bat
+# sed -i -e "s/^py -3 /python.exe /" $INSTALLPREFIX/bin/protoc-gen-nanopb.bat &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
- PATH=$PYDIR:$PATH ninja -Cbuild_win install/strip &&
- cp -f build_win/*.dll.a $INSTALLPREFIX/lib/ &&
- strip build_win/*.dll &&
- cp -f build_win/*.dll $INSTALLPREFIX/bin/ &&
- # fix missing py in bin/protoc-gen-nanopb.bat
- sed -i -e "s/^py -3 /python.exe /" $INSTALLPREFIX/bin/protoc-gen-nanopb.bat &&
+ PATH=$PYDIR:$PATH ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ PATH=$PYDIR:$PATH ninja -Cbuild_shared install/strip &&
+ # remove absolute path to python.exe
+ sed -i -e "s?^.*/\(python\.exe\)?\1?" $INSTALLPREFIX/bin/nanopb_generator.bat $INSTALLPREFIX/bin/protoc-gen-nanopb.bat &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
