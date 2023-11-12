@@ -1,3 +1,121 @@
+#export NAME="GNU Make"
+#export STATUS=
+#export URL=http://www.gnu.org/software/make/
+#export BASENAME=make
+#export DESCRIPTION="Make is a tool which controls the generation of executables and other non-source files of a program from the program's source files."
+#export CATEGORY=development
+#export TYPE=application
+##export VERSION=3.81
+##export VERSIONDATE=20110729
+##export VERSION=3.82
+##export VERSIONDATE=20110729
+#####'fail' is not recognized as an internal or external command, operable program or batch file.
+##export VERSION=4.0
+##export VERSIONDATE=20130910
+##export VERSION=4.1
+##export VERSIONDATE=20141006
+##export VERSION=4.2
+##export VERSIONDATE=20160523
+##export VERSION=4.2.1
+##export VERSIONDATE=20160611
+##export VERSION=4.3
+##export VERSIONDATE=20200120
+##export VERSION=4.4
+##export VERSIONDATE=20221031
+#export VERSION=4.4.1
+#export VERSIONDATE=20230227
+#wl-showstatus --package-version
+##export DEPENDENCIES=libiconv
+#export DEPENDENCIES=libiconv,gettext,sys_wait_h
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="http://ftp.gnu.org/gnu/make/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/make/$BASENAME-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/make/$BASENAME-$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+##tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix redefinition of WAIT_NOHANG in job.c (version >= 4.2.1)
+#patch -ulbf job.c << EOF
+#@@ -126,2 +126,3 @@
+# #ifdef HAVE_WAITPID
+#+# undef WAIT_NOHANG
+# # define WAIT_NOHANG(status)    waitpid (-1, (status), WNOHANG)
+#EOF
+## fix src/output.h for MinGW (version >= 4.3)
+#patch -ulbf src/output.h << EOF
+#@@ -69,4 +69,4 @@
+# /* For emulations in w32/compat/posixfcn.c.  */
+#-#  define F_GETFD 1
+#-#  define F_SETLKW 2
+#+#  define F_GETFD 2
+#+#  define F_SETLKW 3
+# /* Implementation note: None of the values of l_type below can be zero
+#@@ -91,2 +91,3 @@
+# /* Public functions emulated/provided in posixfcn.c.  */
+#+#define fcntl MAKE_fcntl
+# int fcntl (intptr_t fd, int cmd, ...);
+#EOF
+## fix src/w32/compat/dirent.c for MinGW (version >= 4.3)
+#mv src/w32/compat/dirent.c src/w32/compat/dirent.c.bak &&
+#echo "#ifndef __MINGW32__" > src/w32/compat/dirent.c &&
+#cat src/w32/compat/dirent.c.bak >> src/w32/compat/dirent.c &&
+#echo "#endif" >> src/w32/compat/dirent.c
+## fix bad timestamps in src/remake.c (version >= 4.4)
+##### see also: https://github.com/msys2/MINGW-packages/pull/13834
+##### see also: https://lists.gnu.org/archive/html/bug-make/2022-11/msg00020.html
+#patch -ulbf src/remake.c << EOF
+#@@ -39,3 +39,3 @@
+# #include <sys/stat.h>
+#-#if defined(_MSC_VER) && _MSC_VER > 1200
+#+#if defined(__MINGW32__) || (defined(_MSC_VER) && _MSC_VER > 1200)
+# /* VC7 or later supprots _stat64 to access 64-bit file size. */
+#EOF
+## also support triplet ending with mingw32ucrt (version >= 4.3)
+#sed -i.bak -e "s/\(mingw32\))/\1*)/" configure
+#wl-showstatus configure &&
+# #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-case-insensitive-file-system &&
+# #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --enable-case-insensitive-file-system --enable-job-server &&
+# #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --without-guile --enable-case-insensitive-file-system &&
+# #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --without-guile --enable-case-insensitive-file-system CFLAGS="-I$MINGWPREFIX/win32ports/include" &&
+# #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --without-dmalloc CFLAGS="-I$MINGWPREFIX/win32ports/include" &&
+# ./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --without-dmalloc CFLAGS="-I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" LDFLAGS="-Wl,--no-insert-timestamp" &&
+# ## fix missing waitpid (and pipe) (version <= 4.2.1)
+# #echo "#if defined(HAVE_SYS_WAIT_H) && !defined(HAVE_WAITPID)" >> config.h &&
+# #echo "#define HAVE_WAITPID 1" >> config.h &&
+# #echo "/*#define HAVE_PIPE 1*/" >> config.h &&
+# #echo "#endif" >> config.h &&
+# ## fix missing realpath (version <= 4.2.1)
+# #echo "#if !defined(HAVE_REALPATH) && !defined(realpath)" >> config.h &&
+# #echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" >> config.h &&
+# #echo "#define HAVE_REALPATH 1" >> config.h &&
+# #echo "#endif" >> config.h &&
+# # fix missing realpath (version >= 4.3)
+# echo '#if !defined(HAVE_REALPATH) && !defined(realpath)' >> src/config.h &&
+# echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" >> src/config.h &&
+# echo "#define HAVE_REALPATH 1" >> src/config.h &&
+# echo "#endif" >> src/config.h &&
+# echo "#undef HAVE_SYS_WAIT_H" >> src/config.h &&
+# ## fix missing pipe (version >= 4.3)
+# #echo "#ifndef HAVE_PIPE" >> src/config.h &&
+# #echo "#define pipe(fds) _pipe(fds, 512, _O_BINARY)" >> src/config.h &&
+# #echo "#define HAVE_PIPE 1" >> src/config.h &&
+# #echo "#endif" >> src/config.h &&
+# wl-showstatus build-install &&
+# #( make install-strip || make install || /bin/make install || C_INCLUDE_PATH=$MINGWPREFIX/win32ports/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} mingw32-make.exe install ) &&
+# ( make install-strip CFLAGS="-O2" || make install CFLAGS="-O2" || /bin/make install CFLAGS="-O2" || C_INCLUDE_PATH=$MINGWPREFIX/win32ports/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} mingw32-make.exe install CFLAGS="-O2" ) &&
+# strip $INSTALLPREFIX/share/make/bin/*.exe &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
+
+
+
 export NAME="GNU Make"
 export STATUS=
 export URL=http://www.gnu.org/software/make/
@@ -5,28 +123,10 @@ export BASENAME=make
 export DESCRIPTION="Make is a tool which controls the generation of executables and other non-source files of a program from the program's source files."
 export CATEGORY=development
 export TYPE=application
-#export VERSION=3.81
-#export VERSIONDATE=20110729
-#export VERSION=3.82
-#export VERSIONDATE=20110729
-####'fail' is not recognized as an internal or external command, operable program or batch file.
-#export VERSION=4.0
-#export VERSIONDATE=20130910
-#export VERSION=4.1
-#export VERSIONDATE=20141006
-#export VERSION=4.2
-#export VERSIONDATE=20160523
-#export VERSION=4.2.1
-#export VERSIONDATE=20160611
-#export VERSION=4.3
-#export VERSIONDATE=20200120
-#export VERSION=4.4
-#export VERSIONDATE=20221031
 export VERSION=4.4.1
 export VERSIONDATE=20230227
 wl-showstatus --package-version
-#export DEPENDENCIES=libiconv
-export DEPENDENCIES=libiconv,gettext,sys_wait_h
+export DEPENDENCIES=libiconv,gettext,libdl,sys_wait_h
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -34,83 +134,21 @@ export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
 export DOWNLOADURL="http://ftp.gnu.org/gnu/make/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-#export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/make/$BASENAME-$VERSION.tar.bz2
 export DOWNLOADSOURCEURL=http://ftp.gnu.org/gnu/make/$BASENAME-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
-#tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix redefinition of WAIT_NOHANG in job.c (version >= 4.2.1)
-patch -ulbf job.c << EOF
-@@ -126,2 +126,3 @@
- #ifdef HAVE_WAITPID
-+# undef WAIT_NOHANG
- # define WAIT_NOHANG(status)    waitpid (-1, (status), WNOHANG)
-EOF
-# fix src/output.h for MinGW (version >= 4.3)
-patch -ulbf src/output.h << EOF
-@@ -69,4 +69,4 @@
- /* For emulations in w32/compat/posixfcn.c.  */
--#  define F_GETFD 1
--#  define F_SETLKW 2
-+#  define F_GETFD 2
-+#  define F_SETLKW 3
- /* Implementation note: None of the values of l_type below can be zero
-@@ -91,2 +91,3 @@
- /* Public functions emulated/provided in posixfcn.c.  */
-+#define fcntl MAKE_fcntl
- int fcntl (intptr_t fd, int cmd, ...);
-EOF
-# fix src/w32/compat/dirent.c for MinGW (version >= 4.3)
-mv src/w32/compat/dirent.c src/w32/compat/dirent.c.bak &&
-echo "#ifndef __MINGW32__" > src/w32/compat/dirent.c &&
-cat src/w32/compat/dirent.c.bak >> src/w32/compat/dirent.c &&
-echo "#endif" >> src/w32/compat/dirent.c
-# fix bad timestamps in src/remake.c (version >= 4.4)
-#### see also: https://github.com/msys2/MINGW-packages/pull/13834
-#### see also: https://lists.gnu.org/archive/html/bug-make/2022-11/msg00020.html
-patch -ulbf src/remake.c << EOF
-@@ -39,3 +39,3 @@
- #include <sys/stat.h>
--#if defined(_MSC_VER) && _MSC_VER > 1200
-+#if defined(__MINGW32__) || (defined(_MSC_VER) && _MSC_VER > 1200)
- /* VC7 or later supprots _stat64 to access 64-bit file size. */
-EOF
 # also support triplet ending with mingw32ucrt (version >= 4.3)
 sed -i.bak -e "s/\(mingw32\))/\1*)/" configure
 wl-showstatus configure &&
- #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-case-insensitive-file-system &&
- #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --enable-case-insensitive-file-system --enable-job-server &&
- #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --without-guile --enable-case-insensitive-file-system &&
- #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --without-guile --enable-case-insensitive-file-system CFLAGS="-I$MINGWPREFIX/win32ports/include" &&
- #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --without-dmalloc CFLAGS="-I$MINGWPREFIX/win32ports/include" &&
- ./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --without-dmalloc CFLAGS="-I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/mman-win32 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" LDFLAGS="-Wl,--no-insert-timestamp" &&
- ## fix missing waitpid (and pipe) (version <= 4.2.1)
- #echo "#if defined(HAVE_SYS_WAIT_H) && !defined(HAVE_WAITPID)" >> config.h &&
- #echo "#define HAVE_WAITPID 1" >> config.h &&
- #echo "/*#define HAVE_PIPE 1*/" >> config.h &&
- #echo "#endif" >> config.h &&
- ## fix missing realpath (version <= 4.2.1)
- #echo "#if !defined(HAVE_REALPATH) && !defined(realpath)" >> config.h &&
- #echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" >> config.h &&
- #echo "#define HAVE_REALPATH 1" >> config.h &&
- #echo "#endif" >> config.h &&
- # fix missing realpath (version >= 4.3)
- echo '#if !defined(HAVE_REALPATH) && !defined(realpath)' >> src/config.h &&
- echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" >> src/config.h &&
- echo "#define HAVE_REALPATH 1" >> src/config.h &&
- echo "#endif" >> src/config.h &&
+ ./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --enable-load --without-dmalloc --enable-year2038 CFLAGS="-I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/libdl-win32 -O2 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic"; fi)" LDFLAGS="-Wl,--no-insert-timestamp -Wl,--as-needed -ldl" &&
+ # enable sys/wait.h (version >= 4.4.1)
  echo "#undef HAVE_SYS_WAIT_H" >> src/config.h &&
- ## fix missing pipe (version >= 4.3)
- #echo "#ifndef HAVE_PIPE" >> src/config.h &&
- #echo "#define pipe(fds) _pipe(fds, 512, _O_BINARY)" >> src/config.h &&
- #echo "#define HAVE_PIPE 1" >> src/config.h &&
- #echo "#endif" >> src/config.h &&
+ echo "#define HAVE_SYS_WAIT_H 1" >> src/config.h &&
  wl-showstatus build-install &&
- #( make install-strip || make install || /bin/make install || C_INCLUDE_PATH=$MINGWPREFIX/win32ports/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} mingw32-make.exe install ) &&
- ( make install-strip CFLAGS="-O2" || make install CFLAGS="-O2" || /bin/make install CFLAGS="-O2" || C_INCLUDE_PATH=$MINGWPREFIX/win32ports/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} mingw32-make.exe install CFLAGS="-O2" ) &&
+ make install-strip &&
  strip $INSTALLPREFIX/share/make/bin/*.exe &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
 
