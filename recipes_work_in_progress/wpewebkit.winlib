@@ -173,6 +173,8 @@ patch -ulbf Source/WTF/wtf/ASCIICType.cpp << EOF
 -WTF_EXPORT_PRIVATE const unsigned char asciiCaseFoldTable[256] = {
 +const unsigned char asciiCaseFoldTable[256] = {
 EOF
+# fix path to sys/mman.h (version >= 2.42.2)
+sed -i.bak -e "s?\(#include <\)\(sys/mman\.h>\)?\1mman-win32/\2?" $(grep -l "#include <sys/mman\.h>" $(find -name '*.h' -or -name '*.c' -or -name '*.cpp' -or -name '*.cc'))
 # fix Tools/TestWebKitAPI/CMakeLists.txt
 patch -ulbf Tools/TestWebKitAPI/CMakeLists.txt << EOF
 @@ -279,3 +279,3 @@
@@ -207,6 +209,7 @@ EOF
 cat Source/WebCore/CMakeLists.txt.bak >> Source/WebCore/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
+ #-DPORT:STRING=WPE -DUSE_GBM:BOOL=OFF -DENABLE_JOURNALD_LOG:BOOL=OFF -DENABLE_DOCUMENTATION:BOOL=OFF 
  #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DWTF_PLATFORM_WIN_CAIRO:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DENABLE_API_TESTS:BOOL=OFF -S. -Bbuild_win &&
  #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_API_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_API_TESTS:BOOL=OFF -DENABLE_LAYOUT_TESTS:BOOL=OFF -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/WTF" -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_win &&
@@ -218,6 +221,39 @@ mkdir -p build_win &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####Requires WebKit Support Library (not open source)
+
+
+
+# fix Source/ThirdParty/ANGLE/src/libANGLE/renderer/dxgi_support_table.h (version >= 2.42.2)
+mv Source/ThirdParty/ANGLE/src/libANGLE/renderer/dxgi_support_table.h Source/ThirdParty/ANGLE/src/libANGLE/renderer/dxgi_support_table.h.bak &&
+echo "#include <dxgiformat.h>" > Source/ThirdParty/ANGLE/src/libANGLE/renderer/dxgi_support_table.h &&
+echo "#include <d3d11.h>" >> Source/ThirdParty/ANGLE/src/libANGLE/renderer/dxgi_support_table.h &&
+cat Source/ThirdParty/ANGLE/src/libANGLE/renderer/dxgi_support_table.h.bak >> Source/ThirdParty/ANGLE/src/libANGLE/renderer/dxgi_support_table.h
+# fix Source/ThirdParty/ANGLE/src/libANGLE/renderer/Format.h (version >= 2.42.2)
+echo "#include <dxgiformat.h>" >> Source/ThirdParty/ANGLE/src/libANGLE/renderer/Format.h
+echo "#include <d3d11.h>" >> Source/ThirdParty/ANGLE/src/libANGLE/renderer/Format.h
+# fix Source/ThirdParty/ANGLE/CMakeLists.txt (version >= 2.42.2)
+cp Source/ThirdParty/ANGLE/CMakeLists.txt Source/ThirdParty/ANGLE/CMakeLists.txt.bak
+cat > Source/ThirdParty/ANGLE/CMakeLists.txt << EOF
+list(APPEND CMAKE_MODULE_PATH \${CMAKE_CURRENT_LIST_DIR}/../../cmake)
+include(WebKitMacros)
+EOF
+sed -e "s/ STATIC/ \${LIBTYPE}/" Source/ThirdParty/ANGLE/CMakeLists.txt.bak >> Source/ThirdParty/ANGLE/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIBTYPE:STRING=STATIC -SSource/ThirdParty/ANGLE -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIBTYPE:STRING=SHARED -SSource/ThirdParty/ANGLE -Bbuild_shared &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lxxhash/" build_shared/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
 
 
 
