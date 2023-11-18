@@ -7,8 +7,8 @@ export CATEGORY=dataprocessing
 export TYPE=library
 #export VERSION=3.5.0
 #export VERSIONDATE=20210315
-export VERSION=3.6.0
-export VERSIONDATE=20210529
+#export VERSION=3.6.0
+#export VERSIONDATE=20210529
 ####undefined reference to `vtable for graphql::service::Object'
 #export VERSION=3.7.0
 #export VERSIONDATE=20211217
@@ -43,9 +43,9 @@ export VERSIONDATE=20210529
 #export VERSIONDATE=20230516
 #export VERSION=4.5.4
 #export VERSIONDATE=20230627
-#export VERSION=4.5.5
-#export VERSIONDATE=20231118
 ####include/graphqlservice/GraphQLService.h:856:39: error: function 'graphql::service::Object::~Object()' definition is marked dllimport
+export VERSION=4.5.5
+export VERSIONDATE=20231118
 wl-showstatus --package-version
 export DEPENDENCIES=rapidjson,pegtl
 export OPTIONALDEPENDENCIES=
@@ -62,18 +62,49 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix include/graphqlservice/GraphQLService.h (version >= 3.5.0)
+## fix include/graphqlservice/GraphQLService.h (version >= 3.5.0)
+#patch -ulbf include/graphqlservice/GraphQLService.h << EOF
+#@@ -83,3 +83,3 @@
+# // This exception bubbles up 1 or more error messages to the JSON results.
+#-class schema_exception : public std::exception
+#+class GRAPHQLSERVICE_EXPORT schema_exception : public std::exception
+# {
+#@@ -506,3 +506,3 @@
+# // in which case it requires its own selection set.
+#-class Object : public std::enable_shared_from_this<Object>
+#+class GRAPHQLSERVICE_EXPORT Object : public std::enable_shared_from_this<Object>
+# {
+#EOF
+# fix include/graphqlservice/internal/Schema.h (version >= 4.5.5)
+patch -ulbf include/graphqlservice/internal/Schema.h << EOF
+@@ -88,3 +88,3 @@
+
+-class [[nodiscard("unnecessary construction")]] BaseType
++class GRAPHQLSERVICE_EXPORT [[nodiscard("unnecessary construction")]] BaseType
+        : public std::enable_shared_from_this<BaseType>
+@@ -92,3 +92,3 @@
+ public:
+-       GRAPHQLSERVICE_EXPORT virtual ~BaseType() = default;
++       virtual ~BaseType() = default;
+
+EOF
+# fix include/graphqlservice/GraphQLService.h (version >= 4.5.5)
 patch -ulbf include/graphqlservice/GraphQLService.h << EOF
-@@ -83,3 +83,3 @@
+@@ -89,3 +89,3 @@
  // This exception bubbles up 1 or more error messages to the JSON results.
--class schema_exception : public std::exception
-+class GRAPHQLSERVICE_EXPORT schema_exception : public std::exception
+-class [[nodiscard("unnecessary construction")]] schema_exception : public std::exception
++class GRAPHQLSERVICE_EXPORT [[nodiscard("unnecessary construction")]] schema_exception : public std::exception
  {
-@@ -506,3 +506,3 @@
+@@ -875,3 +875,3 @@
  // in which case it requires its own selection set.
--class Object : public std::enable_shared_from_this<Object>
-+class GRAPHQLSERVICE_EXPORT Object : public std::enable_shared_from_this<Object>
+-class [[nodiscard("unnecessary construction")]] Object : public std::enable_shared_from_this<Object>
++class GRAPHQLSERVICE_EXPORT [[nodiscard("unnecessary construction")]] Object : public std::enable_shared_from_this<Object>
  {
+@@ -879,3 +879,3 @@
+        GRAPHQLSERVICE_EXPORT explicit Object(TypeNames&& typeNames, ResolverMap&& resolvers) noexcept;
+-       GRAPHQLSERVICE_EXPORT virtual ~Object() = default;
++       virtual ~Object() = default;
+
 EOF
 ## fix missing touch PEGTL/CMakeLists.txt
 #touch PEGTL/CMakeLists.txt
@@ -88,8 +119,8 @@ sed -i.bak -e "s?/nologo??" src/CMakeLists.txt
 #+find_package(pegtl 3.2.5 QUIET CONFIG)
 # if(NOT pegtl_FOUND)
 #EOF
-## fix invalid windres flag /fo in src/CMakeLists.txt (version >= 4.5.5)
-#sed -i.bak2 "s?\(\"\)/fo\(.*\.res\"\)?\1-o\2?" src/CMakeLists.txt
+# fix invalid windres flag /fo in src/CMakeLists.txt (version >= 4.5.5)
+sed -i.bak2 "s?\(\"\)/fo\(.*\.res\"\)?\1-o\2?" src/CMakeLists.txt
 ## fix shared library exports (version >= 4.5.5)
 #sed -i.bak -e "s/IMPL_GRAPHQLRESPONSE_DLL/graphqlresponse_EXPORTS/" include/graphqlservice/GraphQLResponse.h include/graphqlservice/internal/Base64.h
 #sed -i.bak -e "s/IMPL_GRAPHQLCLIENT_DLL/graphqlclient_EXPORTS/" include/graphqlservice/GraphQLClient.h
