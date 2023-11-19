@@ -1,0 +1,70 @@
+export NAME="WinPT"
+export STATUS=
+export URL=http://winpt.wald.intevation.org/
+export BASENAME=winpt
+export DESCRIPTION="WinPT is a taskbar front-end for GnuPG which includes key management, encryption via the clipboard, direct file encryption and support for OpenPGP smartcards. It is is designed to make life easier for people who want encryption, and to make security less daunting for people who are new to securing data."
+export CATEGORY=security
+export TYPE=application
+export VERSION=1.5.0
+export VERSIONDATE=20231119
+wl-showstatus --package-version
+export DEPENDENCIES=gpgme,libgpg-error
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="http://winpt.wald.intevation.org/download.html"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://wald.intevation.org/frs/download.php/1024/winpt-1.5.0.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix pointer conversion error in Src/wptCardPCSC.cpp (version >= 1.5.0)
+patch -ulbf Src/wptCardPCSC.cpp << EOF
+@@ -87,3 +87,3 @@
+
+-    err = pcsc_establish (SCARD_SCOPE_SYSTEM, NULL, NULL, &ctx);
++    err = pcsc_establish (SCARD_SCOPE_SYSTEM, NULL, NULL, (void*)&ctx);
+     if (err == SCARD_S_SUCCESS) {
+EOF
+# fix conversion errors from long to tm_t in Src/wptW32API.cpp (version >= 1.5.0)
+patch -ulbf Src/wptW32API.cpp << EOF
+@@ -505,3 +505,4 @@
+
+-    ptm = localtime (&tm_t);
++    time_t proper_tm_t = tm_t;
++    ptm = localtime (&proper_tm_t);
+     memset (&st, 0, sizeof (st));
+@@ -524,3 +525,4 @@
+
+-    ptm = localtime (&tm_t);
++    time_t proper_tm_t = tm_t;
++    ptm = localtime (&proper_tm_t);
+     memset (&st, 0, sizeof (st));
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-fpermissive" &&
+ # fix redefinition of fseeko
+ echo "#define HAVE_FSEEKO 1" >> config.h &&
+ # fix undefined DWL_MSGRESULT/GWL_WNDPROC/GWL_USERDATA
+ echo "#include <windows.h>" >> config.h &&
+ echo "#include <winuser.h>" >> config.h &&
+ echo "#ifndef DWL_MSGRESULT" >> config.h &&
+ echo "#define DWL_MSGRESULT DWLP_MSGRESULT" >> config.h &&
+ echo "#endif" >> config.h &&
+ echo "#ifndef GWL_WNDPROC" >> config.h &&
+ echo "#define GWL_WNDPROC GWLP_WNDPROC" >> config.h &&
+ echo "#endif" >> config.h &&
+ echo "#ifndef GWL_USERDATA" >> config.h &&
+ echo "#define GWL_USERDATA GWLP_USERDATA" >> config.h &&
+ echo "#endif" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
