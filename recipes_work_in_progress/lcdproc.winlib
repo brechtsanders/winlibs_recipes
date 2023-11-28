@@ -1,0 +1,109 @@
+export NAME="LCDproc"
+export STATUS=
+export URL=http://lcdproc.omnipotent.net/
+export BASENAME=lcdproc
+export DESCRIPTION="LCDproc is a piece of open source software that displays real-time system information from your Linux/*BSD box on a LCD. The server supports several serial and USB devices from Matrix Orbital and CrystalFontz as well as some devices connected to the LPT port: HD44780, T6963, SED1520 and SED1330. Various clients are available that display things like CPU load, system load, memory usage, uptime, and a lot more."
+export CATEGORY=hardware
+export TYPE=library
+export VERSION=0.5.7
+export VERSIONDATE=20231127
+wl-showstatus --package-version
+export DEPENDENCIES=libusb,libftdi,libpng,freetype2,libdl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=doxygen
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://lcdproc.omnipotent.net/download.php3"
+export DOWNLOADURL="https://sourceforge.net/projects/lcdproc/files/lcdproc/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/lcdproc/lcdproc/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+# fix shared/sockets.c (version >= 0.5.7)
+patch -ulbf shared/sockets.c << EOF
+@@ -17,2 +17,5 @@
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+@@ -22,2 +25,3 @@
+ #include <arpa/inet.h>
++#endif
+ #include <stdarg.h>
+@@ -93,3 +97,8 @@
+
++#ifdef _WIN32
++       unsigned long mode = 1;
++       ioctlsocket(sock, FIONBIO, &mode);
++#else
+        fcntl (sock, F_SETFL, O_NONBLOCK);
++#endif
+
+EOF
+# fix shared/report.c (version >= 0.5.7)
+patch -ulbf shared/report.c << EOF
+@@ -19,3 +19,9 @@
+ #include <string.h>
++#ifdef _WIN32
++#define openlog(...)
++#define closelog(...)
++#define vsyslog(...)
++#else
+ #include <syslog.h>
++#endif
+
+EOF
+wl-showstatus configure &&
+ #wl-showstatus preconfigure &&
+ #mkdir -p m4 &&
+ ##libtoolize -f -i -c &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ ## allow building shared libraries when using clang
+ #if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+ # sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" configure
+ # #sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" $(find -name configure)
+ #fi &&
+ ## fix confusion between MSVC and clang
+ #if ${CC:-gcc} --version|grep -q "^clang"; then
+ # sed -i.bak2 -e "s/\b\(cl\)\(\*\)/\1.exe\2/g; s/\(ld_shlibs\)=no/\1yes/" configure
+ #fi &&
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-libhid --disable-libX11 CFLAGS="-I$PWD/winfix -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
