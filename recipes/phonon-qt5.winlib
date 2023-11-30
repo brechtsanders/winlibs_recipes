@@ -1,0 +1,41 @@
+export NAME="Phonon (Qt5)"
+export STATUS=
+#export URL=https://projects.kde.org/projects/kdesupport/phonon
+export URL=https://invent.kde.org/libraries/phonon
+export BASENAME=phonon-qt5
+export DESCRIPTION="The Phonon multimedia library and its backend plugins."
+export CATEGORY=
+export TYPE=library
+export VERSION=4.12.0
+export VERSIONDATE=20231103
+wl-showstatus --package-version
+export DEPENDENCIES=qt,glib2,pulseaudio
+export OPTIONALDEPENDENCIES=qzeitgeist
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING.LIB
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://invent.kde.org/libraries/phonon/-/tags phonon-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://invent.kde.org/libraries/phonon/-/archive/v$VERSION/phonon-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/phonon $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xj --force-local -f $TARBALLDIR/phonon/phonon-$VERSION.tar.bz2
+cd phonon-v$VERSION*
+# fix missing unsetenv in phonon/pulsesupport.cpp (version >= 4.11.1)
+mv phonon/pulsesupport.cpp phonon/pulsesupport.cpp.bak
+cat > phonon/pulsesupport.cpp << EOF
+#include <windows.h>
+#define unsetenv(v) SetEnvironmentVariableA((v), NULL)
+EOF
+cat phonon/pulsesupport.cpp.bak >> phonon/pulsesupport.cpp
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPHONON_BUILD_QT5:BOOL=ON -DPHONON_BUILD_QT6:BOOL=OFF -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt -DCMAKE_BUILD_TYPE:STRING=Release -DPHONON_PULSESUPPORT:BOOL=ON -DPHONON_BUILD_DEMOS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/qt/include" -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf phonon-v$VERSION*
+
+
+
