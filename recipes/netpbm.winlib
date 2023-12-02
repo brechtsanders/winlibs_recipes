@@ -156,8 +156,10 @@ export TYPE=library,application
 #export VERSIONDATE=20220925
 #export VERSION=10.73.42
 #export VERSIONDATE=20221231
-export VERSION=10.73.43
-export VERSIONDATE=20230325
+#export VERSION=10.73.43
+#export VERSIONDATE=20230325
+export VERSION=10.86.39
+export VERSIONDATE=20231202
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libjpeg,libpng,libtiff,jasper,jbigkit,libx11,libxml2
 export OPTIONALDEPENDENCIES=
@@ -243,26 +245,48 @@ cat converter/ppm/ppmtompeg/mpeg.c.bak >> converter/ppm/ppmtompeg/mpeg.c
 ## fix copying . (version >= 10.47.61)
 #mv common.mk common.mk.bak &&
 #sed -e "s/\((SYMLINK) \). /\1 * /" common.mk.bak > common.mk
-# fix converter/other/pstopnm.c
-patch -ulbf converter/other/pstopnm.c << EOF
---- converter/other/pstopnm.c  2011-11-25 08:14:32 +0100
-+++ converter/other/pstopnm.c  2011-11-25 08:17:52 +0100
-@@ -24,4 +24,10 @@
- #include <stdio.h>
-+#ifndef __MINGW32__
- #include <signal.h>
- #include <sys/wait.h>
+## fix converter/other/pstopnm.c (version <= 10.73.43)
+#patch -ulbf converter/other/pstopnm.c << EOF
+#@@ -24,4 +24,10 @@
+# #include <stdio.h>
+#+#ifndef __MINGW32__
+# #include <signal.h>
+# #include <sys/wait.h>
+#+#else
+#+#include <fcntl.h>
+#+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+#+#define lstat stat
+#+#endif
+# #include <sys/stat.h>
+#@@ -795,3 +801,5 @@
+#         */
+#+#ifndef __MINGW32__
+#         signal(SIGPIPE, SIG_IGN);
+#+#endif
+#EOF
+# fix converter/other/tifftopnm.c (version >= 10.86.39)
+patch -ulbf converter/other/tifftopnm.c << EOF
+@@ -846,2 +846,3 @@
+
++#ifdef WIFSIGNALED
+                 if (WIFSIGNALED(terminationStatus))
+@@ -850,3 +851,6 @@
+                              WTERMSIG(terminationStatus));
+-                else if (!WIFEXITED(terminationStatus))
++                else
++#endif
++#ifdef WIFEXITED
++                if (!WIFEXITED(terminationStatus))
+                     pm_error("Shell process died, but its termination status "
+@@ -854,3 +858,8 @@
+                 else
++#endif
++#ifdef WEXITSTATUS
+                     exit(WEXITSTATUS(terminationStatus));
 +#else
-+#include <fcntl.h>
-+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
-+#define lstat stat
++                    pm_error("Shell process died (termination status unknown on Windows)");
 +#endif
- #include <sys/stat.h>
-@@ -795,3 +801,5 @@
-         */
-+#ifndef __MINGW32__
-         signal(SIGPIPE, SIG_IGN);
-+#endif
+             }
 EOF
 ## fix missing pipe in pm_config.in.h (version >= 10.73.28 <= 10.73.42)
 #patch -ulbf pm_config.in.h << EOF
@@ -296,29 +320,180 @@ patch -ulbf pm_config.in.h << EOF
 +#elif MSVCRT
    #define pm_pipe _pipe
 EOF
-# fix lib/libsystem.c (version >= 10.73.28)
+## fix lib/libsystem.c (version >= 10.73.28 <= 10.73.43)
+#patch -ulbf lib/libsystem.c << EOF
+#@@ -133,2 +133,5 @@
+# -----------------------------------------------------------------------------*/
+#+#ifdef __MINGW32__
+#+    pm_error("fork() not implemented in Windows");
+#+#else
+#     int pipeToFeed[2];
+#@@ -153,2 +156,3 @@
+#     }
+#+#endif
+# }
+#@@ -184,2 +188,5 @@
+# 
+#+#ifdef __MINGW32__
+#+    pm_error("fork() not implemented in Windows");
+#+#else
+#     rc = fork();
+#@@ -216,2 +223,3 @@
+#     }
+#+#endif
+# }
+#@@ -238,44 +246,74 @@
+#     switch (signalClass) {
+#+#ifdef SIGHUP
+#     case SIGHUP: /* POSIX.1 */
+#         return "SIGHUP";
+#+#endif
+#     case SIGINT: /* POSIX.1 */
+#         return "SIGINT";
+#+#ifdef SIGQUIT
+#     case SIGQUIT: /* POSIX.1 */
+#         return "SIGQUIT";
+#+#endif
+#     case SIGILL: /* POSIX.1 */
+#         return "SIGILL";
+#+#ifdef SIGTRAP
+#     case SIGTRAP:
+#         return "SIGTRAP";
+#+#endif
+#     case SIGABRT: /* POSIX.1 */
+#         return "SIGABRT";
+#+#ifdef SIGBUS
+#     case SIGBUS:
+#         return "SIGBUS";
+#+#endif
+#     case SIGFPE: /* POSIX.1 */
+#         return "SIGFPE";
+#+#ifdef SIGKILL
+#     case SIGKILL: /* POSIX.1 */
+#         return "SIGKILL";
+#+#endif
+#+#ifdef SIGUSR1
+#     case SIGUSR1: /* POSIX.1 */
+#         return "SIGUSR1";
+#+#endif
+#     case SIGSEGV: /* POSIX.1 */
+#         return "SIGSEGV";
+#+#ifdef SIGUSR2
+#     case SIGUSR2: /* POSIX.1 */
+#         return "SIGUSR2";
+#+#endif
+#+#ifdef SIGPIPE
+#     case SIGPIPE: /* POSIX.1 */
+#         return "SIGPIPE";
+#+#endif
+#+#ifdef SIGALRM
+#     case SIGALRM: /* POSIX.1 */
+#         return "SIGALRM";
+#+#endif
+#     case SIGTERM: /* POSIX.1 */
+#         return "SIGTERM";
+#+#ifdef SIGCHLD
+#     case SIGCHLD: /* POSIX.1 */
+#         return "SIGCHLD";
+#+#endif
+#+#ifdef SIGCONT
+#     case SIGCONT: /* POSIX.1 */
+#         return "SIGCONT";
+#+#endif
+#+#ifdef SIGSTOP
+#     case SIGSTOP: /* POSIX.1 */
+#         return "SIGSTOP";
+#+#endif
+#+#ifdef SIGTSTP
+#     case SIGTSTP: /* POSIX.1 */
+#         return "SIGTSTP";
+#+#endif
+#+#ifdef SIGTTIN
+#     case SIGTTIN: /* POSIX.1 */
+#         return "SIGTTIN";
+#+#endif
+#+#ifdef SIGTTOU
+#     case SIGTTOU: /* POSIX.1 */
+#         return "SIGTTOU";
+#+#endif
+# #ifdef SIGURG
+#@@ -285,10 +323,18 @@
+# #endif
+#+#ifdef SIGXCPU
+#     case SIGXCPU:
+#         return "SIGXCPU";
+#+#endif
+#+#ifdef SIGXFSZ
+#     case SIGXFSZ:
+#         return "SIGXFSZ";
+#+#endif
+#+#ifdef SIGVTALRM
+#     case SIGVTALRM:
+#         return "SIGVTALRM";
+#+#endif
+#+#ifdef SIGPROF
+#     case SIGPROF:
+#         return "SIGPROF";
+#+#endif
+# #ifdef SIGWINCH
+#@@ -306,4 +352,6 @@
+# #endif
+#+#ifdef SIGSYS
+#     case SIGSYS:
+#         return "SIGSYS";
+#+#endif
+#     default:
+#@@ -317,3 +365,3 @@
+# cleanupProcessorProcess(pid_t const processorPid) {
+#-
+#+#ifndef __MINGW32__
+#     int terminationStatus;
+#@@ -335,2 +383,3 @@
+#     }
+#+#endif
+# }
+#@@ -343,2 +392,5 @@
+# 
+#+#ifdef __MINGW32__
+#+    pm_error("waitpid() not implemented in Windows");
+#+#else
+#     waitpid(feederPid, &status, 0);
+#@@ -346,2 +398,3 @@
+#     if (WIFSIGNALED(status)) {
+#+#ifdef SIGPIPE
+#         if (WTERMSIG(status) == SIGPIPE)
+#@@ -353,2 +406,3 @@
+#         else
+#+#endif
+#             pm_message("WARNING: "
+#@@ -366,2 +420,3 @@
+#                    "Standard Input feeder: %d", status);
+#+#endif
+# }
+#EOF
+# fix lib/libsystem.c (version >= 10.86.39)
 patch -ulbf lib/libsystem.c << EOF
-@@ -133,2 +133,5 @@
+@@ -146,2 +146,5 @@
  -----------------------------------------------------------------------------*/
 +#ifdef __MINGW32__
 +    pm_error("fork() not implemented in Windows");
 +#else
      int pipeToFeed[2];
-@@ -153,2 +156,3 @@
+@@ -169,2 +172,3 @@
      }
 +#endif
  }
-@@ -184,2 +188,5 @@
- 
+@@ -200,2 +204,5 @@
+
 +#ifdef __MINGW32__
 +    pm_error("fork() not implemented in Windows");
 +#else
      rc = fork();
-@@ -216,2 +223,3 @@
+@@ -232,2 +239,3 @@
      }
 +#endif
  }
-@@ -238,44 +246,74 @@
+@@ -254,44 +262,74 @@
      switch (signalClass) {
 +#ifdef SIGHUP
      case SIGHUP: /* POSIX.1 */
@@ -393,7 +568,7 @@ patch -ulbf lib/libsystem.c << EOF
          return "SIGTTOU";
 +#endif
  #ifdef SIGURG
-@@ -285,10 +323,18 @@
+@@ -301,10 +339,18 @@
  #endif
 +#ifdef SIGXCPU
      case SIGXCPU:
@@ -412,37 +587,39 @@ patch -ulbf lib/libsystem.c << EOF
          return "SIGPROF";
 +#endif
  #ifdef SIGWINCH
-@@ -306,4 +352,6 @@
+@@ -322,4 +368,6 @@
  #endif
 +#ifdef SIGSYS
      case SIGSYS:
          return "SIGSYS";
 +#endif
      default:
-@@ -317,3 +365,3 @@
- cleanupProcessorProcess(pid_t const processorPid) {
--
-+#ifndef __MINGW32__
-     int terminationStatus;
-@@ -335,2 +383,3 @@
-     }
+@@ -350,2 +398,3 @@
+
++#ifdef WIFEXITED
+     if (WIFEXITED(termStatus)) {
+@@ -359,3 +408,6 @@
+                         exitStatus);
+-    } else if (WIFSIGNALED(termStatus)) {
++    } else
 +#endif
- }
-@@ -343,2 +392,5 @@
- 
++#ifdef WIFSIGNALED
++    if (WIFSIGNALED(termStatus)) {
+         pm_asprintf(&retval, "Process was killed by a Class %u (%s) signal.",
+@@ -363,3 +415,5 @@
+                     signalName(WTERMSIG(termStatus)));
+-    } else {
++    } else
++#endif
++    {
+         pm_asprintf(&retval, "Process died, but its termination status "
+@@ -377,2 +431,5 @@
+
 +#ifdef __MINGW32__
 +    pm_error("waitpid() not implemented in Windows");
 +#else
      waitpid(feederPid, &status, 0);
-@@ -346,2 +398,3 @@
-     if (WIFSIGNALED(status)) {
-+#ifdef SIGPIPE
-         if (WTERMSIG(status) == SIGPIPE)
-@@ -353,2 +406,3 @@
-         else
-+#endif
-             pm_message("WARNING: "
-@@ -366,2 +420,3 @@
+@@ -400,2 +457,3 @@
                     "Standard Input feeder: %d", status);
 +#endif
  }
@@ -458,13 +635,54 @@ patch -ulbf converter/other/pnmtops.c << EOF
 +#endif
  }
 EOF
-# fix converter/other/pstopnm.c (version >= 10.73.31)
+## fix converter/other/pstopnm.c (version >= 10.73.31)
+#patch -ulbf converter/other/pstopnm.c << EOF
+#@@ -995,2 +995,3 @@
+#         if (gsTermStatus != 0) {
+#+#if defined(WIFEXITED) && defined(WIFSIGNALED)
+#             if (WIFEXITED(gsTermStatus))
+#@@ -1002,2 +1003,3 @@
+#             else
+#+#endif
+#                 pm_error("Ghostscript process died with exit code %d",
+#EOF
+# fix converter/other/pstopnm.c (version >= 10.86.39)
 patch -ulbf converter/other/pstopnm.c << EOF
-@@ -995,2 +995,3 @@
+@@ -267,3 +267,7 @@
+
++#ifdef _WIN32
++    statRc = stat(origFileName, &statbuf);
++#else
+     statRc = lstat(origFileName, &statbuf);
++#endif
+
+@@ -276,3 +280,7 @@
+
++#ifdef _WIN32
++        statRc = stat(fileNamePlusPs, &statbuf);
++#else
+         statRc = lstat(fileNamePlusPs, &statbuf);
++#endif
+         if (statRc == 0)
+@@ -958,3 +966,5 @@
+     */
++#ifdef SIGPIPE
+     signal(SIGPIPE, SIG_IGN);
++#endif
+
+@@ -1065,2 +1075,3 @@
          if (gsTermStatus != 0) {
-+#if defined(WIFEXITED) && defined(WIFSIGNALED)
++#ifdef WIFEXITED
              if (WIFEXITED(gsTermStatus))
-@@ -1002,2 +1003,3 @@
+@@ -1068,3 +1079,6 @@
+                          WEXITSTATUS(gsTermStatus));
+-            else if (WIFSIGNALED(gsTermStatus))
++            else
++#endif
++#ifdef WIFSIGNALED
++            if (WIFSIGNALED(gsTermStatus))
+                 pm_error("Ghostscript process died because of a signal %d.",
+@@ -1072,2 +1086,3 @@
              else
 +#endif
                  pm_error("Ghostscript process died with exit code %d",
@@ -572,13 +790,38 @@ sed -i.bak -e "s?/link?/lib?g" lib/Makefile
 #
 #
 #EOF
-# prepare configuration answers (version >= 10.73.31)
+## prepare configuration answers (version >= 10.73.31 <= 10.73.43)
+#cat > answers << EOF
+#
+#win
+#n
+#n$(if ( echo $RUNPLATFORM | grep -vq "^i.86" ); then echo "
+#y"; fi)
+#regular
+#shared
+#y
+#<stdint.h>
+#y
+#y
+#-ljpeg
+#
+#-ltiff
+#
+#-lz
+#
+#
+#
+#
+#EOF
+# prepare configuration answers (version >= 10.86.39)
 cat > answers << EOF
 
 win
 n
-n$(if ( echo $RUNPLATFORM | grep -vq "^i.86" ); then echo "
-y"; fi)
+n
+y
+
+y
 regular
 shared
 y
@@ -590,8 +833,6 @@ y
 -ltiff
 
 -lz
-
-
 
 
 EOF
@@ -611,7 +852,7 @@ wl-showstatus configure &&
  # fix missing isatty in converter/pbm/thinkjettopbm.c (version >= 10.73.43)
  make -Cconverter/pbm thinkjettopbm.c &&
  sed -i.bak -e "s/isatty( fileno(file) )/0/" converter/pbm/thinkjettopbm.c &&
- ( make CC=${CC:-gcc} WINDRES=${WINDRES:-windres} LD=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" ZLIB=-lz JBIGLIB=-ljbig JBIGHDR_DIR=$MINGWPREFIX/include JASPERLIB=-ljasper JASPERHDR_DIR=$MINGWPREFIX/include/jasper || make -j1 CC=${CC:-gcc} WINDRES=${WINDRES:-windres} LD=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" ZLIB=-lz JBIGLIB=-ljbig JBIGHDR_DIR=$MINGWPREFIX/include JASPERLIB=-ljasper JASPERHDR_DIR=$MINGWPREFIX/include/jasper ) &&
+ ( make CC=${CC:-gcc} WINDRES=${WINDRES:-windres} LD=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -L$PWD/lib" SYMLINK="cp -rf" ZLIB=-lz JBIGLIB=-ljbig JBIGHDR_DIR=$MINGWPREFIX/include JASPERLIB=-ljasper JASPERHDR_DIR=$MINGWPREFIX/include/jasper || make -j1 CC=${CC:-gcc} WINDRES=${WINDRES:-windres} LD=${CC:-gcc} CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" SYMLINK="cp -rf" ZLIB=-lz JBIGLIB=-ljbig JBIGHDR_DIR=$MINGWPREFIX/include JASPERLIB=-ljasper JASPERHDR_DIR=$MINGWPREFIX/include/jasper ) &&
  wl-showstatus build-install &&
  #make install.lib install.sharedlibstub install.staticlib install.hdr pkgdir=$INSTALLPREFIX &&
  ( rm -rf $INSTALLPREFIX && make -j1 package pkgdir=$INSTALLPREFIX SYMLINK="cp -f" || ( rm -rf $INSTALLPREFIX && make install.lib install.sharedlibstub install.staticlib install.hdr pkgdir=$INSTALLPREFIX )) &&
