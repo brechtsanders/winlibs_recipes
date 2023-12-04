@@ -25,30 +25,34 @@ export TYPE=application
 #export VERSIONDATE=20190412
 #export VERSION=5.01.9671
 #export VERSIONDATE=20190711
-#export VERSION=5.01.9672
-#export VERSIONDATE=20191125
+export VERSION=5.01.9672
+export VERSIONDATE=20191125
 #export VERSION=5.01.9673
 #export VERSIONDATE=20200419
 #export VERSION=5.01.9674
 #export VERSIONDATE=20200430
 #export VERSION=5.02.0
 #export VERSIONDATE=20210525
-export VERSION=5.02.5180
-export VERSIONDATE=20210624
+#export VERSION=5.02.5180
+#export VERSIONDATE=20210624
+#export VERSION=5.02.5181
+#export VERSIONDATE=20231204
 ####The source directory src/Mayaqua/3rdparty/zlib does not contain a CMakeLists.txt file.
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=libhamcore
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=GPL
 #export DOWNLOADURL="http://www.softether-download.com/files/softether/"
 export DOWNLOADURL="https://github.com/SoftEtherVPN/SoftEtherVPN/releases"
+#export DOWNLOADURL="https://gitlab.com/SoftEther/VPN/-/tags VPN-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=http://www.softether-download.com/files/softether/v$VERSION-tree/Source_Code/softether-src-v$(echo $VERSION|sed -e "s/rtm-.*$/rtm/").tar.gz
 #export DOWNLOADSOURCEURL=https://github.com/SoftEtherVPN/SoftEtherVPN/archive/v$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://github.com/SoftEtherVPN/SoftEtherVPN/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/SoftEtherVPN/SoftEtherVPN/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://gitlab.com/SoftEther/VPN/-/archive/$VERSION/VPN-$VERSION.tar.bz2
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
@@ -57,8 +61,10 @@ wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/softether-src-v$(echo $VERSION|sed -e "s/rtm-.*$/rtm/").tar.gz -C$BASENAME-$VERSION
 #cd $BASENAME-$VERSION/v$(echo $VERSION|sed -e "s/-rtm-.*$//")
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
-cd SoftEtherVPN-$VERSION
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd SoftEtherVPN-$VERSION
+tar xj --force-local -f $TARBALLDIR/$BASENAME/VPN-$VERSION.tar.bz2
+cd VPN-$VERSION
 ## fix src/Mayaqua/MayaType.h (version <= 4.20-9608-rtm-2016.04.17)
 #patch -ulbf src/Mayaqua/MayaType.h << EOF
 #--- src/Mayaqua/MayaType.h  2016-04-17 15:59:45.000000000 +0200
@@ -85,18 +91,37 @@ cd SoftEtherVPN-$VERSION
 # wl-showstatus build &&
 # make CC="${CC:-gcc} -DWIN32" &&
 #    echo OK
+# fix src/Mayaqua/MayaType.h (version >= 5.01.9672)
+patch -ulbf src/Mayaqua/MayaType.h << EOF
+@@ -209,3 +209,3 @@
 
+-#ifndef        WIN32COM_CPP
++#if !defined(WIN32COM_CPP) && !defined(__MINGW32__)
+ typedef signed char                    CHAR;
+EOF
 # fix missing file
 touch src/Mayaqua/3rdparty/zlib/CMakeLists.txt
+# fix src/CMakeLists.txt (version >= 5.02.5181)
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -67,2 +67,3 @@
+
++ if(MSVC)
+   message("Setting CONTROL FLOW GUARD")
+@@ -76,2 +77,3 @@
+   set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} /CETCOMPAT")
++ endif()
+
+EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe)  -S. -Bbuild_win &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe)  -S. -Bbuild_win &&
  wl-showstatus build &&
- make -Cbuild_win &&
+ ninja -Cbuild_win &&
  wl-showstatus build-install &&
- make -Cbuild_win install/strip &&
+ ninja -Cbuild_win install/strip &&
     echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf SoftEtherVPN-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf VPN-$VERSION
 
 
 

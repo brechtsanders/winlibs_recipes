@@ -324,6 +324,8 @@ export VERSION=3.1.2
 export VERSIONDATE=20231108
 #export VERSION=3.1.3
 #export VERSIONDATE=20231129
+#export VERSION=3.1.4
+#export VERSIONDATE=20231204
 ####src/dht_proxy_server.cpp:119:19: error: 'holds_alternative' is not a member of 'restinio'
 wl-showstatus --package-version
 export DEPENDENCIES=libnettle,gnutls,msgpack-cxx,libargon2,readline,fmt,http-parser,cppunit,jsoncpp,restinio,asio
@@ -359,6 +361,19 @@ cat > src/utils.cpp << EOF
 #endif
 EOF
 cat src/utils.cpp.bak >> src/utils.cpp
+## fix missing restinio::holds_alternative in src/dht_proxy_server.cpp (version >= 3.1.3)
+#sed -i.bak -e "s/restinio\(::holds_alternative\)/std\1/" src/dht_proxy_server.cpp
+## fix conflicts between http_parser.h and llhttp.h in src/dht_proxy_client.cpp and src/http.cpp (version >= 3.1.4)
+#for F in src/dht_proxy_client.cpp src/http.cpp; do
+# mv $F $F.bak &&
+# echo "#include <http_parser.h>" > $F &&
+# echo "#undef HTTP_STATUS_MAP" >> $F &&
+# sed -ne "s/^\s*\(\(HPE\|F\|HTTP\)_.*\)\s*=\s*[0-9x]*,*\s*$/#define \1 DHT_RPL__\1/p" $MINGWPREFIX/include/llhttp.h >> $F &&
+# echo "#include <llhttp.h>" >> $F &&
+# echo "#include <restinio/impl/tls_socket.hpp>" >> $F &&
+# sed -ne "s/^\s*\(\(HPE\|F\|HTTP\)_.*\)\s*=\s*[0-9x]*,*\s*$/#undef \1/p" $MINGWPREFIX/include/llhttp.h >> $F &&
+# cat $F.bak >> $F
+#done
 # fix CMakeLists.txt (version >= 2.5.0)
 patch -ulbf CMakeLists.txt << EOF
 @@ -234,2 +234,3 @@
