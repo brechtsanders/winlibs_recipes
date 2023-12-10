@@ -1,0 +1,59 @@
+export NAME="smbios-parser"
+export STATUS=
+export URL=https://github.com/brunexgeek/smbios-parser
+export BASENAME=smbios-parser
+export DESCRIPTION="Small C++ library to parse SMBIOS information (DMI table)"
+export CATEGORY=hardware,dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20231210
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/brunexgeek/smbios-parser/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/brunexgeek/smbios-parser/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix smbios.cc (version >= master)
+mv smbios.cc smbios.cc.bak &&
+echo "#include <cstdlib>" > smbios.cc &&
+cat smbios.cc.bak >> smbios.cc
+# fix undefined Signature in smbios_decode.cc (version >= master)
+patch -ulbf smbios_decode.cc << EOF
+@@ -41,3 +41,3 @@
+
+-    if (size != GetSystemFirmwareTable(Signature, 0, buffer.data(), size))
++    if (size != GetSystemFirmwareTable(signature, 0, buffer.data(), size))
+     {
+EOF
+# also allow building shared library
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/; s/\(OUTPUT_NAME \"smbios\)\(\"\)/\1-parser\2/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build &&
+ ninja -Cbuild_static &&
+ wl-showstatus build &&
+ ninja -Cbuild_shared &&
+ strip build_shared/*.{dll,exe} &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f smbios.hh $INSTALLPREFIX/include/ &&
+ cp -f build_static/*.a build_shared/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.{dll,exe} $INSTALLPREFIX/bin &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####$MINGWPREFIX/bin/smbios_decode.exe
+
+
+
