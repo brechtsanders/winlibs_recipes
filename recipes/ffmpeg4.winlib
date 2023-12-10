@@ -121,65 +121,65 @@ cd ffmpeg-$VERSION
 #cat libavcodec/vdpau_internal.h.bak >> libavcodec/vdpau_internal.h
 # fix deprecated x264_bit_depth in recent ffmpeg
 sed -i.bak -e "s/x264_bit_depth/X264_BIT_DEPTH/" libavcodec/libx264.c
-# fix "operand type mismatch for `shr'" error when building with binutils 2.41 or higher in libavcodec/x86/mathops.h (version >= 4.4.4)
-patch -ulbf libavcodec/x86/mathops.h << EOF
-@@ -35,12 +35,20 @@
- static av_always_inline av_const int MULL(int a, int b, unsigned shift)
- {
-     int rt, dummy;
-+    if (__builtin_constant_p(shift))
-     __asm__ (
-         "imull %3               \n\t"
-         "shrdl %4, %%edx, %%eax \n\t"
-         :"=a"(rt), "=d"(dummy)
--        :"a"(a), "rm"(b), "ci"((uint8_t)shift)
-+        :"a"(a), "rm"(b), "i"(shift & 0x1F)
-     );
-+    else
-+        __asm__ (
-+            "imull %3               \n\t"
-+            "shrdl %4, %%edx, %%eax \n\t"
-+            :"=a"(rt), "=d"(dummy)
-+            :"a"(a), "rm"(b), "c"((uint8_t)shift)
-+        );
-     return rt;
- }
- 
-@@ -113,19 +121,31 @@ __asm__ volatile(\
- // avoid +32 for shift optimization (gcc should do that ...)
- #define NEG_SSR32 NEG_SSR32
- static inline  int32_t NEG_SSR32( int32_t a, int8_t s){
-+    if (__builtin_constant_p(s))
-     __asm__ ("sarl %1, %0\n\t"
-          : "+r" (a)
--         : "ic" ((uint8_t)(-s))
-+         : "i" (-s & 0x1F)
-     );
-+    else
-+        __asm__ ("sarl %1, %0\n\t"
-+               : "+r" (a)
-+               : "c" ((uint8_t)(-s))
-+        );
-     return a;
- }
- 
- #define NEG_USR32 NEG_USR32
- static inline uint32_t NEG_USR32(uint32_t a, int8_t s){
-+    if (__builtin_constant_p(s))
-     __asm__ ("shrl %1, %0\n\t"
-          : "+r" (a)
--         : "ic" ((uint8_t)(-s))
-+         : "i" (-s & 0x1F)
-     );
-+    else
-+        __asm__ ("shrl %1, %0\n\t"
-+               : "+r" (a)
-+               : "c" ((uint8_t)(-s))
-+        );
-     return a;
- }
- 
-EOF
+## fix "operand type mismatch for `shr'" error when building with binutils 2.41 or higher in libavcodec/x86/mathops.h (version >= 4.4.4)
+#patch -ulbf libavcodec/x86/mathops.h << EOF
+#@@ -35,12 +35,20 @@
+# static av_always_inline av_const int MULL(int a, int b, unsigned shift)
+# {
+#     int rt, dummy;
+#+    if (__builtin_constant_p(shift))
+#     __asm__ (
+#         "imull %3               \n\t"
+#         "shrdl %4, %%edx, %%eax \n\t"
+#         :"=a"(rt), "=d"(dummy)
+#-        :"a"(a), "rm"(b), "ci"((uint8_t)shift)
+#+        :"a"(a), "rm"(b), "i"(shift & 0x1F)
+#     );
+#+    else
+#+        __asm__ (
+#+            "imull %3               \n\t"
+#+            "shrdl %4, %%edx, %%eax \n\t"
+#+            :"=a"(rt), "=d"(dummy)
+#+            :"a"(a), "rm"(b), "c"((uint8_t)shift)
+#+        );
+#     return rt;
+# }
+# 
+#@@ -113,19 +121,31 @@ __asm__ volatile(\
+# // avoid +32 for shift optimization (gcc should do that ...)
+# #define NEG_SSR32 NEG_SSR32
+# static inline  int32_t NEG_SSR32( int32_t a, int8_t s){
+#+    if (__builtin_constant_p(s))
+#     __asm__ ("sarl %1, %0\n\t"
+#          : "+r" (a)
+#-         : "ic" ((uint8_t)(-s))
+#+         : "i" (-s & 0x1F)
+#     );
+#+    else
+#+        __asm__ ("sarl %1, %0\n\t"
+#+               : "+r" (a)
+#+               : "c" ((uint8_t)(-s))
+#+        );
+#     return a;
+# }
+# 
+# #define NEG_USR32 NEG_USR32
+# static inline uint32_t NEG_USR32(uint32_t a, int8_t s){
+#+    if (__builtin_constant_p(s))
+#     __asm__ ("shrl %1, %0\n\t"
+#          : "+r" (a)
+#-         : "ic" ((uint8_t)(-s))
+#+         : "i" (-s & 0x1F)
+#     );
+#+    else
+#+        __asm__ ("shrl %1, %0\n\t"
+#+               : "+r" (a)
+#+               : "c" ((uint8_t)(-s))
+#+        );
+#     return a;
+# }
+# 
+#EOF
 # fix for building on MSYS (version >= 3.1.2)
 patch -ulbf configure << EOF
 @@ -4671,6 +4671,3 @@
