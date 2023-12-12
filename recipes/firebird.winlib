@@ -588,8 +588,25 @@ pexports $INSTALLPREFIX/bin/ib_util.dll > $INSTALLPREFIX/lib/ib_util.def &&
 #mv build_win/src/utilities/gstat/dba.epp.boot.cpp build_win/src/utilities/gstat/dba.epp.boot.cpp.bak &&
 #echo "_POSIX_THREAD_SAFE_FUNCTIONS" > build_win/src/utilities/gstat/dba.epp.boot.cpp &&
 #cat build_win/src/utilities/gstat/dba.epp.boot.cpp.bak >> build_win/src/utilities/gstat/dba.epp.boot.cpp
-## fix already defined MININT64 in src/common/utils_proto.h (version >= 4.0.0.2496-0)
-#sed -i.bak -e "s/MININT64/MY_&/g" src/common/utils_proto.h
+### fix already defined MININT64 in src/common/utils_proto.h (version >= 4.0.0.2496-0)
+##sed -i.bak -e "s/MININT64/MY_&/g" src/common/utils_proto.h
+## fix already defined MININT64 in src/common/utils_proto.h (version >= 4.0.4.3010-0)
+#patch -ulbf src/common/utils_proto.h << EOF
+#@@ -117,4 +117,6 @@
+# #if FB_INT64_COMPARE_FAILED
+#+#ifndef MININT64
+#+#define MININT64 0x8000000000000000
+#+#endif
+#                // avoid compiler bug when comparing minimum INT64
+#-               const SINT64 MININT64 = 0x8000000000000000;
+#                if (n1 == MININT64)
+#EOF
+## fix undefined FB_TZDATADIR in src/common/config/config.h (version >= 4.0.4.3010-0)
+#cat >> src/common/config/config.h << EOF
+##ifndef FB_TZDATADIR
+##define FB_TZDATADIR ""
+##endif
+#EOF
 ## fix missing firebird.msg
 #mkdir -p build_win/src
 #unzip -oq $TARBALLDIR/$BASENAME/Firebird-$VERSION\_x64.zip firebird.msg -dbuild_win/src
@@ -625,9 +642,26 @@ pexports $INSTALLPREFIX/bin/ib_util.dll > $INSTALLPREFIX/lib/ib_util.def &&
 #+if (MSVC)
 #     add_custom_command(
 #EOF
+### allow using shell scripts in builds/cmake/BuildFunctions.cmake (version >= 4.0.4.3010-0)
+##patch -ulbf builds/cmake/BuildFunctions.cmake << EOF
+##@@ -266,4 +266,3 @@
+##
+##-    set_win32(env "PATH=\${dir}\\;%PATH%")
+##-    set_unix (env "PATH=\${dir}/bin:\$PATH")
+##+    set_win32(env "PATH=\${dir}/bin:\$PATH")
+##     set(env "\${env}"
+##@@ -282,3 +281,3 @@
+##     set(perm)
+##-    if (WIN32)
+##+    if (MSVC)
+##         set(pre_cmd @)
+##EOF
+## fix building with C++ 17
+#sed -i.bak -e "s/-std=c++11/-std=c++17/" CMakeLists.txt
 #mkdir -p build_win build_static build_shared &&
 # wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32 -fpermissive -D_POSIX_THREAD_SAFE_FUNCTIONS -DHAVE_CTIME_R -std=c++11 -msse4.2 -Wno-deprecated -Wno-write-strings -Wa,-mbig-obj -g0" -S. -Bbuild_win &&
+# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $MINGWPREFIX/include/libdl-win32) -fpermissive -D_POSIX_THREAD_SAFE_FUNCTIONS -DHAVE_CTIME_R -std=c++11 -msse4.2 -Wno-deprecated -Wno-write-strings -Wa,-mbig-obj -g0" -S. -Bbuild_win &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $MINGWPREFIX/include/libdl-win32) -fpermissive -D_POSIX_THREAD_SAFE_FUNCTIONS -DHAVE_CTIME_R -Wno-deprecated -Wno-write-strings -Wa,-mbig-obj -g0" -S. -Bbuild_win &&
 # #wl-showstatus configure &&
 # #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
 # #wl-showstatus configure &&
@@ -637,7 +671,9 @@ pexports $INSTALLPREFIX/bin/ib_util.dll > $INSTALLPREFIX/lib/ib_util.def &&
 # # fix missing -ldl
 # sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -ldl/" build_win/build.ninja &&
 # wl-showstatus build &&
-# #ninja -Cbuild_win &&
+# #sed -i.bak2 -e "s/\(\&\& \)\([^ ]*\.sh \)/\1sh.exe -i \2/" build_win/build.ninja &&
+# #ninja -C build_win src/alice/alice_meta.epp.boot.cpp &&
+# ninja -Cbuild_win &&
 # ( ninja -Cbuild_win || (
 #  # fix missing ctime_r/ctime_s (version >= 3.0.6.33328-0)
 #  mv build_win/src/utilities/gstat/dba.epp.boot.cpp build_win/src/utilities/gstat/dba.epp.boot.cpp.bak &&
