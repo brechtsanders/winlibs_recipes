@@ -1,0 +1,45 @@
+export NAME="dxil-spirv"
+export STATUS=
+export URL=https://github.com/HansKristian-Work/dxil-spirv
+export BASENAME=dxil-spirv
+export DESCRIPTION="DXIL (SM 6.x) shaders conversion to SPIR-V, which can be used in the vkd3d project, which implements D3D12 on top of Vulkan"
+export CATEGORY=graphics
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20231216
+wl-showstatus --package-version
+export DEPENDENCIES=spirv-headers,spirv-tools,spirv-cross
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE.MIT
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/HansKristian-Work/dxil-spirv/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/HansKristian-Work/dxil-spirv/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined CapabilityRayTracingOpacityMicromapEXT/RayFlagsForceOpacityMicromap2StateEXTMask
+for F in $(grep -l "CapabilityRayTracingOpacityMicromapEXT\|RayFlagsForceOpacityMicromap2StateEXTMask" $(find -name '*.cpp')); do
+ mv $F $F.bak &&
+ echo "#include <spirv/unified1/spirv.hpp>" > $F &&
+ cat $F.bak >> $F
+done
+# fix missing files
+touch third_party/spirv-headers/CMakeLists.txt third_party/SPIRV-Tools/CMakeLists.txt third_party/SPIRV-Cross/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DDXIL_SPIRV_CLI:BOOL=ON -DDXIL_SPV_MISC_CLI:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/spirv_cross" -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ cp -u $INSTALLPREFIX/lib/libdxil-spirv-c-shared.dll.a $INSTALLPREFIX/lib/libdxil-spirv-c.dll.a &&
+ cp -u build_win/libdxil-spirv-c-static.a $INSTALLPREFIX/lib/ &&
+ cp -u $INSTALLPREFIX/lib/libdxil-spirv-c-static.a $INSTALLPREFIX/lib/libdxil-spirv-c.a &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
