@@ -1,0 +1,162 @@
+export NAME="Guile 3"
+export STATUS=
+export URL=http://www.gnu.org/software/guile/
+export BASENAME=guile3
+export DESCRIPTION="Guile is a library designed to help programmers create flexible applications. Using Guile in an application allows programmers to write plug-ins, or modules (there are many names, but the concept is essentially the same) and users to use them to have an application fit their needs."
+export CATEGORY=development
+export TYPE=library
+export VERSION=3.0.9
+export VERSIONDATE=20230125
+wl-showstatus --package-version
+export DEPENDENCIES=gmp,libcrypt,gettext,libltdl,pcre,pthreads,libunistring,libffi,bdwgc
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING.LESSER
+export LICENSETYPE=LGPL2
+export DOWNLOADURL="https://ftp.gnu.org/pub/gnu/guile/ guile-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://ftp.gnu.org/pub/gnu/guile/guile-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+tar xJ --force-local -f $TARBALLDIR/$BASENAME/guile-$VERSION.tar.xz
+cd guile-$VERSION
+
+
+
+# fix definition of start_child() in libguile/posix-w32.h and libguile/posix-w32.c (version >= 2.2.4)
+patch -ulbf libguile/posix-w32.h << EOF
+@@ -78,3 +78,3 @@
+-SCM_INTERNAL int start_child (const char *exec_file, char **argv,
+-                              int reading, int c2p[2], int writing, int p2c[2],
+-                              int infd, int outfd, int errfd);
++SCM_INTERNAL intptr_t start_child (const char *exec_file, char **argv,
++                                   int reading, int c2p[2], int writing,
++                                   int p2c[2], int infd, int outfd, int errfd);
+EOF
+patch -ulbf libguile/posix-w32.c << EOF
+@@ -604,3 +604,3 @@
+    process.  */
+-pid_t
++intptr_t
+ start_child (const char *exec_file, char **argv,
+EOF
+# fix missing netinet/tcp.h in libguile/socket.c (version >= 2.2.4)
+sed -i.bak -e "s?netinet/in\.h\|netinet/tcp\.h\|netdb\.h\|arpa/inet.h?winsock2.h?" libguile/socket.c
+# fix missing hostname in libguile/posix.c (version >= 2.2.4)
+patch -ulbf libguile/posix.c << EOF
+@@ -50,2 +50,6 @@
+ #include <unistd.h>
++#if defined(__MINGW32__) && defined(gethostname)
++#undef gethostname
++#include <winsock2.h>
++#endif
+
+EOF
+# fix missing SCM_INTERNAL in libguile/posix-w32.h (version >= 3.0.0)
+mv libguile/posix-w32.h libguile/posix-w32.h.bak
+cat > libguile/posix-w32.h << EOF
+#ifndef SCM_INTERNAL
+#define SCM_INTERNAL extern
+#endif
+EOF
+cat libguile/posix-w32.h.bak >> libguile/posix-w32.h
+# fix missing __mktime_internal in lib/timegm.c (version >= 2.2.7)
+patch -ulbf lib/timegm.c << EOF
+@@ -35,6 +35,10 @@
+ timegm (struct tm *tmp)
+ {
++#ifdef __MINGW32__
++  return _mkgmtime(tmp);
++#else
+   static mktime_offset_t gmtime_offset;
+   tmp->tm_isdst = 0;
+   return __mktime_internal (tmp, __gmtime_r, &gmtime_offset);
++#endif
+ }
+
+EOF
+# fix lib/mktime-internal.h (version >= 3.0.6)
+patch -ulbf lib/mktime-internal.h << EOF
+@@ -48,4 +48,6 @@
+ # define __localtime64_r __localtime_r
++# ifndef __MINGW32__
+ # define __mktime64 mktime
+ # define __timegm64 timegm
++# endif
+ #endif
+EOF
+# fix libguile/socket.c (version >= 3.0.6)
+mv libguile/socket.c libguile/socket.c.bak &&
+echo "#define _POSIX_SOURCE" > libguile/socket.c &&
+echo "#include <ws2tcpip.h>" >> libguile/socket.c &&
+cat libguile/socket.c.bak >> libguile/socket.c
+## fix missing timegm in lib/time_rz.c (version >= 3.0.6)
+#mv lib/time_rz.c lib/time_rz.c.bak
+#cat > lib/time_rz.c << EOF
+##include <config.h>
+##include <stdlib.h>
+##include <time.h>
+#inline time_t timegm (struct tm* tm) {
+#  time_t ret;
+#  putenv("TZ=");
+#  tzset();
+#  ret = mktime(tm);
+#  //to do: reset time zone to previous value
+#  return ret;
+#}
+#EOF
+#cat lib/time_rz.c.bak >> lib/time_rz.c
+# fix lib/poll.h (version >= 2.2.7)
+mv lib/poll.h lib/poll.h.bak
+cat > lib/poll.h << EOF
+#ifdef _WIN32
+#include <winsock2.h>
+#define poll RPL_poll
+#define pollfd RPL_pollfd
+#endif
+EOF
+cat lib/poll.h.bak >> lib/poll.h
+# fix lib/stdlib.in.h (version >= 3.0.9)
+patch -ulbf lib/stdlib.in.h << EOF
+@@ -1119,2 +1119,3 @@
+         || _GL_USE_STDLIB_ALLOC)
++#  if !defined(__MINGW32__)
+ #   undef realloc
+@@ -1122,2 +1123,3 @@
+ #  endif
++#  endif
+ _GL_FUNCDECL_RPL (realloc, void *, (void *ptr, size_t size)
+EOF
+## fix meta/guild.in
+#sed -i.bak -e "s?\${GUILE:-@installed_guile@}?$PWD/libguile/guile.exe?" meta/guild.in
+sed -i.bak -e "s?\(\${GUILE:-@installed_guile@\)\(}.*\)\$0?\1.exe\2../meta/guild?" meta/guild.in
+# fix replacing mktime
+sed -i.bak -e "s/\(gl_cv_func_working_mktime\)=no/\1=yes/; s/\(GNULIB_MKTIME\)=0/\1=1/g; s/\(REPLACE_MKTIME\)=1/\1=0/g" configure
+
+
+
+# fix redefintion of putenv in lib/putenv.c (version >= 3.0.9)
+patch -ulbf lib/putenv.c << EOF
+@@ -119,2 +119,5 @@
+
++#ifndef putenv
++#define putenv rpl_putenv
++#endif
+ /* Put STRING, which is of the form "NAME=VALUE", in the environment.
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --enable-posix --enable-networking --enable-regex --without-included-regex --without-64-calls LDFLAGS="-Wl,--as-needed -lpthread -lregex -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --enable-posix --enable-networking --disable-jit --enable-regex --with-included-regex --without-64-calls LDFLAGS="-Wl,--as-needed -lpthread -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --enable-posix --enable-networking --disable-jit --enable-regex --with-included-regex --without-64-calls CFLAGS="-D_GL_USE_STDLIB_ALLOC=1 -DGNULIB_NAMESPACE=1" CXXFLAGS="-D_GL_USE_STDLIB_ALLOC=1 -DGNULIB_NAMESPACE=1" LDFLAGS="-Wl,--as-needed -lpthread -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-guile-debug --with-threads --enable-posix --enable-networking --disable-jit --enable-regex --with-included-regex --without-64-calls CFLAGS="-D__need_system_stdlib_h" LDFLAGS="-Wl,--as-needed -lpthread -lws2_32" &&
+ #-Wl,-femulated-tls
+ #--enable-year2038 
+ # fix missing getpagesize
+ echo "#define getpagesize() 4096" >> config.h &&
+ wl-showstatus build-install &&
+ GUILE_LOAD_PATH=$PWD/module:$PWD/guile-readline PATH=$PWD/am:$PWD/meta:$PATH make install-strip &&
+ sed -i -e "s?^\#\!$INSTALLPREFIX/bin/guile?\#\!guile.exe?" $INSTALLPREFIX/bin/guile-config &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf guile-$VERSION
