@@ -25,58 +25,58 @@ cd guile-$VERSION
 
 
 
-# fix definition of start_child() in libguile/posix-w32.h and libguile/posix-w32.c (version >= 2.2.4)
-patch -ulbf libguile/posix-w32.h << EOF
-@@ -78,3 +78,3 @@
--SCM_INTERNAL int start_child (const char *exec_file, char **argv,
--                              int reading, int c2p[2], int writing, int p2c[2],
--                              int infd, int outfd, int errfd);
-+SCM_INTERNAL intptr_t start_child (const char *exec_file, char **argv,
-+                                   int reading, int c2p[2], int writing,
-+                                   int p2c[2], int infd, int outfd, int errfd);
-EOF
-patch -ulbf libguile/posix-w32.c << EOF
-@@ -604,3 +604,3 @@
-    process.  */
--pid_t
-+intptr_t
- start_child (const char *exec_file, char **argv,
-EOF
-# fix missing netinet/tcp.h in libguile/socket.c (version >= 2.2.4)
-sed -i.bak -e "s?netinet/in\.h\|netinet/tcp\.h\|netdb\.h\|arpa/inet.h?winsock2.h?" libguile/socket.c
-# fix missing hostname in libguile/posix.c (version >= 2.2.4)
-patch -ulbf libguile/posix.c << EOF
-@@ -50,2 +50,6 @@
- #include <unistd.h>
-+#if defined(__MINGW32__) && defined(gethostname)
-+#undef gethostname
-+#include <winsock2.h>
-+#endif
-
-EOF
-# fix missing SCM_INTERNAL in libguile/posix-w32.h (version >= 3.0.0)
-mv libguile/posix-w32.h libguile/posix-w32.h.bak
-cat > libguile/posix-w32.h << EOF
-#ifndef SCM_INTERNAL
-#define SCM_INTERNAL extern
-#endif
-EOF
-cat libguile/posix-w32.h.bak >> libguile/posix-w32.h
-# fix missing __mktime_internal in lib/timegm.c (version >= 2.2.7)
-patch -ulbf lib/timegm.c << EOF
-@@ -35,6 +35,10 @@
- timegm (struct tm *tmp)
- {
-+#ifdef __MINGW32__
-+  return _mkgmtime(tmp);
-+#else
-   static mktime_offset_t gmtime_offset;
-   tmp->tm_isdst = 0;
-   return __mktime_internal (tmp, __gmtime_r, &gmtime_offset);
-+#endif
- }
-
-EOF
+## fix definition of start_child() in libguile/posix-w32.h and libguile/posix-w32.c (version >= 2.2.4)
+#patch -ulbf libguile/posix-w32.h << EOF
+#@@ -78,3 +78,3 @@
+#-SCM_INTERNAL int start_child (const char *exec_file, char **argv,
+#-                              int reading, int c2p[2], int writing, int p2c[2],
+#-                              int infd, int outfd, int errfd);
+#+SCM_INTERNAL intptr_t start_child (const char *exec_file, char **argv,
+#+                                   int reading, int c2p[2], int writing,
+#+                                   int p2c[2], int infd, int outfd, int errfd);
+#EOF
+#patch -ulbf libguile/posix-w32.c << EOF
+#@@ -604,3 +604,3 @@
+#    process.  */
+#-pid_t
+#+intptr_t
+# start_child (const char *exec_file, char **argv,
+#EOF
+## fix missing netinet/tcp.h in libguile/socket.c (version >= 2.2.4)
+#sed -i.bak -e "s?netinet/in\.h\|netinet/tcp\.h\|netdb\.h\|arpa/inet.h?winsock2.h?" libguile/socket.c
+## fix missing hostname in libguile/posix.c (version >= 2.2.4)
+#patch -ulbf libguile/posix.c << EOF
+#@@ -50,2 +50,6 @@
+# #include <unistd.h>
+#+#if defined(__MINGW32__) && defined(gethostname)
+#+#undef gethostname
+#+#include <winsock2.h>
+#+#endif
+#
+#EOF
+## fix missing SCM_INTERNAL in libguile/posix-w32.h (version >= 3.0.0)
+#mv libguile/posix-w32.h libguile/posix-w32.h.bak
+#cat > libguile/posix-w32.h << EOF
+##ifndef SCM_INTERNAL
+##define SCM_INTERNAL extern
+##endif
+#EOF
+#cat libguile/posix-w32.h.bak >> libguile/posix-w32.h
+## fix missing __mktime_internal in lib/timegm.c (version >= 2.2.7)
+#patch -ulbf lib/timegm.c << EOF
+#@@ -35,6 +35,10 @@
+# timegm (struct tm *tmp)
+# {
+#+#ifdef __MINGW32__
+#+  return _mkgmtime(tmp);
+#+#else
+#   static mktime_offset_t gmtime_offset;
+#   tmp->tm_isdst = 0;
+#   return __mktime_internal (tmp, __gmtime_r, &gmtime_offset);
+#+#endif
+# }
+#
+#EOF
 # fix lib/mktime-internal.h (version >= 3.0.6)
 patch -ulbf lib/mktime-internal.h << EOF
 @@ -48,4 +48,6 @@
@@ -92,22 +92,22 @@ mv libguile/socket.c libguile/socket.c.bak &&
 echo "#define _POSIX_SOURCE" > libguile/socket.c &&
 echo "#include <ws2tcpip.h>" >> libguile/socket.c &&
 cat libguile/socket.c.bak >> libguile/socket.c
-## fix missing timegm in lib/time_rz.c (version >= 3.0.6)
-#mv lib/time_rz.c lib/time_rz.c.bak
-#cat > lib/time_rz.c << EOF
-##include <config.h>
-##include <stdlib.h>
-##include <time.h>
-#inline time_t timegm (struct tm* tm) {
-#  time_t ret;
-#  putenv("TZ=");
-#  tzset();
-#  ret = mktime(tm);
-#  //to do: reset time zone to previous value
-#  return ret;
-#}
-#EOF
-#cat lib/time_rz.c.bak >> lib/time_rz.c
+# fix missing timegm in lib/time_rz.c (version >= 3.0.6)
+mv lib/time_rz.c lib/time_rz.c.bak
+cat > lib/time_rz.c << EOF
+#include <config.h>
+#include <stdlib.h>
+#include <time.h>
+inline time_t timegm (struct tm* tm) {
+  time_t ret;
+  putenv("TZ=");
+  tzset();
+  ret = mktime(tm);
+  //to do: reset time zone to previous value
+  return ret;
+}
+EOF
+cat lib/time_rz.c.bak >> lib/time_rz.c
 # fix lib/poll.h (version >= 2.2.7)
 mv lib/poll.h lib/poll.h.bak
 cat > lib/poll.h << EOF
