@@ -21,9 +21,11 @@ export TYPE=application
 #export VERSIONDATE=20221005
 #export VERSION=0.25.0
 #export VERSIONDATE=20230319
-export VERSION=0.26.0
-export VERSIONDATE=20230711
+#export VERSION=0.26.0
+#export VERSIONDATE=20230711
 ####Cannot found ECMWF BUFR library.  Please install it
+export VERSION=0.28.0
+export VERSIONDATE=20231219
 wl-showstatus --package-version
 export DEPENDENCIES=date-time
 export OPTIONALDEPENDENCIES=
@@ -33,12 +35,14 @@ export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
 export DOWNLOADURL="https://github.com/gbvalor/bufr2synop/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/gbvalor/bufr2synop/archive/refs/tags/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/gbvalor/bufr2synop/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/gbvalor/bufr2synop/archive/refs/tags/$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix missing exp10() (version >= 0.17.0)
 sed -i.bak -e "s/exp10\(\s*(\s*\)/pow\110.0, /g" $(grep -l exp10 $(find -name '*.c'))
@@ -75,6 +79,13 @@ patch -ulbf src/libraries/bufr2tac_synop.c << EOF
 +#endif
 
 EOF
+# fix undefined strlcpy (version >= 0.28.0)
+for F in $(grep -lw "strlcpy\|strlcat" $(find -name '*.c')); do
+ mv $F $F.bak &&
+ echo "#define strlcpy strncpy" > $F &&
+ echo "#define strlcat strncat" >> $F &&
+ cat $F.bak >> $F
+done
 wl-showstatus preconfigure &&
  mkdir -p m4 &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
