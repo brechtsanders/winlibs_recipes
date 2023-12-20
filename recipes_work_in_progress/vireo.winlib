@@ -8,7 +8,7 @@ export TYPE=library
 export VERSION=master
 export VERSIONDATE=20231220
 wl-showstatus --package-version
-export DEPENDENCIES=mman-win32
+export DEPENDENCIES=mman-win32,l-smash,ffmpeg4,libwebm,fdk-aac,libogg,libvorbis,libvpx,zlib
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -23,51 +23,88 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing files
-mkdir -p winfix
-cat > winfix/endian.h << EOF
-#define __LITTLE_ENDIAN 1234
-#define __BYTE_ORDER __LITTLE_ENDIAN
+## fix missing files
+#mkdir -p winfix
+#cat > winfix/endian.h << EOF
+##define __LITTLE_ENDIAN 1234
+##define __BYTE_ORDER __LITTLE_ENDIAN
+#EOF
+# fix imagecore/utils/endianutils.h
+patch -ulbf imagecore/utils/endianutils.h << EOF
+@@ -47,2 +47,23 @@
+ #define letoh64(x) OSSwapLittleToHostInt64(x)
++#elif defined(_WIN32)
++#define __LITTLE_ENDIAN 1234
++#define __BYTE_ORDER __LITTLE_ENDIAN
++#define htobe16(x) __builtin_bswap16(x)
++#define htole16(x) (x)
++#define betoh16(x) __builtin_bswap16(x)
++#define letoh16(x) (x)
++#define be16toh(x) __builtin_bswap16(x)
++#define le16toh(x) (x)
++#define htobe32(x) __builtin_bswap32(x)
++#define htole32(x) (x)
++#define betoh32(x) __builtin_bswap32(x)
++#define letoh32(x) (x)
++#define be32toh(x) __builtin_bswap32(x)
++#define le32toh(x) (x)
++#define htobe64(x) __builtin_bswap64(x)
++#define htole64(x) (x)
++#define betoh64(x) __builtin_bswap64(x)
++#define letoh64(x) (x)
++#define be64toh(x) __builtin_bswap64(x)
++#define le64toh(x) (x)
+ #else
 EOF
+# fix missing strlen in imagecore/formats/exif/exifcommon.h
+mv imagecore/formats/exif/exifcommon.h imagecore/formats/exif/exifcommon.h.bak &&
+echo "#include <cstring>" > imagecore/formats/exif/exifcommon.h &&
+cat imagecore/formats/exif/exifcommon.h.bak >> imagecore/formats/exif/exifcommon.h
+# fix missing strcasecmp in imagecore/formats/internal/raw.cpp
+mv imagecore/formats/internal/raw.cpp imagecore/formats/internal/raw.cpp.bak &&
+echo "#include <cstring>" > imagecore/formats/internal/raw.cpp &&
+cat imagecore/formats/internal/raw.cpp.bak >> imagecore/formats/internal/raw.cpp
+# fix missing memalign in imagecore/imagecore.h
+patch -ulbf imagecore/imagecore.h << EOF
+@@ -39,2 +39,4 @@
+ #define memalign(a, s) malloc(s)
++#elif defined(_WIN32)
++#define memalign(a, s) _aligned_malloc(s, a)
+ #else
+EOF
+# fix number of parameters to mkdir() in vireo/common/path.cpp (version >= master)
+patch -ulbf vireo/common/path.cpp << EOF
+@@ -69,3 +69,7 @@
+   }
++#ifdef _WIN32
++  if (mkdir(path.c_str()) != 0) {
++#else
+   if (mkdir(path.c_str(), 0777) != 0) {
++#endif
+     return 1;
+EOF
+# fix dllexport in vireo/base_h.h
+patch -ulbf vireo/base_h.h << EOF
+@@ -53,3 +53,5 @@
+ #if defined _WIN32 || defined __CYGWIN__
+-#ifdef BUILDING_DLL
++#ifdef STATIC
++#define PUBLIC
++#elif defined(BUILDING_DLL) || (defined(BUILDING_VIREO) && defined(DLL_EXPORT))
+ #ifdef __GNUC__
+EOF
+# fix vireo/settings/settings.cpp
+mv vireo/settings/settings.cpp vireo/settings/settings.cpp.bak &&
+echo "#define DLL_EXPORT" > vireo/settings/settings.cpp &&
+cat vireo/settings/settings.cpp.bak >> vireo/settings/settings.cpp
 wl-showstatus configure &&
- #wl-showstatus preconfigure &&
- #mkdir -p m4 &&
- ##libtoolize -f -i -c &&
- ##intltoolize -f -c &&
- #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- #./autogen.sh &&
- #    echo OK
- ## fix building DLLs on 64-bit
- #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
- # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
- #fi
- ## allow building shared libraries when using clang
- #if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
- # sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" configure
- # #sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" $(find -name configure)
- #fi &&
- ## fix confusion between MSVC and clang
- #if ${CC:-gcc} --version|grep -q "^clang"; then
- # sed -i.bak2 -e "s/\b\(cl\)\(\*\)/\1.exe\2/g; s/\(ld_shlibs\)=no/\1yes/" configure
- #fi &&
- #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
- #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
- #PYTHON=$PYDIR/python.exe 
- #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
- #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
  cd vireo &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-I$PWD/../winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-fpermissive -DBUILDING_VIREO -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/ffmpeg4/include -I$MINGWPREFIX/include/webm" LDFLAGS="-Wl,--as-needed -lmman -L$MINGWPREFIX/ffmpeg4/lib" &&
  cd .. &&
- ## fix building DLLs
- #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
- ## fix detection of shared libraries
- #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
- #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
- #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
- #wl-showstatus build &&
- #make &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" vireo/libtool imagecore/libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" vireo/libtool imagecore/libtool &&
  wl-showstatus build-install &&
  make -Cvireo install-strip &&
  #( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
