@@ -287,20 +287,23 @@ export TYPE=library
 #export VERSIONDATE=20231031
 #export VERSION=5.2.112
 #export VERSIONDATE=20231208
-export VERSION=5.3.0
-export VERSIONDATE=20231221
-wl-showstatus --package-version
-#export DEPENDENCIES=
-export DEPENDENCIES=polarssl
-#export DEPENDENCIES=mbedtls
-export OPTIONALDEPENDENCIES=
-#export BUILDDEPENDENCIES=cmake
+##export DEPENDENCIES=
+#export DEPENDENCIES=polarssl
+##export DEPENDENCIES=mbedtls
+#export OPTIONALDEPENDENCIES=
+##export BUILDDEPENDENCIES=cmake
+#export BUILDDEPENDENCIES=cmake,ninja
 #export OPTIONALBUILDDEPENDENCIES=
+#export VERSION=5.3.0
+#export VERSIONDATE=20231221
+export VERSION=5.3.1
+export VERSIONDATE=20231222
+wl-showstatus --package-version
+export DEPENDENCIES=bcunit,polarssl
+#export DEPENDENCIES=bcunit,mbedtls
+export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
-#export BUILDDEPENDENCIES=cmake,ninja,cunit
-#export OPTIONALBUILDDEPENDENCIES=
-#export LICENSEFILE=COPYING
 export LICENSEFILE=LICENSE.txt
 export LICENSETYPE=GPL
 #export DOWNLOADURL="https://github.com/BelledonneCommunications/bctoolbox/releases"
@@ -318,10 +321,31 @@ wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix redefinition of ssize_t
-#sed -i.bak -e "s?^typedef long ssize_t;?//&?; s?#define strtok_r strtok_s?#define strtok_r(_s,_sep,_lasts) (*(_lasts) = strtok((_s), (_sep)))?" include/bctoolbox/port.h
-sed -i.bak -e "s?^typedef long ssize_t;?//&?; s?^#define strtok_r strtok_s?//&?" include/bctoolbox/port.h
-sed -i.bak2 -e "s?^#ifdef BCTBX_EXPORTS?#if defined(BCTBX_EXPORTS) || defined(bctoolbox_EXPORT)?" include/bctoolbox/port.h
+## fix redefinition of ssize_t
+##sed -i.bak -e "s?^typedef long ssize_t;?//&?; s?#define strtok_r strtok_s?#define strtok_r(_s,_sep,_lasts) (*(_lasts) = strtok((_s), (_sep)))?" include/bctoolbox/port.h
+#sed -i.bak -e "s?^typedef long ssize_t;?//&?; s?^#define strtok_r strtok_s?//&?" include/bctoolbox/port.h
+#sed -i.bak2 -e "s?^#ifdef BCTBX_EXPORTS?#if defined(BCTBX_EXPORTS) || defined(bctoolbox_EXPORT)?" include/bctoolbox/port.h
+# fix include/bctoolbox/port.h (version >= 5.3.0)
+patch -ulbf include/bctoolbox/port.h << EOF
+@@ -249,3 +249,3 @@
+ #else
+-#ifdef BCTBX_EXPORTS
++#if defined(BCTBX_EXPORTS) || defined(bctoolbox_EXPORT)
+ #define BCTBX_PUBLIC __declspec(dllexport)
+@@ -263,4 +263,7 @@
+
+-#define strtok_r strtok_s
++//#define strtok_r strtok_s
+
++#ifdef __MINGW32__
++#include <stdint.h>
++#else
+ typedef unsigned __int64 uint64_t;
+@@ -273,2 +276,3 @@
+ typedef long ssize_t;
++#endif
+ #else
+EOF
 # fix missing AI_NUMERICSERV/_access and exports of __bctbx_* in src/utils/port.c
 mv src/utils/port.c src/utils/port.c.bak &&
 echo "#define _WIN32_WINNT 0x0600" > src/utils/port.c &&
@@ -383,6 +407,55 @@ patch -ulbf src/crypto/polarssl.c << EOF
 +int32_t bctbx_ssl_config_set_callback_cli_cert(bctbx_ssl_config_t *ssl_config, int(*callback_function)(void *, bctbx_ssl_context_t *, const bctbx_list_t *), void *callback_data) {
         if (ssl_config != NULL) {
 EOF
+# fix issue exporting symbol bcStandardVfs in src/vfs/vfs_standard.c (version >= 5.3.1)
+patch -ulbf src/vfs/vfs_standard.c << EOF
+@@ -49,3 +49,3 @@
+
+-bctbx_vfs_t bcStandardVfs = {
++BCTBX_PUBLIC bctbx_vfs_t bcStandardVfs = {
+     "bctbx_vfs", /* vfsName */
+EOF
+# fix include/bctoolbox/vfs_encrypted.hh (version >= 5.3.1)
+patch -ulbf include/bctoolbox/vfs_encrypted.hh << EOF
+@@ -77,3 +77,3 @@
+  */
+-const std::string encryptionSuiteString(const EncryptionSuite suite) noexcept;
++BCTBX_PUBLIC const std::string encryptionSuiteString(const EncryptionSuite suite) noexcept;
+
+@@ -92,3 +92,3 @@
+ /** Store in the bctbx_vfs_file_t userData field an object specific to encryption */
+-class VfsEncryption {
++class BCTBX_PUBLIC VfsEncryption {
+        /* Class properties and method */
+EOF
+# fix include/bctoolbox/crypto.hh (version >= 5.3.1)
+patch -ulbf include/bctoolbox/crypto.hh << EOF
+@@ -39,3 +39,3 @@
+  */
+-class RNG {
++class BCTBX_PUBLIC RNG {
+ public:
+@@ -93,3 +93,3 @@
+  */
+-std::string encodeBase64(const std::vector<uint8_t> &input);
++BCTBX_PUBLIC std::string encodeBase64(const std::vector<uint8_t> &input);
+
+@@ -101,3 +101,3 @@
+  */
+-std::vector<uint8_t> decodeBase64(const std::string &input);
++BCTBX_PUBLIC std::vector<uint8_t> decodeBase64(const std::string &input);
+
+@@ -322,3 +322,3 @@
+  */
+-int AES_key_wrap(const std::vector<uint8_t> &plaintext,
++BCTBX_PUBLIC int AES_key_wrap(const std::vector<uint8_t> &plaintext,
+                  const std::vector<uint8_t> &key,
+@@ -339,3 +339,3 @@
+  */
+-int AES_key_unwrap(const std::vector<uint8_t> &ciphertext,
++BCTBX_PUBLIC int AES_key_unwrap(const std::vector<uint8_t> &ciphertext,
+                    const std::vector<uint8_t> &key,
+EOF
 ## don't abort on warnings
 #sed -i.bak -e "s/-Wall//" CMakeLists.txt
 #mkdir -p build_static build_shared &&
@@ -407,6 +480,8 @@ patch -ulbf CMakeLists.txt << EOF
 EOF
 # avoid invalid compiler flags in CMakeLists.txt (version >= 5.2.0)
 sed -i.bak2 -e "s?add_definitions(-EHa)\|list(APPEND STRICT_OPTIONS_CXX \"/EHa\")?#&?g" src/CMakeLists.txt
+# fix IMPORTED_LOCATION not set errors in cmake/FindMbedTLS.cmake (version >= 5.3.0)
+sed -i.bak -e "s/WIN32/MSVC/" cmake/FindMbedTLS.cmake
 #mkdir -p build_win &&
 # wl-showstatus configure &&
 # #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_win &&
@@ -416,15 +491,30 @@ sed -i.bak2 -e "s?add_definitions(-EHa)\|list(APPEND STRICT_OPTIONS_CXX \"/EHa\"
 # wl-showstatus build-install &&
 # ninja -Cbuild_win install/strip &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
+# #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
+# #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+# #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+# #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+# # fix missing link libraries
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ldbghelp/" build_shared/build.ninja &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
- #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC" -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_MBEDTLS=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC -fpermissive" -S. -Bbuild_static &&
+ #-DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON 
  wl-showstatus configure &&
- #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=ON -DENABLE_MBEDTLS=OFF -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
- #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON -DENABLE_TESTS:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_MBEDTLS=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -S. -Bbuild_shared -DCMAKE_CXX_FLAGS:STRING="-fpermissive" &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ldbghelp/" build_shared/build.ninja &&
  wl-showstatus build-install &&
