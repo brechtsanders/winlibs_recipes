@@ -1,0 +1,56 @@
+export NAME="GkWare TFTP Client & Server"
+export STATUS=
+export URL=https://www.streamguru.de/home/tftp-client-server/
+export BASENAME=gkware-tftp
+export DESCRIPTION="TFTP client and server for Windows, with RFC2348 (Blocksize option) and RFC 2349 (Timeout interval, Transfer size option)"
+export CATEGORY=communication
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20231223
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/GkWare-e-K-Streamguru/TFTP/tags tftp-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/GkWare-e-K-Streamguru/TFTP/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd TFTP-$VERSION
+# fix undefined min() in Source/TFTP.cpp
+mv Source/TFTP.cpp Source/TFTP.cpp.bak
+cat > Source/TFTP.cpp << EOF
+#include <stdlib.h>
+#ifndef min
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+EOF
+cat Source/TFTP.cpp.bak >> Source/TFTP.cpp
+wl-showstatus build &&
+ touch SUCCESS &&
+ for F in $(find Source -name '*.cpp'); do
+  echo CXX $F
+  ${CXX:-g++} -c -o $F.o $F -O3 -fpermissive || ( rm -f SUCCESS; false ) || break
+ done &&
+ for F in $(find Source -name '*.rc'); do
+  echo RC $F
+  ${WINDRES:-windres} $F $F.o || ( rm -f SUCCESS; false ) || break
+ done &&
+ rm SUCCESS &&
+ ${CXX:-g++} -s -o TFTPClient.exe Source/*.o Source/TFTPClient/*.o -lws2_32 &&
+ ${CXX:-g++} -s -o TFTPServer.exe Source/*.o Source/TFTPServer/*.o -lws2_32 &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/share/GkWare/bin &&
+ cp *.exe $INSTALLPREFIX/share/GkWare/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf TFTP-$VERSION
+####$MINGWPREFIX/share/GkWare/bin/TFTPServer.exe
+####$MINGWPREFIX/share/GkWare/bin/TFTPClient.exe
+
+
+
