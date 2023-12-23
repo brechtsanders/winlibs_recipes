@@ -1,0 +1,53 @@
+export NAME="libucl"
+export STATUS=
+export URL=https://github.com/vstakhov/libucl
+export BASENAME=libucl
+export DESCRIPTION="Universal configuration library parser"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=0.8.2
+export VERSIONDATE=20231223
+wl-showstatus --package-version
+export DEPENDENCIES=libcurl,openssl,mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/vstakhov/libucl/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/vstakhov/libucl/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix conflict with utstring.h from uthash in src/ucl_internal.h
+patch -ulbf src/ucl_internal.h << EOF
+@@ -124,3 +124,3 @@
+ #include "utlist.h"
+-#include "utstring.h"
++#include "../uthash/utstring.h"
+ #include "uthash.h"
+EOF
+# fix src/ucl_util.c (version >= 0.8.2)
+mv src/ucl_util.c src/ucl_util.c.bak &&
+echo "#include <mman-win32/sys/mman.h>" > src/ucl_util.c &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" >> src/ucl_util.c &&
+cat src/ucl_util.c.bak >> src/ucl_util.c
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_UTILS:BOOL=OFF -DENABLE_LUAJIT:BOOL=ON -DENABLE_URL_INCLUDE:BOOL=ON -DENABLE_URL_SIGN:BOOL=ON -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_UTILS:BOOL=OFF -DENABLE_LUAJIT:BOOL=ON -DENABLE_URL_INCLUDE:BOOL=ON -DENABLE_URL_SIGN:BOOL=ON -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lmman/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
