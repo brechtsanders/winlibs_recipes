@@ -1,0 +1,153 @@
+export NAME="lanrat TFTP"
+export STATUS=
+export URL=https://github.com/lanrat/tftp
+export BASENAME=lanrat-tftp
+export DESCRIPTION="A simple TFTP server and client"
+export CATEGORY=communication
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20231223
+wl-showstatus --package-version
+export DEPENDENCIES=win32-fork
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/lanrat/tftp/tags tftp-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/lanrat/tftp/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd tftp-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/arpa/inet.h
+# fix packets.h
+patch -ulbf packets.h << EOF
+@@ -3,2 +3,11 @@
+
++#ifdef __MINGW32__
++#include <stdint.h>
++#include <windows.h>
++#define u_int8_t uint8_t
++#define u_int16_t uint16_t
++#undef ERROR
++#define ERROR TFT_ERROR
++#endif
++
+ #define MAX_STRING_SIZE 1024
+EOF
+# fix packets.c
+patch -ulbf packets.c << EOF
+@@ -1,2 +1,5 @@
+ #include "tftp.h"
++#ifdef __MINGW32__
++#define bzero(b,len) memset(b, 0, len)
++#endif
+
+EOF
+# fix pong.c
+patch -ulbf pong.c << EOF
+@@ -1,2 +1,6 @@
+ #include "tftp.h"
++#ifdef __MINGW32__
++#include <io.h>
++#define bzero(b,len) memset(b, 0, len)
++#endif
+
+@@ -122,2 +126,3 @@
+   size_t cli_size = sizeof(cli_addr);
++#ifndef __MINGW32__
+   struct sigaction myAction;
+@@ -133,2 +138,3 @@
+   if (sigaction(SIGALRM,&myAction,0) < 0)
++#endif
+   {
+EOF
+# fix tftpclient.c
+patch -ulbf tftpclient.c << EOF
+@@ -1,2 +1,5 @@
+ #include "tftp.h"
++#ifdef __MINGW32__
++#define bzero(b,len) memset(b, 0, len)
++#endif
+
+@@ -145,2 +148,9 @@
+ {
++#ifdef _WIN32
++  static WSADATA wsaData;
++  if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
++    return(9999);
++  atexit((void(*)())WSACleanup);
++#endif
++
+   int port = SERV_UDP_PORT;
+@@ -162,6 +172,6 @@
+         putFile(port,argv[argOffset+1]);
+-        return;
++        return 0;
+       case 'r':
+         getFile(port,argv[argOffset+1]);
+-        return;
++        return 0;
+       default:
+EOF
+# fix tftpserver.c
+patch -ulbf tftpserver.c << EOF
+@@ -1,2 +1,7 @@
+ #include "tftp.h"
++#ifdef __MINGW32__
++#include <io.h>
++#include <win32fork.h>
++#define bzero(b,len) memset(b, 0, len)
++#endif
+
+@@ -175,3 +180,7 @@
+       //close the parents Socket, we will make our own
++#ifdef _WIN32
++      closesocket(sockfd);
++#else
+       close(sockfd);
++#endif
+       childCount++;
+@@ -193,3 +202,7 @@
+   }
++#ifdef _WIN32
++  closesocket(sockfd);
++#else
+   close(sockfd);
++#endif
+ }
+@@ -199,2 +212,9 @@
+ {
++#ifdef _WIN32
++  static WSADATA wsaData;
++  if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
++    return(9999);
++  atexit((void(*)())WSACleanup);
++#endif
++
+   int port = SERV_UDP_PORT;
+EOF
+# fix missing fork() in tftpserver.c
+mv tftpserver.c tftpserver.c.bak &&
+echo "#include <win32fork.h>" > tftpserver.c &&
+cat tftpserver.c.bak >> tftpserver.c
+# fix missing link libraries
+sed -i.bak -e "s/\${CXX} \${flags}.*$/& -s -lws2_32 -lwin32fork/" Makefile
+wl-showstatus build &&
+ make CXX=${CC:-gcc} flags="-D_POSIX -D__USE_MINGW_ALARM -I$PWD/winfix" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/share/lanrat-tftp/bin &&
+ cp -f *.exe $INSTALLPREFIX/share/lanrat-tftp/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tftp-$VERSION
+####TO DO: make client work
+
+
+

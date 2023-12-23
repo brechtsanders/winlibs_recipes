@@ -5,9 +5,12 @@ export BASENAME=tftp-hpa
 export DESCRIPTION="tftp-hpa is an enhanced version of the BSD TFTP client and server."
 export CATEGORY=communication
 export TYPE=application
-export VERSION=0.40
-export VERSIONDATE=20191218
+#export VERSION=0.40
+#export VERSIONDATE=20191218
 ####configure: error: inet_aton not found
+export VERSION=5.2
+export VERSIONDATE=20231223
+####configure: error: getaddrinfo but not gai_strerror found
 wl-showstatus --package-version
 export DEPENDENCIES=readline
 export OPTIONALDEPENDENCIES=
@@ -15,31 +18,40 @@ export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=
 export LICENSETYPE=
-export DOWNLOADURL="https://mirrors.edge.kernel.org/pub/software/network/tftp/"
+#export DOWNLOADURL="https://mirrors.edge.kernel.org/pub/software/network/tftp/"
+export DOWNLOADURL="https://git.kernel.org/pub/scm/network/tftp/tftp-hpa.git/"
+#export DOWNLOADURL="https://github.com/Distrotech/tftp-hpa/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://mirrors.edge.kernel.org/pub/software/network/tftp/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://mirrors.edge.kernel.org/pub/software/network/tftp/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://git.kernel.org/pub/scm/network/tftp/tftp-hpa.git/snapshot/$BASENAME-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-wl-showstatus configure &&
-# mkdir -p m4 &&
-# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
-#./autogen.sh &&
-#    echo OK
-## fix building DLLs on 64-bit
-#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
-# echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
-# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
-#fi
-#INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
-#PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
-#PYTHON=$PYDIR/python.exe 
-#PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# fix missing files
+mkdir -p winfix/sys
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
+#sed -i.bak -e "s/\[AC_MSG_ERROR(\(getaddrinfo but not gai_strerror found\|inet_aton not found\))\]//; s/\(AC_CHECK_HEADERS(\)winsock2\.h\()\)/&\n\1ws2tcpip.h\2/; s/#ifdef HAVE_SYS_SOCKET_H/#include <winsock2.h>\n#include <ws2tcpip.h>\n&/; s/\(\[\)\(nsl resolv\]\)/\1ws2_32 \2/" configure.in
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PWD/winfix" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  #wl-showstatus build &&
