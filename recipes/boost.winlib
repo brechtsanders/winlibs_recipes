@@ -493,6 +493,104 @@
 
 
 
+#export NAME="boost"
+#export STATUS=
+#export URL=http://www.boost.org/
+##export URL=https://github.com/boostorg/boost
+#export BASENAME=boost
+#export DESCRIPTION="Boost provides free peer-reviewed portable C++ source libraries."
+#export CATEGORY=portability
+#export TYPE=library
+##export VERSION=1.81.0
+##export VERSIONDATE=20221215
+#export VERSION=1.82.0
+#export VERSIONDATE=20230414
+#wl-showstatus --package-version
+#export DEPENDENCIES=zlib,libbz2,xz,zstd,icu,libiconv,expat,pcre
+#export OPTIONALDEPENDENCIES=libbacktrace
+#export BUILDDEPENDENCIES=b2,jwasm,pexports
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE_1_0.txt
+#export LICENSETYPE=BSL
+##export DOWNLOADURL="https://sourceforge.net/projects/boost/files/boost/"
+##export DOWNLOADURL="https://github.com/boostorg/boost/releases"
+#export DOWNLOADURL="https://github.com/boostorg/boost/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/boost/boost/$VERSION/boost_$(echo $VERSION|sed -e "s/\./_/g").tar.bz2
+#export DOWNLOADSOURCEURL=https://github.com/boostorg/boost/releases/download/boost-$VERSION/boost-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+##tar xj --force-local -f $TARBALLDIR/$BASENAME/boost_$(echo $VERSION|sed -e "s/\./_/g").tar.bz2
+##cd boost_$(echo $VERSION|sed -e "s/\./_/g")
+#tar xJ --force-local -f $TARBALLDIR/$BASENAME/boost-$VERSION.tar.xz
+#cd boost-$VERSION
+### fix boost/stacktrace/detail/frame_msvc.ipp (version >= 1.81.0)
+##patch -ulbf boost/stacktrace/detail/frame_msvc.ipp << EOF
+##@@ -29,2 +29,3 @@
+##
+##+#if 0
+## #ifdef __CRT_UUID_DECL // for __MINGW32__
+##@@ -38,2 +39,3 @@
+## #endif
+##+#endif
+##
+##EOF
+##wl-showstatus preconfigure &&
+## $COMSPEC //C "CD tools\\build & bootstrap.bat $(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi)" &&
+#wl-showstatus build-install &&
+# PATH=$PYDIR:$PATH BOOST_ROOT=$PWD MINGW=/ \
+# $MINGWPREFIX/share/b2/bin/b2.exe - --prefix=$INSTALLPREFIX --build-dir=build_win \
+#  --build-type=complete \
+#  --layout=tagged \
+#  --disable-filesystem2 \
+#  --without-mpi \
+#  --without-stacktrace \
+#  --without-graph_parallel \
+#  $(if ( echo $RUNPLATFORM | grep -q "^\(arm\|aarch64\)" ); then echo "--without-python"; fi) \
+#  toolset=$(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi) \
+#  target-os=windows \
+#  abi=ms \
+#  link=static,shared \
+#  runtime-link=static,shared \
+#  variant=release \
+#  threading=single,multi \
+#  threadapi=win32 $(if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then echo "--without-coroutine --without-context context-impl=winfib"; else echo "context-impl=fcontext"; fi) \
+#  architecture=$(if ( echo $RUNPLATFORM | grep -q "^\(arm\|aarch64\)" ); then echo "arm"; else echo "x86"; fi) \
+#  address-model=$(if ( echo $RUNPLATFORM | grep -q "^i.86" ); then echo 32; else echo 64; fi) \
+#  cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG -fpermissive $(if ${CC:-gcc} --version|grep -q clang; then echo "-femulated-tls"; fi)" \
+#  linkflags="-pthread" \
+#  stage install &&
+# #--with-stacktrace
+# #abi=aapcs (maybe needed for aarch64?)
+# #threading=single$(if ( echo $RUNPLATFORM | grep -vq "^aarch64" ); then echo ",multi"; fi) \
+# # threadapi=pthread --without-coroutine --without-context \
+# # linkflags="-pthread -Wl,--as-needed -licuuc -licudata -licui18n -licuin" \
+# mkdir -p $INSTALLPREFIX/bin &&
+# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+# # fix missing .dll.a files when building with LLVM/CLang
+# if ${CC:-gcc} --version|grep -q clang && ! ls -1 $INSTALLPREFIX/lib/*-[xa][36][24].dll.a &> /dev/null; then
+#  for F in $INSTALLPREFIX/bin/*.dll; do
+#   #dlltool -D $F -l $INSTALLPREFIX/lib/$(basename $F|sed -e "s/\.dll$/&.a/")
+#   pexports $F > $F.def &&
+#   ${DLLTOOL:-dlltool} -D $F -d $F.def -l $INSTALLPREFIX/lib/$(basename $F|sed -e "s/\.dll$/&.a/")
+#  done
+# fi &&
+# # remove architecture suffix from library names (version >= 1.69.0)
+# for F in $INSTALLPREFIX/lib/*-[xa][36][24].a $INSTALLPREFIX/lib/*-[xa][36][24].dll.a; do
+#  cp -f $F $(echo $F | sed -e "s/-[xa][36][24]\(\.a\|\.dll\.a\)$/\1/")
+# done &&
+# ## also install bjam and b2 (version >= 1.72.0)
+# #cp -f tools/build/src/engine/b*.exe $INSTALLPREFIX/bin/ &&
+# # fix absolute link in .cmake file(s)
+# touch dummy &&
+# #sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $(grep -l "$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")" $INSTALLPREFIX/lib/cmake/*/*.cmake) dummy &&
+# sed -i -e "s?$(cygpath -m $INSTALLPREFIX)?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $(grep -l "$(cygpath -m $INSTALLPREFIX)" $INSTALLPREFIX/lib/cmake/*/*.cmake) dummy &&
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf boost_$(echo $VERSION|sed -e "s/\./_/g")
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf boost-$VERSION
+
+
+
 export NAME="boost"
 export STATUS=
 export URL=http://www.boost.org/
@@ -501,21 +599,20 @@ export BASENAME=boost
 export DESCRIPTION="Boost provides free peer-reviewed portable C++ source libraries."
 export CATEGORY=portability
 export TYPE=library
-#export VERSION=1.81.0
-#export VERSIONDATE=20221215
-export VERSION=1.82.0
-export VERSIONDATE=20230414
 #export VERSION=1.83.0
 #export VERSIONDATE=20230812
+export VERSION=1.84.0
+export VERSIONDATE=20231224
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,libbz2,xz,zstd,icu,expat,libiconv,pcre
+export DEPENDENCIES=zlib,libbz2,xz,zstd,icu,libiconv,expat,pcre
 export OPTIONALDEPENDENCIES=libbacktrace
-export BUILDDEPENDENCIES=b2,jwasm,pexports
+export BUILDDEPENDENCIES=cmake,ninja,jwasm
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE_1_0.txt
 export LICENSETYPE=BSL
 #export DOWNLOADURL="https://sourceforge.net/projects/boost/files/boost/"
-export DOWNLOADURL="https://github.com/boostorg/boost/releases"
+#export DOWNLOADURL="https://github.com/boostorg/boost/releases"
+export DOWNLOADURL="https://github.com/boostorg/boost/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/boost/boost/$VERSION/boost_$(echo $VERSION|sed -e "s/\./_/g").tar.bz2
 export DOWNLOADSOURCEURL=https://github.com/boostorg/boost/releases/download/boost-$VERSION/boost-$VERSION.tar.xz
@@ -526,68 +623,33 @@ wl-wait4deps
 #cd boost_$(echo $VERSION|sed -e "s/\./_/g")
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/boost-$VERSION.tar.xz
 cd boost-$VERSION
-## fix boost/stacktrace/detail/frame_msvc.ipp (version >= 1.81.0)
-#patch -ulbf boost/stacktrace/detail/frame_msvc.ipp << EOF
-#@@ -29,2 +29,3 @@
-#
-#+#if 0
-# #ifdef __CRT_UUID_DECL // for __MINGW32__
-#@@ -38,2 +39,3 @@
-# #endif
-#+#endif
-#
-#EOF
-#wl-showstatus preconfigure &&
-# $COMSPEC //C "CD tools\\build & bootstrap.bat $(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi)" &&
-wl-showstatus build-install &&
- PATH=$PYDIR:$PATH BOOST_ROOT=$PWD MINGW=/ \
- $MINGWPREFIX/share/b2/bin/b2.exe -q --prefix=$INSTALLPREFIX --build-dir=build_win \
-  --build-type=complete \
-  --layout=tagged \
-  --disable-filesystem2 \
-  --without-mpi \
-  --without-stacktrace \
-  --without-graph_parallel \
-  $(if ( echo $RUNPLATFORM | grep -q "^\(arm\|aarch64\)" ); then echo "--without-python"; fi) \
-  toolset=$(if ${CXX:-g++} --version | grep clang -q; then echo "clang"; else echo "gcc"; fi) \
-  target-os=windows \
-  abi=ms \
-  link=static,shared \
-  runtime-link=static,shared \
-  variant=release \
-  threading=single,multi \
-  threadapi=win32 $(if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then echo "--without-coroutine --without-context context-impl=winfib"; else echo "context-impl=fcontext"; fi) \
-  architecture=$(if ( echo $RUNPLATFORM | grep -q "^\(arm\|aarch64\)" ); then echo "arm"; else echo "x86"; fi) \
-  address-model=$(if ( echo $RUNPLATFORM | grep -q "^i.86" ); then echo 32; else echo 64; fi) \
-  cxxflags="-fpermissive -DBOOST_LOG_WITHOUT_SYSLOG -fpermissive $(if ${CC:-gcc} --version|grep -q clang; then echo "-femulated-tls"; fi)" \
-  linkflags="-pthread" \
-  stage install &&
- #--with-stacktrace
- #abi=aapcs (maybe needed for aarch64?)
- #threading=single$(if ( echo $RUNPLATFORM | grep -vq "^aarch64" ); then echo ",multi"; fi) \
- # threadapi=pthread --without-coroutine --without-context \
- # linkflags="-pthread -Wl,--as-needed -licuuc -licudata -licui18n -licuin" \
- mkdir -p $INSTALLPREFIX/bin &&
- mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
- # fix missing .dll.a files when building with LLVM/CLang
- if ${CC:-gcc} --version|grep -q clang && ! ls -1 $INSTALLPREFIX/lib/*-[xa][36][24].dll.a &> /dev/null; then
-  for F in $INSTALLPREFIX/bin/*.dll; do
-   #dlltool -D $F -l $INSTALLPREFIX/lib/$(basename $F|sed -e "s/\.dll$/&.a/")
-   pexports $F > $F.def &&
-   ${DLLTOOL:-dlltool} -D $F -d $F.def -l $INSTALLPREFIX/lib/$(basename $F|sed -e "s/\.dll$/&.a/")
-  done
- fi &&
- # remove architecture suffix from library names (version >= 1.69.0)
- for F in $INSTALLPREFIX/lib/*-[xa][36][24].a $INSTALLPREFIX/lib/*-[xa][36][24].dll.a; do
-  cp -f $F $(echo $F | sed -e "s/-[xa][36][24]\(\.a\|\.dll\.a\)$/\1/")
- done &&
- ## also install bjam and b2 (version >= 1.72.0)
- #cp -f tools/build/src/engine/b*.exe $INSTALLPREFIX/bin/ &&
- # fix absolute link in .cmake file(s)
- touch dummy &&
- #sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $(grep -l "$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")" $INSTALLPREFIX/lib/cmake/*/*.cmake) dummy &&
- sed -i -e "s?$(cygpath -m $INSTALLPREFIX)?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $(grep -l "$(cygpath -m $INSTALLPREFIX)" $INSTALLPREFIX/lib/cmake/*/*.cmake) dummy &&
- #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf boost_$(echo $VERSION|sed -e "s/\./_/g")
+# fix missing Windows functions
+for F in libs/fiber/src/numa/windows/*.cpp; do
+mv $F $F.bak &&
+cat > $F << EOF &&
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
+EOF
+cat $F.bak >> $F
+done
+## fix missing libs/CMakeLists.txt
+#ls -1 libs/CMakeLists.txt &> /dev/null || ls -1 libs/*/CMakeLists.txt|sed -e "s?libs/\(.*\)/CMakeLists\.txt?ADD_SUBDIRECTORY(\1)?" > libs/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBOOST_RUNTIME_LINK:STRING=static -DBOOST_INSTALL_LAYOUT:STRING=tagged -DBOOST_THREAD_THREADAPI:STRING=win32 -DBOOST_CONTEXT_IMPLEMENTATION:STRING=$(if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then echo "winfib"; else echo "fcontext"; fi) -DBOOST_FIBER_NUMA_TARGET_OS:STRING=windows -DBOOST_IOSTREAMS_ENABLE_ZLIB:BOOL=ON -DBOOST_IOSTREAMS_ENABLE_BZIP2:BOOL=ON -DBOOST_IOSTREAMS_ENABLE_LZMA:BOOL=ON -DBOOST_IOSTREAMS_ENABLE_ZSTD:BOOL=OFF -DBOOST_ENABLE_PYTHON:BOOL=ON -DBOOST_URL_BUILD_EXAMPLES:BOOL=OFF -DBOOST_URL_BUILD_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DBOOST_IOSTREAMS_ENABLE_ZSTD:BOOL=ON 
+ #-DBOOST_REGEX_STANDALONE:BOOL=ON 
+ #-DBOOST_THREAD_THREADAPI:STRING=pthread 
+ wl-showstatus configure &&
+ PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBOOST_RUNTIME_LINK:STRING=shared -DBOOST_INSTALL_LAYOUT:STRING=tagged -DBOOST_THREAD_THREADAPI:STRING=win32 -DBOOST_CONTEXT_IMPLEMENTATION:STRING=$(if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then echo "winfib"; else echo "fcontext"; fi) -DBOOST_FIBER_NUMA_TARGET_OS:STRING=windows -DBOOST_IOSTREAMS_ENABLE_ZLIB:BOOL=ON -DBOOST_IOSTREAMS_ENABLE_BZIP2:BOOL=ON -DBOOST_IOSTREAMS_ENABLE_LZMA:BOOL=ON -DBOOST_IOSTREAMS_ENABLE_ZSTD:BOOL=OFF -DBOOST_ENABLE_PYTHON:BOOL=ON -DBOOST_URL_BUILD_EXAMPLES:BOOL=OFF -DBOOST_URL_BUILD_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf boost-$VERSION
 
 
