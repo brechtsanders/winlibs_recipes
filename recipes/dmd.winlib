@@ -221,32 +221,60 @@ tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # use prebuilt binary to avoid bootstrap
 unzip -oq $TARBALLDIR/$BASENAME/dmd.$VERSION.windows.zip -dprebuilt
-# fix compiler/src/dmd/link.d (version >= 2.105.2)
+## fix compiler/src/dmd/link.d (version >= 2.105.2)
+#patch -ulbf compiler/src/dmd/link.d << EOF
+#@@ -239,3 +239,3 @@
+#
+#-    version (Windows)
+#+    version (Windows_MSVC)
+#     {
+#@@ -481,3 +481,3 @@
+#     }
+#-    else version (Posix)
+#+    else version (MinGW)
+#     {
+#@@ -512,3 +512,3 @@
+#         }
+#-        else version (Posix)
+#+        else version (MinGW)
+#         {
+#@@ -1050,3 +1050,3 @@
+#     //printf("runPreprocessor() cpp: %.*s filename: %.*s\\n", cast(int)cpp.length, cpp.ptr, cast(int)filename.length, filename.ptr);
+#-    version (Windows)
+#+    version (Windows_MSVC)
+#     {
+#@@ -1261,3 +1261,3 @@
+#     }
+#-    else version (Posix)
+#+    else version (MinGW)
+#     {
+#EOF
+# fix compiler/src/dmd/link.d (version >= 2.106.0)
 patch -ulbf compiler/src/dmd/link.d << EOF
 @@ -239,3 +239,3 @@
 
 -    version (Windows)
 +    version (Windows_MSVC)
      {
-@@ -481,3 +481,3 @@
+@@ -485,3 +485,3 @@
      }
 -    else version (Posix)
-+    else version (MinGW)
++    else version (Windows)
      {
-@@ -512,3 +512,3 @@
+@@ -516,3 +516,3 @@
          }
 -        else version (Posix)
-+        else version (MinGW)
++        else version (Windows)
          {
-@@ -1050,3 +1050,3 @@
+@@ -1055,3 +1055,3 @@
      //printf("runPreprocessor() cpp: %.*s filename: %.*s\\n", cast(int)cpp.length, cpp.ptr, cast(int)filename.length, filename.ptr);
 -    version (Windows)
 +    version (Windows_MSVC)
      {
-@@ -1261,3 +1261,3 @@
+@@ -1266,3 +1266,3 @@
      }
 -    else version (Posix)
-+    else version (MinGW)
++    else version (Windows)
      {
 EOF
 wl-showstatus build &&
@@ -259,3 +287,111 @@ wl-showstatus build &&
 
 
 
+wl-showstatus build-stage1 &&
+ #LINKCMD=${LD:-ld} LINKCMD64=${LD:-ld} PATH=$PWD/prebuilt/dmd2/windows/bin$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi):$PATH INSTALL_DIR=$PWD/stage2 AUTO_BOOTSTRAP=0 ENABLE_RELEASE=1 MODEL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) BUILD=release HOST_DMD=$PWD/stage1/windows/bin/dmd.exe $PWD/stage1/windows/bin/dmd.exe -I$PWD/druntime/src -I$PWD/prebuilt/dmd2/src/phobos -run compiler/src/build.d install &&
+ PATH=$PWD/prebuilt/dmd2/windows/bin$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi):$PATH AUTO_BOOTSTRAP=0 ENABLE_RELEASE=1 ENABLE_DEBUG=0 ENABLE_COVERAGE=1 MODEL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) BUILD=release HOST_DMD=$(PATH=$PWD/prebuilt/dmd2/windows/bin$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi):$PATH which dmd.exe) dmd.exe -run compiler/src/build.d &&
+ touch compiler/src/dmd/root/root.h &&
+ wl-showstatus install-stage1 &&
+ PATH=$PWD/prebuilt/dmd2/windows/bin$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi):$PATH AUTO_BOOTSTRAP=0 ENABLE_RELEASE=1 ENABLE_DEBUG=0 ENABLE_COVERAGE=1 MODEL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) BUILD=release HOST_DMD=$(PATH=$PWD/prebuilt/dmd2/windows/bin$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi):$PATH which dmd.exe) dmd.exe -run compiler/src/build.d install INSTALL_DIR=$PWD/stage1 &&
+ cp -u $PWD/prebuilt/dmd2/windows/bin$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; fi)/*.dll $PWD/stage1/windows/bin/ &&
+ cp -rf $PWD/prebuilt/dmd2/src/phobos $PWD/prebuilt/dmd2/src/druntime stage1/src/ &&
+ wl-showstatus build &&
+ #PATH=$PWD/stage1/windows/bin:$PATH INSTALL_DIR=$PWD/stage2 AUTO_BOOTSTRAP=0 ENABLE_RELEASE=1 MODEL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) BUILD=release HOST_DMD=$PWD/stage1/windows/bin/dmd.exe $PWD/stage1/windows/bin/dmd.exe -I$PWD/druntime/src -I$PWD/prebuilt/dmd2/src/phobos -run compiler/src/build.d install &&
+ LINKCMD=${LD:-ld} LINKCMD64=${LD:-ld} PATH=$PWD/stage1/windows/bin:$PATH AUTO_BOOTSTRAP=0 ENABLE_RELEASE=1 ENABLE_DEBUG=0 ENABLE_COVERAGE=1 MODEL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) BUILD=release HOST_DMD=$(PATH=$PWD/stage1/windows/bin:$PATH which dmd.exe) dmd.exe -run compiler/src/build.d &&
+ #DFLAGS=$PWD/prebuilt/dmd2/src/druntime:$PWD/prebuilt/dmd2/src/druntime/import 
+ #touch compiler/src/dmd/root/root.h &&
+ wl-showstatus install &&
+ PATH=$PWD/stage1/windows/bin:$PATH AUTO_BOOTSTRAP=0 ENABLE_RELEASE=1 ENABLE_DEBUG=0 ENABLE_COVERAGE=1 MODEL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo 64; else echo 32; fi) BUILD=release HOST_DMD=$(PATH=$PWD/stage1/windows/bin:$PATH which dmd.exe) dmd.exe -run compiler/src/build.d install INSTALL_DIR=$PWD/stage1 &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+# fix compiler/src/dmd/link.d (version >= 2.106.0)
+patch -ulbf compiler/src/dmd/link.d << EOF
+@@ -247,3 +247,6 @@
+             OutBuffer cmdbuf;
+-            cmdbuf.writestring("/NOLOGO");
++            version (MinGW) {
++           } else {
++                cmdbuf.writestring("/NOLOGO");
++           }
+             for (size_t i = 0; i < global.params.objfiles.length; i++)
+@@ -262,3 +265,7 @@
+             {
+-                cmdbuf.writestring("/OUT:");
++                version (MinGW) {
++                    cmdbuf.writestring("-o ");
++               } else {
++                    cmdbuf.writestring("/OUT:");
++               }
+                 writeFilename(&cmdbuf, global.params.exefile);
+@@ -275,3 +282,7 @@
+             {
+-                cmdbuf.writestring("/MAP:");
++                version (MinGW) {
++                    cmdbuf.writestring("-Xlinker -Map=");
++               } else {
++                    cmdbuf.writestring("/MAP:");
++               }
+                 writeFilename(&cmdbuf, global.params.mapfile);
+@@ -280,3 +291,7 @@
+             {
+-                cmdbuf.writestring("/MAP:");
++                version (MinGW) {
++                    cmdbuf.writestring("-Xlinker -Map=");
++               } else {
++                    cmdbuf.writestring("/MAP:");
++               }
+                 writeFilename(&cmdbuf, getMapFilename());
+@@ -286,3 +301,7 @@
+                 cmdbuf.writeByte(' ');
+-                cmdbuf.writestring("/DEFAULTLIB:");
++                version (MinGW) {
++                    cmdbuf.writestring("-l");
++               } else {
++                    cmdbuf.writestring("/DEFAULTLIB:");
++               }
+                 writeFilename(&cmdbuf, global.params.libfiles[i]);
+@@ -292,3 +311,7 @@
+                 cmdbuf.writeByte(' ');
+-                cmdbuf.writestring("/DEF:");
++                version (MinGW) {
++                    cmdbuf.writestring("-def ");
++               } else {
++                    cmdbuf.writestring("/DEF:");
++               }
+                 writeFilename(&cmdbuf, global.params.deffile);
+@@ -298,7 +321,19 @@
+                 cmdbuf.writeByte(' ');
+-                cmdbuf.writestring("/DEBUG");
++                version (MinGW) {
++                    cmdbuf.writestring("-g");
++               } else {
++                    cmdbuf.writestring("/DEBUG");
++               }
+                 // in release mode we need to reactivate /OPT:REF after /DEBUG
+-                if (global.params.release)
+-                    cmdbuf.writestring(" /OPT:REF");
+-            }
++                if (global.params.release) {
++                    version (MinGW) {
++                   } else {
++                        cmdbuf.writestring(" /OPT:REF");
++                   }
++               }
++            } else {
++                version (MinGW) {
++                    cmdbuf.writestring(" -s");
++               }
++           }
+             if (driverParams.dll)
+@@ -306,3 +341,7 @@
+                 cmdbuf.writeByte(' ');
+-                cmdbuf.writestring("/DLL");
++                version (MinGW) {
++                    cmdbuf.writestring("-shared");
++               } else {
++                    cmdbuf.writestring("/DLL");
++               }
+             }
+EOF
