@@ -1,0 +1,52 @@
+export NAME="libbytesize"
+export STATUS=
+export URL=https://github.com/storaged-project/libbytesize
+export BASENAME=libbytesize
+export DESCRIPTION="A tiny library providing a C \"class\" for working with arbitrary big sizes in bytes"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=2.10
+export VERSIONDATE=20231228
+wl-showstatus --package-version
+export DEPENDENCIES=gmp,mpfr,pcre2,gettext
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/storaged-project/libbytesize/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/storaged-project/libbytesize/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/bs_size.c
+patch -ulbf src/bs_size.c << EOF
+@@ -2,3 +2,8 @@
+ #include <mpfr.h>
++#ifdef _WIN32
++#define RADIXCHAR 50
++#define nl_langinfo(item) ((item) == RADIXCHAR ? "." : "?")
++#else
+ #include <langinfo.h>
++#endif
+ #include <stdarg.h>
+EOF
+# don't require langinfo.h
+sed -i.bak -e "s/ langinfo\.h / /" configure
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-tools PYTHON=$PYDIR/python.exe LDFLAGS="-Wl,--as-needed -lintl" &&
+ #--with-tools --with-python3 
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build &&
+ ( make || make -j1 ) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
