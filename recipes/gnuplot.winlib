@@ -517,18 +517,76 @@ wl-showstatus build-install &&
 ##+#endif
 ## #endif
 ##EOF
-## fix missing config.h
-#echo "#include \"../config.h\"" > src/config.h
 ## fix missing win_popen in src/win/winmain.c and src/win/wgnuplib.h (version >= 5.2.8)
 #sed -i.bak -e "s/#ifndef USE_FAKEPIPES/#if !defined(USE_FAKEPIPES) || defined(__MINGW32__)/" src/win/winmain.c src/win/wgnuplib.h
+## fix undefined uint32_t in src/encoding.h (version >= 6.0.0)
+#mv src/encoding.h src/encoding.h.bak &&
+#echo "#include <stdint.h>" > src/encoding.h &&
+#cat src/encoding.h.bak >> src/encoding.h
+## fix undefined H_FOUND/H_NOTFOUND in src/command.c (version >= 6.0.0)
+#mv src/command.c src/command.c.bak2 &&
+#echo "#include \"help.h\"" > src/command.c &&
+#cat src/command.c.bak2 >> src/command.c
+## fix error No valid windows terminal backend enabled in src/win/wgraph.c (version >= 6.0.0)
+#sed -i.bak -e "s?//\(#define USE_WINGDI\)?\1?" src/win/wgraph.c
+## fix src/win/wpause.c (version >= 6.0.0)
+#patch -ulbf src/win/wpause.c << EOF
+#@@ -93,4 +93,6 @@
+#
+#+#ifdef USE_MOUSE
+#                if (term->waitforinput != NULL)
+#                        term->waitforinput(TERM_ONLY_CHECK_MOUSING);
+#+#endif
+#
+#@@ -249,2 +251,3 @@
+#        while (lppw->bPause && !ctrlc_flag) {
+#+#ifdef USE_MOUSE
+#            if (term->waitforinput == NULL) {
+#@@ -254,3 +257,5 @@
+#                    WaitMessage();
+#-           } else {
+#+           } else
+#+#endif
+#+           {
+#                /* Call the non-blocking sleep function,
+#@@ -274,2 +279,3 @@
+#        while (paused_for_mouse && !ctrlc_flag) {
+#+#ifdef USE_MOUSE
+#            if (term->waitforinput == NULL) {
+#@@ -279,3 +285,5 @@
+#                    WaitMessage();
+#-           } else {
+#+           } else
+#+#endif
+#+           {
+#                /* Call the non-blocking sleep function,
+#EOF
+## fix src/win/winmain.c (version >= 6.0.0)
+#patch -ulbf src/win/winmain.c << EOF
+#@@ -272,3 +272,4 @@
+#     HMODULE hShell32;
+#-    FARPROC pSHGetSpecialFolderPath;
+#+    typedef WINBOOL (*fnSHGetSpecialFolderPathA)(HWND, LPSTR, int, WINBOOL);
+#+    fnSHGetSpecialFolderPathA pSHGetSpecialFolderPath;
+#     static char dir[MAX_PATH] = "";
+#@@ -284,3 +285,3 @@
+#        pSHGetSpecialFolderPath =
+#-           GetProcAddress(hShell32, "SHGetSpecialFolderPathA");
+#+           (fnSHGetSpecialFolderPathA)GetProcAddress(hShell32, "SHGetSpecialFolderPathA");
+#        if (pSHGetSpecialFolderPath)
+#EOF
+## fix missing config.h
+#echo "#include \"../config.h\"" > src/config.h
 ## fix missing compilation of win/winmain.c
 #sed -i.bak -e "s/\(am_gnuplot_OBJECTS *= *\)/\1win\/winmain.c /" src/Makefile.in
 ### fix config/mingw/Makefile
 ##sed -i.bak -e "s/-lhtmlhelp/-llua -lgd -lcairo/" config/mingw/Makefile
 ##WXWIN=$MINGWPREFIX/wx
+## fix fatal error: opening dependency file
+#mkdir -p src/win/.deps
 #wl-showstatus build-install &&
 # #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-I$MINGWPREFIX/wx/include -I$MINGWPREFIX/wx/lib/gcc_dll/msw" &&
-# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-wxwidgets --without-qt --with-cairo --with-readline=$MINGWPREFIX CXXFLAGS="-I$(pwd)/src" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-wxwidgets --without-qt --with-cairo --with-readline=$MINGWPREFIX CXXFLAGS="-I$(pwd)/src -fpermissive" &&
 # #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$(pwd)/src -I$MINGWPREFIX/wx/include" &&
 # #PKG_CONFIG_PATH=$MINGWPREFIX/qt/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-qt=qt5 --without-x --disable-wxwidgets --with-readline=gnu CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$(pwd)/src -I$MINGWPREFIX/wx/include" &&
 # echo "#define USE_FAKEPIPES 1" >> config.h &&
