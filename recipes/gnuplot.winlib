@@ -378,6 +378,7 @@ wl-showstatus build-install &&
 ##export VERSIONDATE=20231021
 #export VERSION=6.0.0
 #export VERSIONDATE=20231230
+#####src/plugins/printnotes/printnotesnoteaddin.cpp:(.rdata$.refptr._ZN3Gtk13PrintSettings4Keys18OUTPUT_FILE_FORMATE[.refptr._ZN3Gtk13PrintSettings4Keys18OUTPUT_FILE_FORMATE]+0x0): undefined reference to `Gtk::PrintSettings::Keys::OUTPUT_FILE_FORMAT'
 #wl-showstatus --package-version
 #export DEPENDENCIES=readline,zlib,libgd,lua,wxwidgets,cairo
 #export OPTIONALDEPENDENCIES=
@@ -426,16 +427,42 @@ wl-showstatus build-install &&
 #+#if !defined(_WIN64) && !defined(__MINGW32__)
 # /*
 #EOF
-## fix src/command.h
+### fix src/command.h
+##patch -ulbf src/command.h << EOF
+##@@ -131,2 +131,5 @@
+## #ifdef WXWIDGETS
+##+#ifdef __cplusplus
+##+extern "C" {
+##+#endif /*__cplusplus*/
+## extern void wxt_raise_terminal_window __PROTO((int));
+##@@ -135,2 +138,5 @@
+## extern void wxt_lower_terminal_group __PROTO((void));
+##+#ifdef __cplusplus
+##+}
+##+#endif /*__cplusplus*/
+## #endif
+##EOF
+## fix src/command.h (version >= 6.0.0)
 #patch -ulbf src/command.h << EOF
-#@@ -131,2 +131,5 @@
+#@@ -127,2 +127,5 @@
+# #ifdef _WIN32
+#+#ifdef __cplusplus
+#+extern "C" {
+#+#endif /*__cplusplus*/
+# extern void win_raise_terminal_window(int);
+#@@ -131,4 +134,10 @@
+# extern void win_lower_terminal_group(void);
+#+#ifdef __cplusplus
+#+}
+#+#endif /*__cplusplus*/
+# #endif
 # #ifdef WXWIDGETS
 #+#ifdef __cplusplus
 #+extern "C" {
 #+#endif /*__cplusplus*/
-# extern void wxt_raise_terminal_window __PROTO((int));
-#@@ -135,2 +138,5 @@
-# extern void wxt_lower_terminal_group __PROTO((void));
+# extern void wxt_raise_terminal_window(int);
+#@@ -137,2 +146,5 @@
+# extern void wxt_lower_terminal_group(void);
 #+#ifdef __cplusplus
 #+}
 #+#endif /*__cplusplus*/
@@ -475,35 +502,34 @@ wl-showstatus build-install &&
 #+               double scaleY = ppi.GetHeight() / (double) dpi.GetHeight();
 #                cairo_surface_set_fallback_resolution(surface, ppi.GetWidth(), ppi.GetHeight());
 #EOF
-## fix src/command.h (version >= 5.4.2)
-#patch -ulbf src/command.h << EOF
-#@@ -122,2 +122,5 @@
-# #ifdef WXWIDGETS
-#+#ifdef __cplusplus
-#+extern "C" {
-#+#endif
-# extern void wxt_raise_terminal_window(int);
-#@@ -126,2 +129,5 @@
-# extern void wxt_lower_terminal_group(void);
-#+#ifdef __cplusplus
-#+}
-#+#endif
-# #endif
-#EOF
+### fix src/command.h (version >= 5.4.2)
+##patch -ulbf src/command.h << EOF
+##@@ -122,2 +122,5 @@
+## #ifdef WXWIDGETS
+##+#ifdef __cplusplus
+##+extern "C" {
+##+#endif
+## extern void wxt_raise_terminal_window(int);
+##@@ -126,2 +129,5 @@
+## extern void wxt_lower_terminal_group(void);
+##+#ifdef __cplusplus
+##+}
+##+#endif
+## #endif
+##EOF
 ## fix missing config.h
 #echo "#include \"../config.h\"" > src/config.h
 ## fix missing win_popen in src/win/winmain.c and src/win/wgnuplib.h (version >= 5.2.8)
 #sed -i.bak -e "s/#ifndef USE_FAKEPIPES/#if !defined(USE_FAKEPIPES) || defined(__MINGW32__)/" src/win/winmain.c src/win/wgnuplib.h
 ## fix missing compilation of win/winmain.c
-#mv src/Makefile.in src/Makefile.in.bak
-#sed -e "s/\(am_gnuplot_OBJECTS *= *\)/\1win\/winmain.c /" src/Makefile.in.bak > src/Makefile.in
+#sed -i.bak -e "s/\(am_gnuplot_OBJECTS *= *\)/\1win\/winmain.c /" src/Makefile.in
 ### fix config/mingw/Makefile
 ##sed -i.bak -e "s/-lhtmlhelp/-llua -lgd -lcairo/" config/mingw/Makefile
 ##WXWIN=$MINGWPREFIX/wx
 #wl-showstatus build-install &&
 # #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-I$MINGWPREFIX/wx/include -I$MINGWPREFIX/wx/lib/gcc_dll/msw" &&
-# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-wxwidgets --without-qt --with-cairo --with-readline=$MINGWPREFIX CXXFLAGS="-I$(pwd)/src" &&
-# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$(pwd)/src -I$MINGWPREFIX/wx/include" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-wxwidgets --without-qt --with-cairo --with-readline=$MINGWPREFIX CXXFLAGS="-I$(pwd)/src" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$(pwd)/src -I$MINGWPREFIX/wx/include" &&
 # #PKG_CONFIG_PATH=$MINGWPREFIX/qt/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-qt=qt5 --without-x --disable-wxwidgets --with-readline=gnu CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$(pwd)/src -I$MINGWPREFIX/wx/include" &&
 # echo "#define USE_FAKEPIPES 1" >> config.h &&
 # sed -i.bak -e "s?^am_gnuplot_OBJECTS = ?&win/screenbuf.o win/wgnuplib.o win/wgraph.o win/wmenu.o win/wpause.o win/wprinter.o win/wtext.o win/wgdiplus.o win/wredirect.o gpexecute.o ?; s?^LIBS = ?&-lgdiplus -lshlwapi ?" src/Makefile &&
