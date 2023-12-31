@@ -10,7 +10,8 @@ export VERSIONDATE=20171118
 wl-showstatus --package-version
 export DEPENDENCIES=boost,websocketpp,rapidjson,openssl
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+#export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 #export BUILDDEPENDENCIES=scons
 #export OPTIONALBUILDDEPENDENCIES=
@@ -28,34 +29,69 @@ wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix missing _1
-sed -i.bak -e "s/\b_1\b/boost::placeholders::&/" restpp/drivers/WebSocketPPServerDriverBase.h restpp/drivers/WebSocketPPASIOTLSServerDriver.cpp restpp/RESTServer.cpp
+sed -i.bak -e "s/\b_[1-2]\b/boost::placeholders::&/" restpp/drivers/WebSocketPPServerDriverBase.h restpp/drivers/WebSocketPPASIOTLSServerDriver.cpp restpp/RESTServer.cpp
+# fix restpp/drivers/WebSocketPPASIOServerDriver.h
+patch -ulbf restpp/drivers/WebSocketPPASIOServerDriver.h << EOF
+@@ -10,9 +10,3 @@
+
+-//#include <boost/asio/io_service.hpp>
+-
+-namespace boost {
+-  namespace asio {
+-    class io_service;
+-  }
+-}
++#include <boost/asio/io_service.hpp>
+
+EOF
+# fix restpp/drivers/WebSocketPPASIOTLSServerDriver.h
+patch -ulbf restpp/drivers/WebSocketPPASIOTLSServerDriver.h << EOF
+@@ -11,12 +11,4 @@
+
+-//#include <boost/asio/io_service.hpp>
+-
+-namespace boost {
+-  namespace asio {
+-    namespace ssl {
+-      class context;
+-    }
+-    class io_service;
+-  }
+-}
++#include <boost/asio/io_service.hpp>
++#include <boost/asio/ssl.hpp>
+
+EOF
 # fix building both static and shared libraries
 mv CMakeLists.txt CMakeLists.txt.bak &&
 sed -e "s/add_library([^ ]*/& STATIC/" CMakeLists.txt.bak > CMakeLists.txt &&
 sed -n -e "s/\(add_library(\)\([^ ]*\)/\1\2_shared SHARED/; /add_library(/,/)/p" CMakeLists.txt.bak >> CMakeLists.txt
 sed -n -e "s/\(add_library(\)\([^ ]*\)/set_target_properties(\2_shared PROPERTIES OUTPUT_NAME \2)/p" CMakeLists.txt.bak >> CMakeLists.txt
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-std=c++11" -S. -Bbuild_win &&
+# # fix dependancies for shared library
+# echo "-Wl,--as-needed -lws2_32 -lmswsock -lcrypto -lssl -lboost_system -lboost_filesystem" >> build_win/CMakeFiles/restpp_shared.dir/linklibs.rsp &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+# strip *.dll &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# cp -f *.dll $INSTALLPREFIX/bin &&
+# cp -f *.dll.a $INSTALLPREFIX/lib &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-std=c++11" -S. -Bbuild_win &&
- # fix dependancies for shared library
- echo "-Wl,--as-needed -lws2_32 -lmswsock -lcrypto -lssl -lboost_system -lboost_filesystem" >> build_win/CMakeFiles/restpp_shared.dir/linklibs.rsp &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-std=c++11" -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -lwsock32 -lcrypto -lssl -lboost_system -lboost_filesystem/" build_win/build.ninja &&
  wl-showstatus build-install &&
- make -Cbuild_win install/strip &&
- strip *.dll &&
+ ninja -Cbuild_win install/strip &&
+ strip build_win/*.dll &&
  mkdir -p $INSTALLPREFIX/bin &&
- cp -f *.dll $INSTALLPREFIX/bin &&
- cp -f *.dll.a $INSTALLPREFIX/lib &&
+ cp -f build_win/*.dll $INSTALLPREFIX/bin &&
+ cp -f build_win/*.dll.a $INSTALLPREFIX/lib &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 
-##export BUILDDEPENDENCIES=cmake,ninja
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-std=c++11" -S. -Bbuild_win &&
-# ## fix missing link libraries
-# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -lmswsock -lcrypto -lssl -lboost_system -lboost_filesystem/" build_win/build.ninja &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_win install/strip &&
-#    echo OK
