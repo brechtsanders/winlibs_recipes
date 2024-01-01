@@ -29,10 +29,33 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd Clp-releases-$VERSION
+## fix exporting symbols when building shared library
+#cat > Clp/src/ClpExport.hpp << EOF
+##ifndef INCLUDED_CLPEXPORT_H
+##define INCLUDED_CLPEXPORT_H
+#
+##if !defined(CLPEXPORT)
+## if !defined(_WIN32) || defined(STATIC)
+##  define CLPEXPORT
+## elif defined(BUILDING_CLP) && defined(DLL_EXPORT)
+##  define CLPEXPORT __declspec(dllexport)
+## else
+##  define CLPEXPORT __declspec(dllimport)
+## endif
+##endif
+#
+##endif
+#EOF
+#for F in $(grep -l "^class" $(find Clp/src -name '*.hpp')); do
+# mv $F $F.bak &&
+# echo '#include "ClpExport.hpp"' > $F &&
+# sed -e "s/^\(class \)\([^;]*\)$/\1CLPEXPORT \2/" $F.bak >> $F
+#done
 # fix building shared library
 sed -i.bak -e "s/\(coin_disable_shared=\)yes/\1no/" configure
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static CFLAGS="-I$MINGWPREFIX/share/lapack/include" LDFLAGS="-L$MINGWPREFIX/share/lapack/lib -Wl,--as-needed -lCoinUtils" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static CFLAGS="-I$MINGWPREFIX/share/lapack/include" LDFLAGS="-L$MINGWPREFIX/share/lapack/lib -Wl,--as-needed -lCoinUtils" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --enable-static CXXFLAGS="-DBUILDING_CLP -I$MINGWPREFIX/share/lapack/include -I$PWD" LDFLAGS="-L$MINGWPREFIX/share/lapack/lib -Wl,--as-needed -lCoinUtils" &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ## fix detection of shared libraries
@@ -43,6 +66,7 @@ wl-showstatus configure &&
  make install-strip &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Clp-releases-$VERSION
+####To do: also build shared libraries
 
 
 
