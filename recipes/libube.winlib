@@ -18,6 +18,7 @@ export VERSIONDATE=20220619
 ####lube/var.cpp:14:10: fatal error: execinfo.h: No such file or directory
 wl-showstatus --package-version
 export DEPENDENCIES=kissfft,qt,boost
+#export DEPENDENCIES=mkl,qt,boost
 export OPTIONALDEPENDENCIES=qwt,libsndfile,expat,libcurl,openblas,libdl
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -100,12 +101,26 @@ cd $BASENAME-$VERSION
 #EOF
 ## don't abort on warnings (version <= 1.0)
 #sed -i.bak -e "s/-Wall -Werror//" CMakeLists.txt
+# fix lube/CMakeLists.txt (version >= 1.0.2)
+patch -ulbf lube/CMakeLists.txt << EOF
+@@ -81,4 +81,3 @@   libube.pc.in
+     transpose-adhoc.cpp
+-    \${KISSFFT_DIR}/tools/kiss_fftr.c
+-    \${KISSFFT_DIR}/kiss_fft.c
++    $(cygpath -m $MINGWPREFIX/src/kiss_fft_tools/kiss_fftr.c)
+     )
+EOF
+# don't download KissFFT
+mv cmake/KissFFT.cmake cmake/KissFFT.cmake.bak &&
+touch cmake/KissFFT.cmake
 mkdir -p build_win &&
  wl-showstatus configure &&
  #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
  #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_STATIC:BOOL=OFF -DQWT_LIBRARY:PATH=$MINGWPREFIX/qt/lib -DQWT_INCLUDE_DIR:PATH=$MINGWPREFIX/qt/include -DQt5Widgets_DIR:PATH=$MINGWPREFIX/qt/lib/cmake/Qt5Widgets -S. -Bbuild_win &&
- USE_STATIC=ON PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
- USE_STATIC=ON PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DQWT_INCLUDE_DIR:PATH=$MINGWPREFIX/qt/include -DQWT_LIBRARY:STRING=$MINGWPREFIX/qt/lib/libqwt.a -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+ #USE_STATIC=ON PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+ USE_STATIC=ON PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DQWT_INCLUDE_DIR:PATH=$MINGWPREFIX/qt/include -DQWT_LIBRARY:STRING=$MINGWPREFIX/qt/lib/libqwt.a -DKISSDIR="$MINGWPREFIX/src/kiss_fft_tools" -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -w $MINGWPREFIX/include/libdl-win32) -I$(cygpath -w $MINGWPREFIX/src/kiss_fft_tools)" -S. -Bbuild_win &&
+ ## fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lkiss_fft/" build_win/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  # fix missing version in .pc file
