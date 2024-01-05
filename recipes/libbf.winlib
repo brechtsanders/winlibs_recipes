@@ -1,0 +1,43 @@
+export NAME="LibBF"
+export STATUS=
+export URL=https://bellard.org/libbf/
+export BASENAME=libbf
+export DESCRIPTION="LibBF is a small library to handle arbitrary precision floating point numbers."
+export CATEGORY=math
+export TYPE=library
+export VERSION=2020-01-19
+export VERSIONDATE=20210826
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://bellard.org/libbf/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://bellard.org/libbf/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+sed -i.bak -e "s/-flto//" Makefile
+wl-showstatus build &&
+ make CC=${CC:-gcc} EXE=.exe CONFIG_AVX2=1 &&
+ ${AR:-ar} cru libbf.a libbf.o cutils.o &&
+ #( echo "EXPORTS"; ${CC:-gcc} -E libbf.h | grep -v "^\(static\|typedef\)* " | sed -n -e "s/(.*//p" | sed -n -e "s/^.*\(bf_[^ *]*\).*/\1/p" ) > libbf.def &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libbf.a | sed -n -e "s/^_\{0,1\}\([^ ]*\) T .*$/\1/p" ) > libbf.def &&
+ ${CC:-gcc} -shared -s -mwindows -def libbf.def -o libbf.dll libbf.a -Wl,--out-implib,libbf.dll.a &&
+ ${AR:-ar} cru libbf_avx2.a libbf.avx2.o cutils.avx2.o &&
+ ${CC:-gcc} -shared -s -mwindows -def libbf.def -o libbf_avx2.dll libbf_avx2.a -Wl,--out-implib,libbf_avx2.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f libbf.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
