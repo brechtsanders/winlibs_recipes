@@ -554,6 +554,8 @@ patch -ulbf src/backend/storage/ipc/latch.c << EOF
 -       StaticAssertStmt(WSA_INVALID_EVENT == NULL, "");
  #endif
 EOF
+# fix unresolved symbols DllRegisterServer/DllUnregisterServer (version >= 15.4)
+sed -i.bak -e "s/@0//" src/bin/pgevent/exports.txt 
 ### fix missing ProcessWalRcvInterrupts (version >= 11.4)
 ##sed -i -e "s?^OBJS = libpqwalreceiver\.o?& ../walreceiver.o ../../access/transam/xlog.o ../../storage/file/fd.o ../../utils/mmgr/aset.o?" src/backend/replication/libpqwalreceiver/Makefile
 ##sed -i -e "s?^OBJS = pgoutput\.o?& ../logical/proto.o ../../utils/mmgr/aset.o ../../utils/cache/syscache.o ../../utils/cache/catcache.o ../../access/common/heaptuple.o?" src/backend/replication/pgoutput/Makefile
@@ -574,11 +576,13 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=bsd --with-libxml --with-libxslt &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=ossp --with-libxml --with-libxslt &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=ossp --with-libxml --with-libxslt --with-icu CFLAGS="-I$(pwd)/src/backend -DBUILDING_DLL" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=ossp --with-libxml --with-libxslt --with-icu CFLAGS="-I$(pwd)/src/backend -DBUILDING_DLL -Wno-int-conversion -Wno-implicit-function-declaration" LDFLAGS="-Wl,-no-undefined" LIBS="-lole32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=ossp --with-libxml --with-libxslt --with-icu CFLAGS="-I$(pwd)/src/backend -DBUILDING_DLL -Wno-int-conversion -Wno-implicit-function-declaration" LDFLAGS="-Wl,-no-undefined" LIBS="-lole32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-thread-safety --with-openssl --with-ldap --with-uuid=ossp --with-libxml --with-libxslt --with-icu CFLAGS="-I$(pwd)/src/backend -DBUILDING_DLL -Wno-int-conversion -Wno-implicit-function-declaration $(if ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-function-pointer-types"; fi)" LDFLAGS="-Wl,-no-undefined" LIBS="-lole32" &&
  #--disable-tap-tests 
  wl-showstatus build &&
+ make -Csrc/backend/utils/adt xml.o &&
  #( make || make -j1 ) &&
- ( make || ( make -i; make LDFLAGS="-L$PWD/src/backend -lpostgres" ) || make -j1 ) &&
+ ( make || ( make -i; make LDFLAGS="-L$PWD/src/backend -lpostgres" ) || make -j1 || make -j1 STRIP=strip ) &&
  #( make || ( make -Csrc/backend utils/fmgr/dfmgr.o; make -i; make LDFLAGS="-L$PWD/src/backend -lpostgres" ) || make -j1 ) &&
  wl-showstatus build-install &&
  ( make -j1 install-strip || (
