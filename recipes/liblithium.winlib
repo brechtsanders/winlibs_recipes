@@ -10,7 +10,8 @@ export VERSIONDATE=20240108
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=scons
+#export BUILDDEPENDENCIES=scons
+export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=Apache
@@ -23,10 +24,25 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
+#wl-showstatus build &&
+# PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages:$INSTALLPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $MINGWPREFIX/python/Scripts/scons-script.py &&
+#    echo OK
 wl-showstatus build &&
- PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages:$INSTALLPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $MINGWPREFIX/python/Scripts/scons-script.py &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ touch SUCCESS &&
+ for F in src/*.c; do
+  echo CC $F
+  ${CC:-gcc} -c -o $F.o $F -O3 -Iinclude || ( rm -f SUCCESS; false ) || break
+ done &&
+ rm SUCCESS &&
+ ${AR:-ar} cru liblithium.a src/*.o &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p liblithium.a | sed -n -e "s/^_\{0,1\}\([^ ]*\) T .*$/\1/p" ) > liblithium.def &&
+ ${CC:-gcc} -shared -s -mwindows -def liblithium.def -o liblithium.dll liblithium.a -Wl,--out-implib,liblithium.dll.a -lbcrypt &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 
