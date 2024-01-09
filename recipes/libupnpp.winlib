@@ -43,8 +43,8 @@ export TYPE=library
 #export VERSION=0.19.1
 #export VERSIONDATE=20200509
 ####libupnpp/control/service.cxx:178:38: error: cannot convert 'std::__cxx11::string {aka std::__cxx11::basic_string<char>}' to 'const char*' for argument '3' to 'int UpnpSendAction(UpnpClient_Handle, const char*, const char*, const char*, IXML_Document*, IXML_Document**)'
-export VERSION=0.19.2
-export VERSIONDATE=20200622
+#export VERSION=0.19.2
+#export VERSIONDATE=20200622
 #export VERSION=0.19.3
 #export VERSIONDATE=20200705
 #####libupnpp/upnpplib.cxx:35:10: fatal error: upnp/netif.h: No such file or directory
@@ -73,9 +73,9 @@ export VERSIONDATE=20200622
 #export VERSIONDATE=20231124
 #export VERSION=0.25.0
 #export VERSIONDATE=20231222
-#export VERSION=0.26.1
-#export VERSIONDATE=20240109
 ####libupnpp/log.cpp:64:5: error: 'localtime_r' was not declared in this scope
+export VERSION=0.26.1
+export VERSIONDATE=20240109
 wl-showstatus --package-version
 #export DEPENDENCIES=libupnp,expat,poco,libcurl,pthreads
 export DEPENDENCIES=libnpupnp,expat,poco,libcurl,pthreads
@@ -204,6 +204,11 @@ EOF
 #mv libupnpp/smallut.cpp libupnpp/smallut.cpp.bak &&
 #echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > libupnpp/smallut.cpp &&
 #cat libupnpp/smallut.cpp.bak >> libupnpp/smallut.cpp
+# fix missing in localtime_r libupnpp/log.cpp (version >= 0.26.1)
+mv libupnpp/log.cpp libupnpp/log.cpp.bak &&
+#echo "#define localtime_r(clock,result) (*(result) = *localtime(clock),result)" > libupnpp/log.cpp &&
+echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > libupnpp/log.cpp &&
+cat libupnpp/log.cpp.bak >> libupnpp/log.cpp
 # avoid quote issues with DATADIR/CONFIGDIR when defined via -D flag and avoid -Wl,-zdefs
 #sed -i.bak -e 's?\(DIR=\)\\"\([^"]*\)\\"?\1""?g; s/-Wl,-zdefs//' Makefile.in
 #sed -i.bak -e 's?\(DIR=\)\\"\([^"]*\)\\"?\1""?g; s/-Wl,-zdefs//' Makefile.am
@@ -226,8 +231,10 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-D_POSIX_THREAD_SAFE_FUNCTIONS -DWIN32 -DCONFIG_WINDOWS_INCLUDED -IPWD/winfix" CXXFLAGS="-fpermissive -D_POSIX_THREAD_SAFE_FUNCTIONS -DWIN32 -DCONFIG_WINDOWS_INCLUDED -I$PWD/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -liphlpapi" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
- ## fix exporting symbols in DLL
- #echo "#define UPNPP_DLL_EXPORTS" >> libupnpp/config.h &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ # fix exporting symbols in DLL
+ echo "#define UPNPP_DLL_EXPORTS" >> libupnpp/config.h &&
  # fix missing localtime_r
  echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" >> libupnpp/config.h &&
  # avoid quotes issues in -D compile flags
