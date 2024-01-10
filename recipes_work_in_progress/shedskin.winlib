@@ -1,0 +1,53 @@
+export NAME="Shed Skin"
+export STATUS=
+export URL=https://shedskin.readthedocs.io/
+export BASENAME=shedskin
+export DESCRIPTION="Shed Skin is a transpiler, that can translate pure, but implicitly statically typed Python programs into optimized C++. It can generate stand-alone programs or extension modules that can be imported and used in larger Python programs."
+export CATEGORY=
+export TYPE=library
+export VERSION=0.9.8
+export VERSIONDATE=20240110
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL/Expat
+export DOWNLOADURL="https://github.com/shedskin/shedskin/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/shedskin/shedskin/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# use python instead of missing python3
+sed -i -e "s/\(python\)3/\1/" scripts/shedskin
+#wl-showstatus build &&
+# PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe PYTHONPATH=$PWD/winfix:$MINGWPREFIX/python/Lib/site-packages:$INSTALLPREFIX/python:$INSTALLPREFIX/python/Lib/site-packages:$PYDIR/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} PYTHONDONTWRITEBYTECODE=1 $PYDIR/python.exe setup.py build --compiler=mingw32 &&
+wl-showstatus build-install &&
+ PATH=$PYDIR:$PATH PYTHON=$PYDIR/python.exe PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/python/Lib/site-packages:$INSTALLPREFIX/python:$PYDIR/Lib/site-packages:$INSTALLPREFIX/python/Lib/site-packages PYTHONDONTWRITEBYTECODE=1 $PYDIR/python.exe setup.py install --prefix=$(cygpath -w $INSTALLPREFIX/python) &&
+ ## delete any __pycache__ folder(s)
+ #find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
+ # manually install script(s)
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -rf scripts/* $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+echo "print('Hello world')" > hello.py
+$PYDIR/python.exe hello.py
+
+PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $MINGWPREFIX/bin/shedskin translate -o out hello.py &&
+ make -Cout LDFLAGS="-s" &&
+ out/hello.exe
+
+#PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} shedskin build --generator Ninja --build-type Release hello.py
+#PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $MINGWPREFIX/bin/shedskin build --generator Ninja hello.py
+####Bug reported here: https://github.com/shedskin/shedskin/issues/456
+
+
+
