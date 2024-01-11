@@ -9,10 +9,16 @@ export TYPE=library
 #export VERSIONDATE=20201015
 #export VERSION=1.0
 #export VERSIONDATE=20201113
-export VERSION=1.1
-export VERSIONDATE=20221014
+#export VERSION=1.1
+#export VERSIONDATE=20221014
+#export DEPENDENCIES=pthreads,protobuf,xz
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+export VERSION=1.2
+export VERSIONDATE=20240111
 wl-showstatus --package-version
-export DEPENDENCIES=pthreads,protobuf,xz
+export DEPENDENCIES=pthreads,protobuf,xz,abseil
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -29,11 +35,15 @@ wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# build with C++17 (version >= 1.2)
+sed -i.bak -e "s/^\(set(CMAKE_CXX_STANDARD \)14/\117/" CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPKG_CONFIG_PATH:PATH=lib/pkgconfig -DLIB_PROTO_MUTATOR_DOWNLOAD_PROTOBUF:BOOL=OFF -DLIB_PROTO_MUTATOR_TESTING:BOOL=OFF -S. -Bbuild_static &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPKG_CONFIG_PATH:PATH=lib/pkgconfig -DLIB_PROTO_MUTATOR_DOWNLOAD_PROTOBUF:BOOL=OFF -DLIB_PROTO_MUTATOR_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -labsl_spinlock_wait/" build_shared/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
