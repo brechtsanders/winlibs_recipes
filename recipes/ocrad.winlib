@@ -14,8 +14,10 @@ export TYPE=library
 #export VERSIONDATE=20170331
 #export VERSION=0.27
 #export VERSIONDATE=20190112
-export VERSION=0.28
-export VERSIONDATE=20220118
+#export VERSION=0.28
+#export VERSIONDATE=20220118
+export VERSION=0.29
+export VERSIONDATE=20240119
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -90,17 +92,35 @@ cat > rectangle.h << EOF
 #define bottom ocrad_bottom
 EOF
 cat rectangle.h.bak >> rectangle.h
-mv Makefile.in Makefile.in.bak
-sed -e "s/\(\$(INSTALL) -p\) -m [0-9]*/\1/; s?\$(INSTALL_PROGRAM) ./\$(progname) \$(DESTDIR)\$(bindir)/\$(progname)?\$(INSTALL_PROGRAM) ./\$(progname).exe \$(DESTDIR)\$(bindir)/\$(progname).exe?" Makefile.in.bak > Makefile.in
+# fix main.cc (version >= 0.29)
+patch -ulbf main.cc << EOF
+@@ -236,3 +236,7 @@
+         { if( !S_ISDIR( st.st_mode ) ) { errno = ENOTDIR; return false; } }
++#ifdef _WIN32
++      else if( mkdir( partial.c_str() ) != 0 && errno != EEXIST )
++#else
+       else if( mkdir( partial.c_str(), mode ) != 0 && errno != EEXIST )
++#endif
+         return false;          // if EEXIST, another process created the dir
+EOF
+sed -i.bak -e "s/\(\$(INSTALL) -p\) -m [0-9]*/\1/; s?\$(INSTALL_PROGRAM) ./\$(progname) \$(DESTDIR)\$(bindir)/\$(progname)?\$(INSTALL_PROGRAM) ./\$(progname).exe \$(DESTDIR)\$(bindir)/\$(progname).exe?" Makefile.in
 mkdir -p $INSTALLPREFIX/bin
 #make check
 wl-showstatus configure &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  wl-showstatus build &&
  make &&
- wl-showstatus install &&
- cp ocrad.exe $INSTALLPREFIX/bin/ &&
+ # manually build shared library (version >= 0.29)
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libocrad.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > libocrad.def &&
+ ${CXX:-g++} -shared -s -mwindows -def libocrad.def -o ocrad.dll libocrad.a -Wl,--out-implib,libocrad.dll.a -lpng &&
+ #wl-showstatus install &&
+ #cp ocrad.exe $INSTALLPREFIX/bin/ &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ # manually copy shared library (version >= 0.29)
+ cp -f *.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
