@@ -23,9 +23,11 @@ export TYPE=application
 #export VERSIONDATE=20210112
 #export VERSION=1.18
 #export VERSIONDATE=20220205
-export VERSION=1.19
-export VERSIONDATE=20230113
+#export VERSION=1.19
+#export VERSIONDATE=20230113
 ####signal.c:27:21: fatal error: termios.h: No such file or directory
+export VERSION=1.20
+export VERSIONDATE=20240121
 wl-showstatus --package-version
 export DEPENDENCIES=pcre
 export OPTIONALDEPENDENCIES=
@@ -42,11 +44,71 @@ wl-wait4deps
 wl-showstatus extract
 tar xa --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.lz
 cd $BASENAME-$VERSION
+## fix signal.c (version <= 1.19)
+#patch -ulbf signal.c << EOF
+#@@ -25,7 +25,11 @@
+# #include <stdlib.h>
+# #include <string.h>
+#+#ifndef _WIN32
+# #include <termios.h>
+#+#endif
+# #include <unistd.h>
+#+#ifndef _WIN32
+# #include <sys/ioctl.h>
+#+#endif
+#
+# #include "ed.h"
+#@@ -70,4 +74,5 @@
+#
+#
+#+#ifndef _WIN32
+# static void sigint_handler( int signum )
+#   {
+#@@ -83,4 +88,5 @@
+#     }
+#   }
+#+#endif
+#
+#
+#@@ -103,4 +109,7 @@
+# static int set_signal( const int signum, void (*handler)( int ) )
+#   {
+#+#ifdef _WIN32
+#+  return -1;
+#+#else
+#   struct sigaction new_action;
+#
+#@@ -113,4 +122,5 @@
+# #endif
+#   return sigaction( signum, &new_action, 0 );
+#+#endif
+#   }
+#
+#@@ -121,6 +131,8 @@
+#     {
+#     mutex = 0;
+#+#ifndef _WIN32
+#     if( sighup_pending ) sighup_handler( SIGHUP );
+#     if( sigint_pending ) sigint_handler( SIGINT );
+#+#endif
+#     }
+#   }
+#@@ -132,4 +144,5 @@
+# void set_signals( void )
+#   {
+#+#ifndef _WIN32
+# #ifdef SIGWINCH
+#   sigwinch_handler( SIGWINCH );
+#@@ -139,4 +152,5 @@
+#   set_signal( SIGQUIT, SIG_IGN );
+#   set_signal( SIGINT, sigint_handler );
+#+#endif
+#   }
+#
+#EOF
+# fix signal.c (version >= 1.20)
 patch -ulbf signal.c << EOF
---- signal.c  2017-01-06 02:06:04.000000000 +0100
-+++ signal.c  2017-04-10 23:14:48.560731300 +0200
-@@ -25,7 +25,11 @@
- #include <stdlib.h>
+@@ -26,5 +26,9 @@
  #include <string.h>
 +#ifndef _WIN32
  #include <termios.h>
@@ -56,76 +118,73 @@ patch -ulbf signal.c << EOF
  #include <sys/ioctl.h>
 +#endif
 
- #include "ed.h"
-@@ -70,4 +74,5 @@
-
+@@ -61,2 +65,3 @@
 
 +#ifndef _WIN32
- static void sigint_handler( int signum )
-   {
-@@ -83,4 +88,5 @@
-     }
-   }
-+#endif
+ static void sighup_handler( int signum )
+@@ -156,2 +161,6 @@
 
-
-@@ -103,4 +109,7 @@
- static int set_signal( const int signum, void (*handler)( int ) )
-   {
-+#ifdef _WIN32
-+  return -1;
 +#else
-   struct sigaction new_action;
-
-@@ -113,4 +122,5 @@
- #endif
-   return sigaction( signum, &new_action, 0 );
++void enable_interrupts( void ) {}
++void disable_interrupts( void ) {}
 +#endif
-   }
-
-@@ -121,6 +131,8 @@
-     {
-     mutex = 0;
-+#ifndef _WIN32
-     if( sighup_pending ) sighup_handler( SIGHUP );
-     if( sigint_pending ) sigint_handler( SIGINT );
-+#endif
-     }
-   }
-@@ -132,4 +144,5 @@
- void set_signals( void )
-   {
-+#ifndef _WIN32
- #ifdef SIGWINCH
-   sigwinch_handler( SIGWINCH );
-@@ -139,4 +152,5 @@
-   set_signal( SIGQUIT, SIG_IGN );
-   set_signal( SIGINT, sigint_handler );
-+#endif
-   }
-
+ void set_window_lines( const int lines ) { window_lines_ = lines; }
 EOF
+## fix buffer.c (version <= 1.19)
+#patch -ulbf buffer.c << EOF
+#@@ -393,4 +393,7 @@
+# int path_max( const char * filename )
+#   {
+#+#ifdef _WIN32
+#+  return 256;
+#+#else
+#   long result;
+#   if( !filename ) filename = "/";
+#@@ -400,4 +403,5 @@
+#   else if( result < 256 ) result = 256;
+#   return result;
+#+#endif
+#   }
+#
+#EOF
+# fix buffer.c (version >= 1.20)
 patch -ulbf buffer.c << EOF
---- buffer.c  2017-01-06 02:06:04.000000000 +0100
-+++ buffer.c  2017-04-10 23:22:56.400790100 +0200
-@@ -393,4 +393,7 @@
- int path_max( const char * filename )
+@@ -405,2 +405,5 @@
    {
 +#ifdef _WIN32
-+  return 256;
++    return PATH_MAX;
 +#else
-   long result;
    if( !filename ) filename = "/";
-@@ -400,4 +403,5 @@
-   else if( result < 256 ) result = 256;
+@@ -411,2 +414,3 @@
    return result;
 +#endif
    }
-
 EOF
+# fix io.c (version >= 1.20)
+patch -ulbf io.c << EOF
+@@ -335,3 +335,7 @@
+             { free( partial ); errno = ENOTDIR; return false; } }
++#ifdef _WIN32
++      else if( mkdir( partial ) != 0 && errno != EEXIST )
++#else
+       else if( mkdir( partial, mode ) != 0 && errno != EEXIST )
++#endif
+         { free( partial ); return false; }
+EOF
+# fix main_loop.c (version >= 1.20)
+patch -ulbf main_loop.c << EOF
+@@ -755,3 +755,5 @@
+   disable_interrupts();
++#ifndef _WIN32
+   set_signals();
++#endif
+   status = setjmp( jmp_state );
+EOF
+# put linker flags last
 sed -i.bak -e "s/\(\$(LDFLAGS)\) \(.*\)$/\2 \1/" Makefile.in
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX &&
+ #./configure --prefix=$INSTALLPREFIX CFLAGS+="-Wl,--as-needed -lregex" &&
  wl-showstatus build &&
  #make &&
  #make CC="${CC:-gcc} -D_PC_PATH_MAX=255" LDFLAGS="-Wl,--as-needed -lregex" &&
