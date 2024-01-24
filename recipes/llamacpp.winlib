@@ -41,8 +41,10 @@ export TYPE=library
 #export VERSIONDATE=20231230
 #export VERSION=b1808
 #export VERSIONDATE=20240111
-export VERSION=b1833
-export VERSIONDATE=20240112
+#export VERSION=b1833
+#export VERSIONDATE=20240112
+export VERSION=b1961
+export VERSIONDATE=20240124
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -60,15 +62,26 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd llama.cpp-$VERSION
-# fix missing PWIN32_MEMORY_RANGE_ENTRY in llama.cpp (version >= b1299)
-mv llama.cpp llama.cpp.bak 
-cat > llama.cpp << EOF
+## fix missing PWIN32_MEMORY_RANGE_ENTRY in llama.cpp (version >= b1299 <= b1833)
+#mv llama.cpp llama.cpp.bak 
+#cat > llama.cpp << EOF
+##if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0602
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0602
+##endif
+#EOF
+#cat llama.cpp.bak >> llama.cpp
+# missing undeclared FINDEX_INFO_LEVELS (version >= b1961)
+for F in $(find -name '*.c' -or -name '*.cpp'); do
+mv $F $F.bak 
+cat > $F << EOF
 #if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0602
 #undef _WIN32_WINNT
 #define _WIN32_WINNT 0x0602
 #endif
 EOF
-cat llama.cpp.bak >> llama.cpp
+cat $F.bak >> $F
+done
 mkdir -p build_static build_shared &&
  #wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llamacpp -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLLAMA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
