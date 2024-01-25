@@ -27,11 +27,17 @@ export TYPE=library
 #export VERSIONDATE=20220929
 #export VERSION=3.6.4
 #export VERSIONDATE=20221202
-export VERSION=3.6.5
-export VERSIONDATE=20231201
+#export VERSION=3.6.5
+#export VERSIONDATE=20231201
+#export DEPENDENCIES=openmpi
+##export DEPENDENCIES=mpich
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake
+#export OPTIONALBUILDDEPENDENCIES=
+export VERSION=3.7.0
+export VERSIONDATE=20240125
 wl-showstatus --package-version
-export DEPENDENCIES=openmpi
-#export DEPENDENCIES=mpich
+export DEPENDENCIES=libdl,mman-win32
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake
 export OPTIONALBUILDDEPENDENCIES=
@@ -46,7 +52,18 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-
+sed -i.bak -e "s?^typedef unsigned long size_t;?#include <io.h>    //&?" $(grep -l "^typedef unsigned long size_t;" $(find -name '*.h'))
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-I$(cygpath -m $MINGWPREFIX/include/libdl-win32) -I$(cygpath -m $MINGWPREFIX/include/mman-win32)" -S. -Bbuild_win &&
+ # add linker flags
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -ldl -lmman/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+ 
 #mkdir -p build_test && cd build_test && cmake.exe -G"MSYS Makefiles" .. -LH && echo OK; cd ..; rm -rf build_test
 #rm -rf CMakeCache.txt CMakeFiles; cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release . -LH && echo OK
 
