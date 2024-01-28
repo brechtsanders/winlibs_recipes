@@ -80,8 +80,10 @@ export TYPE=application
 #export VERSIONDATE=20200813
 #export VERSION=2.2.0
 #export VERSIONDATE=20220823
-export VERSION=2.2.1
-export VERSIONDATE=20220909
+#export VERSION=2.2.1
+#export VERSIONDATE=20220909
+export VERSION=2.3.0
+export VERSIONDATE=20240124
 wl-showstatus --package-version
 export DEPENDENCIES=
 #export DEPENDENCIES=ncurses
@@ -126,6 +128,60 @@ cat > fdupes.c << EOF
 #define link(f1, f2) 0
 EOF
 cat fdupes.c.bak >> fdupes.c
+# fix number of arguments to mkdir() in fdupes.c (version >= 2.3.0)
+mv fdupes.c fdupes.c.bak2
+cat > fdupes.c << EOF
+#include <io.h>
+#define mkdir(d, p) mkdir(d)
+EOF
+cat fdupes.c.bak2 >> fdupes.c
+# fix xdgbase.c (version >= 2.3.0)
+patch -ulbf xdgbase.c << EOF
+@@ -7,3 +7,8 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <io.h>
++#define mkdir(d, p) mkdir(d)
++#else
+ #include <pwd.h>
++#endif
+ #include <string.h>
+@@ -37,2 +42,3 @@
+         homedir = getenv("HOME");
++#ifndef _WIN32
+         if (homedir == 0)
+@@ -45,2 +51,3 @@
+         }
++#endif
+
+EOF
+# fix getrealpath.c (version >= 2.3.0)
+patch -ulbf getrealpath.c << EOF
+@@ -39,4 +39,5 @@
+ char *getlink(const char *path, struct stat *s)
+ {
++#ifndef _WIN32
+     char *link;
+     char *buffer;
+@@ -83,4 +84,5 @@
+
+     free(link);
++#endif
+
+     return 0;
+@@ -349,4 +351,5 @@
+         scratch[tail] = '\0';
+
++#ifndef _WIN32
+         if (lstat(scratch, &st) != 0)
+         {
+@@ -423,4 +426,5 @@
+             scratch[tail] = save;
+         }
++#endif
+     }
+
+EOF
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-ncurses CFLAGS="-I$(pwd)/winfix" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ncurses CFLAGS="-I$(pwd)/winfix" &&
