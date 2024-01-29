@@ -1,0 +1,74 @@
+export NAME="Coturn"
+export STATUS=
+export URL=https://github.com/coturn/coturn
+export BASENAME=coturn
+export DESCRIPTION="coturn is a free open source implementation of TURN and STUN Server. The TURN Server is a VoIP media traffic NAT traversal server and gateway."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=4.5.2-r13
+#export VERSIONDATE=20220727
+#export VERSION=4.5.2-r14
+#export VERSIONDATE=20220811
+#export VERSION=4.6.0-r0
+#export VERSIONDATE=20220914
+#export VERSION=4.6.1-r0
+#export VERSIONDATE=20221204
+#export VERSION=4.6.1-r3
+#export VERSIONDATE=20230401
+#export VERSION=4.6.2
+#export VERSIONDATE=20230412
+#export VERSION=4.6.2-r4
+#export VERSIONDATE=20230705
+#export VERSION=4.6.2-r6
+#export VERSIONDATE=20231201
+#export VERSION=4.6.2-r7
+#export VERSIONDATE=20231208
+export VERSION=4.6.2-r8
+export VERSIONDATE=20240129
+####Target "turncommon" links to: libevent::core but the target was not found.
+wl-showstatus --package-version
+export DEPENDENCIES=libevent,openssl,cyrus-sasl,libmicrohttpd,mariadb-client,mongo-c-driver,libbson
+export OPTIONALDEPENDENCIES=hiredis,prometheus
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/coturn/coturn/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/coturn/coturn/archive/refs/tags/docker/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd coturn-docker-$VERSION
+## fix missing files
+#mkdir -p winfix/sys winfix/netinet winfix/arpa winfix/net
+#echo "#include <winsock2.h>" > winfix/sys/socket.h
+#touch winfix/netinet/in.h winfix/netinet/tcp.h winfix/arpa/inet.h winfix/net/if.h winfix/netdb.h winfix/ifaddrs.h
+# fix missing usleep/sleep in src/apps/uclient/startuclient.c (version >= 4.6.2-r8)
+mv src/apps/uclient/startuclient.c src/apps/uclient/startuclient.c.bak
+cat > src/apps/uclient/startuclient.c << EOF
+#define usleep(t) _sleep((t) / 1000)
+#define sleep(t) _sleep((t) * 1000)
+EOF
+cat src/apps/uclient/startuclient.c.bak >> src/apps/uclient/startuclient.c
+# fix src/apps/common/CMakeLists.txt (version >= 4.6.2-r8)
+patch -ulbf src/apps/common/CMakeLists.txt << EOF
+@@ -40,3 +40,3 @@
+ find_package(Libevent CONFIG)
+-if(Libevent_FOUND)
++if(FALSE)
+     list(APPEND COMMON_LIBS libevent::core libevent::extra libevent::openssl)
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-I$PWD/winfix" -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lsqlite3/" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf coturn-docker-$VERSION
+
+
+
