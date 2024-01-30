@@ -1,0 +1,73 @@
+export NAME="Diamond"
+export STATUS=
+export URL=https://github.com/copperspice/diamond
+export BASENAME=diamond
+export DESCRIPTION="Diamond is a cross platform editor designed for programmers. It was developed using the CopperSpice libraries and is written in C++."
+export CATEGORY=development
+export TYPE=application
+export VERSION=1.5.0
+export VERSIONDATE=20240130
+wl-showstatus --package-version
+export DEPENDENCIES=copperspice,hunspell
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/copperspice/diamond/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/copperspice/diamond/archive/refs/tags/diamond-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/diamond-$VERSION.tar.gz
+cd diamond-diamond-$VERSION
+# fix include of lm.h in src/dialog_xp_getdir.cpp
+patch -ulbf src/dialog_xp_getdir.cpp << EOF
+@@ -28,4 +28,10 @@
+ #include <windows.h>
++#ifdef __MINGW32__
++#include <levmar.h>
++#include <lmerr.h>
++#include <lmserver.h>
++#else
+ #include <lm.h>
+ #endif
++#endif
+
+EOF
+# fix detection of hunspell in src/CMakeLists.txt
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -162,3 +162,3 @@
+
+-elseif(CMAKE_SYSTEM_NAME MATCHES "(Linux|OpenBSD|FreeBSD|NetBSD|DragonFly)")
++elseif(CMAKE_SYSTEM_NAME MATCHES "(Linux|OpenBSD|FreeBSD|NetBSD|DragonFly)" OR MINGW)
+    set_target_properties(Diamond PROPERTIES OUTPUT_NAME diamond)
+@@ -168,2 +168,3 @@
+
++  if(MINGW)
+    target_link_libraries(Diamond
+@@ -171,3 +172,11 @@
+       PkgConfig::Hunspell
++      netapi32
++      -mwindows
+    )
++  else()
++   target_link_libraries(Diamond
++      PRIVATE
++      PkgConfig::Hunspell
++   )
++  endif()
+
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/copperspice/diamond -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf diamond-diamond-$VERSION
+####$MINGWPREFIX/copperspice/diamond/diamond.exe
+
+
+
