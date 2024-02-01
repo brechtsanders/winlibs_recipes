@@ -9,20 +9,21 @@ export TYPE=library
 #export VERSIONDATE=20230707
 #export VERSION=6.0.5
 #export VERSIONDATE=20230821
-export VERSION=6.0.9
-export VERSIONDATE=20231127
+#export VERSION=6.0.9
+#export VERSIONDATE=20231127
 #export VERSION=6.0.11
 #export VERSIONDATE=20231205
 #export VERSION=6.0.12
 #export VERSIONDATE=20231215
-####lib-http/src/controller-rsrc.cpp:459:1: error: 'rsrc_loader' does not name a type
+export VERSION=6.0.13
+export VERSIONDATE=20240201
 wl-showstatus --package-version
 export DEPENDENCIES=boost,hinnantdate
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja,mrc
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE_1_0.txt
-export LICENSETYPE=BSL
+export LICENSETYPE=Boost
 export DOWNLOADURL="https://github.com/mhekkel/libzeep/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 export DOWNLOADSOURCEURL=https://github.com/mhekkel/libzeep/archive/refs/tags/v$VERSION.tar.gz
@@ -51,11 +52,26 @@ cd $BASENAME-$VERSION
 #mv include/zeep/json/element_fwd.hpp include/zeep/json/element_fwd.hpp.bak &&
 #echo "#include <cstdint>" > include/zeep/json/element_fwd.hpp &&
 #cat include/zeep/json/element_fwd.hpp.bak >> include/zeep/json/element_fwd.hpp
+# fix implementation of class rsrc_loader in lib-http/src/controller-rsrc.cpp (version >= 6.0.13)
+####lib-http/src/controller-rsrc.cpp:459:1: error: 'rsrc_loader' does not name a type
+patch -ulbf lib-http/src/controller-rsrc.cpp << EOF
+@@ -453,2 +453,3 @@
+
++#if USE_RSRC
+ #if _WIN32 and not defined(WIN32_LEAN_AND_MEAN)
+@@ -506,2 +507,3 @@
+ }
++#endif //USE_RSRC
+
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ # fix missing libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -lmswsock/" build_static/build.ninja &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32 -lmswsock/" build_shared/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
