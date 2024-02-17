@@ -1,3 +1,291 @@
+#export NAME="Qt 6"
+#export STATUS=
+##export URL=http://qt-project.org/
+#export URL=https://www.qt.io/
+#export BASENAME=qt6
+#export DESCRIPTION="Qt - A cross-platform application and UI framework"
+#export CATEGORY=gui,framework
+#export TYPE=library,application
+##export VERSION=6.0.0-rc
+##export VERSIONDATE=20201129
+#####Filename longer than 260 characters
+##export VERSION=6.0.0
+##export VERSIONDATE=20201207
+##export VERSION=6.0.1
+##export VERSIONDATE=20210203
+##export VERSION=6.0.2
+##export VERSIONDATE=20210303
+##export VERSION=6.0.3
+##export VERSIONDATE=20210331
+##export VERSION=6.0.4
+##export VERSIONDATE=20210504
+##export VERSION=6.1.0
+##export VERSIONDATE=20210506
+##export VERSION=6.1.1
+##export VERSIONDATE=20210607
+##export VERSION=6.1.2
+##export VERSIONDATE=20210701
+##export VERSION=6.1.3
+##export VERSIONDATE=20210901
+##export VERSION=6.2.0
+##export VERSIONDATE=20210929
+##export VERSION=6.2.1
+##export VERSIONDATE=20211026
+##export VERSION=6.2.2
+##export VERSIONDATE=20211201
+#export VERSION=6.2.3
+#export VERSIONDATE=20220128
+##export VERSION=6.5.2
+##export VERSIONDATE=20230905
+##export VERSION=6.5.3
+##export VERSIONDATE=20230928
+##export VERSION=6.6.0
+##export VERSIONDATE=20231010
+##export VERSION=6.6.1
+##export VERSIONDATE=20231127
+##export VERSION=6.6.2
+##export VERSIONDATE=20240214
+#wl-showstatus --package-version
+#export DEPENDENCIES=sqlite3,mariadb-client,postgresql,freetds,firebird,zlib,libpng,libjpeg,libtiff,libmng,openssl,pcre2,glib2,icu,dbus,jasper,libwebp,freetype2,harfbuzz,assimp,doubleconversion,xmlstar,libb2,gstreamer,gst-plugins-base,egl
+#export OPTIONALDEPENDENCIES=libproxy,xcb,open62541,tslib
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE.QT-LICENSE-AGREEMENT
+#export LICENSETYPE="GPL/LGPL"
+##export DOWNLOADURL="http://download.qt.io/development_releases/qt/6.0/"
+##export DOWNLOADURL="http://download.qt.io/archive/qt/6.0/"
+##export DOWNLOADURL="http://download.qt.io/archive/qt/"
+#export DOWNLOADURL="https://github.com/qt/qt5/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://download.qt.io/development_releases/qt/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1/")/$VERSION/single/qt-everywhere-src-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=http://download.qt.io/archive/qt/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*$/\1/")/$VERSION/single/qt-everywhere-src-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#mkdir -p qt-$VERSION
+#tar xfJ $TARBALLDIR/$BASENAME/qt-everywhere-src-$VERSION.tar.xz --strip-components=1 -Cqt-$VERSION
+#cd qt-$VERSION
+## fix obsolete lm.h in qtbase/src/corelib/io/qfilesystemengine_win.cpp
+#echo "#include <levmar.h>" | gcc -c -xc - -o test_levmar.o &> /dev/null && (
+# sed -i.bak -e "s/#include <lm\.h>.*$/#include <levmar.h>\n#include <lmshare.h>\n#include <lmapibuf.h>/" qtbase/src/corelib/io/qfilesystemengine_win.cpp
+#)
+### fix missing file
+##touch qtbase/header.LGPL
+## fix errors: IMPORTED_IMPLIB not set for imported target "dbus-1" configuration "Release"
+##### bug reported: https://bugreports.qt.io/browse/QTBUG-90887
+#echo "set_property(TARGET \"dbus-1\" PROPERTY IMPORTED_IMPLIB \"-ldbus-1\")" >> qtbase/CMakeLists.txt
+## fix missing std::numeric_limits for GCC 11 or higher (version >= 6.0.3)
+##### bug reported: https://bugreports.qt.io/browse/QTBUG-93452
+#mv qtbase/src/corelib/global/qglobal.h qtbase/src/corelib/global/qglobal.h.bak &&
+#echo "#ifdef __cplusplus" > qtbase/src/corelib/global/qglobal.h &&
+#echo "#include <limits>" >> qtbase/src/corelib/global/qglobal.h &&
+#echo "#include <exception>" >> qtbase/src/corelib/global/qglobal.h &&
+#echo "#include <math.h>" >> qtbase/src/corelib/global/qglobal.h &&
+#echo "#include <wchar.h>" >> qtbase/src/corelib/global/qglobal.h &&
+#echo "#include <string>" >> qtbase/src/corelib/global/qglobal.h &&
+#echo "#endif" >> qtbase/src/corelib/global/qglobal.h &&
+#cat qtbase/src/corelib/global/qglobal.h.bak >> qtbase/src/corelib/global/qglobal.h
+## fix redefinition of FILE_ID_INFO in qtbase/src/corelib/io/qfilesystemengine_win.cpp (version >= 6.1.0)
+##### bug reported: https://bugreports.qt.io/browse/QTBUG-94031
+#patch -ulbf qtbase/src/corelib/io/qfilesystemengine_win.cpp << EOF
+#@@ -619,3 +621,3 @@
+#
+#-#if defined(Q_CC_MINGW) && WINVER < 0x0602 //  Windows 8 onwards
+#+#if defined(Q_CC_MINGW) && WINVER < 0x0602 && !(_WIN32_WINNT >= _WIN32_WINNT_WIN8) //  Windows 8 onwards
+#
+#EOF
+## fix undefined std::exception_ptr
+#mv qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h.bak &&
+#echo "#include <exception>" > qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h &&
+#cat qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h.bak >> qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h
+## fix undefined AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS in qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp (version >= 6.2.2 <= 6.2.3)
+#patch -ulbf qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp << EOF
+#@@ -1419,2 +1419,3 @@
+#         // SpecularGlossiness Properties
+#+#ifdef AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS
+#         bool hasSpecularGlossiness;
+#@@ -1473,2 +1474,3 @@
+#         }
+#+#endif
+#     }
+#EOF
+### fix undefined AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS in qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp (version >= 6.2.2)
+##patch -ulbf qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp << EOF
+##@@ -1450,2 +1450,5 @@
+##                 ai_real glossiness;
+##+#if !defined(AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS_GLOSSINESS_FACTOR)
+##+#define AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS_GLOSSINESS_FACTOR AI_MATKEY_GLOSSINESS_FACTOR
+##+#endif
+##                 result = material->Get(AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS_GLOSSINESS_FACTOR, glossiness);
+##EOF
+### fix qtmultimedia/src/multimedia/platform/windows/common/qwindowsmultimediautils.cpp (version >= 6.2.2)
+##patch -ulbf qtmultimedia/src/multimedia/platform/windows/common/qwindowsmultimediautils.cpp << EOF
+##@@ -84,6 +84,10 @@
+##         return QVideoFrameFormat::Format_P016;
+##+#ifdef MFVideoFormat_L8
+##     if (subtype == MFVideoFormat_L8)
+##         return QVideoFrameFormat::Format_Y8;
+##+#endif
+##+#ifdef MFVideoFormat_L16
+##     if (subtype == MFVideoFormat_L16)
+##         return QVideoFrameFormat::Format_Y16;
+##+#endif
+##
+##@@ -109,4 +113,6 @@
+##         return MFVideoFormat_VP90;
+##+#ifdef MFVideoFormat_AV1
+##     case QMediaFormat::VideoCodec::AV1:
+##         return MFVideoFormat_AV1;
+##+#endif
+##     case QMediaFormat::VideoCodec::WMV:
+##@@ -139,4 +145,6 @@
+##         return QMediaFormat::VideoCodec::VP9;
+##+#ifdef MFVideoFormat_AV1
+##     if (format == MFVideoFormat_AV1)
+##         return QMediaFormat::VideoCodec::AV1;
+##+#endif
+##     if (format == MFVideoFormat_WMV1
+##@@ -157,8 +165,14 @@
+##         return MFAudioFormat_AAC;
+##+#ifdef MFAudioFormat_ALAC
+##     case QMediaFormat::AudioCodec::ALAC:
+##         return MFAudioFormat_ALAC;
+##+#endif
+##+#ifdef MFAudioFormat_FLAC
+##     case QMediaFormat::AudioCodec::FLAC:
+##         return MFAudioFormat_FLAC;
+##+#endif
+##+#ifdef MFAudioFormat_Vorbis
+##     case QMediaFormat::AudioCodec::Vorbis:
+##         return MFAudioFormat_Vorbis;
+##+#endif
+##     case QMediaFormat::AudioCodec::Wave:
+##EOF
+## fix undefined uint32_t in qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h (version >= 6.2.3)
+#mv qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h.bak &&
+#echo "#include <cstdint>" > qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h &&
+#cat qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h.bak >> qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h
+## fix qtremoteobjects/tools/repc/utils.cpp (version >= 6.2.3)
+#patch -ulbf qtremoteobjects/tools/repc/utils.cpp << EOF
+#@@ -32,2 +32,3 @@
+#
+#+#define _Bool rpl_Bool
+# #include "utils.h"
+#EOF
+### fix already defined interface in qtbase/src/gui/accessible/linux/atspiadaptor_p.h (version >= 6.6.2)
+##sed -i.bak -e "s/\binterface\b/iface/g" qtbase/src/gui/accessible/linux/atspiadaptor_p.h
+### fix qtimageformats/src/plugins/imageformats/tiff/CMakeLists.txt (version >= 6.5.3)
+##patch -ulbf qtimageformats/src/plugins/imageformats/tiff/CMakeLists.txt << EOF
+##@@ -30,2 +30,5 @@
+##
+##+if(NOT TARGET TIFF::TIFF)
+##+    add_library(TIFF::TIFF ALIAS TIFF)
+##+endif()
+## qt_internal_extend_target(QTiffPlugin CONDITION QT_FEATURE_system_tiff
+##EOF
+## fix missing LLVMDemangle in qttools/configure.cmake (version >= 6.1.2)
+#patch -ulbf qttools/configure.cmake << EOF
+#@@ -18,3 +18,3 @@
+# # building with CMake will fail at compilation time.
+#-qt_find_package(WrapLibClang 8 PROVIDED_TARGETS WrapLibClang::WrapLibClang)
+#+#qt_find_package(WrapLibClang 8 PROVIDED_TARGETS WrapLibClang::WrapLibClang)
+# # special case end
+#EOF
+## avoid assimp detection issues (version >= 6.2.2)
+#####qt3d/config.tests/assimp/CMakeLists.txt: IMPORTED_IMPLIB not set for imported target "assimp::assimp".
+#mv qt3d/config.tests/assimp/CMakeLists.txt qt3d/config.tests/assimp/CMakeLists.txt.bak &&
+#touch qt3d/config.tests/assimp/CMakeLists.txt
+#mv qtquick3d/config.tests/quick3d_assimp/CMakeLists.txt qtquick3d/config.tests/quick3d_assimp/CMakeLists.txt.bak &&
+#touch qtquick3d/config.tests/quick3d_assimp/CMakeLists.txt
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# # disable QML to avoid error: Filename longer than 260 characters
+# #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdeclarative:BOOL=OFF -DBUILD_qttools:BOOL=OFF -DBUILD_qtquickcontrols2:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.a ]; then echo "ON"; else echo "OFF"; fi) -DFEATURE_wmf:BOOL=OFF -DFEATURE_avfoundation:BOOL=OFF -DFEATURE_gstreamer:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.a ]; then echo "ON"; else echo "OFF"; fi) -DFEATURE_wmf:BOOL=OFF -DFEATURE_avfoundation:BOOL=OFF -DFEATURE_gstreamer:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=ON -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$PWD/qtbase/src/dbus" -S. -Bbuild_static &&
+# #-DFEATURE_quickcontrols2_universal:BOOL=OFF 
+# #-DBUILD_qtquick3d:BOOL=ON 
+# #-DBUILD_qtwebengine:BOOL=OFF -DBUILD_qtwebview:BOOL=OFF -DFEATURE_qtquick3d:BOOL=ON -DFEATURE_qtquick3dphysics:BOOL=OFF 
+# #-DBUILD_qdbus:BOOL=OFF -DBUILD_accessibility_atspi_bridge:BOOL=OFF 
+# #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_textmarkdownreader:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+# #-DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) 
+# #-DCMAKE_CXX_FLAGS:STRING="-I$PWD/qtbase/src" 
+# # fix missing libdbus and error: undefined reference to ucol_close_67
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -licuin/; s/ \([^ ]*\)-NOTFOUND / -l\1/" build_static/build.ninja &&
+# # fix use of wrong mysql library (version >= 6.1.0)
+# sed -i.bak2 -e "s?^\(\s*LINK_LIBRARIES\s*=.* \)[^ ]*/libmysql.a?\1-lmysqlclient?" build_static/build.ninja &&
+# # fix dbus library issue (version >= 6.2.0)
+# sed -i.bak3 -e "s? qtbase/src/dbus/-ldbus-1 ? ?" build_static/build.ninja &&
+# ## fix missing private files (version >= 6.6.0)
+# #mkdir -p build_static/qtbase/include/QtCore/$VERSION/QtCore/private &&
+# #cp -u qtmultimedia/src/multimedia/windows/*_p.h build_static/qtbase/include/QtCore/$VERSION/QtCore/private/ &&
+# wl-showstatus configure &&
+# #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.dll.a ]; then echo "ON"; else echo "OFF"; fi) -DFEATURE_wmf:BOOL=OFF -DFEATURE_avfoundation:BOOL=OFF -DFEATURE_gstreamer:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# #-DBUILD_qtgraphs:BOOL=ON -DBUILD_qtwebengine:BOOL=OFF -DBUILD_qtwebview:BOOL=OFF -DFEATURE_qtquick3d:BOOL=ON -DFEATURE_qtquick3dphysics:BOOL=OFF 
+# #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_textmarkdownreader:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+# #-DFEATURE_qt3d_system_assimp:BOOL=ON
+# #-DFEATURE_dbus:BOOL=OFF
+# #-DGLESv2_INCLUDE_DIR -DGLESv2_LIBRARY -DHAVE_GLESv2
+# #-DFEATURE_iconv:BOOL=ON
+# #-DFEATURE_gtk3:BOOL=ON -DFEATURE_vnc:BOOL=ON
+# #-DFEATURE_system_textmarkdownreader:BOOL=ON
+# ####Feature "system_textmarkdownreader": Forcing to "ON" breaks its condition.
+# #-DFEATURE_gssapi:BOOL=ON -DGSSAPI_INCLUDE_DIRS:PATH=$MINGWPREFIX/include -DGSSAPI_LIBRARIES:STRING=-lgss 
+# #-DFEATURE_gssapi:BOOL=ON -DGSSAPI_INCLUDE_DIRS:STRING=$MINGWPREFIX/include/gssglue 
+# ####ERROR: Feature "gssapi": Forcing to "ON" breaks its condition: NOT WIN32 AND GSSAPI_FOUND
+# # fix missing libdbus and error: undefined reference to ucol_close_67
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -licuin -lopengl32/; s/ -R[^ ]*\/lib\b//; s/ \([^ ]*\)-NOTFOUND / -l\1/" build_shared/build.ninja &&
+# # fix use of wrong mysql library (version >= 6.0.3)
+# sed -i.bak2 -e "s?^\(\s*LINK_LIBRARIES\s*=.* \)[^ ]*/libmysql.a?\1-lmysqlclient?" build_shared/build.ninja &&
+# # fix command line too long (version >= 6.2.0)
+# sed -i.bak3 -e '/^build.*AssimpImporterPlugin_resource\.rc\.obj:/{n;s/\(DEFINES = \).*$/\1/}' build_shared/build.ninja &&
+# # fix dbus library issue (version >= 6.2.0)
+# sed -i.bak4 -e "s? qtbase/src/dbus/-ldbus-1 ? ?" build_shared/build.ninja &&
+# ## fix execution of Python scripts
+# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+# # fix linking issues with mariadb-client
+# #sed -i.bak -e "s?^\(\s*LINK_LIBRARIES\s*=.*/\)lib/libmysqlclient\.dll\.a?\1bin/libmariadb.dll?" build_shared/build.ninja &&
+# ## fix missing private files (version >= 6.6.0)
+# #mkdir -p build_shared/qtbase/include/QtCore/$VERSION/QtCore/private &&
+# #cp -u qtmultimedia/src/multimedia/windows/*_p.h build_shared/qtbase/include/QtCore/$VERSION/QtCore/private/ &&
+# wl-showstatus build &&
+# #cmake --build build_static --parallel &&
+# #ninja -Cbuild_static &&
+# ( ninja -Cbuild_static || ( ninja -Cbuild_static -k0; ninja -Cbuild_static -j1 )) &&
+# wl-showstatus build &&
+# #cmake --build build_shared --parallel &&
+# #ninja -Cbuild_shared &&
+# ( ninja -Cbuild_shared || ( ninja -Cbuild_shared -k0; ninja -Cbuild_shared -j1 )) &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_static install/strip &&
+# # move static libraries and mkspecs to separate folders
+# mv -f $INSTALLPREFIX/qt6/lib $INSTALLPREFIX/qt6/lib_static &&
+# mv -f $INSTALLPREFIX/qt6/mkspecs $INSTALLPREFIX/qt6/mkspecs_static &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_shared install/strip &&
+# # manually create qt.conf
+# echo "[Paths]" > $INSTALLPREFIX/qt6/bin/qt.conf &&
+# echo "Prefix=.." >> $INSTALLPREFIX/qt6/bin/qt.conf &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf qt-$VERSION
+#####https://bugreports.qt.io/browse/QTBUG-88581
+#####https://bugreports.qt.io/browse/QTBUG-90887
+#####https://bugreports.qt.io/browse/QTBUG-93452
+#####TO DO: build_static/qtbase/bin/qt-configure-module.bat
+#####TO DO: use system libmd4c
+#####TO DO: use system assimp
+#####TO DO: use system gssapi
+
+
+
+
 export NAME="Qt 6"
 export STATUS=
 #export URL=http://qt-project.org/
@@ -6,47 +294,10 @@ export BASENAME=qt6
 export DESCRIPTION="Qt - A cross-platform application and UI framework"
 export CATEGORY=gui,framework
 export TYPE=library,application
-#export VERSION=6.0.0-rc
-#export VERSIONDATE=20201129
-####Filename longer than 260 characters
-#export VERSION=6.0.0
-#export VERSIONDATE=20201207
-#export VERSION=6.0.1
-#export VERSIONDATE=20210203
-#export VERSION=6.0.2
-#export VERSIONDATE=20210303
-#export VERSION=6.0.3
-#export VERSIONDATE=20210331
-#export VERSION=6.0.4
-#export VERSIONDATE=20210504
-#export VERSION=6.1.0
-#export VERSIONDATE=20210506
-#export VERSION=6.1.1
-#export VERSIONDATE=20210607
-#export VERSION=6.1.2
-#export VERSIONDATE=20210701
-#export VERSION=6.1.3
-#export VERSIONDATE=20210901
-#export VERSION=6.2.0
-#export VERSIONDATE=20210929
-#export VERSION=6.2.1
-#export VERSIONDATE=20211026
-#export VERSION=6.2.2
-#export VERSIONDATE=20211201
-export VERSION=6.2.3
-export VERSIONDATE=20220128
-#export VERSION=6.5.2
-#export VERSIONDATE=20230905
-#export VERSION=6.5.3
-#export VERSIONDATE=20230928
-#export VERSION=6.6.0
-#export VERSIONDATE=20231010
-#export VERSION=6.6.1
-#export VERSIONDATE=20231127
-#export VERSION=6.6.2
-#export VERSIONDATE=20240214
+export VERSION=6.6.2
+export VERSIONDATE=20240214
 wl-showstatus --package-version
-export DEPENDENCIES=sqlite3,mariadb-client,postgresql,freetds,firebird,zlib,libpng,libjpeg,libtiff,libmng,openssl,pcre2,glib2,icu,dbus,jasper,libwebp,freetype2,harfbuzz,assimp,doubleconversion,xmlstar,libb2,gstreamer,gst-plugins-base,egl
+export DEPENDENCIES=sqlite3,mariadb-client,postgresql,freetds,firebird,zlib,zstd,brotli,libpng,libjpeg,libtiff,libmng,libwebp,openssl,pcre2,glib2,icu,dbus,jasper,freetype2,harfbuzz,assimp,doubleconversion,xmlstar,libb2,gstreamer,gst-plugins-base,egl,abseil,protobuf,md4c,hunspell,grpc
 export OPTIONALDEPENDENCIES=libproxy,xcb,open62541,tslib
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -70,46 +321,10 @@ cd qt-$VERSION
 echo "#include <levmar.h>" | gcc -c -xc - -o test_levmar.o &> /dev/null && (
  sed -i.bak -e "s/#include <lm\.h>.*$/#include <levmar.h>\n#include <lmshare.h>\n#include <lmapibuf.h>/" qtbase/src/corelib/io/qfilesystemengine_win.cpp
 )
-## fix missing file
-#touch qtbase/header.LGPL
-# fix errors: IMPORTED_IMPLIB not set for imported target "dbus-1" configuration "Release"
-#### bug reported: https://bugreports.qt.io/browse/QTBUG-90887
-echo "set_property(TARGET \"dbus-1\" PROPERTY IMPORTED_IMPLIB \"-ldbus-1\")" >> qtbase/CMakeLists.txt
-# fix missing std::numeric_limits for GCC 11 or higher (version >= 6.0.3)
-#### bug reported: https://bugreports.qt.io/browse/QTBUG-93452
-mv qtbase/src/corelib/global/qglobal.h qtbase/src/corelib/global/qglobal.h.bak &&
-echo "#ifdef __cplusplus" > qtbase/src/corelib/global/qglobal.h &&
-echo "#include <limits>" >> qtbase/src/corelib/global/qglobal.h &&
-echo "#include <exception>" >> qtbase/src/corelib/global/qglobal.h &&
-echo "#include <math.h>" >> qtbase/src/corelib/global/qglobal.h &&
-echo "#include <wchar.h>" >> qtbase/src/corelib/global/qglobal.h &&
-echo "#include <string>" >> qtbase/src/corelib/global/qglobal.h &&
-echo "#endif" >> qtbase/src/corelib/global/qglobal.h &&
-cat qtbase/src/corelib/global/qglobal.h.bak >> qtbase/src/corelib/global/qglobal.h
-# fix redefinition of FILE_ID_INFO in qtbase/src/corelib/io/qfilesystemengine_win.cpp (version >= 6.1.0)
-#### bug reported: https://bugreports.qt.io/browse/QTBUG-94031
-patch -ulbf qtbase/src/corelib/io/qfilesystemengine_win.cpp << EOF
-@@ -619,3 +621,3 @@
-
--#if defined(Q_CC_MINGW) && WINVER < 0x0602 //  Windows 8 onwards
-+#if defined(Q_CC_MINGW) && WINVER < 0x0602 && !(_WIN32_WINNT >= _WIN32_WINNT_WIN8) //  Windows 8 onwards
-
-EOF
-# fix undefined std::exception_ptr
-mv qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h.bak &&
-echo "#include <exception>" > qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h &&
-cat qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h.bak >> qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h
-# fix undefined AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS in qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp (version >= 6.2.2 <= 6.2.3)
-patch -ulbf qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp << EOF
-@@ -1419,2 +1419,3 @@
-         // SpecularGlossiness Properties
-+#ifdef AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS
-         bool hasSpecularGlossiness;
-@@ -1473,2 +1474,3 @@
-         }
-+#endif
-     }
-EOF
+## fix undefined std::exception_ptr
+#mv qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h.bak &&
+#echo "#include <exception>" > qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h &&
+#cat qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h.bak >> qtquick3d/src/3rdparty/assimp/src/include/assimp/types.h
 ## fix undefined AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS in qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp (version >= 6.2.2)
 #patch -ulbf qtquick3d/src/plugins/assetimporters/assimp/assimpimporter.cpp << EOF
 #@@ -1450,2 +1450,5 @@
@@ -162,36 +377,25 @@ EOF
 #+#endif
 #     case QMediaFormat::AudioCodec::Wave:
 #EOF
-# fix undefined uint32_t in qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h (version >= 6.2.3)
-mv qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h.bak &&
-echo "#include <cstdint>" > qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h &&
-cat qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h.bak >> qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h
-# fix qtremoteobjects/tools/repc/utils.cpp (version >= 6.2.3)
-patch -ulbf qtremoteobjects/tools/repc/utils.cpp << EOF
-@@ -32,2 +32,3 @@
-
-+#define _Bool rpl_Bool
- #include "utils.h"
-EOF
-## fix already defined interface in qtbase/src/gui/accessible/linux/atspiadaptor_p.h (version >= 6.6.2)
-#sed -i.bak -e "s/\binterface\b/iface/g" qtbase/src/gui/accessible/linux/atspiadaptor_p.h
-## fix qtimageformats/src/plugins/imageformats/tiff/CMakeLists.txt (version >= 6.5.3)
-#patch -ulbf qtimageformats/src/plugins/imageformats/tiff/CMakeLists.txt << EOF
-#@@ -30,2 +30,5 @@
+## fix undefined uint32_t in qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h (version >= 6.2.3)
+#mv qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h.bak &&
+#echo "#include <cstdint>" > qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h &&
+#cat qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h.bak >> qtshadertools/src/3rdparty/glslang/glslang/MachineIndependent/SymbolTable.h
+## fix qtremoteobjects/tools/repc/utils.cpp (version >= 6.2.3)
+#patch -ulbf qtremoteobjects/tools/repc/utils.cpp << EOF
+#@@ -32,2 +32,3 @@
 #
-#+if(NOT TARGET TIFF::TIFF)
-#+    add_library(TIFF::TIFF ALIAS TIFF)
-#+endif()
-# qt_internal_extend_target(QTiffPlugin CONDITION QT_FEATURE_system_tiff
+#+#define _Bool rpl_Bool
+# #include "utils.h"
 #EOF
-# fix missing LLVMDemangle in qttools/configure.cmake (version >= 6.1.2)
-patch -ulbf qttools/configure.cmake << EOF
-@@ -18,3 +18,3 @@
- # building with CMake will fail at compilation time.
--qt_find_package(WrapLibClang 8 PROVIDED_TARGETS WrapLibClang::WrapLibClang)
-+#qt_find_package(WrapLibClang 8 PROVIDED_TARGETS WrapLibClang::WrapLibClang)
- # special case end
-EOF
+## fix missing LLVMDemangle in qttools/configure.cmake (version >= 6.1.2)
+#patch -ulbf qttools/configure.cmake << EOF
+#@@ -18,3 +18,3 @@
+# # building with CMake will fail at compilation time.
+#-qt_find_package(WrapLibClang 8 PROVIDED_TARGETS WrapLibClang::WrapLibClang)
+#+#qt_find_package(WrapLibClang 8 PROVIDED_TARGETS WrapLibClang::WrapLibClang)
+# # special case end
+#EOF
 # avoid assimp detection issues (version >= 6.2.2)
 ####qt3d/config.tests/assimp/CMakeLists.txt: IMPORTED_IMPLIB not set for imported target "assimp::assimp".
 mv qt3d/config.tests/assimp/CMakeLists.txt qt3d/config.tests/assimp/CMakeLists.txt.bak &&
@@ -201,11 +405,75 @@ touch qtquick3d/config.tests/quick3d_assimp/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  # disable QML to avoid error: Filename longer than 260 characters
- #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdeclarative:BOOL=OFF -DBUILD_qttools:BOOL=OFF -DBUILD_qtquickcontrols2:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
- #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
- #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
- #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
- PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.a ]; then echo "ON"; else echo "OFF"; fi) -DFEATURE_wmf:BOOL=OFF -DFEATURE_avfoundation:BOOL=OFF -DFEATURE_gstreamer:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=OFF -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
+ PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF \
+  -DFEATURE_pkg_config:BOOL=ON \
+  -DFEATURE_qml_python:BOOL=ON \
+  -DFEATURE_mimetype_database:BOOL=OFF \
+  -DFEATURE_zstd:BOOL=ON \
+  -DFEATURE_egl:BOOL=OFF \
+  -DFEATURE_syslog:BOOL=OFF \
+  -DFEATURE_slog2:BOOL=OFF \
+  -DFEATURE_icu:BOOL=ON \
+  -DFEATURE_opengl:BOOL=ON \
+  -DFEATURE_opengl_desktop:BOOL=OFF \
+  -DFEATURE_opengl_dynamic:BOOL=ON \
+  -DFEATURE_system_libb2:BOOL=ON \
+  -DFEATURE_system_doubleconversion:BOOL=ON \
+  -DFEATURE_system_freetype:BOOL=ON \
+  -DFEATURE_system_harfbuzz:BOOL=ON \
+  -DFEATURE_system_jpeg:BOOL=ON \
+  -DFEATURE_system_pcre2:BOOL=ON \
+  -DFEATURE_system_png:BOOL=ON \
+  -DFEATURE_system_proxies:BOOL=ON \
+  -DFEATURE_system_zlib:BOOL=ON \
+  -DFEATURE_qt3d_system_assimp:BOOL=ON \
+  -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.a ]; then echo "ON"; else echo "OFF"; fi) \
+  -DFEATURE_wmf:BOOL=OFF \
+  -DFEATURE_avfoundation:BOOL=OFF \
+  -DFEATURE_gstreamer:BOOL=ON \
+  -DFEATURE_qt3d_system_assimp:BOOL=ON \
+  -DFEATURE_system_sqlite:BOOL=ON \
+  -DFEATURE_sql_ibase:BOOL=OFF \
+  -DFEATURE_libudev:BOOL=OFF \
+  -DFEATURE_mtdev:BOOL=OFF \
+  -DFEATURE_evdev:BOOL=OFF \
+  -DBUILD_qtwayland:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF \
+  -DFEATURE_qtplugininfo:BOOL=OFF \
+  -DFEATURE_quickcontrols2_universal:BOOL=OFF \
+  -DFEATURE_dbus:BOOL=OFF \
+  -DBUILD_qdbus:BOOL=OFF \
+  -DBUILD_qtdoc:BOOL=OFF \
+  -DBUILD_qtquick3d:BOOL=ON \
+  -DBUILD_qtquicktimeline:BOOL=OFF \
+  -DBUILD_qttranslations:BOOL=OFF \
+  -DBUILD_qtgraphs:BOOL=ON \
+  -DBUILD_qtmultimedia:BOOL=OFF \
+  -DBUILD_qtspeech:BOOL=OFF \
+  -DBUILD_qtwebengine:BOOL=OFF \
+  -DBUILD_qtwebview:BOOL=OFF \
+  -DFEATURE_qtquick3dphysics:BOOL=OFF \
+  -DBUILD_WITH_PCH:BOOL=OFF \
+  -DFEATURE_clang:BOOL=OFF \
+  -DFEATURE_clangcpp:BOOL=OFF \
+  -DTEST_libclang:BOOL=OFF \
+  -DQT_BUILD_EXAMPLES:BOOL=OFF \
+  -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF \
+  -DQT_BUILD_BENCHMARKS:BOOL=OFF \
+  -DQT_BUILD_TESTS:BOOL=OFF \
+  -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF \
+  -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb \
+  -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe \
+  -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe \
+  -DLLVM_DIR:PATH=NOTFOUND \
+  -DClang_DIR:PATH=NOTFOUND \
+  -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) \
+  -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) \
+  -DCMAKE_CXX_FLAGS:STRING="-DDBUS_STATIC_BUILD -I$(cygpath -m $PWD/qtmultimedia/src/multimedia/windows) -I$(cygpath -m $PWD/qtbase/src/dbus) -I$(cygpath -m $PWD/build_static/qtbase/include/QtDBus)" \
+  -S. -Bbuild_static &&
  #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.a ]; then echo "ON"; else echo "OFF"; fi) -DFEATURE_wmf:BOOL=OFF -DFEATURE_avfoundation:BOOL=OFF -DFEATURE_gstreamer:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DFEATURE_qtplugininfo:BOOL=OFF -DBUILD_qtdoc:BOOL=OFF -DBUILD_qtquick3d:BOOL=ON -DBUILD_qtquicktimeline:BOOL=OFF -DBUILD_qttranslations:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$PWD/qtbase/src/dbus" -S. -Bbuild_static &&
  #-DFEATURE_quickcontrols2_universal:BOOL=OFF 
  #-DBUILD_qtquick3d:BOOL=ON 
@@ -220,15 +488,79 @@ mkdir -p build_static build_shared &&
  sed -i.bak2 -e "s?^\(\s*LINK_LIBRARIES\s*=.* \)[^ ]*/libmysql.a?\1-lmysqlclient?" build_static/build.ninja &&
  # fix dbus library issue (version >= 6.2.0)
  sed -i.bak3 -e "s? qtbase/src/dbus/-ldbus-1 ? ?" build_static/build.ninja &&
- ## fix missing private files (version >= 6.6.0)
- #mkdir -p build_static/qtbase/include/QtCore/$VERSION/QtCore/private &&
- #cp -u qtmultimedia/src/multimedia/windows/*_p.h build_static/qtbase/include/QtCore/$VERSION/QtCore/private/ &&
+ # fix missing private files (version >= 6.6.0)
+ mkdir -p build_static/qtbase/include/QtCore/$VERSION/QtCore/private &&
+ cp -u qtmultimedia/src/multimedia/windows/*_p.h build_static/qtbase/include/QtCore/$VERSION/QtCore/private/ &&
  wl-showstatus configure &&
- #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
- #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
- #PKG_CONFIG= PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
- #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
- PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.dll.a ]; then echo "ON"; else echo "OFF"; fi) -DFEATURE_wmf:BOOL=OFF -DFEATURE_avfoundation:BOOL=OFF -DFEATURE_gstreamer:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
+ PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON \
+  -DFEATURE_pkg_config:BOOL=ON \
+  -DFEATURE_qml_python:BOOL=ON \
+  -DFEATURE_mimetype_database:BOOL=OFF \
+  -DFEATURE_zstd:BOOL=ON \
+  -DFEATURE_egl:BOOL=OFF \
+  -DFEATURE_syslog:BOOL=OFF \
+  -DFEATURE_slog2:BOOL=OFF \
+  -DFEATURE_icu:BOOL=ON \
+  -DFEATURE_opengl:BOOL=ON \
+  -DFEATURE_opengl_desktop:BOOL=OFF \
+  -DFEATURE_opengl_dynamic:BOOL=ON \
+  -DFEATURE_system_libb2:BOOL=ON \
+  -DFEATURE_system_doubleconversion:BOOL=ON \
+  -DFEATURE_system_freetype:BOOL=ON \
+  -DFEATURE_system_harfbuzz:BOOL=ON \
+  -DFEATURE_system_jpeg:BOOL=ON \
+  -DFEATURE_system_pcre2:BOOL=ON \
+  -DFEATURE_system_png:BOOL=ON \
+  -DFEATURE_system_proxies:BOOL=ON \
+  -DFEATURE_system_zlib:BOOL=ON \
+  -DFEATURE_qt3d_system_assimp:BOOL=ON \
+  -DFEATURE_libproxy:BOOL=$(if [ -f $MINGWPREFIX/lib/libproxy.dll.a ]; then echo "ON"; else echo "OFF"; fi) \
+  -DFEATURE_wmf:BOOL=OFF \
+  -DFEATURE_avfoundation:BOOL=OFF \
+  -DFEATURE_gstreamer:BOOL=ON \
+  -DFEATURE_qt3d_system_assimp:BOOL=ON \
+  -DFEATURE_system_sqlite:BOOL=ON \
+  -DFEATURE_sql_ibase:BOOL=OFF \
+  -DFEATURE_libudev:BOOL=OFF \
+  -DFEATURE_mtdev:BOOL=OFF \
+  -DFEATURE_evdev:BOOL=OFF \
+  -DBUILD_qtwayland:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF \
+  -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF \
+  -DFEATURE_qtplugininfo:BOOL=OFF \
+  -DFEATURE_quickcontrols2_universal:BOOL=OFF \
+  -DFEATURE_dbus:BOOL=OFF \
+  -DBUILD_qdbus:BOOL=OFF \
+  -DBUILD_qtdoc:BOOL=OFF \
+  -DBUILD_qtquick3d:BOOL=ON \
+  -DBUILD_qtquicktimeline:BOOL=OFF \
+  -DBUILD_qttranslations:BOOL=OFF \
+  -DBUILD_qtgraphs:BOOL=ON \
+  -DBUILD_qtmultimedia:BOOL=OFF \
+  -DBUILD_qtspeech:BOOL=OFF \
+  -DBUILD_qtwebengine:BOOL=OFF \
+  -DBUILD_qtwebview:BOOL=OFF \
+  -DFEATURE_qtquick3dphysics:BOOL=OFF \
+  -DBUILD_WITH_PCH:BOOL=OFF \
+  -DFEATURE_clang:BOOL=OFF \
+  -DFEATURE_clangcpp:BOOL=OFF \
+  -DTEST_libclang:BOOL=OFF \
+  -DQT_BUILD_EXAMPLES:BOOL=OFF \
+  -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF \
+  -DQT_BUILD_BENCHMARKS:BOOL=OFF \
+  -DQT_BUILD_TESTS:BOOL=OFF \
+  -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF \
+  -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb \
+  -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe \
+  -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe \
+  -DLLVM_DIR:PATH=NOTFOUND \
+  -DClang_DIR:PATH=NOTFOUND \
+  -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) \
+  -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) \
+  -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $PWD/qtmultimedia/src/multimedia/windows) -I$(cygpath -m $PWD/qtbase/src/dbus) -I$(cygpath -m $PWD/build_shared/qtbase/include/QtDBus)" \
+  -S. -Bbuild_shared &&
  #-DBUILD_qtgraphs:BOOL=ON -DBUILD_qtwebengine:BOOL=OFF -DBUILD_qtwebview:BOOL=OFF -DFEATURE_qtquick3d:BOOL=ON -DFEATURE_qtquick3dphysics:BOOL=OFF 
  #PKG_CONFIG=$(which pkg-config.exe) PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/qt6 -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_COMPILER:FILEPATH=$(which gcc.exe) -DCMAKE_CXX_COMPILER:FILEPATH=$(which g++.exe) -DLLVM_DIR:PATH=NOTFOUND -DClang_DIR:PATH=NOTFOUND -DFEATURE_pkg_config:BOOL=ON -DFEATURE_qml_python:BOOL=ON -DFEATURE_mimetype_database:BOOL=OFF -DFEATURE_zstd:BOOL=ON -DFEATURE_egl:BOOL=OFF -DFEATURE_syslog:BOOL=OFF -DFEATURE_slog2:BOOL=OFF -DFEATURE_icu:BOOL=ON -DFEATURE_opengl:BOOL=ON -DFEATURE_opengl_desktop:BOOL=OFF -DFEATURE_opengl_dynamic:BOOL=ON -DFEATURE_system_libb2:BOOL=ON -DFEATURE_system_doubleconversion:BOOL=ON -DFEATURE_system_freetype:BOOL=ON -DFEATURE_system_harfbuzz:BOOL=ON -DFEATURE_system_jpeg:BOOL=ON -DFEATURE_system_pcre2:BOOL=ON -DFEATURE_system_png:BOOL=ON -DFEATURE_system_proxies:BOOL=ON -DFEATURE_system_zlib:BOOL=ON -DFEATURE_qt3d_system_assimp:BOOL=ON -DFEATURE_system_textmarkdownreader:BOOL=ON -DFEATURE_libproxy:BOOL=ON -DFEATURE_system_sqlite:BOOL=ON -DFEATURE_sql_ibase:BOOL=OFF -DFEATURE_libudev:BOOL=OFF -DFEATURE_mtdev:BOOL=OFF -DFEATURE_evdev:BOOL=OFF -DBUILD_qtwayland:BOOL=OFF -DQT_USE_BUNDLED_BundledFreetype:BOOL=OFF -DQT_USE_BUNDLED_BundledHarfbuzz:BOOL=OFF -DQT_USE_BUNDLED_BundledLibpng:BOOL=OFF -DQT_USE_BUNDLED_BundledPcre2:BOOL=OFF -DBUILD_WITH_PCH:BOOL=OFF -DFEATURE_clang:BOOL=OFF -DFEATURE_clangcpp:BOOL=OFF -DTEST_libclang:BOOL=OFF -DQT_BUILD_EXAMPLES:BOOL=OFF -DQT_BUILD_EXAMPLES_BY_DEFAULT:BOOL=OFF -DQT_BUILD_BENCHMARKS:BOOL=OFF -DQT_BUILD_TESTS:BOOL=OFF -DQT_BUILD_TESTS_BY_DEFAULT:BOOL=OFF -DMySQL_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DQT_QML_PYTHON_PATH:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
  #-DFEATURE_qt3d_system_assimp:BOOL=ON
@@ -253,9 +585,9 @@ mkdir -p build_static build_shared &&
  #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
  # fix linking issues with mariadb-client
  #sed -i.bak -e "s?^\(\s*LINK_LIBRARIES\s*=.*/\)lib/libmysqlclient\.dll\.a?\1bin/libmariadb.dll?" build_shared/build.ninja &&
- ## fix missing private files (version >= 6.6.0)
- #mkdir -p build_shared/qtbase/include/QtCore/$VERSION/QtCore/private &&
- #cp -u qtmultimedia/src/multimedia/windows/*_p.h build_shared/qtbase/include/QtCore/$VERSION/QtCore/private/ &&
+ # fix missing private files (version >= 6.6.0)
+ mkdir -p build_shared/qtbase/include/QtCore/$VERSION/QtCore/private &&
+ cp -u qtmultimedia/src/multimedia/windows/*_p.h build_shared/qtbase/include/QtCore/$VERSION/QtCore/private/ &&
  wl-showstatus build &&
  #cmake --build build_static --parallel &&
  #ninja -Cbuild_static &&
@@ -275,14 +607,6 @@ mkdir -p build_static build_shared &&
  echo "[Paths]" > $INSTALLPREFIX/qt6/bin/qt.conf &&
  echo "Prefix=.." >> $INSTALLPREFIX/qt6/bin/qt.conf &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf qt-$VERSION
-####https://bugreports.qt.io/browse/QTBUG-88581
-####https://bugreports.qt.io/browse/QTBUG-90887
-####https://bugreports.qt.io/browse/QTBUG-93452
-####TO DO: build_static/qtbase/bin/qt-configure-module.bat
-####TO DO: use system libmd4c
-####TO DO: use system assimp
-####TO DO: use system gssapi
-
 
 
 
