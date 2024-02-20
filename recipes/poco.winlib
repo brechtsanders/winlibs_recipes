@@ -368,7 +368,7 @@ patch -ulbf XML/src/ParserEngine.cpp << EOF
 EOF
 # fix missing mysql/mysql.h (version >= 1.11.0)
 sed -i -e "s?mysql/\(mysql\.h\)?\1?" $(grep -l "mysql/mysql\.h" $(find -name '*.h' -or -name '*.cpp'))
-# fix Util/include/Poco/Util/Application.h (version >= 1.11.0)
+# fix Util/include/Poco/Util/Application.h (version >= 1.11.0 <= 1.13.0)
 patch -ulf Util/include/Poco/Util/Application.h << EOF
 @@ -506,3 +506,3 @@
  //
@@ -413,11 +413,11 @@ sed -i.bak -e "s/mc\.exe/windmc.exe/" cmake/PocoMacros.cmake
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPOCO_STATIC:BOOL=ON -DPOCO_UNBUNDLED:BOOL=ON -DPocoConfigPackageLocation:PATH=$INSTALLPREFIX/cmake -DENABLE_ENCODINGS:BOOL=ON -DENABLE_JSON:BOOL=ON -DENABLE_CPPPARSER:BOOL=ON -DENABLE_NET:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL_WIN:BOOL=OFF -DFORCE_OPENSSL:BOOL=ON -DENABLE_CRYPTO:BOOL=ON -DENABLE_DATA:BOOL=ON -DENABLE_MONGODB:BOOL=ON -DENABLE_DATA_ODBC:BOOL=ON -DENABLE_DATA_SQLITE:BOOL=ON -DENABLE_DATA_MYSQL:BOOL=ON -DMARIADB_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb -DMYSQL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb -DENABLE_REDIS:BOOL=ON -DENABLE_ZIP:BOOL=ON -DENABLE_SEVENZIP:BOOL=ON -DENABLE_PDF:BOOL=ON -DENABLE_PAGECOMPILER:BOOL=OFF -DENABLE_PAGECOMPILER_FILE2PAGE:BOOL=OFF -DENABLE_UTIL:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DODBCVER=0x0350" -S. -Bbuild_static &&
- # fix undefined reference to wWinMain (version >= 1.13.0)
+ # fix undefined reference to wWinMain (version = 1.13.0)
  sed -i.bak -e "s/\(LINK_FLAGS =\) -municode/\1/" build_static/build.ninja &&
  wl-showstatus configure &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPOCO_STATIC:BOOL=OFF -DPOCO_UNBUNDLED:BOOL=ON -DPocoConfigPackageLocation:PATH=$INSTALLPREFIX/cmake -DENABLE_ENCODINGS:BOOL=ON -DENABLE_JSON:BOOL=ON -DENABLE_CPPPARSER:BOOL=ON -DENABLE_NET:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL_WIN:BOOL=OFF -DFORCE_OPENSSL:BOOL=ON -DENABLE_CRYPTO:BOOL=ON -DENABLE_DATA:BOOL=ON -DENABLE_MONGODB:BOOL=ON -DENABLE_DATA_ODBC:BOOL=ON -DENABLE_DATA_SQLITE:BOOL=ON -DENABLE_DATA_MYSQL:BOOL=ON -DMARIADB_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb -DMYSQL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb -DENABLE_REDIS:BOOL=ON -DENABLE_ZIP:BOOL=ON -DENABLE_SEVENZIP:BOOL=ON -DENABLE_PDF:BOOL=ON -DENABLE_PAGECOMPILER:BOOL=OFF -DENABLE_PAGECOMPILER_FILE2PAGE:BOOL=OFF -DENABLE_UTIL:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DODBCVER=0x0350" -S. -Bbuild_shared &&
- # fix undefined reference to wWinMain (version >= 1.13.0)
+ # fix undefined reference to wWinMain (version = 1.13.0)
  sed -i.bak -e "s/\(LINK_FLAGS =\) -municode/\1/" build_shared/build.ninja &&
  # fix missing link libraries (version >= 1.13.0)
  sed -i.bak2 -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lsqlparser/" build_shared/build.ninja &&
@@ -425,6 +425,64 @@ mkdir -p build_static build_shared &&
  ninja -Cbuild_static &&
  wl-showstatus build &&
  ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION-all
+
+
+
+export NAME="POCO"
+export STATUS=
+export URL=http://pocoproject.org/
+export BASENAME=poco
+export DESCRIPTION="Modern, powerful open source C++ class libraries and frameworks for building network- and internet-based applications that run on desktop, server, mobile and embedded systems."
+export CATEGORY=
+export TYPE=library
+export VERSION=1.13.2
+export VERSIONDATE=20240220
+####Util/src/Application.cpp:145:6: error: no declaration matches 'void Poco::Util::Application::init(int, wchar_t**)'
+wl-showstatus --package-version
+export DEPENDENCIES=pcre,zlib,expat,sqlite3,mariadb-client,openssl,json,sql-parser
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Boost
+export DOWNLOADURL="https://pocoproject.org/download.html"
+#export DOWNLOADURL="https://github.com/pocoproject/poco/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://pocoproject.org/releases/poco-$VERSION/$BASENAME-$VERSION-all.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION-all.tar.gz
+cd $BASENAME-$VERSION-all
+## fix Data/include/Poco/Data/Data.h (version >= 1.13.2)
+#patch -ulbf Data/include/Poco/Data/Data.h << EOF
+#@@ -33,3 +33,3 @@
+# //
+#-#if defined(_WIN32) && defined(POCO_DLL)
+#+#if defined(_WIN32) && (defined(POCO_DLL) || !defined(STATIC))
+#        #if defined(Data_EXPORTS)
+#EOF
+# fix missing mysql/mysql.h (version >= 1.13.2)
+sed -i.bak -e "s?\(#include <\)mysql\(/mysql\.h>\)?\1mariadb\2?" $(grep -l "#include <mysql/mysql\.h>" $(find -name '*.h' -or -name '*.cpp'))
+# fix missing mc.exe (Microsoft's message compiler)
+sed -i.bak -e "s/mc\.exe/windmc.exe/" cmake/PocoMacros.cmake
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DPOCO_UNBUNDLED:BOOL=ON -DPocoConfigPackageLocation:PATH=$INSTALLPREFIX/cmake -DENABLE_ENCODINGS:BOOL=ON -DENABLE_JSON:BOOL=ON -DENABLE_CPPPARSER:BOOL=ON -DENABLE_NET:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL_WIN:BOOL=OFF -DFORCE_OPENSSL:BOOL=ON -DENABLE_CRYPTO:BOOL=ON -DENABLE_DATA:BOOL=ON -DENABLE_MONGODB:BOOL=ON -DENABLE_DATA_ODBC:BOOL=ON -DENABLE_DATA_SQLITE:BOOL=ON -DENABLE_DATA_MYSQL:BOOL=ON -DMYSQL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb -DPC_MARIADB_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPC_MARIADB_LIBRARY_DIRS:PATH=$MINGWPREFIX/lib -DENABLE_REDIS:BOOL=ON -DENABLE_ZIP:BOOL=ON -DENABLE_SEVENZIP:BOOL=ON -DENABLE_PDF:BOOL=ON -DENABLE_PAGECOMPILER:BOOL=OFF -DENABLE_PAGECOMPILER_FILE2PAGE:BOOL=OFF -DENABLE_UTIL:BOOL=ON -DPOCO_NO_FORK_EXEC:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DODBCVER=0x0350 -DSTATIC" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DPOCO_UNBUNDLED:BOOL=ON -DPocoConfigPackageLocation:PATH=$INSTALLPREFIX/cmake -DENABLE_ENCODINGS:BOOL=ON -DENABLE_JSON:BOOL=ON -DENABLE_CPPPARSER:BOOL=ON -DENABLE_NET:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL:BOOL=ON -DENABLE_NETSSL_WIN:BOOL=OFF -DFORCE_OPENSSL:BOOL=ON -DENABLE_CRYPTO:BOOL=ON -DENABLE_DATA:BOOL=ON -DENABLE_MONGODB:BOOL=ON -DENABLE_DATA_ODBC:BOOL=ON -DENABLE_DATA_SQLITE:BOOL=ON -DENABLE_DATA_MYSQL:BOOL=ON -DMYSQL_INCLUDE_DIR:PATH=$MINGWPREFIX/include/mariadb -DPC_MARIADB_INCLUDE_DIRS:PATH=$MINGWPREFIX/include/mariadb -DPC_MARIADB_LIBRARY_DIRS:PATH=$MINGWPREFIX/lib -DENABLE_REDIS:BOOL=ON -DENABLE_ZIP:BOOL=ON -DENABLE_SEVENZIP:BOOL=ON -DENABLE_PDF:BOOL=ON -DENABLE_PAGECOMPILER:BOOL=OFF -DENABLE_PAGECOMPILER_FILE2PAGE:BOOL=OFF -DENABLE_UTIL:BOOL=ON -DPOCO_NO_FORK_EXEC:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DODBCVER=0x0350" -S. -Bbuild_shared &&
+ ## fix missing link libraries (version >= 1.13.0)
+ #sed -i.bak2 -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lsqlparser/" build_shared/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
