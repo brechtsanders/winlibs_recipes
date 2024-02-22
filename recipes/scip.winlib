@@ -24,7 +24,7 @@ export TYPE=library
 export VERSION=9.0.0
 export VERSIONDATE=20240220
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,readline,gmp,papilo,zimpl,ipopt,zimpl
+export DEPENDENCIES=zlib,readline,gmp,mpfr,papilo,zimpl,ipopt,zimpl,tbb
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -86,12 +86,25 @@ patch -ulbf CMakeLists.txt << EOF
 EOF
 ## fix detection of Ipopt (version <= 8.0.3)
 #sed -i.bak -e "s/\(NOT \)WIN32/\1MSVC/" cmake/Modules/FindIPOPT.cmake 
+# don't define SCIP_STATIC_DEFINE when building shared library in src/CMakeLists.txt (version >= 9.0.0)
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -1091,3 +1091,7 @@
+ generate_export_header(libscip BASE_NAME scip EXPORT_FILE_NAME \${PROJECT_BINARY_DIR}/scip/scip_export.h)
++if(BUILD_SHARED_LIBS)
++target_compile_definitions(scip PRIVATE libscip_EXPORTS)
++else()
+ target_compile_definitions(scip PRIVATE SCIP_STATIC_DEFINE)
++endif()
+
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSHARED:BOOL=OFF -DSTATIC_GMP:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSHARED:BOOL=OFF -DSTATIC_GMP:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSHARED:BOOL=OFF -DSTATIC_GMP:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
  #-DCMAKE_C_FLAGS:STRING="-DSTATIC" -DCMAKE_CXX_FLAGS:STRING="-DSTATIC" 
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSHARED:BOOL=ON -DSTATIC_GMP:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSHARED:BOOL=ON -DSTATIC_GMP:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSHARED:BOOL=ON -DSTATIC_GMP:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
