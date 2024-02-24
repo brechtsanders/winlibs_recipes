@@ -79,8 +79,10 @@ export BASENAME=srtp2
 export DESCRIPTION="The libSRTP library is an open-source implementation of the Secure Real-time Transport Protocol (SRTP) originally authored by Cisco Systems, Inc."
 export CATEGORY=audio,communication
 export TYPE=library
-export VERSION=2.5.0
-export VERSIONDATE=20230201
+#export VERSION=2.5.0
+#export VERSIONDATE=20230201
+export VERSION=2.6.0
+export VERSIONDATE=20240224
 wl-showstatus --package-version
 export DEPENDENCIES=openssl
 export OPTIONALDEPENDENCIES=libpcap
@@ -96,11 +98,41 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd libsrtp-$VERSION
+# fix srtp/srtp.c (version >= 2.6.0)
+patch -ulbf srtp/srtp.c << EOF
+@@ -531,3 +531,3 @@
+
+-    debug_print(mod_srtp, "cloning stream (SSRC: 0x%08x)", ntohl(ssrc));
++    debug_print(mod_srtp, "cloning stream (SSRC: 0x%08x)", (unsigned int)ntohl(ssrc));
+
+@@ -2535,3 +2535,3 @@
+             debug_print(mod_srtp, "using provisional stream (SSRC: 0x%08x)",
+-                        ntohl(hdr->ssrc));
++                        (unsigned int)ntohl(hdr->ssrc));
+
+@@ -4284,3 +4284,3 @@
+                         "srtcp using provisional stream (SSRC: 0x%08x)",
+-                        ntohl(hdr->ssrc));
++                        (unsigned int)ntohl(hdr->ssrc));
+         } else {
+EOF
+# fix crypto/kernel/alloc.c (version >= 2.6.0)
+patch -ulbf crypto/kernel/alloc.c << EOF
+@@ -82,4 +82,4 @@
+     } else {
+-        debug_print(srtp_mod_alloc, "allocation failed (asked for %zu bytes)\\n",
+-                    size);
++        debug_print(srtp_mod_alloc, "allocation failed (asked for %lu bytes)\\n",
++                    (unsigned long)size);
+     }
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_OPENSSL:BOOL=ON -DTEST_APPS:BOOL=OFF -DBUILD_WITH_WARNINGS:BOOL=OFF -DPCAP_LIBRARY_TEMP:FILEPATH="-lpcap" -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_OPENSSL:BOOL=ON -DTEST_APPS:BOOL=OFF -DBUILD_WITH_WARNINGS:BOOL=OFF -DPCAP_LIBRARY_TEMP:FILEPATH="-lpcap" -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_OPENSSL:BOOL=ON -DLIBSRTP_TEST_APPS:BOOL=OFF -DTEST_APPS:BOOL=OFF -DBUILD_WITH_WARNINGS:BOOL=OFF -DPCAP_LIBRARY_TEMP:FILEPATH="-lpcap" -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_OPENSSL:BOOL=ON -DTEST_APPS:BOOL=OFF -DBUILD_WITH_WARNINGS:BOOL=OFF -DPCAP_LIBRARY_TEMP:FILEPATH="-lpcap" -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_OPENSSL:BOOL=ON -DTEST_APPS:BOOL=OFF -DBUILD_WITH_WARNINGS:BOOL=OFF -DPCAP_LIBRARY_TEMP:FILEPATH="-lpcap" -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_OPENSSL:BOOL=ON -DLIBSRTP_TEST_APPS:BOOL=OFF -DBUILD_WITH_WARNINGS:BOOL=OFF -DPCAP_LIBRARY_TEMP:FILEPATH="-lpcap" -S. -Bbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
