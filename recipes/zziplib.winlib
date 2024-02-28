@@ -156,10 +156,10 @@ export BASENAME=zziplib
 export DESCRIPTION="The zziplib library is intentionally lightweight, it offers the ability to easily extract data from files archived in a single zip file. Applications can bundle files into a single zip archive and access them. The implementation is based only on the (free) subset of compression with the zlib algorithm which is actually used by the zip/unzip tools."
 export CATEGORY=compression
 export TYPE=library
-export VERSION=0.13.72
-export VERSIONDATE=20210105
-#export VERSION=0.13.73
-#export VERSIONDATE=20240228
+#export VERSION=0.13.72
+#export VERSIONDATE=20210105
+export VERSION=0.13.73
+export VERSIONDATE=20240228
 wl-showstatus --package-version
 export DEPENDENCIES=zlib
 export OPTIONALDEPENDENCIES=
@@ -219,6 +219,8 @@ EOF
 sed -i.bak -e "s/\(SET_TARGET_PROPERTIES.*\) RELEASE_POSTFIX [^ )]*/\1/i" zzip/CMakeLists.txt zzipwrap/CMakeLists.txt
 ## fix additional lib prefix
 #sed -i.bak2 "s/\(set(lib \${CMAKE_SHARED_LIBRARY_PREFIX})\)/#&/" zzip/CMakeLists.txt zzipwrap/CMakeLists.txt
+# copy instead of creating symbolic links (version >= 0.13.73)
+sed -i.bak3 -e "s/create_symlink/copy/" zzip/CMakeLists.txt zzipwrap/CMakeLists.txt test/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_STATIC_LIBS:BOOL=ON -DZZIP_PKGCONFIG:BOOL=ON -DZZIP_INSTALL_ACLOCAL:BOOL=ON -DZZIP_LIBTOOL:BOOL=OFF -DZZIP_COMPAT:BOOL=ON -DMSVC_STATIC_RUNTIME:BOOL=OFF -DZZIP_MANPAGES:BOOL=ON -DZZIP_TESTCVE:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
@@ -229,8 +231,12 @@ mkdir -p build_static build_shared &&
  #ninja -Cbuild_static -wdupbuild=warn install/strip &&
  wl-showstatus build-install &&
  ninja -Cbuild_shared install/strip &&
- # fix .pc files (version >= 0.13.72)
+ #ninja -Cbuild_shared -wdupbuild=warn install/strip &&
+ # fix .pc files (version = 0.13.72)
  sed -i -e "s?^\(prefix=\).*?\1$(cygpath -m $INSTALLPREFIX)?" $INSTALLPREFIX/lib/pkgconfig/zzipfseeko.pc $INSTALLPREFIX/lib/pkgconfig/zzipmmapped.pc &&
+ # move .dll files to bin folder (version >= 0.13.73)
+ strip $INSTALLPREFIX/lib/*.dll &&
+ mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/lib/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
