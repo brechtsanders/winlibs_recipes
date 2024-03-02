@@ -1,0 +1,51 @@
+export NAME="NanoCBOR"
+export STATUS=
+export URL=https://github.com/bergzand/NanoCBOR
+export BASENAME=nanocbor
+export DESCRIPTION="CBOR library aimed at heavily constrained devices"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20240228
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=CC0
+export DOWNLOADURL="https://github.com/bergzand/NanoCBOR/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/bergzand/NanoCBOR/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing endian.h
+mkdir -p winfix
+cat > winfix/endian.h << EOF
+#include <winsock2.h>
+#include <stdint.h>
+#define htobe32(x) htonl(x)
+#define be64toh(x) ((((uint64_t)ntohl(x & 0xFFFFFFFFUL)) << 32) | ntohl((uint64_t)(x >> 32)))
+#define htobe64(x) ((((uint64_t)htonl(x & 0xFFFFFFFFUL)) << 32) | htonl((uint64_t)(x >> 32)))
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Denable-examples=false -Denable-tests=false -Dc_args="-I$PWD/winfix" -Dc_link_args="-lws2_32" . build_both &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_both &&
+ strip build_both/*.dll &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_both install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_both/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_both/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
