@@ -1,0 +1,91 @@
+export NAME="libyang"
+export STATUS=
+export URL=https://github.com/CESNET/libyang
+export BASENAME=libyang
+export DESCRIPTION="libyang is a YANG data modelling language parser and toolkit written (and providing API) in C."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=2.1.148
+export VERSIONDATE=20240228
+wl-showstatus --package-version
+export DEPENDENCIES=dirent,libdl,cmocka
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/CESNET/libyang/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/CESNET/libyang/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix compat/posix-shims/unistd.h (version >= 2.1.148)
+patch -ulbf compat/posix-shims/unistd.h << EOF
+@@ -47,2 +47,5 @@
+ /* should be in some equivalent to <sys/types.h> */
++#ifdef __MINGW32__
++#include <stdint.h>
++#else
+ typedef __int8            int8_t;
+@@ -55,2 +58,3 @@
+ typedef unsigned __int64  uint64_t;
++#endif
+
+EOF
+# fix missing strcasecmp (version >= 2.1.148)
+sed -i.bak -e "s/_MSC_VER/_WIN32/" compat/posix-shims/strings.h
+# fix CMakeLists.txt (version >= 2.1.148)
+patch -ulbf CMakeLists.txt << EOF
+@@ -72,3 +72,3 @@
+
+-if(WIN32)
++if(MSVC)
+     set(C_STANDARD 11)
+@@ -362,3 +362,3 @@
+
+-    if(WIN32)
++    if(MSVC)
+         find_package(dlfcn-win32 REQUIRED)
+@@ -385,4 +385,3 @@
+
+-    find_package(pthreads REQUIRED)
+-    set(COMPAT_WIN_LIBRARIES PThreads4W::PThreads4W shlwapi.lib ws2_32)
++    set(COMPAT_WIN_LIBRARIES shlwapi ws2_32)
+     target_link_libraries(yang \${COMPAT_WIN_LIBRARIES})
+EOF
+# fix tools/CMakeLists.txt (version >= 2.1.148)
+patch -ulbf tools/CMakeLists.txt << EOF
+@@ -3,3 +3,3 @@
+
+-if(WIN32)
++if(MSVC)
+     find_library(GETOPT_LIBRARY NAMES getopt REQUIRED)
+@@ -8,2 +8,5 @@
+ endif()
++if(MINGW)
++    set(GETOPT_LIBRARY "")
++endif()
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_STATIC:BOOL=ON -DDIRENT_INCLUDE_DIR:PATH="$MINGWPREFIX/include/dirent-win32" -DENABLE_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lpcre2-8/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_STATIC:BOOL=OFF -DDIRENT_INCLUDE_DIR:PATH="$MINGWPREFIX/include/dirent-win32" -DENABLE_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lpcre2-8 -ldl/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
