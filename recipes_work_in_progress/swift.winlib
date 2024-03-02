@@ -29,6 +29,37 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/swift-$VERSION-RELEASE.tar.gz
 cd swift-swift-$VERSION-RELEASE
+# fix stdlib/public/LLVMSupport/ErrorHandling.cpp (version >= 5.9.2)
+patch -ulbf stdlib/public/LLVMSupport/ErrorHandling.cpp << EOF
+@@ -46,3 +46,3 @@
+   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", buffer);
+-#elif defined(_WIN32)
++#elif defined(_WIN32) && !defined(__MINGW32__)
+ #define STDERR_FILENO 2
+EOF
+# fix undefined _InterlockedCompareExchange128 in include/swift/Runtime/Atomic.h (version >= 5.9.2)
+# fix include/swift/Runtime/Atomic.h (version >= 5.9.2)
+patch -ulbf include/swift/Runtime/Atomic.h << EOF
+@@ -23,3 +23,3 @@
+ #include <cstdlib>
+-#if defined(_WIN64)
++#if defined(_WIN64) && !defined(__MINGW32__)
+ #include <intrin.h>
+@@ -85,3 +85,3 @@
+
+-#if defined(_WIN64)
++#if defined(_WIN64) && !defined(__MINGW32__)
+
+EOF
+# fix stdlib/public/SwiftShims/swift/shims/LibcShims.h (version >= 5.9.2)
+patch -ulbf stdlib/public/SwiftShims/swift/shims/LibcShims.h << EOF
+@@ -86,3 +86,5 @@
+ static inline int _swift_stdlib_vprintf(const char * __restrict fmt, va_list args) {
++#ifndef __MINGW32__
+     extern int vprintf(const char * __restrict, va_list);
++#endif
+ #pragma clang diagnostic push
+EOF
 # fix cmake/modules/SwiftConfigureSDK.cmake (version >= 5.9.1)
 patch -ulbf cmake/modules/SwiftConfigureSDK.cmake << EOF
 @@ -17,3 +17,3 @@
@@ -73,21 +104,57 @@ patch -ulbf stdlib/CMakeLists.txt << EOF
 +if(WINDOWS IN_LIST SWIFT_SDKS AND NOT MINGW)
    generate_windows_vfs_overlay()
 EOF
-# fix cmake/modules/AddSwift.cmake (version >= 5.9.1)
+## fix cmake/modules/AddSwift.cmake (version >= 5.9.1)
+#patch -ulbf cmake/modules/AddSwift.cmake << EOF
+#@@ -268,3 +268,3 @@
+#       target_compile_options(\${target} PRIVATE \$<\$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:/GR->)
+#-    else()
+#+    elseif(NOT MINGW)
+#       target_compile_options(\${target} PRIVATE
+#EOF
+# fix cmake/modules/AddSwift.cmake (version >= 5.9.2)
 patch -ulbf cmake/modules/AddSwift.cmake << EOF
 @@ -268,3 +268,3 @@
        target_compile_options(\${target} PRIVATE \$<\$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:/GR->)
 -    else()
 +    elseif(NOT MINGW)
        target_compile_options(\${target} PRIVATE
+@@ -767,3 +767,3 @@
+           \$<\$<COMPILE_LANGUAGE:C,CXX>:SHELL:/clang:-Xclang /clang:-ivfsoverlay /clang:-Xclang /clang:\${ASHL_VFS_OVERLAY}>)
+-      else()
++      else(NOT MINGW)
+         target_compile_options(\${name} PRIVATE
+@@ -952,3 +952,3 @@
+     # clang from clang-cl.
+-    if(NOT "\${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" AND NOT "\${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
++    if(NOT MINGW AND NOT "\${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" AND NOT "\${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
+       # MSVC doesn't support -Xclang. We don't need to manually specify
 EOF
-# fix stdlib/cmake/modules/AddSwiftStdlib.cmake (version >= 5.9.1)
+## fix stdlib/cmake/modules/AddSwiftStdlib.cmake (version >= 5.9.1)
+#patch -ulbf stdlib/cmake/modules/AddSwiftStdlib.cmake << EOF
+#@@ -1404,3 +1404,3 @@
+#
+#-    if(NOT \${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+#+    if(NOT \${CMAKE_C_COMPILER_ID} STREQUAL MSVC AND NOT MINGW)
+#       swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+#EOF
+# fix stdlib/cmake/modules/AddSwiftStdlib.cmake (version >= 5.9.2)
 patch -ulbf stdlib/cmake/modules/AddSwiftStdlib.cmake << EOF
+@@ -901,3 +901,3 @@
+   if("\${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
+-    if(NOT "\${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
++    if(NOT MINGW AND NOT "\${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+       swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
 @@ -1404,3 +1404,3 @@
 
--    if(NOT \${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
-+    if(NOT \${CMAKE_C_COMPILER_ID} STREQUAL MSVC AND NOT MINGW)
+-    if(NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
++    if(NOT MINGW AND NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
        swift_windows_get_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY)
+@@ -2669,3 +2669,3 @@
+     endif()
+-    if(NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
++    if(NOT MINGW AND NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+       # MSVC doesn't support -Xclang. We don't need to manually specify
 EOF
 # fix lib/Option/CMakeLists.txt (version >= 5.9.1)
 patch -ulbf lib/Option/CMakeLists.txt << EOF
@@ -155,6 +222,10 @@ mkdir -p build_win &&
 #  -DCMAKE_RC_COMPILER:FILEPATH="$MINGWPREFIX/share/llvm/bin/llvm-windres.exe  -m $(if [ "$arch" == "x86_64" ]; then echo "i386:"; fi)$(if [ "$arch" == "aarch64" ]; then echo "arm64"; else echo "$arch"; fi)" \
 #  -DCMAKE_LINKER:FILEPATH=$MINGWPREFIX/share/llvm/bin/ld.lld.exe \
 #  -DGOLD_EXECUTABLE:FILEPATH=$MINGWPREFIX/share/llvm/bin/ld.lld.exe \
+ # fix invalid flags
+ sed -i.bak -e "s/-fno-lifetime-dse\|-fno-keep-inline-dllexport\|-Wno-class-memaccess//g" build_win/build.ninja &&
+ # fix location of clang
+ sed -i.bak2 -e "s?\(share/llvm/lib/clang/[0-9]*\)[.0-9]*?\1?g" build_win/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
     echo OK
