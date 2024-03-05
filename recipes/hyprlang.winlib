@@ -1,0 +1,71 @@
+export NAME="hyprlang"
+export STATUS=
+export URL=https://github.com/hyprwm/hyprlang
+export BASENAME=hyprlang
+export DESCRIPTION="The hypr configuration language is an extremely efficient, yet easy to work with, configuration language for linux applications."
+export CATEGORY=fileformat
+export TYPE=library
+export VERSION=0.4.1
+export VERSIONDATE=20240304
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/hyprwm/hyprlang/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/hyprwm/hyprlang/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/config.cpp (version >= 0.4.1)
+patch -ulbf src/config.cpp << EOF
+@@ -604,3 +604,9 @@
+
++#ifdef _WIN32
++    using convert_type = std::codecvt_utf8<wchar_t>;
++    std::wstring_convert<convert_type, wchar_t> converter;
++    std::string  canonical = converter.to_bytes(std::filesystem::canonical(impl->path));
++#else
+     std::string  canonical = std::filesystem::canonical(impl->path);
++#endif
+
+EOF
+# skip building tests
+patch -ulbf CMakeLists.txt << EOF
+@@ -40,14 +40,2 @@
+
+-# tests
+-add_custom_target(tests)
+-
+-add_executable(hyprlang_test "tests/parse/main.cpp")
+-target_link_libraries(hyprlang_test PRIVATE hyprlang)
+-add_test(NAME "Parsing" WORKING_DIRECTORY \${CMAKE_SOURCE_DIR}/tests COMMAND hyprlang_test "parse")
+-add_dependencies(tests hyprlang_test)
+-
+-add_executable(hyprlang_fuzz "tests/fuzz/main.cpp")
+-target_link_libraries(hyprlang_fuzz PRIVATE hyprlang)
+-add_test(NAME "Fuzz" WORKING_DIRECTORY \${CMAKE_SOURCE_DIR}/tests COMMAND hyprlang_fuzz "fuzz")
+-add_dependencies(tests hyprlang_fuzz)
+
+EOF
+# also allow building static library
+sed -i.bak -e "s/\(add_library(hyprlang\) SHARED/\1/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
