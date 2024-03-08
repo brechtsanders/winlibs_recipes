@@ -5,10 +5,12 @@ export BASENAME=lib3mf
 export DESCRIPTION="lib3mf is an implementation of the 3D Manufacturing Format file standard "
 export CATEGORY=fileformat
 export TYPE=library
-export VERSION=2.2.0
-export VERSIONDATE=20211206
+#export VERSION=2.2.0
+#export VERSIONDATE=20211206
+export VERSION=2.3.0
+export VERSIONDATE=20240308
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,libzip
+export DEPENDENCIES=zlib,libzip,openssl
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -23,22 +25,30 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing config.h (version >= 2.3.0)
+echo -e "#include <stdio.h>\nint main() { printf(\"#define SIZEOF_OFF_T %i\\\\n#define HAVE__SNWPRINTF_S 1\\\\n\", sizeof(off_t)); return 0; }" | ${CC:-gcc} -xc - -o make_config.exe && make_config.exe > Libraries/libzip/Include/config.h
 # fix also building static library
 sed -i.bak -e "s/\(add_library(.*\) SHARED/\1/" CMakeLists.txt
+# fix CMakeLists.txt (version >= 2.3.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -172,3 +172,3 @@
+     pkg_check_modules(LIBZIP REQUIRED libzip)
+-    target_link_libraries(\${PROJECT_NAME} \${LIBZIP_LIBRARIES})
++    target_link_libraries(\${PROJECT_NAME} PRIVATE  \${LIBZIP_LIBRARIES})
+ endif()
+@@ -181,3 +181,3 @@
+     pkg_check_modules(ZLIB REQUIRED zlib)
+-    target_link_libraries(\${PROJECT_NAME} \${ZLIB_LIBRARIES})
++    target_link_libraries(\${PROJECT_NAME} PRIVATE  \${ZLIB_LIBRARIES})
+ endif()
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIB3MF_TESTS:BOOL=OFF -S. -Bbuild_static &&
- #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIB3MF_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_INCLUDED_ZLIB:BOOL=OFF -DUSE_INCLUDED_LIBZIP:BOOL=OFF -DUSE_INCLUDED_SSL:BOOL=OFF -DLIB3MF_TESTS:BOOL=OFF -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIB3MF_TESTS:BOOL=OFF -S. -Bbuild_shared &&
- ## fix execution of Python scripts
- #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
- ## fix missing link libraries
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
- #wl-showstatus build &&
- #ninja -Cbuild_static &&
- #wl-showstatus build &&
- #ninja -Cbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIB3MF_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_INCLUDED_ZLIB:BOOL=OFF -DUSE_INCLUDED_LIBZIP:BOOL=OFF -DUSE_INCLUDED_SSL:BOOL=OFF -DLIB3MF_TESTS:BOOL=OFF -S. -Bbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
