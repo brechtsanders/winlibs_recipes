@@ -223,13 +223,25 @@ patch -ulbf configure.py << EOF
 
          self._aliases = lex.aliases
 EOF
-# fix src/scripts/install.py (version >= 2.19.1)
+## fix src/scripts/install.py (version >= 2.19.1 <= 3.2.0)
+#patch -ulbf src/scripts/install.py << EOF
+#@@ -188,3 +188,3 @@
+#     if build_shared_lib:
+#-        if target_os == "windows":
+#+        if target_os == "windows" or target_os == "mingw":
+#             libname = cfg['libname']
+#EOF
+# fix src/scripts/install.py (version >= 3.3.0)
 patch -ulbf src/scripts/install.py << EOF
-@@ -188,3 +188,3 @@
+@@ -171,6 +171,6 @@
      if build_shared_lib:
 -        if target_os == "windows":
 +        if target_os == "windows" or target_os == "mingw":
              libname = cfg['libname']
+             soname_base = libname + '.dll'
+-            implib = cfg['implib_name']
++            implib = soname_base + '.a'
+             copy_executable(os.path.join(out_dir, soname_base),
 EOF
 wl-showstatus configure &&
  #$PYDIR/python.exe configure.py --prefix=$INSTALLPREFIX --os=mingw --cpu=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo x86_32; else echo x86_64; fi) --makefile-style=gmake --link-method=cp --enable-shared --with-gnump --with-bzip2 --with-zlib --with-sqlite3 &&
@@ -239,6 +251,7 @@ wl-showstatus configure &&
  #$PYDIR/python.exe configure.py --prefix=$INSTALLPREFIX --os=mingw --cpu=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo x86_32; else echo x86_64; fi) --makefile-style=unix --enable-shared --without-openssl --with-gnump --with-bzip2 --with-zlib &&
  #$PYDIR/python.exe configure.py --prefix=$INSTALLPREFIX --enable-shared-library --enable-static-library --os=mingw --cpu=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo x86_32; else echo x86_64; fi) --enable-shared --without-openssl --with-zlib --with-bzip2 --with-sqlite3 &&
  #$PYDIR/python.exe configure.py --prefix=$INSTALLPREFIX --enable-shared-library --enable-static-library --os=mingw --cpu=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo x86_32; else echo x86_64; fi) --enable-shared --without-openssl --with-zlib --with-bzip2 --with-lzma --with-sqlite3 --with-boost --link-method=copy --ldflags="-Wl,--as-needed -lmswsock" &&
+ #$PYDIR/python.exe configure.py --prefix=$INSTALLPREFIX --enable-shared-library --enable-static-library --os=mingw --cpu=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo x86_32; else echo x86_64; fi) --enable-shared --with-zlib --with-bzip2 --with-lzma --with-sqlite3 --with-boost --link-method=copy --ldflags="-Wl,--as-needed -lmswsock" &&
  $PYDIR/python.exe configure.py --prefix=$INSTALLPREFIX --enable-shared-library --enable-static-library --os=mingw --cpu=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo x86_32; else echo x86_64; fi) --enable-shared --with-zlib --with-bzip2 --with-lzma --with-sqlite3 --with-boost --link-method=copy --ldflags="-Wl,--as-needed -lmswsock" &&
  #$PYDIR/python.exe configure.py --prefix=$INSTALLPREFIX --enable-shared-library --enable-static-library --os=mingw --cpu=$(if ( echo $RUNPLATFORM | grep -qv x86_64 ); then echo x86_32; else echo x86_64; fi) --enable-shared --with-zlib --with-bzip2 --with-lzma --with-sqlite3 --with-boost --link-method=copy --with-external-includedir=$MINGWPREFIX/include/nspr --ldflags="-Wl,--as-needed -lmswsock" &&
  #--cxxflags="-DBOTAN_DLL=__declspec\\\\(dllexport\\\\)" 
@@ -250,6 +263,8 @@ wl-showstatus configure &&
  sed -i.bak -e "s/\(\"libname\": \"\)\(botan-3\"\)/\1lib\2/" build/build_config.json &&
  #( make install LN="cp -f" || make install CXX="${CXX:-g++} -std=c++11" LN="cp -f" ) &&
  #PATH=$PYDIR:$PATH ( make install LN="cp -f" || make install CXX="${CXX:-g++} -std=c++11" LN="cp -f" ) &&
+ # make sure to use local pkcs11.h (version >= 3.3.0)
+ sed -i.bak -e "s?\(\"\)\(pkcs11\.h\"\)?\1../../external/\2?" build/include/public/botan/p11.h &&
  PATH=$PYDIR:$PATH make install &&
  #PATH=$PYDIR:$PATH make CXXFLAGS="-O3 -momit-leaf-frame-pointer -DBOTAN_DLL=__declspec\(dllexport\)" &&
  #g++ -shared -s -mwindows -Wl,--export-all-symbols -o libbotan-2.dll libbotan-2.a -Wl,--out-implib,libbotan-2.dll.a &&
@@ -257,12 +272,12 @@ wl-showstatus configure &&
  #mv $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
  #cp -f libbotan*.dll $INSTALLPREFIX/bin/ &&
  cp -f *.dll.a $INSTALLPREFIX/lib/ &&
+ # replace backslash(es) with forward slash(es) in .pc file
+ sed -i -e 's?\\?/?g' $INSTALLPREFIX/lib/pkgconfig/*.pc &&
  # fix Python package location
  mkdir -p $INSTALLPREFIX/python/Lib &&
  mv $INSTALLPREFIX/lib/python*/site-packages/ $INSTALLPREFIX/python/Lib/ &&
  ( rmdir $INSTALLPREFIX/lib/python* || true ) &&
- # replace backslash(es) with forward slash(es) in .pc file
- sed -i -e 's?\\?/?g' $INSTALLPREFIX/lib/pkgconfig/*.pc &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Botan-$VERSION
 
 
