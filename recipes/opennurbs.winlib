@@ -1,0 +1,223 @@
+export NAME="openNURBS"
+export STATUS=
+#export URL=https://www.rhino3d.com/opennurbs
+export URL=http://opennurbs.org/
+export BASENAME=opennurbs
+export DESCRIPTION="The openNURBS (R) Initiative provides CAD, CAM, CAE, and computer graphics software developers the tools to accurately transfer 3-D geometry between applications."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=6.11.18282.01000
+#export VERSIONDATE=20190211
+#export VERSION=6.15.19158.19451
+#export VERSIONDATE=20190611
+#export VERSION=7.0.19309.17460
+#export VERSIONDATE=20191107
+#export VERSION=7.0.20255.14200
+#export VERSIONDATE=20200918
+#export VERSION=7.6.21127.19001
+#export VERSIONDATE=20210603
+#export VERSION=7.11.21285.13001
+#export VERSIONDATE=20220122
+#export VERSION=8.0.23304.13300
+#export VERSIONDATE=20231116
+#export VERSION=8.4.24044.15001
+#export VERSIONDATE=20240216
+####opennurbs_lock.h:118:44: error: use of deleted function 'std::atomic<int>::atomic(const std::atomic<int>&)'
+export VERSION=8.5.24072.13000
+export VERSIONDATE=20240314
+wl-showstatus --package-version
+export DEPENDENCIES=libuuid
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+#export DOWNLOADURL="https://github.com/louipc/opennurbs/releases"
+#export DOWNLOADURL="https://github.com/mcneel/opennurbs/releases"
+export DOWNLOADURL="https://github.com/mcneel/opennurbs/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/louipc/opennurbs/archive/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/mcneel/opennurbs/archive/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/mcneel/opennurbs/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing PRIu64 in opennurbs_system.h
+mv opennurbs_system.h opennurbs_system.h.bak &&
+echo "#define __STDC_FORMAT_MACROS" > opennurbs_system.h &&
+cat opennurbs_system.h.bak >> opennurbs_system.h
+# fix opennurbs_lock.h
+patch -ulbf opennurbs_lock.h << EOF
+@@ -117,3 +117,3 @@
+ #else
+-  std::atomic<int> m_lock_value = ON_Lock::UnlockedValue;
++  std::atomic<int> m_lock_value = {ON_Lock::UnlockedValue};
+ #endif
+EOF
+# fix opennurbs_file_utilities.cpp (version >= 7.6.21127.19001)
+patch -ulbf opennurbs_file_utilities.cpp << EOF
+@@ -43,2 +43,13 @@
+ #endif
++#elif defined(ON_RUNTIME_WIN)
++#define ON_COMPILER_MSC
++#if !defined(NTDDI_VERSION) || NTDDI_VERSION < 0x06000000
++#undef NTDDI_VERSION
++#define NTDDI_VERSION 0x06000000
++#endif
++#include <shlwapi.h>
++#include <shlobj.h>
++#if !defined(NAME_MAX)
++#define NAME_MAX 255
++#endif
+ #endif
+@@ -550,3 +561,3 @@
+
+-  DWORD rc = ::GetCurrentDirectory(directory_capacity - 1, directory);
++  DWORD rc = ::GetCurrentDirectoryW(directory_capacity - 1, directory);
+   ON_wString fullpath = directory;
+@@ -2441,3 +2452,3 @@
+
+-    m_impl->m_h = ::FindFirstFile(static_cast<const wchar_t*>(s), &m_impl->m_fd);
++    m_impl->m_h = ::FindFirstFileW(static_cast<const wchar_t*>(s), &m_impl->m_fd);
+     if (0 == m_impl->m_h || INVALID_HANDLE_VALUE == m_impl->m_h || 0 == m_impl->m_fd.cFileName[0])
+EOF
+# fix opennurbs_locale.cpp (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_locale.cpp << EOF
+@@ -1347,3 +1347,3 @@
+ #if defined(ON_COMPILER_CLANG) || defined(ON_COMPILER_GNU)
+-#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX)
++#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX) || defined(ON_RUNTIME_WIN)
+     // Test formatted printing
+@@ -1372,3 +1372,3 @@
+ #if defined(ON_COMPILER_CLANG) || defined(ON_COMPILER_GNU)
+-#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX)
++#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX) || defined(ON_RUNTIME_WIN)
+     // Test formatted printing
+@@ -1426,3 +1426,3 @@
+ #if defined(ON_COMPILER_CLANG) || defined(ON_COMPILER_GNU)
+-#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX)
++#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX) || defined(ON_RUNTIME_WIN)
+     // Test formatted scanning
+@@ -1451,3 +1451,3 @@
+ #if defined(ON_COMPILER_CLANG) || defined(ON_COMPILER_GNU)
+-#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX)
++#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX) || defined(ON_RUNTIME_WIN)
+     // Test formatted scanning
+EOF
+# fix opennurbs_internal_defines.h (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_internal_defines.h << EOF
+@@ -29,3 +29,3 @@
+
+-#ifdef ON_RUNTIME_WIN
++#if defined(ON_RUNTIME_WIN) && !defined(__MINGW32__)
+ #define PRIVATE_CHECK(c) auto priv_has = sizeof(_PRIVATE), priv_needs = sizeof(c) + 64; \\
+EOF
+# fix opennurbs_sort.cpp (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_sort.cpp << EOF
+@@ -63,3 +63,3 @@
+   // find pivots, that calculation must be thread safe.
+-#if defined(ON_COMPILER_MSC)
++#if defined(_WIN32)
+   qsort_s(base,nel,width,compar,context);
+EOF
+# fix opennurbs_string_format.cpp (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_string_format.cpp << EOF
+@@ -804,3 +804,3 @@
+   va_copy (args_copy, args);
+-#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX)
++#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX) || defined(__MINGW32__)
+   int len = vsnprintf(buffer, buffer_capacity, format, args_copy);
+@@ -852,3 +852,3 @@
+
+-#if defined(ON_COMPILER_CLANG) || defined(ON_COMPILER_GNU)
++#if defined(ON_COMPILER_CLANG) || defined(ON_COMPILER_GNU) || defined(__MINGW32__)
+   // CLang modifies args so a copy is required
+@@ -857,3 +857,3 @@
+
+-#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX)
++#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX) || defined(__MINGW32__)
+   int len = vsnprintf(nullptr, 0, format, args_copy);
+@@ -1075,3 +1075,3 @@
+
+-#if defined(ON_COMPILER_GNU)
++#if defined(ON_COMPILER_GNU) || defined(__MINGW32__)
+   va_list args_copy;
+EOF
+# fix opennurbs_string_scan.cpp (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_string_scan.cpp << EOF
+@@ -84,4 +84,4 @@
+ {
+-#if defined(ON_COMPILER_CLANG) || defined(ON_RUNTIME_LINUX)
+-#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX)
++#if defined(ON_COMPILER_CLANG) || defined(ON_RUNTIME_LINUX) || defined(__MINGW32__)
++#if defined(ON_RUNTIME_ANDROID) || defined(ON_RUNTIME_LINUX) || defined(__MINGW32__)
+   if (nullptr == buffer || nullptr == format)
+@@ -150,3 +150,3 @@
+
+-#if defined(ON_RUNTIME_WIN)
++#if defined(ON_RUNTIME_WIN) && !defined(__MINGW32__)
+   if (nullptr == args)
+EOF
+# fix opennurbs_uuid.cpp (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_uuid.cpp << EOF
+@@ -16,2 +16,4 @@
+ #include "android_uuid/uuid.h"
++#elif defined(__MINGW32__)
++#include <portable-uuid/uuid/uuid.h>
+ #endif
+@@ -223,3 +225,3 @@
+
+-#if defined(ON_RUNTIME_LINUX)
++#if defined(ON_RUNTIME_LINUX) || defined(__MINGW32__)
+   uuid_generate((unsigned char*)&new_uuid);
+EOF
+# fix opennurbs_xml.cpp (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_xml.cpp << EOF
+@@ -219,3 +219,3 @@
+
+-#ifdef ON_COMPILER_MSC
++#ifdef _WIN32
+   localtime_s(&stm, &time);
+EOF
+# fix opennurbs_defines.cpp (version >= 8.5.24072.13000)
+patch -ulbf opennurbs_defines.cpp << EOF
+@@ -495,3 +495,3 @@
+   // returns number of files closed or EOF for error
+-#if defined(ON_COMPILER_MSC)
++#if defined(_WIN32)
+   return _fcloseall(); // ANSI C name
+EOF
+# also build opennurbs_win_dwrite.cpp (version >= 8.5.24072.13000)
+sed -i.bak -e "s/^ON_SRC = /&opennurbs_win_dwrite.cpp /; s/^ON_OBJ = /&opennurbs_win_dwrite.o /" makefile
+wl-showstatus build &&
+ make ON_GNU_OPTIMIZER_FLAGS="-O2 -municode" EXAMPLES= CC=${CC:-gcc} CCC=${CXX:-g++} AR="${AR:-ar} cr" RANLIB=${RANLIB:-ranlib}  &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libopennurbs_public.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > opennurbs_public.def &&
+ ${CXX:-g++} -shared -s -mwindows -def opennurbs_public.def -o opennurbs_public.dll libopennurbs_public.a -Wl,--out-implib,libopennurbs_public.dll.a -lportable-uuid -lshlwapi -lole32 -luuid -ldwrite &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/OpenNURBS $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f opennurbs*.h $INSTALLPREFIX/include/OpenNURBS/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+# #wl-showstatus build &&
+# #cmake.exe --build build_win &&
+# #ninja -Cbuild_win &&
+# wl-showstatus build-install &&
+# #cmake.exe --install build_win --strip &&
+# #cmake.exe --build build_win --target "install/strip" &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
