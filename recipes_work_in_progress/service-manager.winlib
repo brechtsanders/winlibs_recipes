@@ -1,0 +1,52 @@
+export NAME="service-manager"
+export STATUS=
+export URL=https://github.com/cubiclesoft/service-manager-src
+export BASENAME=service-manager
+export DESCRIPTION="Programming and scripting language-agnostic solution to system service development"
+export CATEGORY=system
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20240315
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=README.md
+export LICENSETYPE=MIT/LGPL
+export DOWNLOADURL="https://github.com/cubiclesoft/service-manager-src/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/cubiclesoft/service-manager-src/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd service-manager-src-$VERSION
+# fix missing wWinMain in servicemanager.cpp (version >= master)
+patch -ulbf servicemanager.cpp << EOF
+@@ -721,2 +721,12 @@
+
++#ifdef __MINGW32__
++int _tmain(int argc, TCHAR **argv);
++int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, TCHAR* lpCmdLine, int nCmdShow)
++{
++       int argc;
++       TCHAR** argv = CommandLineToArgvW(lpCmdLine, &argc);
++       return _tmain(argc, argv);
++}
++#endif
++
+ int _tmain(int argc, TCHAR **argv)
+EOF
+sed -e "s?\bgcc\b?${CXX:-g++} -s -municode?; s?\(servicemanager\)_nix?\1?; s?-lrt??" build_nix.sh > build_mingw.sh
+wl-showstatus build &&
+ ./build_mingw.sh local &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf service-manager-src-$VERSION
+####servicemanager -help
+
+
+
