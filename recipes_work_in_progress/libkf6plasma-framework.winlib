@@ -1,0 +1,144 @@
+export NAME="Plasma"
+export STATUS=
+export URL=https://api.kde.org/frameworks/plasma-framework/html/index.html
+export BASENAME=libkf6plasma-framework
+export DESCRIPTION="Plugin based UI runtime used to write primary user interfaces (KDE Frameworks 6 (KDF6) Tier 3 framework)"
+export CATEGORY=framework
+export TYPE=library
+export VERSION=6.0.0
+export VERSIONDATE=20240317
+wl-showstatus --package-version
+export DEPENDENCIES=qt6,libkf6activities,libkf6archive,libkf6auth,libkf6bookmarks,libkf6codecs,libkf6completion,libkf6configwidgets,libkf6config,libkf6coreaddons,libkf6dbusaddons,libkf6declarative,libkf6guiaddons,libkf6i18n,libkf6iconthemes,libkf6itemviews,libkf6jobwidgets,libkf6kio,libkf6kirigami2,libkf6notifications,libkf6package,libkf6service,libkf6solid,libkf6widgetsaddons,libkf6windowsystem,libkf6xmlgui
+export OPTIONALDEPENDENCIES=libkf6doctools,libkf6wayland
+export BUILDDEPENDENCIES=cmake,extra-cmake-modules
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING.LIB
+export LICENSETYPE=LGPL
+#export DOWNLOADURL="https://kde.org/announcements/ kde-frameworks- .php"
+export DOWNLOADURL="https://download.kde.org/stable/frameworks/ plasma-framework-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://download.kde.org/stable/frameworks/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/plasma-framework-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xJ --force-local -f $TARBALLDIR/$BASENAME/plasma-framework-$VERSION.tar.xz
+cd plasma-framework-$VERSION
+# fix missing KX11Extras (version >= 5.101.0)
+patch -ulbf src/declarativeimports/platformcomponents/icondialog.cpp << EOF
+@@ -14,3 +14,5 @@
+ #include <KIconDialog>
++#ifndef _WIN32
+ #include <KX11Extras>
++#endif
+
+@@ -39,3 +41,5 @@
+
++#ifndef _WIN32
+     KX11Extras::setOnAllDesktops(dialog->winId(), true);
++#endif
+
+@@ -43,3 +47,5 @@
+
++#ifndef _WIN32
+     KX11Extras::forceActiveWindow(dialog->winId());
++#endif
+
+EOF
+patch -ulbf src/plasma/private/theme_p.cpp << EOF
+@@ -24,3 +24,5 @@
+ #include <KWindowEffects>
++#ifndef _WIN32
+ #include <KX11Extras>
++#endif
+ #include <kpluginmetadata.h>
+@@ -95,3 +97,5 @@
+     , cachesToDiscard(NoCache)
++#ifndef _WIN32
+     , compositingActive(KX11Extras::self()->compositingActive())
++#endif
+     , backgroundContrastActive(KWindowEffects::isEffectAvailable(KWindowEffects::BackgroundContrast))
+@@ -153,3 +157,5 @@
+
++#ifndef _WIN32
+     connect(KX11Extras::self(), &KX11Extras::compositingChanged, this, &ThemePrivate::compositingChanged);
++#endif
+ }
+EOF
+patch -ulbf src/plasmaquick/dialog.cpp << EOF
+@@ -27,3 +27,5 @@
+ #include <KWindowSystem>
++#ifndef _WIN32
+ #include <KX11Extras>
++#endif
+
+@@ -269,2 +271,3 @@
+
++#ifndef _WIN32
+         if (KX11Extras::compositingActive()) {
+@@ -274,3 +277,5 @@
+             }
+-        } else {
++        } else
++#endif
++        {
+             hasMask = true;
+@@ -908,2 +913,3 @@
+
++#ifndef _WIN32
+     if (type == Dialog::Dock || type == Dialog::Notification || type == Dialog::OnScreenDisplay || type == Dialog::CriticalNotification) {
+@@ -913,2 +919,3 @@
+     }
++#endif
+
+EOF
+patch -ulbf src/declarativeimports/core/windowthumbnail.cpp << EOF
+@@ -7,3 +7,5 @@
+ // KF5
++#ifndef _WIN32
+ #include <KX11Extras>
++#endif
+ // Qt
+@@ -277,2 +279,3 @@
+     }
++#ifndef _WIN32
+     if (!KX11Extras::self()->hasWId(winId)) {
+@@ -281,2 +284,3 @@
+     }
++#endif
+     if (window() && winId == window()->winId()) {
+@@ -385,5 +389,8 @@
+     QIcon icon;
++#ifndef _WIN32
+     if (KX11Extras::self()->hasWId(m_winId)) {
+         icon = KX11Extras::self()->icon(m_winId, boundingRect().width(), boundingRect().height());
+-    } else {
++    } else
++#endif
++    {
+         // fallback to plasma icon
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ #PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -D7z_EXECUTABLE="/C/Program Files/7-Zip/7z.exe" -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -D7z_EXECUTABLE="/C/Program Files/7-Zip/7z.exe" -D_tar_executable:FILEPATH=false -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITHOUT_X11:BOOL=ON -D7z_EXECUTABLE="/C/Program Files/7-Zip/7z.exe" -D_tar_executable:FILEPATH=false -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_static &&
+ # fix multiple definition errors
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=\s*/&-Wl,--allow-multiple-definition /" build_static/build.ninja &&
+ wl-showstatus configure &&
+ #PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -D7z_EXECUTABLE="/C/Program Files/7-Zip/7z.exe" -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -D7z_EXECUTABLE="/C/Program Files/7-Zip/7z.exe" -D_tar_executable:FILEPATH=false -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ #PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWITHOUT_X11:BOOL=ON -D7z_EXECUTABLE="/C/Program Files/7-Zip/7z.exe" -D_tar_executable:FILEPATH=false -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_shared &&
+ # fix Windows path issue (version >= 5.78.0)
+ sed -i.bak2 -e "s?\(tar\.exe -c \)\([A-Za-z]\):/\(.* -f \)\([A-Za-z]\):/?\1/\2/\3/\4/?" build_*/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf plasma-framework-$VERSION
+####PATH=$PATH:$MINGWPREFIX/qt6/bin plasmapkg2.exe
+####Require 7-Zip to be installed in C:\Program Files\7-Zip
+
+
+
+
