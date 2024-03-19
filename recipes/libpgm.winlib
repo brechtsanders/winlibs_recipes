@@ -27,11 +27,20 @@ tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION/openpgm/pgm
 # fix missing AI_ADDRCONFIG
 sed -i.bak -e "s/AI_ADDRCONFIG/0/" if.c getnodeaddr.c
+# fix sockaddr.c (version >= 5.2.122)
+patch -ulbf sockaddr.c << EOF
+@@ -981,3 +981,3 @@
+        retval = setsockopt (s, recv_level, MCAST_MSFILTER, (const char*)gf_list, len);
+-#elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x600 )
++#elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x600 ) && defined( SIOCSMSFILTER )
+ /* Windows Server 2008+, note MSDN(GROUP_FILTER Structure) does not list
+EOF
 # fix version_generator.py
 sed -i.bak -e "s?/usr/bin/python?python?" version_generator.py
 wl-showstatus configure &&
  #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -lws2_32 -liphlpapi -lwinmm" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -lws2_32 -liphlpapi -lwinmm" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="$(if ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" LDFLAGS="-Wl,-no-undefined -lws2_32 -liphlpapi -lwinmm" &&
  echo "#define AI_ADDRCONFIG 0" >> config.h &&
  echo "#define HAVE_WSACMSGHDR 0" >> config.h &&
  echo "#define HAVE_GETTIMEOFDAY 0" >> config.h &&
