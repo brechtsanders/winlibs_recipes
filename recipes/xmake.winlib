@@ -96,8 +96,10 @@ export TYPE=application
 #export VERSIONDATE=20231226
 #export VERSION=2.8.7
 #export VERSIONDATE=20240225
-export VERSION=2.8.8
-export VERSIONDATE=20240302
+#export VERSION=2.8.8
+#export VERSIONDATE=20240302
+export VERSION=2.8.9
+export VERSIONDATE=20240321
 wl-showstatus --package-version
 #export DEPENDENCIES=lua,lua-cjson,tbox,libsv,ncurses,liblz4
 export DEPENDENCIES=tbox,libsv,luajit,liblz4,ncurses
@@ -136,8 +138,14 @@ wl-showstatus configure &&
  #--generator=ninja 
  #--kind=shared 
  #sed -i.bak -e "s/\(-o [^ ]*xmake\.exe .*\$(\)demo_ldflags/\1xmake_ldflags/" makefile &&
- # make sure luajit path is included first
- sed -i.bak -e "s?^[^ ]*cflags=?&$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit) ?" makefile &&
+ ## make sure luajit path is included first (version <= 2.8.8)
+ #sed -i.bak -e "s?^[^ ]*cflags=?&$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit) ?" makefile &&
+ # make sure luajit path is included first and correct linker flags are used (version >= 2.8.9)
+ sed -i.bak -e "s?^[^ ]*cflags=?&$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit) ?; s?^[^ ]*ldflags=.*?& $(${PKG_CONFIG:-pkg-config} --libs luajit) -ltbox -lsv -llz4?" makefile &&
+ # fix xmake.config.h (version >= 2.8.9)
+ if [ ! -s build_win/mingw/*/release/xmake.config.h ]; then
+  sed -e "s/\${VERSION}/$VERSION/; s/\${VERSION_MAJOR}/$(echo $VERSION|sed -e "s/^\([0-9]*\)\.[0-9]*\.[0-9]*.*$/\1/")/; s/\${VERSION_MINOR}/$(echo $VERSION|sed -e "s/^[0-9]*\.\([0-9]*\)\.[0-9]*.*$/\1/")/; s/\${VERSION_ALTER}/$(echo $VERSION|sed -e "s/^[0-9]*\.[0-9]*\.\([0-9]*\).*$/\1/")/; s/\${VERSION_BUILD}/0/; s/\${GIT_BRANCH}/$VERSION/; s/\${GIT_COMMIT}/$VERSION/" core/src/xmake/xmake.config.h.in > build_win/mingw/*/release/xmake.config.h
+ fi
  wl-showstatus build-install &&
  make -f makefile install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
