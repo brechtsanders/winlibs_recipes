@@ -116,9 +116,68 @@ wl-showstatus configure &&
 
 
 #export BUILDDEPENDENCIES=meson,ninja
+## fix src/common_init.c (version >= 0.18.1)
+#patch -ulbf src/common_init.c << EOF
+#@@ -69,3 +69,3 @@
+#     err = pci_system_hurd_create();
+#-#elif defined(__CYGWIN__)
+#+#elif defined(__CYGWIN__) || defined(__MINGW32__)
+#     err = pci_system_x86_create();
+#EOF
+## fix src/common_interface.c (version >= 0.18.1)
+#patch -ulbf src/common_interface.c << EOF
+#@@ -56,2 +56,9 @@
+#
+#+#elif defined(__MINGW32__)
+#+
+#+#define LETOH_16(x) (x)
+#+#define HTOLE_16(x) (x)
+#+#define LETOH_32(x) (x)
+#+#define HTOLE_32(x) (x)
+#+
+# #elif defined(__sun)
+#EOF
+## fix src/x86_pci.c (version >= 0.18.1)
+#patch -ulbf src/x86_pci.c << EOF
+#@@ -39,2 +39,6 @@
+# #include "pciaccess_private.h"
+#+#if defined(__MINGW32__)
+#+#define error_t int
+#+#define ffs __builtin_ffs
+#+#endif
+#
+#@@ -80,3 +84,3 @@
+#
+#-#elif defined(__CYGWIN__)
+#+#elif defined(__CYGWIN__) || defined(__MINGW32__)
+#
+#@@ -108,3 +112,3 @@
+#
+#-static int
+#+int
+# x86_enable_io(void)
+#@@ -152,3 +156,3 @@
+#
+#-static int
+#+int
+# x86_disable_io(void)
+#@@ -880,3 +884,3 @@
+#
+#-#if defined(__CYGWIN__)
+#+#if defined(__CYGWIN__) || defined(__MINGW32__)
+#
+#EOF
+## fix src/meson.build (version >= 0.18.1)
+#patch -ulbf src/meson.build << EOF
+#@@ -30,3 +30,3 @@
+#   _pci_access_host_files += ['openbsd_pci.c']  # VGA arbiter code is in netbsd_pci.c
+#-elif host == 'cygwin'
+#+elif host == 'cygwin' or host == 'windows'
+#   _pci_access_host_files += ['x86_pci.c', 'common_vgaarb_stub.c']
+#EOF
 #mkdir -p build_both &&
 # wl-showstatus configure &&
-# PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dzlib=enabled . build_both &&
+# PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dzlib=enabled -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-lmman" . build_both &&
 # wl-showstatus build-install &&
 # PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
 #    echo OK && find . -name '*.a'
