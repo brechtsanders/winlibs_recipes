@@ -45,6 +45,9 @@ export TYPE=library
 export VERSION=1.5.3
 export VERSIONDATE=20230928
 ####Unable to find FreeRDP (libfreerdp2 / libfreerdp-client2 / libwinpr2) RDP will be disabled.
+#export VERSION=1.5.4
+#export VERSIONDATE=20240330
+####src/libguac/guacamole/client.h:195:5: error: unknown type name 'timer_t'
 wl-showstatus --package-version
 export DEPENDENCIES=sys_wait_h,libdl
 export OPTIONALDEPENDENCIES=
@@ -108,6 +111,38 @@ patch -ulbf src/common-ssh/ssh.c << EOF
 +#endif
  #include <stddef.h>
 EOF
+## fix src/libguac/guacamole/client.h (version >= 1.5.4)
+#patch -ulbf src/libguac/guacamole/client.h << EOF
+#@@ -46,2 +46,5 @@
+# #include <time.h>
+#+#ifdef _WIN32
+#+#include <windows.h>
+#+#endif
+# 
+#@@ -194,3 +197,7 @@
+#      */
+#+#ifdef _WIN32
+#+    UINT_PTR __pending_users_timer;
+#+#else
+#     timer_t __pending_users_timer;
+#+#endif
+# 
+#EOF
+## fix src/libguac/client.c (version >= 1.5.4)
+#patch -ulbf src/libguac/client.c << EOF
+#@@ -496,2 +496,7 @@
+# 
+#+#ifdef _WIN32
+#+#error Implement Windows timer
+#+//see also: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-settimer?redirectedfrom=MSDN
+#+//see also: https://stackoverflow.com/questions/4625184/passing-user-data-with-settimer
+#+#else
+#     /* Configure the timer to synchronize and clear the pending users */
+#@@ -524,2 +529,3 @@
+#     }
+#+#endif
+# 
+#EOF
 # don't abort build on warnings
 sed -i.bak -e "s/-Werror -Wall -pedantic//" src/libguac/Makefile.in src/protocols/vnc/Makefile.in
 wl-showstatus configure &&
