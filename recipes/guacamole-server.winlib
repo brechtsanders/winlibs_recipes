@@ -45,11 +45,15 @@ export TYPE=library
 #export VERSION=1.5.3
 #export VERSIONDATE=20230928
 ####Unable to find FreeRDP (libfreerdp2 / libfreerdp-client2 / libwinpr2) RDP will be disabled.
+#export DEPENDENCIES=sys_wait_h,libdl
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
 export VERSION=1.5.4
 export VERSIONDATE=20240330
 ####src/libguac/guacamole/client.h:195:5: error: unknown type name 'timer_t'
 wl-showstatus --package-version
-export DEPENDENCIES=sys_wait_h,libdl
+export DEPENDENCIES=sys_wait_h,langinfo,wcwidth,libdl
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -110,6 +114,39 @@ patch -ulbf src/common-ssh/ssh.c << EOF
  #include <pwd.h>
 +#endif
  #include <stddef.h>
+EOF
+# fix missing pipe() in src/terminal/terminal.c (version >= 1.5.4)
+patch -ulbf src/terminal/terminal.c << EOF
+@@ -44,2 +44,6 @@
+ #include <wchar.h>
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#endif
+
+EOF
+# fix invalid number of arguments calling mkdir() in src/terminal/typescript.c (version >= 1.5.4)
+patch -ulbf src/terminal/typescript.c << EOF
+@@ -114,3 +114,7 @@
+     /* Create path if it does not exist, fail if impossible */
++#ifdef _WIN32
++    if (create_path && mkdir(path)
++#else
+     if (create_path && mkdir(path, S_IRWXU | S_IRGRP | S_IXGRP)
++#endif
+             && errno != EEXIST)
+EOF
+# fix missing poll.h in src/protocols/ssh/ssh.c (version >= 1.5.4)
+patch -ulbf src/protocols/ssh/ssh.c << EOF
+@@ -52,3 +52,8 @@
+ #include <netinet/in.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#define poll WSAPoll
++#else
+ #include <poll.h>
++#endif
+ #include <pthread.h>
 EOF
 # fix avoid unsupported timer_t on Windows in src/libguac/guacamole/client.h (version >= 1.5.4)
 patch -ulbf src/libguac/guacamole/client.h << EOF
@@ -184,7 +221,9 @@ EOF
 # don't abort build on warnings
 sed -i.bak -e "s/-Werror -Wall -pedantic//" src/libguac/Makefile.in src/protocols/vnc/Makefile.in
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-guacd --disable-guaclog --without-terminal CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32 -ldl" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-guacd --disable-guaclog --without-terminal CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32 -ldl" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-guacd --disable-guaclog --with-terminal CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/compat" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32 -ldl -lwcwidth -llanginfo" &&
+ echo "#include <wcwidth.h>" >> config.h &&
  #LDFLAGS="-Wl,--as-needed -lws2_32" 
  wl-showstatus build-install &&
  make -Csrc/libguac install-strip &&
