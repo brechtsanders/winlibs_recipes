@@ -42,11 +42,11 @@ export TYPE=library
 #export VERSIONDATE=20210103
 #export VERSION=1.4.0
 #export VERSIONDATE=20220601
-export VERSION=1.5.3
-export VERSIONDATE=20230928
+#export VERSION=1.5.3
+#export VERSIONDATE=20230928
 ####Unable to find FreeRDP (libfreerdp2 / libfreerdp-client2 / libwinpr2) RDP will be disabled.
-#export VERSION=1.5.4
-#export VERSIONDATE=20240330
+export VERSION=1.5.4
+export VERSIONDATE=20240330
 ####src/libguac/guacamole/client.h:195:5: error: unknown type name 'timer_t'
 wl-showstatus --package-version
 export DEPENDENCIES=sys_wait_h,libdl
@@ -111,6 +111,44 @@ patch -ulbf src/common-ssh/ssh.c << EOF
 +#endif
  #include <stddef.h>
 EOF
+# fix avoid unsupported timer_t on Windows in src/libguac/guacamole/client.h (version >= 1.5.4)
+patch -ulbf src/libguac/guacamole/client.h << EOF
+@@ -194,3 +194,5 @@
+      */
++#ifndef _WIN32
+     timer_t __pending_users_timer;
++#endif
+ 
+EOF
+# fix avoid unsupported timer_t on Windows in src/libguac/client.c (version >= 1.5.4)
+patch -ulbf src/libguac/client.c << EOF
+@@ -165,2 +165,3 @@
+  */
++#ifndef _WIN32
+ static void guac_client_promote_pending_users(union sigval data) {
+@@ -252,2 +253,3 @@
+ }
++#endif
+ 
+@@ -368,4 +370,6 @@
+     /* If the timer was registered, stop it before destroying the lock */
++#ifndef _WIN32
+     if (was_started)
+         timer_delete(client->__pending_users_timer);
++#endif
+ 
+@@ -487,2 +491,6 @@
+ 
++#ifdef _WIN32
++    return 1;
++#else
++
+     pthread_mutex_lock(&(client->__pending_users_timer_mutex));
+@@ -530,2 +538,3 @@
+     return 0;
++#endif
+ 
+EOF
 ## fix src/libguac/guacamole/client.h (version >= 1.5.4)
 #patch -ulbf src/libguac/guacamole/client.h << EOF
 #@@ -46,2 +46,5 @@
@@ -147,7 +185,6 @@ EOF
 sed -i.bak -e "s/-Werror -Wall -pedantic//" src/libguac/Makefile.in src/protocols/vnc/Makefile.in
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-guacd --disable-guaclog --without-terminal CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lws2_32 -ldl" &&
- #--without-terminal
  #LDFLAGS="-Wl,--as-needed -lws2_32" 
  wl-showstatus build-install &&
  make -Csrc/libguac install-strip &&
