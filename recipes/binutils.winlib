@@ -5059,7 +5059,7 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
-## fix libiberty/vsnprintf.c (version >= 2.41)
+## fix libiberty/vsnprintf.c (version = 2.41)
 #patch -ulbf libiberty/vsnprintf.c << EOF
 #@@ -57,2 +57,3 @@
 #
@@ -5076,7 +5076,7 @@ cd $BASENAME-$VERSION
 #+         && compare_section (sec->spec.sorted, section, (*tree)->section) < 0)
 #        tree = &((*tree)->left);
 #EOF
-## add Windows on ARM64 support (version >= 2.40)
+## add Windows on ARM64 support (version >= 2.40 <= 2.41)
 #patch -ulbf bfd/config.bfd << EOF
 #@@ -251,3 +251,3 @@
 #     ;;
@@ -5121,16 +5121,19 @@ mkdir -p build_win &&
   ../../libsframe/configure --prefix=$INSTALLPREFIX/share/binutils --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$RUNPLATFORM --enable-shared --enable-static CFLAGS="$(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic -O2"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic -O2"; fi)" LDFLAGS="-Wl,--no-insert-timestamp" &&
   cd ../..
  )) &&
- ( make -Cbuild_win configure-host || make -j1 -Cbuild_win configure-host ) &&
+ ( make -Cbuild_win configure-host || make -j1 -Cbuild_win configure-host || make -i -Cbuild_win configure-host ) &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" build_win/*/libtool &&
  ## fix detection of shared libraries
  #sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" $(find -name 'libtool') &&
- ## remove invalid -rpath linker flag when using clang
- #sed -i.bak2 -e "s/^\(hardcode_libdir_flag_spec=\).*$/\1/" $(find -name 'libtool') &&
+ # remove invalid -rpath linker flag when using clang
+ if ${CC:-gcc} --version|head -n1|grep -q "^clang"; then
+  sed -i.bak2 -e "s/^\(hardcode_libdir_flag_spec=\).*$/\1/" $(find -name 'libtool')
+ fi &&
  #sed -i.bak -e "s/\(include \)*[^ ]*armelf[^ ]*//g" build_win/ld/Makefile
  wl-showstatus build &&
- make -Cbuild_win &&
+ #make -Cbuild_win &&
+ ( make -Cbuild_win || make -j1 -Cbuild_win ) &&
  #(
  # make -Cbuild_win &&
  # rm -f $(find build_win -name '*.la') &&
