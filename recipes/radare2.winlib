@@ -30,10 +30,14 @@ export TYPE=application
 #export VERSIONDATE=20230506
 #export VERSION=5.8.8
 #export VERSIONDATE=20230609
+#export DEPENDENCIES=zlib,libzip,liblz4,xxhash,file,openssl,capstone,libuv
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=meson,ninja
+#export OPTIONALBUILDDEPENDENCIES=
 export VERSION=5.9.0
 export VERSIONDATE=20240401
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,libzip,liblz4,xxhash,file,openssl,capstone
+export DEPENDENCIES=zlib,libzip,liblz4,xxhash,file,capstone,libuv
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=meson,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -48,27 +52,49 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix libr/include/r_util/r_w32.h (version >= 5.7.2)
+## fix libr/include/r_util/r_w32.h (version >= 5.7.2 <= 5.8.8)
+#patch -ulbf libr/include/r_util/r_w32.h << EOF
+#@@ -13,3 +13,5 @@
+# #ifndef NTSTATUS
+#+#ifndef __MINGW32__
+# #define NTSTATUS DWORD
+#+#endif
+# #undef TEXT
+#@@ -31,3 +33,3 @@
+# R_API NTSTATUS r_w32_NtDuplicateObject(HANDLE, HANDLE, HANDLE, PHANDLE, ACCESS_MASK, ULONG, ULONG);
+#-R_API NTSTATUS r_w32_NtQueryObject(HANDLE, ULONG, PVOID, ULONG, PULONG);
+#+R_API DWORD r_w32_NtQueryObject(HANDLE, ULONG, PVOID, ULONG, PULONG);
+# R_API ut64 r_w32_GetEnabledXStateFeatures(void);
+#EOF
+# avoid redefinitions in libr/include/r_util/r_w32.h (version >= 5.9.0)
 patch -ulbf libr/include/r_util/r_w32.h << EOF
-@@ -13,3 +13,5 @@
- #ifndef NTSTATUS
+@@ -12,2 +12,3 @@
+
 +#ifndef __MINGW32__
- #define NTSTATUS DWORD
+ #ifndef NTSTATUS
+@@ -48,2 +49,3 @@
+ #endif
 +#endif
- #undef TEXT
-@@ -31,3 +33,3 @@
- R_API NTSTATUS r_w32_NtDuplicateObject(HANDLE, HANDLE, HANDLE, PHANDLE, ACCESS_MASK, ULONG, ULONG);
--R_API NTSTATUS r_w32_NtQueryObject(HANDLE, ULONG, PVOID, ULONG, PULONG);
-+R_API DWORD r_w32_NtQueryObject(HANDLE, ULONG, PVOID, ULONG, PULONG);
- R_API ut64 r_w32_GetEnabledXStateFeatures(void);
+
 EOF
-# fix libr/socket/meson.build (version >= 5.6.6)
-patch -ulbf libr/socket/meson.build << EOF
-@@ -13,2 +13,3 @@
- r_util_deps = [utl, r_util_dep, platform_deps]
-+r_util_static_deps = []
- if get_option('blob')
-EOF
+# fix inclusion of windows.h before winsock2.h in libr/core/rtr.c (version >= 5.9.0)
+mv libr/core/rtr.c libr/core/rtr.c.bak &&
+echo "#include <winsock2.h>" > libr/core/rtr.c &&
+cat libr/core/rtr.c.bak >> libr/core/rtr.c
+## fix libr/socket/meson.build (version >= 5.6.6 <= 5.8.8)
+#patch -ulbf libr/socket/meson.build << EOF
+#@@ -13,2 +13,3 @@
+# r_util_deps = [utl, r_util_dep, platform_deps]
+#+r_util_static_deps = []
+# if get_option('blob')
+#EOF
+## fix undefined use_ssl_crypto in meson.build (version >= 5.8.2 <= 5.8.8)
+#patch -ulbf meson.build << EOF
+#@@ -290,2 +290,3 @@
+#     use_sys_openssl = true
+#+    use_ssl_crypto = false
+#   else
+#EOF
 # fix libr/syscall/d/meson.build (version >= 5.6.6)
 patch -ulbf libr/syscall/d/meson.build << EOF
 @@ -1,21 +1,2 @@
@@ -94,13 +120,6 @@ patch -ulbf libr/syscall/d/meson.build << EOF
 -  's110-arm-16',
    'windows-x86-32',
 EOF
-# fix undefined use_ssl_crypto in meson.build (version >= 5.8.2)
-patch -ulbf meson.build << EOF
-@@ -290,2 +290,3 @@
-     use_sys_openssl = true
-+    use_ssl_crypto = false
-   else
-EOF
 # fix detection of Python
 sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
 ## fix missing shlr/zip/meson.build in meson.build (version >= 5.8.8)
@@ -108,9 +127,11 @@ sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_sys_openssl=true -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
- PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_sys_openssl=true -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
+ #PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_sys_openssl=true -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_ssl_crypto=true -Duse_sys_openssl=false -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
  wl-showstatus build-install &&
- PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
