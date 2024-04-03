@@ -1,0 +1,214 @@
+export NAME="NAppGUI"
+export STATUS=
+export URL=https://nappgui.com/
+#export URL=https://github.com/frang75/nappgui_src
+export BASENAME=nappgui
+export DESCRIPTION="NAppGUI is a professional SDK to build cross-platform desktop applications using The C Programming Language. C++ is supported but not required, an entire program can be written using ANSI C90. NAppGUI has built as a lightweight layer on top of the native APIs, that allows create portable programs extremelly fast and small without any external dependency. All requirements come standard with the operating system itself."
+export CATEGORY=gui
+export TYPE=library
+#export VERSION=1.2.0
+#export VERSIONDATE=20211209
+#export VERSION=1.2.1
+#export VERSIONDATE=20220321
+#export VERSION=1.2.1-r6
+#export VERSIONDATE=20220322
+#export VERSION=1.2.2
+#export VERSIONDATE=20220430
+#export VERSION=1.2.3
+#export VERSIONDATE=20220606
+#export VERSION=1.2.4
+#export VERSIONDATE=20221226
+#export VERSION=1.3.0
+#export VERSIONDATE=20221227
+#export VERSION=1.3.1
+#export VERSIONDATE=20230906
+#export VERSION=1.4.0
+#export VERSIONDATE=20231231
+export VERSION=1.4.1
+export VERSIONDATE=20240403
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/frang75/nappgui_src/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/frang75/nappgui_src/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd nappgui_src-$VERSION
+# fix src/sewer/win/bmem_win.c
+sed -i.bak -e "s?^#error Unknown* compiler?//&?" src/sewer/win/bmem_win.c
+# fix src/osbs/win/btime.c
+patch -ulbf src/osbs/win/btime.c << EOF
+@@ -23,3 +23,3 @@
+
+-#define EPOCHFILETIME (116444736000000000i64)
++#define EPOCHFILETIME (116444736000000000ULL)
+
+EOF
+# work around MinGW-w64 typo (RotateTranform) in src/draw2d/win/dctx_win.cpp
+mv src/draw2d/win/dctx_win.cpp src/draw2d/win/dctx_win.cpp.bak &&
+echo "#define RotateTranform RotateTransform" > src/draw2d/win/dctx_win.cpp &&
+cat src/draw2d/win/dctx_win.cpp.bak >> src/draw2d/win/dctx_win.cpp
+# fix src/draw2d/win/osimage.cpp (version >= 1.2.3)
+patch -ulbf src/draw2d/win/osimage.cpp << EOF
+@@ -742,3 +742,3 @@
+ {
+-    Gdiplus::Bitmap *bitmap = NULL;
++    Gdiplus::Image *bitmap = NULL;
+     CLSID clsid;
+@@ -761,3 +761,3 @@
+
+-    status = bitmap->Save(stream, &clsid);
++    status = bitmap->Save(stream, &clsid, NULL);
+     cassert(status == Gdiplus::Ok);
+EOF
+# fix src/sewer/arch.hxx (version >= 1.4.1)
+patch -ulbf src/sewer/arch.hxx << EOF
+@@ -17,3 +17,3 @@
+
+-#if defined (_WINDOWS)
++#if defined (_WIN32)
+     #if defined (_MSC_VER) && _MSC_VER <= 1500
+@@ -24,5 +24,5 @@
+     #define __DESKTOP__
+-    #if defined (_M_AMD64)
++    #if defined (_M_AMD64) || defined(__x86_64__)
+         #define __x64__
+-    #elif defined (_M_IX86)
++    #elif defined (_M_IX86) || defined(__i386__)
+         #define __x86__
+EOF
+# fix src/osapp/osmain_win.h (version >= 1.4.1)
+patch -ulbf src/osapp/osmain_win.h << EOF
+@@ -16,10 +16,12 @@
+
+-#if (_MSC_VER)
++#if (_WIN32)
+ /* Enabling Visual Styles for WindowsXP and later */
+-#if defined(_M_IX86)
++#if defined(_M_IX86) || defined(__i386__)
+ #define MANIFEST_PROCESSORARCHITECTURE "x86"
+-#elif defined(_M_AMD64)
++#elif defined(_M_AMD64) || defined(__x86_64__)
+ #define MANIFEST_PROCESSORARCHITECTURE "amd64"
+-#elif defined(_M_IA64)
++#elif defined(_M_IA64) || defined(__ia64__)
+ #define MANIFEST_PROCESSORARCHITECTURE "ia64"
++#elif defined(_M_ARM64) || defined(__aarch64)
++#define MANIFEST_PROCESSORARCHITECTURE "ARM64"
+ #else
+EOF
+# fix prj/NAppTarget.cmake (version >= 1.4.1)
+patch -ulf prj/NAppTarget.cmake << EOF
+@@ -632,3 +632,3 @@
+         foreach(depend \${\${targetName}_LINKDEPENDS})
+-            target_link_libraries(\${targetName} \${depend})
++            target_link_libraries(\${targetName} \${depend} -lws2_32)
+             get_target_property(DEPEND_TARGET_TYPE \${depend} TYPE)
+@@ -844,3 +844,3 @@
+ 
+-    if (WIN32)
++    if (MSVC)
+         # Visual Studio 2005/2008 doesn't have <stdint.h>
+@@ -935,3 +935,7 @@
+             string(TOUPPER \${config} configUpper)
+-            set_target_properties(\${appName} PROPERTIES LINK_FLAGS_\${configUpper} "/SUBSYSTEM:CONSOLE")
++            if (MSVC)
++                set_target_properties(\${appName} PROPERTIES LINK_FLAGS_\${configUpper} "/SUBSYSTEM:CONSOLE")
++            else()
++                set_target_properties(\${appName} PROPERTIES LINK_FLAGS_\${configUpper} "-mconsole")
++            endif()
+         endforeach()
+@@ -962,3 +966,7 @@
+             string(TOUPPER \${config} configUpper)
+-            set_target_properties(\${appName} PROPERTIES LINK_FLAGS_\${configUpper} "/SUBSYSTEM:WINDOWS")
++            if (MSVC)
++                set_target_properties(\${appName} PROPERTIES LINK_FLAGS_\${configUpper} "/SUBSYSTEM:WINDOWS")
++            else()
++                set_target_properties(\${appName} PROPERTIES LINK_FLAGS_\${configUpper} "-mconsole")
++            endif()
+         endforeach()
+EOF
+## fix prj/CMakeCompilers.txt (version >= 1.2.0)
+#patch -ulbf prj/CMakeCompilers.txt << EOF
+#@@ -105,2 +105,15 @@
+#         set(NAPPGUI_COMPILER_TOOLSET \${CMAKE_VS_PLATFORM_TOOLSET})
+#+    elseif(MINGW)
+#+        add_definitions(-DUNICODE -D_UNICODE -D_WINDOWS -DVS_PLATFORM=1101)
+#+        set(HOST_ARCH \${CMAKE_HOST_SYSTEM_PROCESSOR})
+#+        if (\${HOST_ARCH} STREQUAL "i386")
+#+           set(NAPPGUI_HOST x86)
+#+            add_definitions(-D_M_IX86)
+#+        elseif (\${HOST_ARCH} STREQUAL "AMD64")
+#+           set(NAPPGUI_HOST x64)
+#+            add_definitions(-D_M_AMD64)
+#+        else()
+#+           message("- Unknown host architecture")
+#+        endif()
+#+        message(STATUS "- Host architecture: \${HOST_ARCH}")
+#     else()
+#EOF
+## fix prj/CMakeCompilers.cmake (version >= 1.3.0)
+#patch -ulbf prj/CMakeCompilers.cmake << EOF
+#@@ -111,4 +111,2 @@
+#         set(NAPPGUI_COMPILER_TOOLSET \${CMAKE_VS_PLATFORM_TOOLSET})
+#-    else()
+#-        message (FATAL_ERROR "Unknown compiler")
+#
+#@@ -253,4 +251,6 @@
+# #-------------------------------------------------------------------------------elseif (\${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+#+endif ()
+#+if (\${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR MINGW)
+#
+#+  if (NOT MINGW)
+#     set(NAPPGUI_STATIC_LIB_PREFIX "lib")
+#@@ -272,2 +272,3 @@
+#     set(CMAKE_ECLIPSE_GENERATE_LINKED_RESOURCES FALSE)
+#+  endif ()
+#
+#@@ -294,3 +295,3 @@
+#
+#-    elseif (\${HOST_ARCH} STREQUAL "x86_64")
+#+    elseif (\${HOST_ARCH} STREQUAL "x86_64" OR \${HOST_ARCH} STREQUAL "AMD64")
+#         set(NAPPGUI_HOST x64)
+#EOF
+# fix prj/NAppCompilers.cmake (version >= 1.4.0)
+patch -ulf prj/NAppCompilers.cmake << EOF
+@@ -33,3 +33,3 @@
+
+-if (WIN32)
++if (MSVC)
+
+@@ -155,3 +155,3 @@
+ #------------------------------------------------------------------------------
+-elseif (\${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
++elseif (\${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR MINGW)
+
+@@ -180,3 +180,3 @@
+     # Intel 64 bits
+-    elseif (\${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
++    elseif (\${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR \${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "AMD64")
+         set(CMAKE_HOST_ARCHITECTURE "x64")
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/nappgui -DCMAKE_BUILD_TYPE:STRING=Release -DNAPPGUI_SHARED:BOOL=OFF -DCMAKE_TOOLKIT:STRING=None -DNAPPGUI_DEMO:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-std=c++11 -D_WINDOWS -DUNICODE -D_UNICODE -Wno-error=incompatible-pointer-types -I$(cygpath -m $MINGWDIR/$RUNPLATFORM/include/gdiplus)" -DCMAKE_CXX_FLAGS:STRING="-std=c++11 -D_WINDOWS -DUNICODE -D_UNICODE -Wno-error=incompatible-pointer-types -I$(cygpath -m $MINGWDIR/$RUNPLATFORM/include/gdiplus)" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/nappgui -DCMAKE_BUILD_TYPE:STRING=Release -DNAPPGUI_SHARED:BOOL=ON -DCMAKE_TOOLKIT:STRING=None -DNAPPGUI_DEMO:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-std=c++11 -D_WINDOWS -DUNICODE -D_UNICODE -Wno-error=incompatible-pointer-types -I$(cygpath -m $MINGWDIR/$RUNPLATFORM/include/gdiplus)" -DCMAKE_CXX_FLAGS:STRING="-std=c++11 -D_WINDOWS -DUNICODE -D_UNICODE -Wno-error=incompatible-pointer-types -I$(cygpath -m $MINGWDIR/$RUNPLATFORM/include/gdiplus)" -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lgdiplus -lwininet -lcomctl32 -luxtheme/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf nappgui_src-$VERSION
+
+
+

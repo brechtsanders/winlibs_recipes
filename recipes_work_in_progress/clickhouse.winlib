@@ -371,8 +371,10 @@ export TYPE=library
 #export VERSIONDATE=20240301
 #export VERSION=24.2.2.71-stable
 #export VERSIONDATE=20240315
-export VERSION=24.3.1.2672-lts
-export VERSIONDATE=20240328
+#export VERSION=24.3.1.2672-lts
+#export VERSIONDATE=20240328
+export VERSION=24.3.2.23-lts
+export VERSIONDATE=20240403
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -465,6 +467,45 @@ patch -ulbf cmake/tools.cmake << EOF
  else ()
 EOF
 
+# fix cmake/arch.cmake (version >= 24.3.2.23-lts)
+patch -ulbf cmake/arch.cmake << EOF
+@@ -1,2 +1,2 @@
+-if (CMAKE_SYSTEM_PROCESSOR MATCHES "amd64|x86_64")
++if (CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|amd64|x86_64")
+     if (CMAKE_LIBRARY_ARCHITECTURE MATCHES "i386")
+EOF
+# fix cmake/target.cmake (version >= 24.3.2.23-lts)
+patch -ulbf cmake/target.cmake << EOF
+@@ -19,2 +19,5 @@
+     add_definitions(-D OS_SUNOS)
++elseif (CMAKE_SYSTEM_NAME MATCHES "Windows")
++    set (OS_SUNOS 1)
++    add_definitions(-D OS_WINDOWS)
+ else ()
+EOF
+# fix cmake/tools.cmake (version >= 24.3.2.23-lts)
+patch -ulbf cmake/tools.cmake << EOF
+@@ -7,3 +7,3 @@
+ else ()
+-    message (FATAL_ERROR "Compiler \${CMAKE_CXX_COMPILER_ID} is not supported")+    message (WARNING "Compiler \${CMAKE_CXX_COMPILER_ID} is not supported")
+ endif ()
+@@ -78,3 +78,3 @@
+ elseif (NOT ARCH_S390X AND NOT OS_FREEBSD)
+-    message (FATAL_ERROR "The only supported linker is LLVM's LLD, but we cannot find it.")
++    message (WARNING "The only supported linker is LLVM's LLD, but we cannot find it.")
+ else ()
+@@ -128,3 +128,3 @@
+ else ()
+-    message (FATAL_ERROR "Cannot find objcopy.")
++    message (WARNING "Cannot find objcopy.")
+ endif ()
+@@ -140,3 +140,3 @@
+ else ()
+-    message (FATAL_ERROR "Cannot find strip.")
++    message (WARNING "Cannot find strip.")
+ endif ()
+EOF
+
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
 #mkdir -p build_test && cmake.exe -GNinja -DENABLE_CLICKHOUSE_KEEPER:BOOL=OFF -DENABLE_CLICKHOUSE_KEEPER_CONVERTER:BOOL=OFF -DENABLE_CLICKHOUSE_TEST:BOOL=OFF -DENABLE_TESTS:BOOL=OFF -Dpkg-config:FILEPATH=$(which pkg-config.exe) -S. -Bbuild_test -LH && echo OK; rm -rf build_test
 
@@ -489,6 +530,7 @@ EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CLICKHOUSE_TEST:BOOL=OFF -DENABLE_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_SYSTEM_PROCESSOR:STRING="$(echo $RUNPLATFORM|sed -e "s/-.*$//")" -DENABLE_CLICKHOUSE_TEST:BOOL=OFF -DENABLE_TESTS:BOOL=OFF -S. -Bbuild_win &&
  #wl-showstatus build &&
  #ninja -Cbuild_win &&
  wl-showstatus build-install &&
