@@ -335,7 +335,7 @@ export VERSIONDATE=20231108
 #export VERSIONDATE=20240325
 #export VERSION=3.1.11
 #export VERSIONDATE=20240407
-####Cannot find source file: src/rng.cpp
+####Issue: definitions in http-parser conflict with definitions in llhttp (used by restinio)
 wl-showstatus --package-version
 export DEPENDENCIES=libnettle,gnutls,msgpack-cxx,libargon2,readline,fmt,http-parser,cppunit,jsoncpp,restinio,asio
 #export DEPENDENCIES=libnettle,gnutls,msgpack-cxx,libargon2,readline,fmt,http-parser,cppunit,jsoncpp,restinio,asio,restbed
@@ -383,15 +383,15 @@ cat src/utils.cpp.bak >> src/utils.cpp
 # sed -ne "s/^\s*\(\(HPE\|F\|HTTP\)_.*\)\s*=\s*[0-9x]*,*\s*$/#undef \1/p" $MINGWPREFIX/include/llhttp.h >> $F &&
 # cat $F.bak >> $F
 #done
-## fix src/dht_proxy_server.cpp (version >= 3.1.11)
-#patch -ulbf src/dht_proxy_server.cpp << EOF
-#@@ -118,3 +118,3 @@
-# {
-#-    if (restinio::holds_alternative<restinio::connection_state::closed_t>(notice.cause())) {
-#+    if (std::holds_alternative<restinio::connection_state::closed_t>(notice.cause())) {
-#         onClosed_(notice.connection_id());
-#EOF
-# fix CMakeLists.txt (version >= 2.5.0)
+# fix src/dht_proxy_server.cpp (version >= 3.1.2)
+patch -ulbf src/dht_proxy_server.cpp << EOF
+@@ -118,3 +118,3 @@
+ {
+-    if (restinio::holds_alternative<restinio::connection_state::closed_t>(notice.cause())) {
++    if (std::holds_alternative<restinio::connection_state::closed_t>(notice.cause())) {
+         onClosed_(notice.connection_id());
+EOF
+# fix CMakeLists.txt (version >= 2.5.0 <= 3.1.9)
 patch -ulbf CMakeLists.txt << EOF
 @@ -234,2 +234,3 @@
 
@@ -400,8 +400,10 @@ patch -ulbf CMakeLists.txt << EOF
 EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOPENDHT_STATIC:BOOL=ON -DOPENDHT_PROXY_CLIENT:BOOL=ON -DOPENDHT_PROXY_SERVER:BOOL=OFF -DOPENDHT_PROXY_SERVER_IDENTITY:BOOL=OFF -DOPENDHT_PUSH_NOTIFICATIONS:BOOL=ON -DOPENDHT_PYTHON:BOOL=OFF -DOPENDHT_TOOLS:BOOL=OFF -DOPENDHT_DOCUMENTATION:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOPENDHT_STATIC:BOOL=ON -DOPENDHT_PROXY_CLIENT:BOOL=ON -DOPENDHT_PROXY_SERVER:BOOL=ON -DOPENDHT_PROXY_SERVER_IDENTITY:BOOL=ON -DOPENDHT_PUSH_NOTIFICATIONS:BOOL=ON -DOPENDHT_PYTHON:BOOL=OFF -DOPENDHT_TOOLS:BOOL=OFF -DOPENDHT_DOCUMENTATION:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
  wl-showstatus configure shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOPENDHT_STATIC:BOOL=OFF -DOPENDHT_PROXY_CLIENT:BOOL=OFF -DOPENDHT_PROXY_SERVER:BOOL=OFF -DOPENDHT_PROXY_SERVER_IDENTITY:BOOL=ON -DOPENDHT_PUSH_NOTIFICATIONS:BOOL=ON -DOPENDHT_PYTHON:BOOL=OFF -DOPENDHT_TOOLS:BOOL=OFF -DOPENDHT_DOCUMENTATION:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOPENDHT_STATIC:BOOL=OFF -DOPENDHT_PROXY_CLIENT:BOOL=ON -DOPENDHT_PROXY_SERVER:BOOL=ON -DOPENDHT_PROXY_SERVER_IDENTITY:BOOL=ON -DOPENDHT_PUSH_NOTIFICATIONS:BOOL=ON -DOPENDHT_PYTHON:BOOL=OFF -DOPENDHT_TOOLS:BOOL=OFF -DOPENDHT_DOCUMENTATION:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  # add linker flags
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32 -lmswsock -lcrypt32/" build_shared/build.ninja &&
