@@ -107,16 +107,17 @@ export TYPE=library
 #export VERSIONDATE=20220227
 #export VERSION=0.10.0
 #export VERSIONDATE=20230609
-export VERSION=0.10.1
-export VERSIONDATE=20230825
-#export VERSION=0.10.2
-#export VERSIONDATE=20240408
+#export VERSION=0.10.1
+#export VERSIONDATE=20230825
+export VERSION=0.10.2
+export VERSIONDATE=20240408
 wl-showstatus --package-version
 export DEPENDENCIES=glib2,gtk3,gettext,gdk-pixbuf,pango,cairo,gobject-introspection
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
-export LICENSEFILE=COPYING
+#export LICENSEFILE=COPYING
+export LICENSEFILE=COPYING.LGPL-3
 export LICENSETYPE=LGPL
 #export DOWNLOADURL="https://github.com/AyatanaIndicators/ayatana-ido/releases"
 export DOWNLOADURL="https://github.com/AyatanaIndicators/ayatana-ido/tags"
@@ -129,6 +130,9 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing gio-win32-2.0.pc (version >= 0.10.2)
+mkdir -p winfix
+cp $MINGWPREFIX/lib/pkgconfig/gio-windows-2.0.pc winfix/gio-win32-2.0.pc
 # fix src/CMakeLists.txt (version >= 0.9.0)
 patch -ulbf src/CMakeLists.txt << EOF
 @@ -105,2 +105,3 @@
@@ -145,17 +149,21 @@ sed -i.bak -e "s/\(add_library(.* \)SHARED /\1/" src/CMakeLists.txt
 mkdir -p build_static build_shared &&
  #wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(cygpath -m $PYDIR/python.exe) \3\4\5?" build_static/build.ninja &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_TESTS:BOOL=OFF -S. -Bbuild_shared &&
  # fix execution of Python scripts
- sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(cygpath -m $PYDIR/python.exe) \3\4\5?" build_*/build.ninja &&
+ sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(cygpath -m $PYDIR/python.exe) \3\4\5?" build_shared/build.ninja &&
  #wl-showstatus build-install &&
  ##PKG_CONFIG= ninja -Cbuild_static install/strip &&
  #ninja -Cbuild_static install/strip &&
+ #PKG_CONFIG_PATH=$PWD/winfix:${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} ninja -Cbuild_static install/strip &&
  #cp -f build_static/src/*.a $INSTALLPREFIX/lib/ &&
  wl-showstatus build-install &&
  #PKG_CONFIG= ninja -Cbuild_shared install/strip &&
- ninja -Cbuild_shared install/strip &&
+ #ninja -Cbuild_shared install/strip &&
+ PKG_CONFIG_PATH=$PWD/winfix:${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} ninja -Cbuild_shared install/strip &&
  strip build_shared/src/*.dll &&
  mkdir -p $INSTALLPREFIX/bin &&
  cp -f build_shared/src/*.dll $INSTALLPREFIX/bin/ &&
