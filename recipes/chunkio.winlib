@@ -1,0 +1,79 @@
+export NAME="Chunk I/O"
+export STATUS=
+export URL=https://github.com/fluent/chunkio
+export BASENAME=chunkio
+export DESCRIPTION="Chunk I/O is a library to manage chunks of data in the file system and load in memory upon demand."
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=1.1.6
+#export VERSIONDATE=20230522
+export VERSION=1.5.2
+export VERSIONDATE=20240409
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/fluent/chunkio/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/fluent/chunkio/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix include/chunkio/chunkio_compat.h (version >= 1.1.6)
+patch -ulbf include/chunkio/chunkio_compat.h << EOF
+@@ -44,4 +44,6 @@
+
++#ifndef __MINGW32__
+ typedef SSIZE_T ssize_t;
+ typedef unsigned mode_t;
++#endif
+
+EOF
+# fix for MinGW/MinGW-w64
+sed -i.bak -e "s/_MSC_VER/_WIN32/" src/cio_utils.c tools/cio.c
+# fix undefined TIME_UTC in tools/cio.c (version >= 1.5.2)
+patch -ulbf tools/cio.c << EOF
+@@ -247,2 +247,6 @@
+     t->tv_nsec = mts.tv_nsec;
++#elif _WIN32
++    clock_t currentclock = clock();
++    t->tv_sec = currentclock / CLOCKS_PER_SEC;
++    t->tv_nsec = (currentclock % CLOCKS_PER_SEC) * 1000000000L / CLOCKS_PER_SEC;
+ #else
+EOF
+# fix CMakeLists.txt (version >= 1.1.6)
+patch -ulbf CMakeLists.txt << EOF
+@@ -73,2 +73,5 @@
+   int main() {
++#ifdef _WIN32
++#error getpagesize() not available on Windows
++#endif
+      getpagesize();
+EOF
+## also allow building shared library
+#sed -i.bak -e "s/^\(\s*\)\(add_library *(\)\([^ ]*\) *STATIC\(.*\)$/\1\2\3 STATIC\4\n\1\2\3_shared SHARED\4\n\1set_target_properties(\3_shared PROPERTIES OUTPUT_NAME \3)/" deps/crc32/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCIO_LIB_STATIC:BOOL=ON -DCIO_LIB_SHARED:BOOL=ON -DCIO_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lshlwapi -lws2_32 -Ldeps\/crc32 -lcio-crc32/" build_win/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
+ strip build_win/src/*.dll build_win/tools/*.exe &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_win install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_win/src/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_win/src/*.dll build_win/tools/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

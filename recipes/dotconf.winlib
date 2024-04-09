@@ -9,8 +9,10 @@ export TYPE=library
 #export VERSION=1.0.13
 #export VERSION=1.1.0
 #export VERSIONDATE=
-export VERSION=1.3
-export VERSIONDATE=20160107
+#export VERSION=1.3
+#export VERSIONDATE=20160107
+export VERSION=1.4
+export VERSIONDATE=20240409
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -36,19 +38,22 @@ cd $BASENAME-$VERSION
 #####ld.exe: warning: cannot find entry symbol _DllMainCRTStartup@12; defaulting to 00401000
 #####C:\MinGW\msys\1.0\src\mingwrt/../mingw/main.c:73: undefined reference to `WinMain@16'
 #echo "int main(int argc, char **argv) { return 0; }" >> src/dotconf.c
-wl-showstatus configure &&
-# fix building DLL
-( autoreconf -f -i -I $MINGWPREFIX/share/aclocal || autoreconf-2.13 -f -i ) &&
-# fix missing DllMainCRTStartup
-mv configure configure.bak &&
-sed -e "s/--exclude-symbols '[^']*'//" configure.bak > configure &&
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
+# fix undefined dotconf_continue_line_new in src/dotconf.c (version >= 1.4)
+#### Bug reported here: https://github.com/williamh/dotconf/issues/7
+sed -i.bak -e "s/\(dotconf_continue_line\)_new/\1/" src/dotconf.c
+wl-showstatus preconfigure &&
+ # fix building DLL
+ ( autoreconf -f -i -I $MINGWPREFIX/share/aclocal || autoreconf-2.13 -f -i ) &&
+ # fix missing DllMainCRTStartup
+ sed -i.bak -e "s/--exclude-symbols '[^']*'//" configure &&
+ wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -no-undefined -Wl,-no-undefined" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--enable-auto-import -Wl,-no-undefined" &&
  wl-showstatus build-install &&
  # fix building DLLs
- mv libtool libtool.bak &&
- sed -e "s/\(allow_undefined=\)yes/\1no/" libtool.bak > libtool &&
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
  make install && ( make install-strip || true ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
