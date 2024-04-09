@@ -1,0 +1,68 @@
+export NAME="GTK-server"
+export STATUS=
+export URL=https://www.gtk-server.org/
+export BASENAME=gtk-server
+export DESCRIPTION="The GTK-server is a free, open-source project, which offers a stream-oriented interface to the GTK libraries, enabling access to graphical user interfaces for shellscripts and interpreted programming languages using GTK 1.x, 2.x or 3.x. It was inspired by Sun's DeskTop KornShell (dtksh) of the Common Desktop Enviroment (CDE) for Unix."
+export CATEGORY=communication
+export TYPE=library
+export VERSION=2.4.6
+export VERSIONDATE=20240409
+wl-showstatus --package-version
+export DEPENDENCIES=libdl,openssl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=README.1ST
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://www.gtk-server.org/stable/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://www.gtk-server.org/stable/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/gtk-server.c (version >= 2.4.6)
+patch -ulbf src/gtk-server.c << EOF
+@@ -632,2 +632,8 @@
+ #if GTK_SERVER_FFI || GTK_SERVER_FFCALL
++#ifndef RTLD_LAZY
++#define RTLD_LAZY 0
++#endif
++#if __MINGW32__
++#include <libdl-win32/dlfcn.h>
++#endif
+ #define OPENLIB(x) dlopen(x, RTLD_LAZY)
+@@ -3357,3 +3363,5 @@
+ int item;                      /* If handle from client is given start parsing at item = 1, else item = 0 */
++#ifndef _WIN32
+ struct utsname pf;              /* For gtk_server_os */
++#endif
+ char *arg_type;                 /* Used by VARARGS */
+@@ -3748,2 +3756,3 @@
+     /* Internal call for OS */
++#ifndef _WIN32
+     else if (!strcmp("gtk_server_os", gtk_api_call)){
+@@ -3758,2 +3767,3 @@
+     }
++#endif
+     else if (!strcmp("GTK_SERVER_ENABLE_C_STRING_ESCAPING", gtk_api_call) || !strcmp("gtk_server_enable_c_string_escaping", gtk_api_call)){
+EOF
+# fix .dll extension for shared libraries and .exe extension for executable files
+sed -i.bak -e "s/\.so/.dll/; s/\$(BINDIR)\/gtk-server$/&.exe/; s/-DGTK_SERVER_LIBRARY -shared /&-Wl,--out-implib,\$@.a /" src/Makefile.in
+wl-showstatus configure &&
+ cd src &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-gtk3 --with-ssl LDFLAGS="-Wl,--as-needed -lssl -lcrypto" &&
+ cd .. &&
+ # fix .dll extension for shared libraries and avoid soft linhs
+ sed -i.bak -e "s/\.so/.dll/; s/ln -sf /#&/" src/Makefile
+ wl-showstatus build-install &&
+ make -Csrc install &&
+ cp -u src/*.a $INSTALLPREFIX/lib/ &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####gtk-server -tcp=127.0.0.1:9999
+
+
+
