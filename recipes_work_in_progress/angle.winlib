@@ -151,14 +151,14 @@ export LICENSEFILE=LICENSE
 export LICENSETYPE=
 #export DOWNLOADURL="https://github.com/google/angle/releases"
 #export DOWNLOADURL="https://chromium.googlesource.com/angle/angle chrome_m"
-export DOWNLOADURL="https://chromium.googlesource.com/angle/angle/+refs"
-#export DOWNLOADURL="https://chromium.googlesource.com/angle/angle +/"
+#export DOWNLOADURL="https://chromium.googlesource.com/angle/angle/+refs"
+export DOWNLOADURL="https://chromium.googlesource.com/angle/angle +/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/google/angle/archive/$VERSION.tar.gz
 #export DOWNLOADSOURCEURL=https://chromium.googlesource.com/angle/angle/+archive/refs/heads/chrome_m$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://chromium.googlesource.com/angle/angle/+archive/refs/heads/chromium/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://chromium.googlesource.com/angle/angle/+archive/refs/heads/chromium/$VERSION.tar.gz
 #export DOWNLOADSOURCEURL=https://chromium.googlesource.com/angle/angle/+archive/refs/heads/$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=https://chromium.googlesource.com/angle/angle/+archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://chromium.googlesource.com/angle/angle/+archive/$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
@@ -467,3 +467,35 @@ mkdir -p build_win &&
 
 
 #### See also: https://github.com/msys2/MINGW-packages/tree/master/mingw-w64-angleproject
+
+
+
+# get CMake build files
+wl-download -d $TARBALLDIR/$BASENAME/cmake https://github.com/okuoku/angle-static-cmake/archive/refs/heads/master.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/cmake/master.tar.gz
+# also allow building shared library
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC//" CMakeLists.txt
+
+mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DANGLE_ROOT:PATH=$PWD -Sangle-static-cmake-master -Bbuild_test -LH && echo OK; rm -rf build_test
+
+
+export BUILDDEPENDENCIES=ply
+wl-download -d $TARBALLDIR/$BASENAME/cmake https://raw.githubusercontent.com/WebKit/webkit/main/Source/ThirdParty/ANGLE/gni-to-cmake.py
+# fix missing files
+mkdir -p build/config/linux
+touch build/config/linux/pkg_config.gni
+# remove comments at end of lines
+sed -i.bak -e "s?\"//?\"?; s/#.*$//" $(find -name BUILD.gn)
+# patch gni-to-cmake.py
+cp -f $TARBALLDIR/$BASENAME/cmake/gni-to-cmake.py gni-to-cmake.py
+# fix gni-to-cmake.py (version >= d1bffdb657d948a86e55784e1facffd0afe7cfb4)
+patch -ulbf gni-to-cmake.py << EOF
+@@ -336,3 +336,3 @@
+         path = self.cwd / path
+-        return load_gn(path, self.exclude)
++        return load_gn(Path(re.sub('^\\\\\\\\*', '', str(path))), self.exclude)
+EOF
+# convert BUILD.gn to CMakeLists.txt
+PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe gni-to-cmake.py BUILD.gn CMakeLists.txt
+
+
