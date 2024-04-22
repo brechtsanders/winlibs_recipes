@@ -1,0 +1,56 @@
+export NAME="mxml4"
+export STATUS=
+export URL=https://www.msweet.org/mxml/
+#export URL=https://github.com/michaelrsweet/mxml
+export BASENAME=mxml4
+export DESCRIPTION="Tiny XML library"
+export CATEGORY=dataprocessing
+export TYPE=library
+#export VERSION=4.0.0
+#export VERSIONDATE=20240321
+#export VERSION=4.0.2
+#export VERSIONDATE=20240401
+export VERSION=4.0.3
+export VERSIONDATE=20240422
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE="Apache"
+export DOWNLOADURL="https://github.com/michaelrsweet/mxml/releases mxml-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/michaelrsweet/mxml/releases/download/v$VERSION/mxml-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#mkdir -p $BASENAME-$VERSION
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/mxml-$VERSION.tar.gz -Cmxml-$VERSION
+tar xz --force-local -f $TARBALLDIR/$BASENAME/mxml-$VERSION.tar.gz
+cd mxml-$VERSION
+# fix issue with passing 2 .a files to ranlib (version >= 4.0.0)
+sed -i.bak -e "s/^\(libmxml\.a\) libmxml[0-9]*\.a:/\1:/" Makefile.in
+# avoid stack protection (version >= 3.3)
+####/include/string.h:202: undefined reference to `__memcpy_chk'
+sed -i.bak -e "s/-D_FORTIFY_SOURCE=2//" configure
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-threads CFLAGS="$(if ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" LDFLAGS="-Wl,--allow-multiple-definition" &&
+ wl-showstatus build &&
+ #make &&
+ ( make || make -j1 ) &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ strip *.dll &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ cp -f libmxml4.a $INSTALLPREFIX/lib/libmxml4.dll.a &&
+ touch install-libmxml4.dll &&
+ make install &&
+ #make install docdir=$INSTALLPREFIX/share/doc/mxml4 &&
+ ## create mxml.pc file for backwards compatibility (version >= 4.0.0)
+ #cp -u $INSTALLPREFIX/lib/pkgconfig/mxml4.pc $INSTALLPREFIX/lib/pkgconfig/mxml.pc &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mxml-$VERSION
+
+
+
