@@ -98,10 +98,10 @@ export TYPE=application
 #export VERSIONDATE=20240225
 #export VERSION=2.8.8
 #export VERSIONDATE=20240302
-export VERSION=2.8.9
-export VERSIONDATE=20240321
-#export VERSION=2.9.1
-#export VERSIONDATE=20240422
+#export VERSION=2.8.9
+#export VERSIONDATE=20240321
+export VERSION=2.9.1
+export VERSIONDATE=20240422
 wl-showstatus --package-version
 #export DEPENDENCIES=lua,lua-cjson,tbox,libsv,ncurses,liblz4
 export DEPENDENCIES=tbox,libsv,luajit,liblz4,ncurses
@@ -134,6 +134,15 @@ cd $BASENAME-$VERSION
 # skip building tbox
 mkdir -p core/src/tbox/tbox/src
 touch core/src/tbox/tbox/src/xmake.sh
+# fix mktemp errors in configure (version >= 2.8.9)
+####mktemp.exe: cannot make temp file /tmp/tmp.TFebJYCwWH: No such file or directory
+patch -ulbf configure << EOF
+@@ -205,3 +205,3 @@
+ _os_tmpfile() {
+-    _ret=\$(mktemp)
++    _ret=\$(mktemp -p \$TEMP)
+ }
+EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --mode=release --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --generator=gmake --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --runtime=lua --external=yes --buildir=build_win &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --mode=release --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --generator=gmake --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --runtime=luajit --external=yes --buildir=build_win &&
@@ -142,14 +151,17 @@ wl-showstatus configure &&
  #sed -i.bak -e "s/\(-o [^ ]*xmake\.exe .*\$(\)demo_ldflags/\1xmake_ldflags/" makefile &&
  ## make sure luajit path is included first (version <= 2.8.8)
  #sed -i.bak -e "s?^[^ ]*cflags=?&$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit) ?" makefile &&
- # make sure luajit path is included first and correct linker flags are used (version >= 2.8.9)
+ # make sure luajit path is included first and correct linker flags are used (version = 2.8.9)
  sed -i.bak -e "s?^[^ ]*cflags=?&$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit) ?; s?^[^ ]*ldflags=.*?& $(${PKG_CONFIG:-pkg-config} --libs luajit) -ltbox -lsv -llz4?" makefile &&
- # fix xmake.config.h (version >= 2.8.9)
- if [ ! -s build_win/mingw/*/release/xmake.config.h ]; then
-  sed -e "s/\${VERSION}/$VERSION/; s/\${VERSION_MAJOR}/$(echo $VERSION|sed -e "s/^\([0-9]*\)\.[0-9]*\.[0-9]*.*$/\1/")/; s/\${VERSION_MINOR}/$(echo $VERSION|sed -e "s/^[0-9]*\.\([0-9]*\)\.[0-9]*.*$/\1/")/; s/\${VERSION_ALTER}/$(echo $VERSION|sed -e "s/^[0-9]*\.[0-9]*\.\([0-9]*\).*$/\1/")/; s/\${VERSION_BUILD}/0/; s/\${GIT_BRANCH}/$VERSION/; s/\${GIT_COMMIT}/$VERSION/" core/src/xmake/xmake.config.h.in > build_win/mingw/*/release/xmake.config.h
- fi
+ ## fix empty xmake.config.h (version >= 2.8.9)
+ #if [ ! -s build_win/mingw/*/release/xmake.config.h ]; then
+ # sed -e "s/\${VERSION}/$VERSION/; s/\${VERSION_MAJOR}/$(echo $VERSION|sed -e "s/^\([0-9]*\)\.[0-9]*\.[0-9]*.*$/\1/")/; s/\${VERSION_MINOR}/$(echo $VERSION|sed -e "s/^[0-9]*\.\([0-9]*\)\.[0-9]*.*$/\1/")/; s/\${VERSION_ALTER}/$(echo $VERSION|sed -e "s/^[0-9]*\.[0-9]*\.\([0-9]*\).*$/\1/")/; s/\${VERSION_BUILD}/0/; s/\${GIT_BRANCH}/$VERSION/; s/\${GIT_COMMIT}/$VERSION/" core/src/xmake/xmake.config.h.in > build_win/mingw/*/release/xmake.config.h
+ #fi
  wl-showstatus build-install &&
  make -f makefile install &&
+ ## copy binary to folder when it can find its files (version >= 2.8.9)
+ #mkdir -p $INSTALLPREFIX/share/xmake/bin &&
+ #cp -f $INSTALLPREFIX/bin/xmake.exe $INSTALLPREFIX/bin/xrepo $INSTALLPREFIX/share/xmake/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
