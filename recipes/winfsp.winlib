@@ -177,6 +177,8 @@ cat src/dll/fuse/fuse_intf.c.bak >> src/dll/fuse/fuse_intf.c
 # fix missing PREPARSE_DATA_BUFFER in src/dll/mount.c
 mv src/dll/mount.c src/dll/mount.c.bak &&
 echo "#include <ntdef.h>" > src/dll/mount.c &&
+#echo "#include <windows.h>" >> src/dll/mount.c &&
+#echo "#include <knownfolders.h>" >> src/dll/mount.c &&
 cat src/dll/mount.c.bak >> src/dll/mount.c
 # fix missing PREPARSE_DATA_BUFFER in src/dll/debug.c (version >= 2.0)
 mv src/dll/debuglog.c src/dll/debuglog.c.bak &&
@@ -271,20 +273,79 @@ EOF
 #+    //void _ReadWriteBarrier(void);
 #     VOID *v = (VOID *)FSP_INTERLOCKED__LOAD64((__int64 volatile *)(p));
 #EOF
+### fix inc/winfsp/fsctl.h (version >= 2.0)
+##patch -ulbf inc/winfsp/fsctl.h << EOF
+##@@ -754,2 +754,3 @@
+## #elif defined(_M_X64) || defined(_M_IX86)
+##+#undef _ReadWriteBarrier
+##     void _ReadWriteBarrier(void);
+##@@ -784,2 +785,3 @@
+## #elif defined(_M_X64)
+##+#undef _ReadWriteBarrier
+##     void _ReadWriteBarrier(void);
+##@@ -790,2 +792,3 @@
+## #elif defined(_M_IX86)
+##+#undef _ReadWriteBarrier
+##     void _ReadWriteBarrier(void);
+##EOF
 ## fix inc/winfsp/fsctl.h (version >= 2.0)
 #patch -ulbf inc/winfsp/fsctl.h << EOF
-#@@ -754,2 +754,3 @@
+#@@ -25,2 +25,5 @@
+# #include <devioctl.h>
+#+#ifdef _WIN32
+#+#include <psdk_inc/intrin-impl.h>
+#+#endif
+#
+#@@ -754,3 +757,3 @@
 # #elif defined(_M_X64) || defined(_M_IX86)
-#+#undef _ReadWriteBarrier
-#     void _ReadWriteBarrier(void);
-#@@ -784,2 +785,3 @@
+#-    void _ReadWriteBarrier(void);
+#+    //void _ReadWriteBarrier(void);
+#     INT32 v = FSP_INTERLOCKED__LOAD32(p);
+#@@ -784,3 +787,3 @@
 # #elif defined(_M_X64)
-#+#undef _ReadWriteBarrier
-#     void _ReadWriteBarrier(void);
-#@@ -790,2 +792,3 @@
+#-    void _ReadWriteBarrier(void);
+#+    //void _ReadWriteBarrier(void);
+#     VOID *v = (VOID *)FSP_INTERLOCKED__LOAD64((__int64 volatile *)(p));
+#@@ -790,3 +793,3 @@
 # #elif defined(_M_IX86)
-#+#undef _ReadWriteBarrier
-#     void _ReadWriteBarrier(void);
+#-    void _ReadWriteBarrier(void);
+#+    //void _ReadWriteBarrier(void);
+#     VOID *v = (VOID *)FSP_INTERLOCKED__LOAD32((__int32 volatile *)(p));
+#EOF
+## fix src/dll/eventlog.c (version >= 2.0)
+#patch -ulbf src/dll/eventlog.c << EOF
+#@@ -104,2 +104,5 @@
+#
+#+#ifndef MyEventLogRegisterPath
+#+#define MyEventLogRegisterPath
+#+#endif
+#     Result = FspGetModuleFileName(DllInstance, Path, MAX_PATH, L"" MyEventLogRegisterPath);
+#EOF
+## fix src/dll/np.c (version >= 2.0)
+#patch -ulbf src/dll/np.c << EOF
+#@@ -866,2 +866,3 @@
+#
+#+#if 0
+# DWORD APIENTRY NPGetUniversalName(
+#@@ -958,2 +959,3 @@
+# }
+#+#endif
+#
+#@@ -1167,2 +1169,5 @@
+#     HasPercent = FALSE;
+#+#ifndef MyNpRegisterPath
+#+#define MyNpRegisterPath
+#+#endif
+#     for (P = L"" MyNpRegisterPath; *P; P++)
+#EOF
+## fix src/dll/fsctl.c (version >= 2.0)
+#patch -ulbf src/dll/fsctl.c << EOF
+#@@ -850,2 +850,5 @@
+#
+#+#ifndef MyFsctlRegisterPath
+#+#define MyFsctlRegisterPath
+#+#endif
+#     Result = FspGetModuleFileName(DllInstance, DriverPath, MAX_PATH, L"" MyFsctlRegisterPath);
 #EOF
 #wl-showstatus build &&
 # touch SUCCESS &&
