@@ -109,7 +109,6 @@ export DOWNLOADURL="https://pcsclite.apdu.fr/files/ pcsc-lite-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 wl-wait4deps
 #export DOWNLOADSOURCEURL=https://alioth.debian.org/frs/download.php/3479/pcsc-lite-1.6.6.tar.bz2
-#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 #export DOWNLOADSOURCEURL=http://alioth.debian.org/frs/download.php/3687/pcsc-lite-1.8.1.tar.bz2
 #export DOWNLOADSOURCEURL=http://alioth.debian.org/frs/download.php/3695/pcsc-lite-1.8.2.tar.bz2
 #export DOWNLOADSOURCEURL=http://alioth.debian.org/frs/download.php/3706/pcsc-lite-1.8.3.tar.bz2
@@ -295,6 +294,177 @@ wl-showstatus configure &&
   make -i install-strip
  )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pcsc-lite-$VERSION
+
+
+
+#export NAME="PCSC-Lite"
+#export STATUS=
+#export URL=https://pcsclite.apdu.fr/
+#export BASENAME=pcsclite
+#export DESCRIPTION="Middleware to access a smart card using SCard API (PC/SC)."
+#export CATEGORY=security,hardware
+#export TYPE=library
+#export VERSION=2.2.0
+#export VERSIONDATE=20240503
+#wl-showstatus --package-version
+#export DEPENDENCIES=libdl,mman-win32,pthreads
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=meson,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=COPYING
+#export LICENSETYPE=
+#export DOWNLOADURL="https://pcsclite.apdu.fr/files/ pcsc-lite-"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#wl-wait4deps
+#export DOWNLOADSOURCEURL=https://pcsclite.apdu.fr/files/pcsc-lite-$VERSION.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#tar xJ --force-local -f $TARBALLDIR/$BASENAME/pcsc-lite-$VERSION.tar.xz
+#cd pcsc-lite-$VERSION
+## fix missing files
+#mkdir -p winfix/sys winfix/netinet winfix/arpa
+#cat > winfix/sys/socket.h << EOF
+##include <winsock2.h>
+#struct sockaddr_un
+#{
+#  short          sun_family;
+#  unsigned short sun_port;
+#  struct         in_addr sun_addr;
+#  char           sun_path[108-2-4]; 
+#};
+#EOF
+#touch winfix/sys/mman.h winfix/sys/un.h winfix/sys/wait.h winfix/sys/ioctl.h winfix/ifdhandler.h winfix/netinet/in.h winfix/arpa/inet.h winfix/poll.h
+##ls src/ifdhandler.h &> /dev/null || echo '#include "PCSC/ifdhandler.h"' > src/ifdhandler.h
+##ls src/PCSC/pcsclite.h &> /dev/null || echo '#include "../ifdhandler.h"' > src/PCSC/pcsclite.h
+## fix src/simclist.c (version >= 1.8.5)
+#patch -ulbf src/simclist.c << EOF
+#--- src/simclist.c  2011-10-22 10:30:38 +0200
+#+++ src/simclist.c  2012-08-05 09:45:14 +0200
+#@@ -27,3 +27,6 @@
+# #include <sys/types.h>
+#-#ifndef _WIN32
+#+#ifdef _WIN32
+#+#   include <windows.h>
+#+#   include <winsock2.h>
+#+#else
+#     /* not in Windows! */
+#EOF
+## fix missing struct timeval in src/simclist.h (version >= 1.8.8)
+#mv src/simclist.h src/simclist.h.bak
+#echo "#include <winsock2.h>" > src/simclist.h
+#cat src/simclist.h.bak >> src/simclist.h
+## fix src/utils.c (version >= 1.8.8)
+#mv src/utils.c src/utils.c.bak
+#cat > src/utils.c << EOF
+##include <winsock2.h>
+##if defined(__MINGW64_VERSION_MAJOR)
+##define sleep(t) _sleep((t) * 1000)
+##endif
+##define kill(pid,sig) 0
+##define SIGUSR1 30
+#EOF
+#cat src/utils.c.bak >> src/utils.c
+## fix src/PCSC/wintypes.h (version >= 1.8.8)
+#mv src/PCSC/wintypes.h src/PCSC/wintypes.h.bak
+#sed -e "s?\(typedef short BOOL;\)?//\1?" src/PCSC/wintypes.h.bak > src/PCSC/wintypes.h
+## fix missing sleep in src/sys_unix.c (version >= 1.8.8)
+#mv src/sys_unix.c src/sys_unix.c.bak
+#cat > src/sys_unix.c << EOF
+##include <winsock2.h>
+##if defined(__MINGW64_VERSION_MAJOR)
+##define sleep(t) (_sleep((t) * 1000), 0)
+##endif
+#EOF
+#cat src/sys_unix.c.bak >> src/sys_unix.c
+## fix missing srand48/lrand48 in src/sys_unix.c (version >= 1.9.8)
+#mv src/sys_unix.c src/sys_unix.c.bak2
+#cat > src/sys_unix.c << EOF
+##define srand48(x) srand(x)
+##define lrand48 rand
+#EOF
+#cat src/sys_unix.c.bak2 >> src/sys_unix.c
+## fix src/winscard_msg.c (version >= 1.8.8)
+#patch -ulbf src/winscard_msg.c << EOF
+#--- src/winscard_msg.c  2012-08-25 16:29:44 +0200
+#+++ src/winscard_msg.c  2013-01-16 22:18:48 +0100
+#@@ -116,4 +116,8 @@
+#        }
+#
+#+#ifdef _WIN32
+#+       unsigned long flags = 1;
+#+       if (ioctlsocket(*pdwClientID, FIONBIO, &flags) != 0)
+#+#else
+#        ret = fcntl(*pdwClientID, F_GETFL, 0);
+#        if (ret < 0)
+#@@ -126,4 +130,5 @@
+#
+#        if (fcntl(*pdwClientID, F_SETFL, ret | O_NONBLOCK) < 0)
+#+#endif
+#        {
+#                Log3(PCSC_LOG_CRITICAL, "Error: cannot set socket %s nonblocking: %s",
+#EOF
+## fix src/winscard_msg.c (version >= 1.8.26)
+#mv src/winscard_msg.c src/winscard_msg.c.bak
+#cat > src/winscard_msg.c << EOF
+##if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0600
+##endif
+##include <winsock2.h>
+##define poll WSAPoll
+#EOF
+#cat src/winscard_msg.c.bak >> src/winscard_msg.c
+## fix src/winscard_clnt.c (version >= 1.8.8)
+#mv src/winscard_clnt.c src/winscard_clnt.c.bak
+#echo "#define pthread_atfork(a,b,c)" > src/winscard_clnt.c
+#cat src/winscard_clnt.c.bak >> src/winscard_clnt.c
+## fix src/PCSC/pcsclite.h.in (version >= 1.8.8)
+#mv src/PCSC/pcsclite.h.in src/PCSC/pcsclite.h.in.bak
+#sed -e 's/\(#include \)<\(wintypes.h\)>/\1"\2"/' src/PCSC/pcsclite.h.in.bak > src/PCSC/pcsclite.h.in
+## fix missing RESPONSECODE in src/pcsc-wirecheck-gen.c (version >= 1.8.10)
+#mv src/pcsc-wirecheck-gen.c src/pcsc-wirecheck-gen.c.bak
+#cat > src/pcsc-wirecheck-gen.c << EOF
+##ifndef RESPONSECODE_DEFINED_IN_WINTYPES_H
+#typedef long RESPONSECODE;
+##endif
+#EOF
+#cat src/pcsc-wirecheck-gen.c.bak >> src/pcsc-wirecheck-gen.c
+## fix missing DT_REG in src/configfile.c
+#patch -ulbf src/configfile.c << EOF
+#--- src/configfile.c  2013-10-16 16:28:20 +0200
+#+++ src/configfile.c  2013-11-19 11:21:40 +0100
+#@@ -1986,4 +1986,5 @@
+#                        int r;
+#
+#+#ifdef DT_REG
+#                        /* skip non regular files */
+#                        if (direntry->d_type != DT_REG)
+#@@ -1993,4 +1994,5 @@
+#                                continue;
+#                        }
+#+#endif
+#
+#                        /* skip files starting with . like ., .., .svn, etc */
+#EOF
+## remove extra file (version >= 2.2.0)
+#rm -f meson.options
+##rm -f meson_options.txt
+## fix meson.build (version >= 2.2.0)
+#patch -ulbf meson.build << EOF
+#@@ -127,2 +127,4 @@
+#   conf_data.set_quoted('PCSC_ARCH', 'NetBSD')
+#+elif target_system == 'windows'
+#+  conf_data.set_quoted('PCSC_ARCH', 'Windows')
+# endif
+#EOF
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibsystemd=false -Dlibudev=false -Dc_args="-I$PWD/winfix -I$(cygpath -m $MINGWPREFIX/include/libdl-win32) -I$(cygpath -m $MINGWPREFIX/include/mman-win32)" -Dc_link_args="-Wl,--as-needed -ldl -lmman" . build_both &&
+# #-Dlibusb=true 
+# wl-showstatus build-install &&
+# ninja -Cbuild_both install &&
+#    echo OK && find . -name '*.a'
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf pcsc-lite-$VERSION
 
 
 
