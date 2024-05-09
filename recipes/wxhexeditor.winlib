@@ -1,0 +1,59 @@
+export NAME="wxHex Editor"
+export STATUS=
+export URL=http://www.wxhexeditor.org/
+export BASENAME=wxhexeditor
+export DESCRIPTION="a free hex editor / disk editor for Linux, Windows and MacOSX"
+export CATEGORY=office
+export TYPE=application
+export VERSION=0.24-Beta
+export VERSIONDATE=20240509
+wl-showstatus --package-version
+export DEPENDENCIES=udis86,mhash,wxwidgets
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=docs/GPL.txt
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/wxhexeditor/files/wxHexEditor/ wxHexEditor-v -src.tar.xz"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/wxhexeditor/wxHexEditor/v$(echo $VERSION|sed -e "s/-/%20/")/wxHexEditor-v$(echo $VERSION|sed -e "s/-.*$//")-src.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+mkdir -p $BASENAME-$VERSION
+tar xJ --force-local -f $TARBALLDIR/$BASENAME/wxHexEditor-v$(echo $VERSION|sed -e "s/-.*$//")-src.tar.xz -C$BASENAME-$VERSION
+cd $BASENAME-$VERSION/wxHexEditor
+# fix missing semicolon after WX_CLEAR_ARRAY (version >= 0.24-Beta)
+sed -i.bak -e "s/WX_CLEAR_ARRAY\s*(.*)\s*/&;/" src/HexEditorCtrl/HexEditorCtrl.cpp src/HexDialogs.cpp
+# fix src/FAL.cpp (version >= 0.24-Beta)
+patch -ulbf src/FAL.cpp << EOF
+@@ -126,3 +126,3 @@
+
+-               std::wcout << "WinDevice" << devnm << std::endl;
++               std::wcout << "WinDevice" << devnm.mb_str() << std::endl;
+                if( myfilename.GetFullPath().StartsWith("\\\\Device") ){
+EOF
+# fix undefined uint32_t in src/windrv.cpp (version >= 0.24-Beta)
+mv src/windrv.cpp src/windrv.cpp.bak &&
+echo "#include <cstdint>" > src/windrv.cpp &&
+cat src/windrv.cpp.bak >> src/windrv.cpp
+# copy already built prerequisites so they won't be rebuilt
+rm -rf mhash udis86
+mkdir -p mhash/lib/.libs udis86/libudis86/.libs
+cp -f $MINGWPREFIX/lib/libmhash.dll.a mhash/lib/.libs/libmhash.a
+cp -f $MINGWPREFIX/lib/libudis86.dll.a udis86/libudis86/.libs/libudis86.a
+mkdir -p mhash/include
+cp -f $MINGWPREFIX/include/mhash.h mhash/include/
+cp -f $MINGWPREFIX/include/udis86.h udis86/
+wl-showstatus build &&
+ WXWIN=$MINGWPREFIX/wx make wxHexEditor.exe CC=${CC:-gcc} CXX=${CXX:-g++} RC=${WINDRES:-windres} RCFLAGS="-I$MINGWPREFIX/wx/include" LDFLAGS="-lgomp -ldl" &&
+ strip *.exe &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH wxHexEditor.exe
+
+
+
