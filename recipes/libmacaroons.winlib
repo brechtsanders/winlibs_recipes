@@ -1,0 +1,73 @@
+export NAME="libmacaroons"
+export STATUS=
+export URL=https://github.com/rescrv/libmacaroons
+export BASENAME=libmacaroons
+export DESCRIPTION="Macaroons are flexible authorization credentials that support decentralized delegation, attenuation, and verification."
+export CATEGORY=security
+export TYPE=library
+export VERSION=0.3.0
+export VERSIONDATE=20240529
+wl-showstatus --package-version
+export DEPENDENCIES=json,libsodium
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/rescrv/libmacaroons/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/rescrv/libmacaroons/archive/refs/tags/releases/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd libmacaroons-releases-$VERSION
+# fix undefined TRUE in macaroons.c (version >= 0.3.0)
+patch -ulbf macaroons.c << EOF
+@@ -1478,3 +1478,3 @@
+     if ((tok->char_offset < 0 || (size_t)tok->char_offset < data_sz) ||
+-        (json_object_object_get_ex(obj, "caveats", &arr) != TRUE) ||
++        (!json_object_object_get_ex(obj, "caveats", &arr)) ||
+         (json_object_get_type(arr) != json_type_array) ||
+EOF
+# fix missing strndup in macaroons.c (version >= 0.3.0)
+mv macaroons.c macaroons.c.bak2
+cat > macaroons.c << EOF
+#include <malloc.h>
+#include <string.h>
+static inline char* strndup (const char* s, size_t n)
+{
+  char* result;
+  size_t len = strlen(s);
+  if (len > n)
+    len = n;
+  result = (char*)malloc(len + 1);
+  if (!result)
+    return 0;
+  result[len] = 0;
+  return (char*)memcpy(result, s, len);
+}
+EOF
+cat macaroons.c.bak2 >> macaroons.c
+# fix undefined strndup in macaroons.c (version >= 0.3.0)
+# fix location of json.h
+sed -i.bak -e "s?json\(/json\.h\)?json-c\1?" configure.ac macaroons.c
+wl-showstatus preconfigure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-json-support PYTHON=$PYDIR/python.exe &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libmacaroons-releases-$VERSION
+
+
+
