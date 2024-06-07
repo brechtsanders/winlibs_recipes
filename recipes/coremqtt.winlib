@@ -1,0 +1,49 @@
+export NAME="coreMQTT"
+export STATUS=
+export URL=https://github.com/FreeRTOS/coreMQTT
+export BASENAME=coremqtt
+export DESCRIPTION="Client implementation of the MQTT 3.1.1 specification for embedded devices"
+export CATEGORY=
+export TYPE=library
+#export VERSION=2.1.1
+#export VERSIONDATE=20240122
+#export VERSION=2.2.0
+#export VERSIONDATE=20240506
+export VERSION=2.2.1
+export VERSIONDATE=20240607
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/FreeRTOS/coreMQTT/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/FreeRTOS/coreMQTT/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus build &&
+ touch SUCCESS &&
+ for F in source/*.c; do
+  echo CC $F
+  ${CC:-gcc} -c -o $F.o $F -DMQTT_DO_NOT_USE_CUSTOM_CONFIG -Isource/include -Isource/interface || ( rm -f SUCCESS; false ) || break
+ done &&
+ rm SUCCESS &&
+ ${AR:-ar} cru libcore_mqtt.a source/*.o &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libcore_mqtt.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p" ) > core_mqtt.def &&
+ ${CC:-gcc} -shared -s -mwindows -def core_mqtt.def -o core_mqtt.dll libcore_mqtt.a -Wl,--out-implib,libcore_mqtt.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/interface $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f source/include/*.h $INSTALLPREFIX/include/ &&
+ cp -f source/interface/*.h $INSTALLPREFIX/include/interface/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
