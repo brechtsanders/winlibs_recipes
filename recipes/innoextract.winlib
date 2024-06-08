@@ -33,14 +33,21 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing _tzset in src/util/time.cpp
-mv src/util/time.cpp src/util/time.cpp.bak
-echo "#undef __STRICT_ANSI__" > src/util/time.cpp
-cat src/util/time.cpp.bak >> src/util/time.cpp
-# fix missing _argc/_wargv in src/util/windows.cpp
-mv src/util/windows.cpp src/util/windows.cpp.bak
-echo "#undef __STRICT_ANSI__" > src/util/windows.cpp
-cat src/util/windows.cpp.bak >> src/util/windows.cpp
+## fix missing _tzset in src/util/time.cpp
+#mv src/util/time.cpp src/util/time.cpp.bak
+#echo "#undef __STRICT_ANSI__" > src/util/time.cpp
+#cat src/util/time.cpp.bak >> src/util/time.cpp
+## fix missing _argc/_wargv in src/util/windows.cpp
+#mv src/util/windows.cpp src/util/windows.cpp.bak
+#echo "#undef __STRICT_ANSI__" > src/util/windows.cpp
+#cat src/util/windows.cpp.bak >> src/util/windows.cpp
+# fix error: 'directory_iterator' is not a member of 'boost::filesystem' in src/stream/slice.cpp (version >= 1.9)
+patch -ulbf src/stream/slice.cpp << EOF
+@@ -29,2 +29,3 @@
+ #include <boost/filesystem/operations.hpp>
++#include <boost/filesystem/directory.hpp>
+ #include <boost/range/size.hpp>
+EOF
 ## fix CMakeLists.txt (version = 1.8)
 #patch -ulbf CMakeLists.txt << EOF
 #@@ -171,8 +171,3 @@
@@ -67,6 +74,8 @@ mkdir -p build_win &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_STATIC_LIBS:BOOL=ON -DWITH_CONV:STRING=iconv -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DBoost_USE_MULTITHREADED:BOOL=OFF -DZLIB_USE_STATIC_LIBS:BOOL=OFF -DLZMA_USE_STATIC_LIBS:BOOL=OFF -DBZip2_USE_STATIC_LIBS:BOOL=OFF -Diconv_USE_STATIC_LIBS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DUSE_STATIC_LIBS:BOOL=OFF -DWITH_CONV:STRING=iconv -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DBoost_USE_MULTITHREADED:BOOL=ON -DZLIB_USE_STATIC_LIBS:BOOL=OFF -DLZMA_USE_STATIC_LIBS:BOOL=OFF -DBZip2_USE_STATIC_LIBS:BOOL=OFF -Diconv_USE_STATIC_LIBS:BOOL=OFF -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_win &&
+ # avoid building in strict ANSI mode (version >= 1.9)
+ sed -i.bak -e "s/-std=c/-std=gnu/g" build_win/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
