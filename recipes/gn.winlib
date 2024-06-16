@@ -230,8 +230,10 @@ export BASENAME=gn
 export DESCRIPTION="GN is a meta-build system that generates build files for Ninja."
 export CATEGORY=build
 export TYPE=application
-export VERSION=master
-export VERSIONDATE=20200419
+#export VERSION=master
+#export VERSIONDATE=20200419
+export VERSION=main
+export VERSIONDATE=20240616
 wl-showstatus --package-version
 export DEPENDENCIES=
 #export DEPENDENCIES=mman-win32
@@ -280,46 +282,90 @@ patch -ulbf gn/src/util/sys_info.cc << EOF
 +      return "arm64";
      case PROCESSOR_ARCHITECTURE_INTEL:
 EOF
-# fix gn/build/build_linux.ninja.template (version >= master)
-patch -ulbf gn/build/build_linux.ninja.template << EOF
-@@ -7,3 +7,3 @@
- rule alink_thin
--  command = rm -f \$out && \$ar rcsT \$out \$in
-+  command = \$ar rcsT \$out \$in
-   description = AR \$out
-EOF
-# fix gn/build/gen.py (version >= master)
+## fix gn/build/build_linux.ninja.template (version >= master)
+#patch -ulbf gn/build/build_linux.ninja.template << EOF
+#@@ -7,3 +7,3 @@
+# rule alink_thin
+#-  command = rm -f \$out && \$ar rcsT \$out \$in
+#+  command = \$ar rcsT \$out \$in
+#   description = AR \$out
+#EOF
+## fix gn/build/gen.py (version >= master)
+#patch -ulbf gn/build/gen.py << EOF
+#@@ -43,2 +43,6 @@
+#       self._platform = 'msvc'
+#+      if 'MSC' in sys.version:
+#+        self._platform = 'msvc'
+#+      else:
+#+        self._platform = 'mingw'
+#     elif self._platform.startswith('aix'):
+#@@ -303,3 +307,3 @@
+#     executable_ext = '.exe'
+#-    library_ext = '.lib'
+#+    library_ext = '.a'
+#     object_ext = '.obj'
+#@@ -381,4 +385,8 @@
+#   elif platform.is_msys() or platform.is_mingw():
+#-    cxx = os.environ.get('CXX', 'g++')
+#-    ld = os.environ.get('LD', 'g++')
+#+    if 'Clang' in sys.version:
+#+      cxx = os.environ.get('CXX', 'clang++')
+#+      ld = os.environ.get('LD', 'clang++')
+#+    else:
+#+      cxx = os.environ.get('CXX', 'g++')
+#+      ld = os.environ.get('LD', 'g++')
+#     ar = os.environ.get('AR', 'ar')
+#@@ -471,2 +479,5 @@
+#
+#+    if cxx == 'g++':
+#+      cflags.append('-Wno-restrict')
+#+
+#     # flags not supported by gcc/g++.
+#EOF
+# fix gn/build/gen.py (version >= main)
 patch -ulbf gn/build/gen.py << EOF
-@@ -43,2 +43,6 @@
-       self._platform = 'msvc'
+@@ -42,3 +42,6 @@
+     elif self._platform.startswith('win'):
+-      self._platform = 'msvc'
 +      if 'MSC' in sys.version:
 +        self._platform = 'msvc'
 +      else:
 +        self._platform = 'mingw'
      elif self._platform.startswith('aix'):
-@@ -303,3 +307,3 @@
-     executable_ext = '.exe'
--    library_ext = '.lib'
-+    library_ext = '.a'
-     object_ext = '.obj'
-@@ -381,4 +385,8 @@
-   elif platform.is_msys() or platform.is_mingw():
--    cxx = os.environ.get('CXX', 'g++')
--    ld = os.environ.get('LD', 'g++')
+@@ -300,3 +303,3 @@
+       'msvc': 'build_win.ninja.template',
+-      'mingw': 'build_linux.ninja.template',
++      'mingw': 'build_mingw.ninja.template',
+       'msys': 'build_linux.ninja.template',
+@@ -322,6 +325,7 @@
+       library_ext = '.lib'
++      object_ext = '.obj'
+     else:
+       library_ext = '.a'
++      object_ext = '.o'
+
+-    object_ext = '.obj'
+   else:
+@@ -401,3 +405,3 @@
+     ar = os.environ.get('AR', 'ar -X64')
+-  elif platform.is_msys() or platform.is_mingw():
++  elif platform.is_msys():
+     cxx = os.environ.get('CXX', 'g++')
+@@ -405,2 +409,11 @@
+     ar = os.environ.get('AR', 'ar')
++  elif platform.is_mingw():
 +    if 'Clang' in sys.version:
 +      cxx = os.environ.get('CXX', 'clang++')
 +      ld = os.environ.get('LD', 'clang++')
++      ar = os.environ.get('AR', 'llvm-ar')
 +    else:
 +      cxx = os.environ.get('CXX', 'g++')
 +      ld = os.environ.get('LD', 'g++')
-     ar = os.environ.get('AR', 'ar')
-@@ -471,2 +479,5 @@
-
-+    if cxx == 'g++':
-+      cflags.append('-Wno-restrict')
-+
-     # flags not supported by gcc/g++.
++      ar = os.environ.get('AR', 'ar')
+   else:
 EOF
+# create build_mingw.ninja.template (version >= main)
+cp -n gn/build/build_linux.ninja.template gn/build/build_mingw.ninja.template
 ## don't abort on warnings
 #sed -i.bak -e "s/'\(-Wall\|-Wextra\)',//g" gn/build/gen.py
 ## avoid invalid linker flag -Wl,--gc-sections
@@ -343,8 +389,9 @@ wl-showstatus configure &&
  ninja -Cbuild_win &&
  #build_win/gn_unittests.exe &&
  wl-showstatus install &&
- mkdir -p $INSTALLPREFIX/bin &&
+ mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/share/doc/gn &&
  cp -f build_win/gn.exe $INSTALLPREFIX/bin/ &&
+ cp -rf docs/* $INSTALLPREFIX/share/doc/gn/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####PATH=$PYDIR:$PATH gn gen build_win --args='is_official_build=true'
 ####PATH=$PYDIR:$PATH gn args --list build_win
