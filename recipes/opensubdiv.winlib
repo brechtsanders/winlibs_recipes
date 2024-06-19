@@ -1,0 +1,66 @@
+export NAME="OpenSubdiv"
+export STATUS=
+export URL=https://graphics.pixar.com/opensubdiv/
+#export URL=https://github.com/PixarAnimationStudios/OpenSubdiv
+export BASENAME=opensubdiv
+export DESCRIPTION="OpenSubdiv is a set of open source libraries that implement high performance subdivision surface (subdiv) evaluation on massively parallel CPU and GPU architectures. This codepath is optimized for drawing deforming subdivs with static topology at interactive framerates. The resulting limit surface matches Pixar's Renderman to numerical precision."
+export CATEGORY=3d,math
+export TYPE=library
+export VERSION=3.6.0
+export VERSIONDATE=20240619
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,glfw3,ptex,khronos-opencl-headers,khronos-opencl-icd-loader
+export OPTIONALDEPENDENCIES=clew,cuda-toolkit
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=doxygen
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE="Modified Apache"
+export DOWNLOADURL="https://github.com/PixarAnimationStudios/OpenSubdiv/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/PixarAnimationStudios/OpenSubdiv/archive/refs/tags/v$(echo $VERSION|tr . _).tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$(echo $VERSION|tr . _).tar.gz
+cd OpenSubdiv-$(echo $VERSION|tr . _)
+# fix cmake/FindDXSDK.cmake (version >= 3.6.0)
+patch -ulbf cmake/FindDXSDK.cmake << EOF
+@@ -40,2 +40,3 @@
+         PATHS
++            "$(cygpath -m $MINGWDIR/$RUNPLATFORM)/include"
+             "\${DXSDK_LOCATION}/Include"
+@@ -58,4 +59,5 @@
+     find_path(LIBRARY_DIR
+-            d3d11.lib
++            libd3d11.a
+         PATHS
++            "$(cygpath -m $MINGWDIR/$RUNPLATFORM)/lib"
+             "\${DXSDK_LOCATION}/Lib/\${ARCH}"
+@@ -76,3 +78,3 @@
+             NAMES
+-                \${DX_LIB}.lib
++                lib\${DX_LIB}.a \${DX_LIB}.lib
+             PATHS
+EOF
+# fix opensubdiv/CMakeLists.txt (version >= 3.6.0)
+patch -ulbf opensubdiv/CMakeLists.txt << EOF
+@@ -182,3 +182,3 @@
+     # Build dynamic libs  ----------------------------------
+-    if (BUILD_SHARED_LIBS AND NOT WIN32 AND NOT IOS)
++    if (BUILD_SHARED_LIBS AND NOT MSVC AND NOT IOS)
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DNO_TUTORIALS:BOOL=ON -DNO_EXAMPLES:BOOL=ON -DNO_GLTESTS:BOOL=ON -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DNO_TUTORIALS:BOOL=ON -DNO_EXAMPLES:BOOL=ON -DNO_GLTESTS:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf OpenSubdiv-$(echo $VERSION|tr . _)
+
+
+
