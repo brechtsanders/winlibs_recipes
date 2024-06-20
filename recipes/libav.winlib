@@ -166,6 +166,52 @@ cd $BASENAME-$VERSION
 sed -i.bak -e "s/x264_bit_depth/X264_BIT_DEPTH/" libavcodec/libx264.c
 # fix undefined VPX_IMG_FMT_ symbols in libavcodec/libvpx.c (version >= 12.3)
 sed -i.bak -e "s/^\s*case\s*\([^ ]*\):\s*return\s*\s*\([^ ]*\);/#if defined(\1) \&\& defined(\2)\n&\n#endif/" libavcodec/libvpx.c
+# fix error: operand type mismatch for `shr' in libavcodec/x86/mathops.h (version >= 12.3)
+#### see also: https://git.ffmpeg.org/gitweb/ffmpeg.git/commitdiff/effadce6c756247ea8bae32dc13bb3e6f464f0eb
+patch -ulbf libavcodec/x86/mathops.h << EOF
+@@ -37,2 +37,3 @@
+     int rt, dummy;
++  if (__builtin_constant_p(shift))
+     __asm__ (
+@@ -41,3 +42,10 @@
+         :"=a"(rt), "=d"(dummy)
+-        :"a"(a), "rm"(b), "ci"((uint8_t)shift)
++        :"a"(a), "rm"(b), "i"(shift & 0x1F)
++    );
++  else
++    __asm__ (
++        "imull %3               \\n\\t"
++        "shrdl %4, %%edx, %%eax \\n\\t"
++        :"=a"(rt), "=d"(dummy)
++        :"a"(a), "rm"(b), "c"((uint8_t)shift)
+     );
+@@ -115,5 +123,11 @@
+ static inline  int32_t NEG_SSR32( int32_t a, int8_t s){
++  if (__builtin_constant_p(s))
+     __asm__ ("sarl %1, %0\\n\\t"
+          : "+r" (a)
+-         : "ic" ((uint8_t)(-s))
++         : "i" (-s & 0x1F)
++    );
++  else
++    __asm__ ("sarl %1, %0\\n\\t"
++           : "+r" (a)
++           : "c" ((uint8_t)(-s))
+     );
+@@ -124,5 +138,11 @@
+ static inline uint32_t NEG_USR32(uint32_t a, int8_t s){
++  if (__builtin_constant_p(s))
+     __asm__ ("shrl %1, %0\\n\\t"
+          : "+r" (a)
+-         : "ic" ((uint8_t)(-s))
++         : "i" (-s & 0x1F)
++    );
++  else
++    __asm__ ("shrl %1, %0\\n\\t"
++           : "+r" (a)
++           : "c" ((uint8_t)(-s))
+     );
+EOF
 #make -j1 SRC_PATH="$(pwd)"
 mv configure configure.bak
 sed -e "s/\(mingw32\*\)/\1|msys\*|mingw64\*/" configure.bak > configure

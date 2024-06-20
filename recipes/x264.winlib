@@ -415,8 +415,10 @@ export TYPE=library
 #export VERSIONDATE=20190908
 #export VERSION=snapshot-20191025-2245
 #export VERSIONDATE=20191026
-export VERSION=snapshot-20191110-2245
-export VERSIONDATE=20191111
+#export VERSION=snapshot-20191110-2245
+#export VERSIONDATE=20191111
+export VERSION=master
+export VERSIONDATE=20240620
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads
 export OPTIONALDEPENDENCIES=
@@ -425,28 +427,39 @@ export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL2
 #export DOWNLOADURL=""
-export DOWNLOADURL="http://download.videolan.org/pub/videolan/x264/snapshots/ x264-snapshot- -stable.tar.bz2 "
+#export DOWNLOADURL="http://download.videolan.org/pub/videolan/x264/snapshots/ x264-snapshot- -stable.tar.bz2 "
+#export DOWNLOADURL="https://github.com/corecodec/x264"
+export DOWNLOADURL="https://code.videolan.org/videolan/x264/-/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=http://download.videolan.org/pub/videolan/x264/snapshots/x264-$VERSION.tar.bz2
+#export DOWNLOADSOURCEURL=http://download.videolan.org/pub/videolan/x264/snapshots/x264-$VERSION.tar.bz2
+export DOWNLOADSOURCEURL=https://code.videolan.org/videolan/x264/-/archive/$VERSION/x264-$VERSION.tar.bz2
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
-# fix conflicting definition of DllMain in x264dll.c
-patch -ulbf x264dll.c << EOF
---- x264dll.c  2013-11-17 19:59:24 +0100
-+++ x264dll.c  2013-11-17 19:59:44 +0100
-@@ -29,3 +29,3 @@
- /* Callback for our DLL so we can initialize pthread */
--BOOL WINAPI DllMain( HANDLE hinstDLL, DWORD fdwReason, LPVOID lpvReserved )
-+BOOL WINAPI DllMain( HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved )
- {
-EOF
-# fix missing /bin/bash
-mv version.sh version.sh.bak
-echo '#!/bin/sh' > version.sh
-cat version.sh.bak >> version.sh
+## fix conflicting definition of DllMain in x264dll.c
+#patch -ulbf x264dll.c << EOF
+#--- x264dll.c  2013-11-17 19:59:24 +0100
+#+++ x264dll.c  2013-11-17 19:59:44 +0100
+#@@ -29,3 +29,3 @@
+# /* Callback for our DLL so we can initialize pthread */
+#-BOOL WINAPI DllMain( HANDLE hinstDLL, DWORD fdwReason, LPVOID lpvReserved )
+#+BOOL WINAPI DllMain( HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved )
+# {
+#EOF
+## fix common/common.h (version >= snapshot-20191110-2245)
+#mv common/common.h common/common.h.bak &&
+#cat > common/common.h << EOF &&
+##ifndef X264_COMMON_H
+##include "config.h"
+##endif
+#EOF
+#cat common/common.h.bak >> common/common.h
+## fix missing /bin/bash
+#mv version.sh version.sh.bak
+#echo '#!/bin/sh' > version.sh
+#cat version.sh.bak >> version.sh
 # fix invalid link option -Wl,--large-address-aware on 64-bit
 if ( echo $RUNPLATFORM | grep -q x86_64 ); then
  mv configure configure.bak
@@ -457,6 +470,12 @@ wl-showstatus configure &&
  #make clean; make CC="${CC:-gcc} -march=i686" && echo OK
  #sh ./configure --prefix=$INSTALLPREFIX --host=$RUNPLATFORM --enable-shared --disable-asm &&
  sh ./configure --prefix=$INSTALLPREFIX --host=$RUNPLATFORM --enable-static --enable-shared --disable-asm --enable-strip &&
+ #mv config.h config.h.bak &&
+ #echo "#include <stdio.h>" > config.h &&
+ #cat config.h.bak >> config.h &&
+ #if echo $RUNPLATFORM|grep -q "^aarch64"; then
+ # echo "#define ARCH_AARCH64 1" >> config.h
+ #fi &&
  wl-showstatus build-install &&
  make all install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
