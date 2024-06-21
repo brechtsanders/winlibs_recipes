@@ -25,6 +25,8 @@ export TYPE=application
 #export VERSIONDATE=20240521
 export VERSION=14.1.0
 export VERSIONDATE=20240508
+#export VERSION=15-20240616
+#export VERSIONDATE=20240620
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mman-win32,mingw-w64
 #export DEPENDENCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mman-win32,armwin-mingw-w64
@@ -101,6 +103,14 @@ patch -ulbf gcc/config.host << EOF
 -  i[34567]86-*-mingw32*)
 +  i[34567]86-*-mingw32* | arm*-*-mingw* | aarch64*-*-mingw*)
      host_xm_file=i386/xm-mingw32.h
+EOF
+# fix undefined symbol: host_detect_local_cpu(int, char const**) in gcc/config.host
+patch -ulbf gcc/config.host << EOF
+@@ -102,3 +102,3 @@
+   aarch64*-*-freebsd* | aarch64*-*-linux* | aarch64*-*-fuchsia* |\\
+-  aarch64*-*-darwin*)
++  aarch64*-*-darwin* | aarch64-*-mingw32)
+     case \${target} in
 EOF
 # fix undefined TARGET_64BIT in gcc/config/i386/mingw-stdint.h (version >= 10.2.0)
 patch -ulbf gcc/config/i386/mingw-stdint.h << EOF
@@ -182,6 +192,8 @@ mkdir -p build_arm64win &&
  # PATH=$(pwd)/build_arm64win/gcc:$(pwd)/build_arm64win/gcc/build:$MINGWPREFIX/share/arm64win-binutils/bin:$PATH make -Cbuild_arm64win
  #)) &&
  make -C build_arm64win configure-host &&
+ ## avoid invalid linker flags -Wl,--gc-keep-exported and -no-pie when building with CLang
+ #if ${CC:-gcc} --version|grep -q "^clang"; then sed -i.bak -e "s/-Wl,--gc-keep-exported//; s/ -no-pie//" build_arm64win/gcc/Makefile; fi &&
  # fix missing TARGET_64BIT (version <= 10.3.0)
  echo "#ifndef TARGET_64BIT" >> build_arm64win/gcc/auto-host.h &&
  echo "#define TARGET_64BIT 0" >> build_arm64win/gcc/auto-host.h &&
