@@ -128,6 +128,87 @@ sed -i.bak -e "s/--silent/-s/" potomo
 sed -i.bak -e "s/\(EWOULDBLOCK\)/WSA\1/g" src/estream.c
 # fix missing errnos_msgidxof/errnos_msgstr/errnos_msgidx in src/strerror-sym.c (version >= 1.36)
 sed -i.bak -e "s/errnos_//g" src/strerror-sym.c
+# fix src/spawn-w32.c (version >= 1.50)
+patch -ulbf src/spawn-w32.c << EOF
+@@ -357,3 +357,7 @@
+   PROCESS_INFORMATION pi = { NULL, 0, 0, 0 };
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++  STARTUPINFOW si;
++#else
+   STARTUPINFOEXW si;
++#endif
+   int cr_flags;
+@@ -410,2 +414,3 @@
+         {
++#if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600
+           if (check_windows_version ())
+@@ -425,2 +430,3 @@
+             }
++#endif
+           ask_inherit = TRUE;
+@@ -435,2 +441,11 @@
+   /* Start the process.  */
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++  si.cb = sizeof (si);
++  si.dwFlags = ((i > 0 ? STARTF_USESTDHANDLES : 0)
++                | STARTF_USESHOWWINDOW);
++  si.wShowWindow = DEBUG_W32_SPAWN? SW_SHOW : SW_MINIMIZE;
++  si.hStdInput  = act->hd[0];
++  si.hStdOutput = act->hd[1];
++  si.hStdError  = act->hd[2];
++#else
+   si.StartupInfo.cb = sizeof (si);
+@@ -442,2 +457,3 @@
+   si.StartupInfo.hStdError  = act->hd[2];
++#endif
+
+@@ -480,4 +496,6 @@
+     }
++#if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600
+   if (si.lpAttributeList)
+     DeleteProcThreadAttributeList (si.lpAttributeList);
++#endif
+   xfree (wpgmname);
+@@ -560,3 +578,7 @@
+   PROCESS_INFORMATION pi = { NULL, 0, 0, 0 };
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++  STARTUPINFOW si;
++#else
+   STARTUPINFOEXW si;
++#endif
+   int cr_flags;
+@@ -750,2 +772,3 @@
+         {
++#if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600
+           if (check_windows_version ())
+@@ -781,2 +804,3 @@
+             }
++#endif
+           ask_inherit = TRUE;
+@@ -791,2 +815,11 @@
+   /* Start the process.  */
++#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
++  si.cb = sizeof (si);
++  si.dwFlags = ((i > 0 ? STARTF_USESTDHANDLES : 0)
++                | STARTF_USESHOWWINDOW);
++  si.wShowWindow = DEBUG_W32_SPAWN? SW_SHOW : SW_HIDE;
++  si.hStdInput  = act->hd[0];
++  si.hStdOutput = act->hd[1];
++  si.hStdError  = act->hd[2];
++#else
+   si.StartupInfo.cb = sizeof (si);
+@@ -798,2 +831,3 @@
+   si.StartupInfo.hStdError  = act->hd[2];
++#endif
+
+@@ -850,4 +884,6 @@
+
++#if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600
+   if (si.lpAttributeList)
+     DeleteProcThreadAttributeList (si.lpAttributeList);
++#endif
+   xfree (wpgmname);
+EOF
 # fix invalid blank lines in generated .def file
 sed -i.bak -e "s/\(grep -v '^#'\)/\1|grep -v '^\$\$' /" src/Makefile.in
 ## allow building shared libraries when using clang
