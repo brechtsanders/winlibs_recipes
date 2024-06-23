@@ -1,0 +1,50 @@
+export NAME="FrontISTR"
+export STATUS=
+export URL=https://www.frontistr.com/
+export BASENAME=frontistr
+export DESCRIPTION="FrontISTR : Open-Source Large-Scale Parallel FEM Program for Nonlinear Structural Analysis"
+export CATEGORY=math
+export TYPE=library
+export VERSION=5.6
+export VERSIONDATE=2040623
+####hecmw1/src/solver/precond/nn/hecmw_ML_wrapper.c:14:10: fatal error: ml_include.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=License.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/FrontISTR/FrontISTR/tags"
+#export DOWNLOADURL="https://gitlab.com/FrontISTR-Commons/FrontISTR/-/tags FrontISTR-v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/FrontISTR/FrontISTR/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://gitlab.com/FrontISTR-Commons/FrontISTR/-/archive/v$VERSION/FrontISTR-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd FrontISTR-$VERSION
+tar xj --force-local -f $TARBALLDIR/$BASENAME/FrontISTR-v$VERSION.tar.bz2
+cd FrontISTR-v$VERSION
+# also allow building shared library
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" fistr1/CMakeLists.txt
+# don't abort on warnings
+sed -i.bak -e "s/-Wall//" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWINDOWS:BOOL=ON -DWITH_ML:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DWINDOWS:BOOL=ON -DWITH_ML:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" -S. -Bbuild_shared &&
+ # ignore multiple definitions when linking
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--allow-multiple-definition/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FrontISTR-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FrontISTR-v$VERSION
+
+
+
