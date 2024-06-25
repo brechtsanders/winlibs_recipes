@@ -57,8 +57,10 @@ export TYPE=library
 #export VERSIONDATE=20240326
 #export VERSION=0.21.9
 #export VERSIONDATE=20240418
-export VERSION=0.21.10
-export VERSIONDATE=20240515
+#export VERSION=0.21.10
+#export VERSIONDATE=20240515
+export VERSION=0.22.0
+export VERSIONDATE=20240625
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -102,27 +104,55 @@ patch -ulbf src/supplemental/nanolib/file.c << EOF
 +       ret = nano_mkdir(fpath, 0777);
  out:
 EOF
-# fix src/platform/windows/win_clock.c (version >= 0.21.9)
-#### Buf reported here: https://github.com/nanomq/NanoNNG/issues/922
+## fix src/platform/windows/win_clock.c (version >= 0.21.9 <= 0.21.10)
+##### Buf reported here: https://github.com/nanomq/NanoNNG/issues/922
+#patch -ulbf src/platform/windows/win_clock.c << EOF
+#@@ -35,3 +35,3 @@
+# {
+#-       int             rv;
+#+#ifdef _UCRT
+#        struct timespec ts;
+#@@ -43,2 +43,12 @@
+#        return (nni_win_error(GetLastError()));
+#+#else
+#+       int rv;
+#+       struct timeval tv;
+#+       if ((rv = gettimeofday(&tv, NULL)) == 0) {
+#+               *seconds     = tv.tv_sec;
+#+               *nanoseconds = tv.tv_usec * 1000;
+#+               return (0);
+#+       }
+#+       return (nni_plat_errno(errno));
+#+#endif
+# }
+#EOF
+# fix src/platform/windows/win_clock.c (version >= 0.22.0)
 patch -ulbf src/platform/windows/win_clock.c << EOF
-@@ -35,3 +35,3 @@
+@@ -35,2 +35,3 @@
  {
--       int             rv;
 +#ifdef _UCRT
         struct timespec ts;
-@@ -43,2 +43,12 @@
+@@ -42,2 +43,12 @@
         return (nni_win_error(GetLastError()));
 +#else
-+       int rv;
-+       struct timeval tv;
-+       if ((rv = gettimeofday(&tv, NULL)) == 0) {
-+               *seconds     = tv.tv_sec;
-+               *nanoseconds = tv.tv_usec * 1000;
-+               return (0);
-+       }
-+       return (nni_plat_errno(errno));
++        int rv;
++        struct timeval tv;
++        if ((rv = gettimeofday(&tv, NULL)) == 0) {
++                *seconds     = tv.tv_sec;
++                *nanoseconds = tv.tv_usec * 1000;
++                return (0);
++        }
++        return (nni_plat_errno(errno));
 +#endif
  }
+EOF
+# fix src/platform/windows/CMakeLists.txt (version >= 0.22.0)
+patch -ulbf src/platform/windows/CMakeLists.txt << EOF
+@@ -18,3 +18,3 @@
+     if (NOT NNG_HAVE_CONDVAR OR NOT NNG_HAVE_SNPRINTF OR NOT NNG_HAVE_TIMESPEC_GET)
+-        message(FATAL_ERROR
++        message(WARNING
+                 "Modern Windows API support is missing. "
 EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
