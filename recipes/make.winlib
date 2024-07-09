@@ -143,19 +143,28 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix timestamp issue in src/remake.c (version >= 4.4.1)
+patch -ulbf src/remake.c << EOF
+@@ -39,3 +39,3 @@
+ #include <sys/stat.h>
+-#if defined(_MSC_VER) && _MSC_VER > 1200
++#if (defined(_MSC_VER) && _MSC_VER > 1200) || defined(__MINGW32__)
+ /* VC7 or later supports _stat64 to access 64-bit file size. */
+EOF
 # also support triplet ending with mingw32ucrt (version >= 4.3)
 sed -i.bak -e "s/\(mingw32\))/\1*)/" configure
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --enable-load --without-dmalloc --disable-rpath CFLAGS="-I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/libdl-win32 -O2 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic"; fi)" LDFLAGS="-Wl,--no-insert-timestamp -Wl,--as-needed -ldl" &&
  #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --enable-load --without-dmalloc --disable-rpath CFLAGS="-I$MINGWPREFIX/win32ports/include -O2 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic"; fi)" LDFLAGS="-Wl,--no-insert-timestamp" &&
- ./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --enable-load --without-dmalloc --disable-rpath CFLAGS="-D__USE_MINGW_ANSI_STDIO=0 -I$MINGWPREFIX/win32ports/include -O2 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic"; fi)" LDFLAGS="-Wl,--no-insert-timestamp" &&
- #--enable-year2038 
+ #./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --enable-load --without-dmalloc --disable-rpath CFLAGS="-D__USE_MINGW_ANSI_STDIO=0 -I$MINGWPREFIX/win32ports/include -O2 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic"; fi)" LDFLAGS="-Wl,--no-insert-timestamp" &&
+ ./configure --prefix=$INSTALLPREFIX/share/make --build=$BUILDPLATFORM --host=$RUNPLATFORM --program-prefix=mingw32- --enable-job-server --enable-load --enable-cross-guesses=conservative --without-guile --enable-case-insensitive-file-system --disable-posix-spawn --enable-load --without-dmalloc --disable-rpath $(if echo $RUNPLATFORM|grep -vq "^i.86"; then echo "--enable-year2038"; fi) CFLAGS="-D__USE_MINGW_ANSI_STDIO=0 -I$MINGWPREFIX/win32ports/include -O2 $(if echo $RUNPLATFORM | grep -q "^i.86"; then echo "-march=pentium4 -mtune=generic"; fi) $(if echo $RUNPLATFORM | grep -q "^x86_64"; then echo "-march=nocona -msahf -mtune=generic"; fi)" &&
  # enable sys/wait.h (version >= 4.4.1)
  echo "#undef HAVE_SYS_WAIT_H" >> src/config.h &&
  echo "#define HAVE_SYS_WAIT_H 1" >> src/config.h &&
+ # avoid storing absolute path specified by CXX environment variable
+ sed -i.bak -e "s?^\(#define MAKE_[^ ]* \"\)[^\"]*/?\1?p" src/config.h &&
  wl-showstatus build-install &&
- #make install-strip &&
- mingw32-make install-strip &&
+ ( mingw32-make install-strip || make install-strip ) &&
  strip $INSTALLPREFIX/share/make/bin/*.exe &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
 
