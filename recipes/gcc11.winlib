@@ -1,0 +1,134 @@
+export NAME="GCC, the GNU Compiler Collection (version 10)"
+export STATUS=
+export URL=https://gcc.gnu.org/
+export BASENAME=gcc11
+export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom."
+export CATEGORY=development
+export TYPE=application
+#export VERSION=11.4.0
+#export VERSIONDATE=20230702
+export VERSION=11.5.0
+export VERSIONDATE=20230723
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl,mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=binutils
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/releases/ gcc-"
+#export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/snapshots/ gcc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/snapshots/$VERSION/gcc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/gcc $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xJlh --force-local -f $TARBALLDIR/gcc/gcc-$VERSION.tar.xz
+cd gcc-$VERSION
+# set to 0 to build Dwarf2 (32-bit) or SEH (64-bit) C++ exception handling (or to 1 to use SJLJ)
+if [ "$USE_SJLJ" == "" ]; then
+ USE_SJLJ=0
+fi
+# set to 0 to use msvcrt or to 1 to use ucrt
+if [ "$USE_UCRT" == "" ]; then
+ USE_UCRT=0
+fi
+## fix undefined reference to __intrinsic_setjmpex in gcc/fortran/parse.c
+#sed -i.bak -e "s/^\(#include <setjmp\)\(\.h>\)/\1ex\2/" gcc/fortran/parse.c
+## fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+#sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
+## fix printf format issues with MinGW-w64 >= 8.0.0
+#####See also: https://sourceforge.net/p/mingw-w64/bugs/853/
+#####See also: https://github.com/msys2/MINGW-packages-dev/blob/master/mingw-w64-gcc-git/0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch
+#sed -i.bak -e "s/^\(\s*#\s*\)include <inttypes\.h>.*$/&\n\1ifdef __MINGW32__\n\1undef HAVE_INTTYPES_H\n\1endif/" libgomp/target.c libgomp/oacc-parallel.c
+# fix error: expected identifier before string constant in gcc/system.h
+patch -ulbf gcc/system.h << EOF
+@@ -774,3 +774,5 @@
+                                         ATTRIBUTE_NORETURN ATTRIBUTE_COLD;
++#ifndef __cplusplus
+ #define abort() fancy_abort (__FILE__, __LINE__, __FUNCTION__)
++#endif
+
+EOF
+# fix issue when building for ucrt in libstdc++-v3/src/filesystem/ops.cc (version >= 11)
+patch -ulbf libstdc++-v3/src/filesystem/ops.cc << EOF
+@@ -977,3 +977,3 @@
+   if (nofollow && is_symlink(st))
+-    ec = std::make_error_code(std::errc::operation_not_supported);
++    ec = std::make_error_code(std::errc::function_not_supported);
+   else if (posix::chmod(p.c_str(), static_cast<mode_t>(prms)))
+EOF
+## fix undefined operation_not_supported in libstdc++-v3/config/os/mingw32/error_constants.h
+# fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
+# avoid looking for libiberty.a in pic subdirectory
+sed -i.bak -e "s?pic/\(libiberty\.a\)?\1?g" $(grep -l "pic/libiberty\.a" */Makefile.in)
+## fix location of /lib/cpp
+#sed -i.bak -e "s?/lib/cpp?$(which cpp.exe)?" $(find -name configure)
+# copy MinGW-w64 files
+mkdir -p build_mingw/mingw-w64/mingw/lib &&
+cp -rf $MINGWPREFIX/share/mingw-w64/include build_mingw/mingw-w64/mingw/ &&
+#cp -f $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/include/*.h build_mingw/mingw-w64/mingw/include &&
+( cp -rf $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/lib/* build_mingw/mingw-w64/mingw/lib/ &> /dev/null || cp -rf $MINGWPREFIX/share/mingw-w64/lib/* build_mingw/mingw-w64/mingw/lib/ ) &&
+mkdir -p build_mingw &&
+ wl-showstatus configure &&
+ cd build_mingw &&
+ PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc11 --build=$BUILDPLATFORM --host=$RUNPLATFORM \
+  --with-pkgversion="MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//")$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "-ucrt"; else echo -n "-msvcrt"; fi)-posix-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" \
+  --with-tune=generic \
+  --enable-checking=release \
+  --enable-threads=posix \
+  $(if [ "0$USE_SJLJ" -ne 0 ]; then if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--without-dwarf2 "; fi; echo "--enable-sjlj-exceptions"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--with-dwarf2 "; fi; echo "--disable-sjlj-exceptions"; fi) \
+  --disable-libunwind-exceptions \
+  --disable-serial-configure \
+  --disable-bootstrap \
+  --enable-host-shared \
+  --enable-plugin \
+  --disable-default-ssp \
+  --disable-rpath \
+  --disable-libstdcxx-debug \
+  --disable-version-specific-runtime-libs \
+  --with-stabs \
+  --disable-symvers \
+  --enable-languages=c,c++,fortran,lto,objc,obj-c++,jit \
+  --disable-{gold,nls,stage1-checking,win32-registry,multilib} \
+  --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,libstdcxx-time,libstdcxx-pch} \
+  --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX \
+  $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) \
+  --enable-install-libiberty \
+  --enable-__cxa_atexit \
+  --without-included-gettext \
+  --with-diagnostics-color=auto \
+  --enable-clocale=generic \
+  --with-libiconv \
+  --with-system-zlib \
+  --with-build-sysroot=$PWD/mingw-w64 \
+  --enable-version-specific-runtime-libs \
+  CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -Wno-int-conversion" \
+  CXXFLAGS="-Wno-int-conversion" \
+  LDFLAGS="-L$MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/lib -L$MINGWPREFIX/share/mingw-w64/lib -pthread $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--dynamicbase &> /dev/null; then echo "-Wl,--dynamicbase"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--high-entropy-va &> /dev/null; then echo "-Wl,--high-entropy-va"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--nxcompat &> /dev/null; then echo "-Wl,--nxcompat"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--tsaware &> /dev/null; then echo "-Wl,--tsaware"; fi)" \
+  &&
+ cd .. &&
+ make -Cbuild_mingw configure-host &&
+ sed -i.bak -e "s?\$(DESTDIR)\(\$\$dest\)?\1?" build_mingw/gcc/Makefile &&
+ #sed -i.bak2 -e "s/\$(DESTDIR)\(\$(plugin_resourcesdir)\)/\1/" build_mingw/gcc/Makefile &&
+ wl-showstatus build &&
+ ( make -Cbuild_mingw || make -j1 -Cbuild_mingw ) &&
+ #XCFLAGS="-Wc,-pthread -Wno-error=format-extra-args" 
+ ## fix missing cc1.exe.a / cc1plus.exe.a (version >= 11)
+ #touch build_mingw/gcc/cc1.exe.a build_mingw/gcc/cc1plus.exe.a &&
+ wl-showstatus build-install &&
+ ( make -Cbuild_mingw install-strip || make -Cbuild_mingw install-strip LIBS="-lmman" ) &&
+ # remove .la files
+ rm -f $(find $INSTALLPREFIX -name '*.la') &&
+ # fix absolute path
+ sed -i -e "s?$INSTALLPREFIX/share/gcc?\$(realpath \$(dirname \$0)/../../../../..)?" $INSTALLPREFIX/share/gcc11/libexec/gcc/*/*/install-tools/mkheaders &&
+ sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc11/lib/gcc/*/*/libstdc++.dll.a-gdb.py &&
+ ## remove dummy cc1.exe.a / cc1plus.exe.a (version >= 11)
+ #for F in build_mingw/gcc/cc1.exe.a build_mingw/gcc/cc1plus.exe.a; do if [ ! -s $F ]; then echo rm -f $F; fi; done &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gcc-$VERSION
+
+
+
