@@ -413,35 +413,45 @@ export VERSIONDATE=20240729
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,boost,seastar
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.AGPL
 export LICENSETYPE="Affero GPL"
 #export DOWNLOADURL="https://github.com/scylladb/scylla/releases scylla-"
-export DOWNLOADURL="https://github.com/scylladb/scylla/tags scylla-"
+#export DOWNLOADURL="https://github.com/scylladb/scylla/tags scylla-"
+export DOWNLOADURL="https://github.com/scylladb/scylladb/tags scylla-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/scylladb/scylla/archive/scylla-$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://github.com/scylladb/scylla/archive/refs/tags/scylla-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/scylladb/scylla/archive/refs/tags/scylla-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/scylladb/scylladb/archive/refs/tags/scylla-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/scylla-$VERSION.tar.gz
-cd scylla-scylla-$VERSION
-##$PYDIR/python.exe configure.py --help
-#wl-showstatus configure &&
-#$PYDIR/python.exe configure.py  --mode=release --with=scylla --disable-xen &&
-#    echo OK
+#cd scylla-scylla-$VERSION
+cd scylladb-scylla-$VERSION
+# fix cmake/mode.common.cmake (version >= 6.0.2)
+patch -ulbf cmake/mode.common.cmake << EOF
+@@ -77,3 +77,3 @@
+   else()
+-    message(FATAL_ERROR "Unable to find \${dynamic_linker_option} in driver-generated command: "
++    message(WARNING "Unable to find \${dynamic_linker_option} in driver-generated command: "
+       "\${driver_command_line}")
+EOF
 #sed -i.bak -e "s/-std=gnu++20/-std=gnu++2a/" CMakeLists.txt
+# allow Release build type
+sed -i.bak2 -e "s/\(message(\)FATAL_ERROR\(.*Unknown CMAKE_BUILD_TYPE\)/\1WARNING\2/" CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DFOR_IDE:BOOL=ON -S. -Bbuild_win &&
+ $PYDIR/python.exe configure.py --mode release --python $PYDIR/python.exe &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DFOR_IDE:BOOL=ON -S. -Bbuild_win &&
  wl-showstatus build &&
- make -Cbuild_win &&
+ ninja -Cbuild_win &&
  wl-showstatus build-install &&
- make -Cbuild_win install/strip &&
+ ninja -Cbuild_win install/strip &&
     echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf scylla-scylla-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf scylladb-scylla-$VERSION
 
 
 
