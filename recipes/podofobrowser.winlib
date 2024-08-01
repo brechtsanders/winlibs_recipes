@@ -24,6 +24,89 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+## fix src/backgroundloader.cpp (version >= 0.9.7)
+#patch -ulbf src/backgroundloader.cpp << EOF
+#@@ -13,3 +13,3 @@
+#     connect(&m_timer, SIGNAL(timeout()), SLOT(loadNextObject()));
+#-    qDebug("Beginning background load of %i objects", doc->GetObjects()->GetSize());
+#+    qDebug("Beginning background load of %i objects", doc->GetObjects().GetSize());
+# }
+#@@ -29,3 +29,3 @@
+#     // just to index its members.
+#-    PdfVecObjects & objs = *m_pDoc->GetObjects();
+#+    PdfIndirectObjectList & objs = m_pDoc->GetObjects();
+#     const int objCount = objs.GetSize();
+#@@ -43,3 +43,3 @@
+#        // FIXME unsafe if objects are removed while loading happening.
+#-        objs[++m_lastObjectIdx]->GetDataType();
+#+        objs.CreateArrayObject().GetDataType();
+#         emit progress(m_lastObjectIdx);
+#EOF
+## fix src/podofoutil.cpp (version >= 0.9.7)
+#patch -ulbf src/podofoutil.cpp << EOF
+#@@ -10,5 +10,5 @@
+# {
+#-    TCIDequeErrorInfo it = eCode.GetCallstack().begin();
+#-    const char* pszMsg   = PdfError::ErrorMessage( eCode.GetError() );
+#-    const char* pszName  = PdfError::ErrorName( eCode.GetError() );
+#+    PdErrorInfoStack::const_iterator it = eCode.GetCallStack().begin();
+#+    const char* pszMsg   = std::string(PdfError::ErrorMessage( eCode.GetCode()
+#)).c_str();
+#+    const char* pszName  = std::string(PdfError::ErrorName( eCode.GetCode() )).c_str();
+#
+#@@ -18,3 +18,3 @@
+#                              "Error: %1 %2\\n%3\\n" )
+#-           .arg( eCode.GetError() )
+#+           .arg( (int)eCode.GetCode() )
+#            .arg( QString::fromLocal8Bit(pszName ? pszName : "") )
+#@@ -22,13 +22,7 @@
+#
+#-    if( eCode.GetCallstack().size() )
+#+    if( eCode.GetCallStack().size() )
+#         msg += QObject::tr("Callstack:\\n");
+#
+#-    while( it != eCode.GetCallstack().end() )
+#+    while( it != eCode.GetCallStack().end() )
+#     {
+#-        if( !(*it).GetFilename().empty() )
+#-            msg += QObject::tr("\\t#%1 Error Source: %2:%3\\n")
+#-                   .arg( i )
+#-                   .arg( QString::fromLocal8Bit((*it).GetFilename().c_str()) )
+#-                   .arg( (*it).GetLine() );
+#-
+#         if( !(*it).GetInformation().empty() )
+#EOF
+## fix src/pdfobjectmodel.cpp (version >= 0.9.7)
+#patch -ulbf src/pdfobjectmodel.cpp << EOF
+#@@ -235,3 +235,3 @@
+#     bool operator()(const PdfObjectModelNode* p1) const {
+#-        return p1 ? (p1->GetObject()->Reference() == m_ref ) : false;
+#+        return p1 ? (p1->GetObject()->GetReference() == m_ref ) : false;
+#     }
+#@@ -334,3 +334,3 @@
+#     std::advance(it, row);
+#-    a.insert(it, PdfVariant::NullValue);
+#+    a.insert(it, PdfVariant::Null);
+# }
+#@@ -347,3 +347,3 @@
+#     assert(CanInsertKey(keyName));
+#-    m_pObject->GetDictionary().AddKey(keyName, PdfVariant::NullValue);
+#+    m_pObject->GetDictionary().AddKey(keyName, PdfVariant::Null);
+# }
+#@@ -371,4 +371,3 @@
+#     {
+#-        TKeyMap& keys ( m_pObject->GetDictionary().GetKeys() );
+#-        TKeyMap::iterator it = keys.begin();
+#+       auto it = m_pObject->GetDictionary().GetIndirectIterator().begin();
+#         std::advance(it, row);
+#@@ -417,4 +416,4 @@
+#         // if not working on a copy, causing a crash
+#-        TKeyMap keys ( m_pObject->GetDictionary().GetKeys() );
+#-        TKeyMap::iterator it = keys.begin();
+#+       PdfDictionaryIndirectIterable keys = m_pObject->GetDictionary().GetIndirectIterator();
+#+       auto it = keys.begin();
+#
+#EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
  PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBPODOFO_SHARED:BOOL=ON -DLIBFREETYPE_FT2BUILD_H:PATH=$MINGWPREFIX/include/freetype2 -DLIBFREETYPE_FTHEADER_H:PATH=$MINGWPREFIX/include/freetype2/freetype/config -S. -Bbuild_win &&
