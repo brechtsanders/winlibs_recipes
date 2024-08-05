@@ -21,8 +21,10 @@ export TYPE=library
 #export VERSIONDATE=20240304
 #export VERSION=1.6.0
 #export VERSIONDATE=20240316
-export VERSION=1.7.0
-export VERSIONDATE=20240629
+#export VERSION=1.7.0
+#export VERSIONDATE=20240629
+export VERSION=1.7.1
+export VERSIONDATE=20240805
 wl-showstatus --package-version
 export DEPENDENCIES=glib2,gettext,gobject-introspection,vala,gtk4,libadwaita,cairo,graphene
 export OPTIONALDEPENDENCIES=
@@ -39,13 +41,26 @@ wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
+# fix meson.build (version >= 1.7.1)
+###meson.build:184:2: ERROR: Tried to use 'add_global_arguments' after a build target has been declared.
+patch -ulbf meson.build << EOF
+@@ -182,3 +182,3 @@
+ ]
+-if not buildtype.startswith('debug')
++if false
+   add_global_arguments([
+EOF
 # fix detection of Python
 sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" subprojects/gi-docgen/meson.build
 mkdir -p build_both &&
  wl-showstatus configure &&
  PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX/share/libpanel --backend ninja --buildtype release --strip --default-library both -Dintrospection=enabled -Dvapi=true -Ddocs=disabled -Dinstall-examples=false -Dc_link_args="-Wl,-no-undefined -lssp" . build_both &&
+ #PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX/share/libpanel --backend ninja --buildtype release --strip --default-library both -Dintrospection=enabled -Dvapi=true -Ddocs=disabled -Dinstall-examples=false -Dc_args="-DG_DISABLE_ASSERT -DG_DISABLE_CAST_CHECKS" -Dc_link_args="-Wl,-no-undefined -lssp" . build_both &&
+ # fix subprojects/libadwaita/meson.build (version >= 1.7.1)
+ sed -i.bak -e "s/^subdir('tests')/#&/" subprojects/libadwaita/meson.build &&
  wl-showstatus build-install &&
- PATH=$PYDIR:$PATH ninja -Cbuild_both install &&
+ #PATH=$PYDIR:$PATH ninja -Cbuild_both install &&
+ GETTEXTDATADIR=$MINGWPREFIX/share/gettext PATH=$PYDIR:$PATH ninja -Cbuild_both install &&
  cp -u build_both/src/*.a $INSTALLPREFIX/share/libpanel/lib/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 #### conflicts with ncurses (libpanel.a) => moved to a seperate folder
