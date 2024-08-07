@@ -128,7 +128,8 @@ tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix missing socklen_t (not working)
 mkdir -p win32fix/sys win32fix/netinet win32fix/arpa
-echo "#include <ws2tcpip.h>" > win32fix/sys/socket.h
+echo "#include <winsock2.h>" > win32fix/sys/socket.h
+echo "#include <ws2tcpip.h>" >> win32fix/sys/socket.h
 touch win32fix/termios.h win32fix/netinet/in.h win32fix/netinet/in_systm.h win32fix/arpa/inet.h win32fix/arpa/nameser.h win32fix/netdb.h win32fix/resolv.h win32fix/sys/ioctl.h win32fix/netinet/ip.h
 echo > win32fix/sys/uio.h << EOF
 #include <bfd.h>
@@ -145,17 +146,89 @@ typedef int gid_t;
 EOF
 echo > win32fix/grp.h << EOF
 EOF
+
+# fix includes.h (version >= 9.8p1)
+patch -ulbf includes.h << EOF
+@@ -24,4 +24,13 @@
+
++#define setkey MINGW_setkey
++#include <stdlib.h>
++#undef setkey
++
+ #include <sys/types.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <sys/socket.h> /* For CMSG_* */
++#endif
+
+EOF
+# fix misc.c (version >= 9.8p1)
+patch -ulbf misc.c << EOF
+@@ -790,2 +790,6 @@
+                return NULL;
++#ifdef _WIN32
++       if (isalpha(*cp) && *(cp+1) == ':')     /* Do not split at drive name. */
++               return NULL;
++#endif
+        if (*cp == '[')
+EOF
+# fix openbsd-compat/bsd-cygwin_util.c (version >= 9.8p1)
+patch -ulbf openbsd-compat/bsd-cygwin_util.c << EOF
+@@ -89,3 +89,3 @@
+        { NL("COMSPEC=") },
+-       { NL("CYGWIN=") },
++       { NL("MSYS=") },
+        { NL("OS=") },
+EOF
+# fix regress/agent-ptrace.sh (version >= 9.8p1)
+patch -ulbf regress/agent-ptrace.sh << EOF
+@@ -7,3 +7,3 @@
+        case \`uname\` in
+-       AIX|CYGWIN*|OSF1)
++       AIX|CYGWIN*|MSYS*|MINGW*|OSF1)
+                echo "skipped (not supported on this platform)"
+EOF
+# fix regress/reexec.sh (version >= 9.8p1)
+patch -ulbf regress/reexec.sh << EOF
+@@ -46,3 +46,3 @@
+ # cygwin can't fork a deleted binary
+-if [ "\$os" != "cygwin" ]; then
++if [ "\$os" != "cygwin" || "\$os" != "msys" ]; then
+
+EOF
+# fix regress/test-exec.sh (version >= 9.8p1)
+patch -ulbf regress/test-exec.sh << EOF
+@@ -66,3 +66,3 @@
+        ;;
+-CYGWIN*)
++CYGWIN* | MSYS* | MINGW*)
+        os=cygwin
+EOF
+# fix contrib/cygwin/Makefile (version >= 9.8p1)
+patch -ulbf contrib/cygwin/Makefile << EOF
+@@ -9,3 +9,3 @@
+ sshdocdir=\$(docdir)/openssh
+-cygdocdir=\$(docdir)/Cygwin
++cygdocdir=\$(docdir)/MSYS
+ sysconfdir=/etc
+EOF
+
 ## remove -Wno-unused-result from configure
 #sed -i.bak-e "s/-Wno-unused-result//g" configure
 # don't abort if socklen_t is not found
 sed -i.bak2 -e "s/as_fn_error\(.*Cannot find a type to use in place of socklen_t\)/echo\1/g" configure
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/win32fix" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PWD/win32fix" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libedit --without-hardening CFLAGS="-I$PWD/win32fix" &&
  wl-showstatus build-install &&
- # fix missing socklen_t
- echo "#include <ws2tcpip.h>" >> includes.h &&
+ ## fix missing socklen_t
+ #echo "#include <ws2tcpip.h>" >> includes.h &&
  #echo "#define HAVE_INET_NTOA 1" >> config.h &&
+ #echo "#define HAVE_INET_NTOP 1" >> config.h &&
  #echo "#define HAVE_STRUCT_SOCKADDR_IN6 1" >> includes.h &&
+ #echo "#define HAVE_STRUCT_SOCKADDR_STORAGE 1" >> includes.h &&
  make install &&
     echo OK
 #CFLAGS="-Dsocklen_t=int"
