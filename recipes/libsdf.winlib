@@ -1,0 +1,64 @@
+export NAME="libsdf"
+export STATUS=
+export URL=https://github.com/dcanelhas/libsdf
+export BASENAME=libsdf
+export DESCRIPTION="Library to describe, manipulate and render implicitly defined geometry as signed (pseudo-) distance fields"
+export CATEGORY=math
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20240807
+wl-showstatus --package-version
+export DEPENDENCIES=eigen,opencv
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/dcanelhas/libsdf/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/dcanelhas/libsdf/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing M_PI in src/main.cpp
+mv src/main.cpp src/main.cpp.bak &&
+echo "#define _USE_MATH_DEFINES" > src/main.cpp &&
+echo "#include <cmath>" >> src/main.cpp &&
+cat src/main.cpp.bak >> src/main.cpp
+# avoid absolute paths in LibsdfConfig.cmake.in
+patch -ulbf LibsdfConfig.cmake.in << EOF
+@@ -8,4 +8,4 @@
+
+-set( Libsdf_INCLUDE_DIRS "@EXPORT_LIB_INC_DIR@" )
+-set( Libsdf_INCLUDE_DIR  "@EXPORT_LIB_INC_DIR@" )
++set( Libsdf_INCLUDE_DIRS "\${Libsdf_CMAKE_DIR}/../../../include" )
++set( Libsdf_INCLUDE_DIR  "\${Libsdf_CMAKE_DIR}/../../../include" )
+ set( Libsdf_LIBRARIES Libsdf )
+EOF
+# fix CMakeLists.txt
+patch -ulbf CMakeLists.txt << EOF
+@@ -104,3 +104,2 @@
+ INSTALL(FILES "\${CMAKE_CURRENT_BINARY_DIR}\${CMAKE_FILES_DIRECTORY}/LibsdfConfig.cmake"
+-              "\${CMAKE_CURRENT_BINARY_DIR}/LibsdfConfigVersion.cmake"
+         DESTINATION \${CMAKECONFIG_INSTALL_DIR} )
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lopencv_core4100 -lopencv_highgui4100/" build_static/build.ninja &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lopencv_core4100 -lopencv_highgui4100/" build_shared/build.ninja &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
