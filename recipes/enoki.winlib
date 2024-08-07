@@ -1,0 +1,59 @@
+export NAME="Enoki"
+export STATUS=
+export URL=https://github.com/mitsuba-renderer/enoki
+export BASENAME=enoki
+export DESCRIPTION="Enoki: structured vectorization and differentiation on modern processor architectures "
+export CATEGORY=math
+export TYPE=library
+export VERSION=0.1.0
+export VERSIONDATE=20240807
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/mitsuba-renderer/enoki/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mitsuba-renderer/enoki/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined M_PI in include/enoki/array_router.h (version >= 0.1.0)
+mv include/enoki/array_router.h include/enoki/array_router.h.bak &&
+echo "#define _USE_MATH_DEFINES" > include/enoki/array_router.h &&
+echo "#include <cmath>" >> include/enoki/array_router.h &&
+cat include/enoki/array_router.h.bak >> include/enoki/array_router.h
+# fix undefined std::sort() in src/autodiff/autodiff.cpp (version >= 0.1.0)
+mv src/autodiff/autodiff.cpp src/autodiff/autodiff.cpp.bak &&
+echo "#include <algorithm>" > src/autodiff/autodiff.cpp &&
+cat src/autodiff/autodiff.cpp.bak >> src/autodiff/autodiff.cpp
+# also allow building static libraries
+sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENOKI_AUTODIFF:BOOL=ON -DENOKI_TEST:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENOKI_AUTODIFF:BOOL=ON -DENOKI_TEST:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-static &&
+ ninja -Cbuild_static &&
+ wl-showstatus build-shared &&
+ ninja -Cbuild_shared &&
+ strip build_shared/*.dll &&
+ #wl-showstatus build-install-static &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install-shared &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_static/*.a build_shared/*.dll.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
