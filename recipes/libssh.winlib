@@ -259,8 +259,10 @@ export TYPE=library
 #export VERSIONDATE=20220908
 #export VERSION=0.10.5
 #export VERSIONDATE=20230504
-export VERSION=0.10.6
-export VERSIONDATE=20231219
+#export VERSION=0.10.6
+#export VERSIONDATE=20231219
+export VERSION=0.11.0
+export VERSIONDATE=20240808
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,zlib,openssl,libgssapi,softhsm
 export OPTIONALDEPENDENCIES=
@@ -278,6 +280,19 @@ wl-wait4deps
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
+# fix include/libssh/gssapi.h (version >= 0.11.0)
+####/include/gssglue/gssapi/gssapi.h:42:2: error: #error It appears you have already included the Heimdal gssapi.h file
+mv include/libssh/gssapi.h include/libssh/gssapi.h.bak &&
+echo "#include <gssglue/gssapi/gssapi.h>" > include/libssh/gssapi.h &&
+cat include/libssh/gssapi.h.bak >> include/libssh/gssapi.h
+# fix src/gssapi.c (version >= 0.11.0)
+patch -ulbf src/gssapi.c << EOF
+@@ -109,3 +109,3 @@
+     }
+-    gss_release_oid(&min, &session->gssapi->client.oid);
++    gss_release_oid_set(&min, &session->gssapi->client.oid);
+     gss_delete_sec_context(&min, &session->gssapi->ctx, GSS_C_NO_BUFFER);
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DWITH_PKCS11_URI:BOOL=ON -DWITH_DSA:BOOL=ON -DWITH_NACL:BOOL=OFF -DWITH_GCRYPT:BOOL=OFF -DWITH_PCAP:BOOL=OFF -DWITH_DEBUG_CALLTRACE:BOOL=OFF -DWITH_DEBUG_CRYPTO:BOOL=OFF -DGSSAPI_INCLUDE_DIR:PATH=$MINGWPREFIX/include/gssglue -DGSSAPI_LIBRARIES:STRING=-lgssapi -DWITH_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
