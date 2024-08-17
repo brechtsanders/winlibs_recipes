@@ -1,0 +1,85 @@
+export NAME="Pure-FTPd"
+export STATUS=
+export URL=https://www.pureftpd.org/
+export BASENAME=pure-ftpd
+export DESCRIPTION="Pure-FTPd is a fast, production-quality, standard-conformant FTP server, based upon Troll-FTPd."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=1.0.50
+export VERSIONDATE=20240816
+####configure: error: unable to use gethostbyname()
+wl-showstatus --package-version
+export DEPENDENCIES=mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://github.com/jedisct1/pure-ftpd/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/jedisct1/pure-ftpd/releases/download/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+cd $BASENAME-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+touch winfix/netinet/in.h winfix/netinet/ip.h winfix/netinet/tcp.h winfix/arpa/inet.h winfix/netdb.h winfix/poll.h
+cat > winfix/pwd.h << EOF
+EOF
+cat > winfix/grp.h << EOF
+EOF
+cat > winfix/syslog.h << EOF
+EOF
+# don't abort on missing gethostbyname()
+sed -i.bak "s/as_fn_error\(.*unable to use gethostbyname\)/echo\1/" configure
+wl-showstatus configure &&
+ #wl-showstatus preconfigure &&
+ #mkdir -p m4 &&
+ ##libtoolize -f -i -c &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ ## allow building shared libraries when using clang
+ #if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+ # sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" configure
+ # #sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" $(find -name configure)
+ #fi &&
+ ## fix confusion between MSVC and clang
+ #if ${CC:-gcc} --version|grep -q "^clang"; then
+ # sed -i.bak2 -e "s/\b\(cl\)\(\*\)/\1.exe\2/g; s/\(ld_shlibs\)=no/\1yes/" configure
+ #fi &&
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-everything --with-brokenrealpath --without-shadow  --with-nonroot --with-tls CFLAGS="-I$PWD/winfix -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -lmman" &&
+ echo "#define HAVE_STRDUP 1" >> config.h &&
+ #--disable-ssp 
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip LIBS="-lws2_32" &&
+ #( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
