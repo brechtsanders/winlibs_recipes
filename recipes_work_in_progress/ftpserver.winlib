@@ -1,0 +1,82 @@
+export NAME="FTPServer"
+export STATUS=
+export URL=https://github.com/aakashrav/FTPServer
+export BASENAME=ftpserver
+export DESCRIPTION="A full-fledged FTP Server written in C for *nix environments, with SSL and SFTP support in the future"
+export CATEGORY=communication
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20240817
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/aakashrav/FTPServer/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/aakashrav/FTPServer/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd FTPServer-$VERSION
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+echo "#include <winsock2.h>" > winfix/sys/socket.h
+echo "#include <ws2tcpip.h>" > winfix/arpa/inet.h
+touch winfix/netdb.h winfix/netinet/in.h winfix/poll.h winfix/sys/dir.h
+# fix undefined SIGUSR1/SIGUSR2/poll() in src/main_server.c
+patch -ulbf src/main_server.c << EOF
+@@ -85,3 +85,10 @@
+
++#ifdef _WIN32
++        static WSADATA wsaData;
++        if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
++                fprintf(stderr, "Attempting to initialize Winsock failed\\n");
++        atexit((void(*)())WSACleanup);
++#endif
+        // Register our signal handler for gracefully terminating the server
++#ifdef SIGUSR1
+        if (signal(SIGUSR1, handler) == SIG_ERR) {
+@@ -95,2 +102,3 @@
+        }
++#endif
+
+@@ -129,3 +137,7 @@
+
++#ifdef _WIN32
++               err = WSAPoll(fds, 1, -1);
++#else
+                err = poll(fds, 1, -1);
++#endif
+                if (err == -1)
+EOF
+# fix number of arguments for mkdir() in src/ftp_functions.c
+patch -ulbf src/ftp_functions.c << EOF
+@@ -1399,3 +1399,7 @@
+        // Then simply make the specified new directory
++#ifdef _WIN32
++       err = mkdir(dirname);
++#else
+        err = mkdir(dirname, 0644);
++#endif
+        if (err < 0)
+EOF
+# fix src/Makefile (version >= master)
+patch -ulbf src/Makefile << EOF
+@@ -16,3 +16,3 @@
+ else
+-       \$(CC) -o \$(EXECUTABLE_DIRECTORY)/\$@ -pthread \$(SERVER_OBJECTS)
++       \$(CC) -o \$(EXECUTABLE_DIRECTORY)/\$@ -pthread \$(SERVER_OBJECTS) \$(LDFLAGS)
+ endif
+EOF
+wl-showstatus build &&
+ make -Csrc CC="${CC:-gcc} -I$PWD/winfix" LDFLAGS="-s -Wl,--as-needed -lws2_32 -Wl,--allow-multiple-definition" &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FTPServer-$VERSION
+
+
+
