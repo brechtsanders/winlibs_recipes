@@ -1,6 +1,6 @@
 export NAME="MIT Kerberos for Windows"
 export STATUS=
-export URL=http://web.mit.edu/kerberos/dist/#kfw-3.2
+export URL=http://web.mit.edu/kerberos/dist/
 export BASENAME=kfw
 export DESCRIPTION="MIT Kerberos for Windows (KfW) is an integrated Kerberos release for Microsoft Windows operating systems. It includes the Kerberos v4 library, Kerberos v5 library version 1.6.3, Kerberos v5 GSS API library, Kerberos 524 library, KClient API library, Leash API library, Network Identity Manager, the kinit, klist, kdestroy, krb524init, ms2mit, aklog command-line credentials managers, and an in-memory credentials cache."
 export CATEGORY=security
@@ -13,7 +13,7 @@ export VERSION=4.1
 export VERSIONDATE=20160704
 ####configure: error: cannot find res_nsearch or res_search
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=libdl
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -31,23 +31,52 @@ wl-showstatus extract
 #cd kfw-$(echo $VERSION|tr . -)-final/src
 unzip -oq $TARBALLDIR/$BASENAME/kfw-$VERSION-src.zip
 cd kfw-$VERSION/src
+# fix util/support/threads.c (version >= 4.1)
+patch -ulbf util/support/threads.c << EOF
+@@ -47,2 +47,3 @@
+ #elif defined(_WIN32)
++#include <windows.h>
 
+EOF
+# fix ./util/support/plugins.c (version >= 4.1)
+patch -ulbf ./util/support/plugins.c << EOF
+@@ -89,3 +89,3 @@
+
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+ struct dirent {
+@@ -335,2 +335,6 @@
+     void *sym = NULL;
++#ifdef _WIN32
++    LPVOID lpMsgBuf;
++    DWORD dw;
++#endif
+
+@@ -353,5 +357,2 @@
+ #ifdef _WIN32
+-    LPVOID lpMsgBuf;
+-    DWORD dw;
+-
+     if (!err && !sym && (h->hinstPlugin != NULL)) {
+EOF
 wl-showstatus preconfigure &&
  mkdir -p m4 &&
- autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ autoreconf-2.69 -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  # avoid detection of missing res_search
  sed -i.bak -e "s/as_fn_error\(.*cannot find res_nsearch or res_search\)/echo\1/" configure &&
  # allow building shared libraries
  sed -i.bak2 -e "s/as_fn_error\(.*Shared libraries are not yet supported on this platform\)/echo\1/" configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --with-ldap &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-rpath --with-ldap CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ## fix detection of shared libraries
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
- #wl-showstatus build &&
- #make &&
+ wl-showstatus build &&
+ make SHLIBSEXT=.dll DEPLIBEXT=.a &&
+ #WHAT=windows 
  wl-showstatus build-install &&
  make install-strip &&
     echo OK
