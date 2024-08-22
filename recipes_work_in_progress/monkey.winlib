@@ -47,15 +47,20 @@ patch -ulbf mk_core/deps/libevent/evdns.c << EOF
 +char *
  strtok_r(char *s, const char *delim, char **state) {
 EOF
-# fix plugins/mandril/mandril.c (version >= 1.7.5)
+# fix plugins/mandril/mandril.c (version >= 1.8.0)
 patch -ulbf plugins/mandril/mandril.c << EOF
-@@ -25,2 +25,5 @@
- /* system */
+@@ -21,2 +21,6 @@
+ /* Monkey API */
 +#ifdef _WIN32
 +#include <winsock2.h>
-+#else
++inline int inet_aton (const char* cp, struct in_addr* addr) { return ((addr->s_addr = inet_addr(cp)) == INADDR_NONE ? 0 : 1); }
++#endif
+ #include <monkey/mk_api.h>
+@@ -25,2 +29,3 @@
+ /* system */
++#ifndef _WIN32
  #include <sys/socket.h>
-@@ -28,2 +31,3 @@
+@@ -28,2 +33,3 @@
  #include <arpa/inet.h>
 +#endif
  #include <sys/stat.h>
@@ -124,6 +129,130 @@ patch -ulbf plugins/dirlisting/dirlisting.c << EOF
 +#include "../../include/monkey/mk_core/external/dirent.h"
  #include <sys/stat.h>
 EOF
+# fix plugins/dirlisting/dirlisting.c (version >= 1.8.0)
+patch -ulbf plugins/dirlisting/dirlisting.c << EOF
+@@ -33,3 +33,7 @@
+ #include <time.h>
++#ifdef _WIN32
++#include <windows.h>
++#else
+ #include <dirent.h>
++#endif
+ #include <sys/stat.h>
+@@ -95,3 +99,7 @@
+
++#ifdef _WIN32
++    if (type & FILE_ATTRIBUTE_DIRECTORY == 0) {
++#else
+     if (type != DT_DIR) {
++#endif
+         mk_dirhtml_human_readable_size(entry->size,
+@@ -115,3 +123,8 @@
+     struct mk_list *list;
++#ifdef _WIN32
++    WIN32_FIND_DATAA ent;
++    HANDLE dirhandle;
++#else
+     struct dirent *ent;
++#endif
+     struct mk_f_list *entry = 0;
+@@ -121,2 +134,19 @@
+
++#ifdef _WIN32
++    if ((dirhandle = FindFirstFileA(dir, &ent)) != INVALID_HANDLE_VALUE) {
++      do {
++        if ((ent.cFileName[0] == '.') && (strcmp(ent.cFileName, "..") != 0))
++            continue;
++
++        snprintf(full_path, PATH_MAX, "%s%s", path, ent.cFileName);
++        entry = mk_dirhtml_create_element(ent.cFileName,
++                                          ent.dwFileAttributes, full_path, list_len);
++        if (!entry) {
++            continue;
++        }
++
++        mk_list_add(&entry->_head, list);
++      } while (FindNextFileA(dirhandle, &ent));
++    }
++#else
+     while ((ent = readdir(dir)) != NULL) {
+@@ -140,2 +170,3 @@
+     }
++#endif
+
+@@ -555,3 +586,7 @@
+     /* %_target_title_% */
++#ifdef _WIN32
++    if (request->toc[i]->type & FILE_ATTRIBUTE_DIRECTORY != 0) {
++#else
+     if (request->toc[i]->type == DT_DIR) {
++#endif
+         sep = mk_dir_iov_slash;
+EOF
+# fix include/monkey/mk_thread_libco.h (version >= 1.8.0)
+sed -i.bak -e "s/^static \(MK_INLINE\)/\1/" include/monkey/mk_thread_libco.h include/monkey/mk_http_thread.h
+# fix mk_bin/monkey.c (version >= 1.8.0)
+patch -ulbf mk_bin/monkey.c << EOF
+@@ -292,2 +292,3 @@
+     /* Running Monkey as daemon */
++#ifndef _WIN32
+     if (server->is_daemon == MK_TRUE) {
+@@ -295,2 +296,3 @@
+     }
++#endif
+
+@@ -310,3 +312,5 @@
+     /* Register PID of Monkey */
++#ifndef _WIN32
+     mk_utils_register_pid(server->path_conf_pidfile);
++#endif
+
+@@ -322,2 +326,3 @@
+     /* Hang here, basically do nothing as threads are doing the job. */
++#ifndef _WIN32
+     sigset_t mask;
+@@ -325,2 +330,3 @@
+     sigsuspend(&mask);
++#endif
+
+EOF
+# fix mk_bin/mk_signals.c (version >= 1.8.0)
+patch -ulbf mk_bin/mk_signals.c << EOF
+@@ -26,3 +26,5 @@
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <sys/wait.h>
++#endif
+
+@@ -39,2 +41,3 @@
+ {
++#ifndef _WIN32
+     /* ignore future signals to properly handle the cleanup */
+@@ -49,2 +52,3 @@
+     mk_info("Exiting... >:(");
++#endif
+     _exit(EXIT_SUCCESS);
+@@ -52,2 +56,3 @@
+
++#ifndef _WIN32
+ static void mk_signal_handler(int signo, siginfo_t *si, void *context UNUSED_PARAM)
+@@ -85,2 +90,3 @@
+ }
++#endif
+
+@@ -88,2 +94,3 @@
+ {
++#ifndef _WIN32
+     struct sigaction act;
+@@ -102,2 +109,3 @@
+     mk_signal_context(context);
++#endif
+ }
+EOF
+# fix undefined realpath in mk_core/mk_rconf.c (version >= 1.8.0)
+mv mk_core/mk_rconf.c mk_core/mk_rconf.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > mk_core/mk_rconf.c &&
+cat mk_core/mk_rconf.c.bak >> mk_core/mk_rconf.c
 
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
 mkdir -p build_win &&
@@ -145,8 +274,8 @@ mkdir -p build_win &&
 # cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
 # ## fix execution of Python scripts
 # #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
-# ## fix missing link libraries
-# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
+# # fix missing link libraries
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
 # #wl-showstatus build &&
 # #ninja -Cbuild_static &&
 # #wl-showstatus build &&
