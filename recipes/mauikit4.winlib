@@ -1,0 +1,104 @@
+export NAME="MauiKit 4"
+export STATUS=
+export URL=https://mauikit.org/
+export BASENAME=mauikit4
+export DESCRIPTION="MauiKit is a set of templated controls and tools based on QQC2 and Kirigami shared among the Maui set of applications. MauiKit helps to quickly build UIs that follow the Maui HIG and bring ready-to-go tools for different platforms, such as Android and Linux."
+export CATEGORY=
+export TYPE=library
+export VERSION=4.0.0
+export VERSIONDATE=20240830
+wl-showstatus --package-version
+export DEPENDENCIES=gettext,qt6,libkf6i18n,libkf6coreaddons,libkf6notifications,mauiman4
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=extra-cmake-modules,cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSES/LGPL-3.0.txt
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://invent.kde.org/maui/mauikit/-/tags mauikit-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://invent.kde.org/maui/mauikit/-/archive/v$VERSION/mauikit-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/mauikit-v$VERSION.tar.bz2
+cd mauikit-v$VERSION
+## fix src/mauikit.cpp (version >= 2.0.2)
+#patch -ulbf src/mauikit.cpp << EOF
+#@@ -37,4 +37,6 @@
+#
+#+#if defined Q_OS_LINUX || defined Q_OS_LINUX
+# #include "shadowhelper/windowshadow.h"
+# #include "blurhelper/windowblur.h"
+#+#endif
+#
+#@@ -201,4 +203,6 @@
+#
+#+#if defined Q_OS_LINUX || defined Q_OS_LINUX
+#     qmlRegisterType<WindowShadow>(uri, 1, 0, "WindowShadow");
+#     qmlRegisterType<WindowBlur>(uri, 1, 0, "WindowBlur");
+#+#endif
+#
+#EOF
+## fix missing darkModeEnabled() in src/platforms/windows/mauiwindows.h (version >= 2.1.1)
+#patch -ulbf src/platforms/windows/mauiwindows.h << EOF
+#@@ -18,2 +18,3 @@
+#     void notify(const QString &title, const QString &message, const QString &icon, const QString &imageUrl) override final;
+#+    bool darkModeEnabled();
+# };
+#EOF
+## fix missing darkModeEnabled() in src/platforms/windows/mauiwindows.cpp (version >= 2.1.1)
+#patch -ulbf src/platforms/windows/mauiwindows.cpp << EOF
+#@@ -29 +29,6 @@
+# }
+#+
+#+bool MAUIWindows::darkModeEnabled()
+#+{
+#+    return false;
+#+}
+#EOF
+## fix src/CMakeLists.txt (version >= 3.1.0)
+#patch -ulbf src/CMakeLists.txt << EOF
+#@@ -105,2 +105,3 @@
+#
+#+    platforms/windows/mauiwindows.cpp
+#     assets.qrc)
+#EOF
+## fix missing QDBusInterface in src/CMakeLists.txt (version >= 4.0.0)
+#sed -i.bak -e "s/#if \!defined Q_OS_ANDROID/& \&\& \!defined _WIN32/" lib/src/modules/inputdevicesmanager.cpp lib/src/modules/backgroundmanager.cpp lib/src/modules/screenmanager.cpp lib/src/modules/accessibilitymanager.cpp lib/src/modules/thememanager.h lib/src/modules/thememanager.cpp
+# fix missing implementation of darkModeEnabled() in src/platforms/windows/mauiwindows.h and src/platforms/windows/mauiwindows.cpp (version >= 4.0.0)
+patch -ulbf src/platforms/windows/mauiwindows.h << EOF
+@@ -18,2 +18,3 @@
+     void notify(const QString &title, const QString &message, const QString &icon, const QString &imageUrl) override final;
++    bool darkModeEnabled();
+ };
+EOF
+cat >> src/platforms/windows/mauiwindows.cpp << EOF
+
+bool MAUIWindows::darkModeEnabled()
+{
+    return false;
+}
+EOF
+# fix missing target sources (version >= 4.0.0)
+echo 'target_sources(MauiKit${MAUI_MAJOR_VERSION} PRIVATE ${mauikit_PLATFORM_SRCS})' >> src/CMakeLists.txt
+## fix to also build static library
+#sed -i.bak "s/^\s*SHARED\s*$//" src/CMakeLists.txt
+mkdir -p build_static build_shared &&
+ #wl-showstatus configure &&
+ #PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUNDLE_LUV_ICONS:BOOL=OFF -DBUILD_DEMO:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/qt6/include/QtDBus -DQT_STATIC" -S. -Bbuild_static &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s?^\s*LINK_LIBRARIES\s*=.*\$?& -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX/qt6/lib_static) -lQt6DBus?" build_static/build.ninja &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUNDLE_LUV_ICONS:BOOL=OFF -DBUILD_DEMO:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/qt6/include/QtDBus" -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s?^\s*LINK_LIBRARIES\s*=.*\$?& -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX/qt6/lib) -lQt6DBus?" build_shared/build.ninja &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mauikit-v$VERSION
+####Note: pulls in https://github.com/Nitrux/luv-icon-theme
+
+
+

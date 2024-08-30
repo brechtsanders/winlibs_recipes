@@ -1,0 +1,45 @@
+export NAME="maui-shelf 4"
+export STATUS=
+export URL=https://github.com/KDE/maui-shelf
+export BASENAME=maui-shelf4
+export DESCRIPTION="Document and EBook collection manager"
+export CATEGORY=office
+export TYPE=application
+export VERSION=4.0.0
+export VERSIONDATE=20240830
+wl-showstatus --package-version
+export DEPENDENCIES=gettext,qt,libkf6i18n,libkf6coreaddons,mauikit-filebrowsing4,mauikit-documents4
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=extra-cmake-modules,cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/KDE/maui-shelf/tags maui-shelf-v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/KDE/maui-shelf/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd maui-shelf-$VERSION
+sed -i.bak -e "s/\(if(\)\(UNIX\)\( AND NOT APPLE AND NOT ANDROID)\)/\1(\2 OR MINGW)\3/" CMakeLists.txt src/CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/qt6/include/QtWidgets" -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s?^\s*LINK_LIBRARIES\s*=.*?& -Wl,--as-needed -lpoppler-qt5 -L$(cygpath -m $MINGWPREFIX/qt6/lib) -lQt6Widgets?" build_win/build.ninja &&
+ # fix undefined QVariant
+ ninja -Cbuild_win src/shelf_autogen/mocs_compilation.cpp &&
+ mv build_win/src/shelf_autogen/mocs_compilation.cpp build_win/src/shelf_autogen/mocs_compilation.cpp.bak &&
+ echo "#include <QtCore/qvariant.h>" > build_win/src/shelf_autogen/mocs_compilation.cpp &&
+ cat build_win/src/shelf_autogen/mocs_compilation.cpp.bak >> build_win/src/shelf_autogen/mocs_compilation.cpp &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ #PATH=$PATH:$MINGWPREFIX/qt6/bin build_win/bin/shelf.exe
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf maui-shelf-$VERSION
+####PATH=$PATH:$MINGWPREFIX/qt6/bin shelf.exe
+####TO DO: executable fails
+
+
+

@@ -1,0 +1,49 @@
+export NAME="MauiMan 4"
+export STATUS=
+export URL=https://invent.kde.org/maui/mauiman
+export BASENAME=mauiman4
+export DESCRIPTION="Maui Manager Library. Server and public library API."
+export CATEGORY=
+export TYPE=library
+export VERSION=4.0.0
+export VERSIONDATE=20240830
+wl-showstatus --package-version
+export DEPENDENCIES=qt6
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja,extra-cmake-modules
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://invent.kde.org/maui/mauiman/-/tags mauiman-v"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://invent.kde.org/maui/mauiman/-/archive/v$VERSION/mauiman-v$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/mauiman-v$VERSION.tar.bz2
+cd mauiman-v$VERSION
+# fix undefined MauiManUtils in lib/src/modules/accessibilitymanager.cpp (version >= 4.0.0)
+mv lib/src/modules/accessibilitymanager.cpp lib/src/modules/accessibilitymanager.cpp.bak &&
+echo '#include "../mauimanutils.h"' > lib/src/modules/accessibilitymanager.cpp &&
+cat lib/src/modules/accessibilitymanager.cpp.bak >> lib/src/modules/accessibilitymanager.cpp
+# fix missing QtSystemInfo/qinputinfo.h in lib/src/modules/formfactormanager.cpp (version >= 1.0.2)
+sed -i.bak -e "s/#if \!defined Q_OS_ANDROID/& \&\& \!defined __MINGW32__/" lib/src/modules/formfactormanager.cpp
+mkdir -p build_static build_shared &&
+ #wl-showstatus configure &&
+ #PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/qt6/include/QtDBus -DQT_STATIC" -S. -Bbuild_static &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s?^\s*LINK_LIBRARIES\s*=.*\$?& -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX/qt6/lib_static) -lQt6DBus -lQt6Core -lsicuin -ldbus-1 -lws2_32?" build_static/build.ninja &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/qt6/include/QtDBus" -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s?^\s*LINK_LIBRARIES\s*=.*\$?& -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX/qt6/lib) -lQt6DBus?" build_shared/build.ninja &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf mauiman-v$VERSION
+####TO DO: also build shared library
+
+
+
