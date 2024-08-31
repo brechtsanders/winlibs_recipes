@@ -11,17 +11,17 @@ export TYPE=library
 #export VERSIONDATE=20230101
 #export VERSION=1.10.3
 #export VERSIONDATE=20230113
-export VERSION=1.10.4
-export VERSIONDATE=20230408
-#export VERSION=1.10.5
-#export VERSIONDATE=20240831
+#export VERSION=1.10.4
+#export VERSIONDATE=20230408
+export VERSION=1.10.5
+export VERSIONDATE=20240831
 ####No supported packet capture interface was found.
 ####In order to build a version of libpcap that supports packet capture on Windows, you will need to install Npcap and the Npcap SDK, or WinPcap and the WinPcap SDK, and run cmake with -DPacket_ROOT={path of SDK},
 ####where {path of SDK} is the path name of the top-level directory of the SDK.
 ####That argument may have to be quoted if the path contains blanks.
 ####If you want a libpcap that cannot capture packets but that can read pcap and pcapng files, run cmake with -DPCAP_TYPE=null.
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=winpcap
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -59,12 +59,23 @@ cd libpcap-libpcap-$VERSION
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libpcap-libpcap-$VERSION
 # disable use of symbolic links in CMakeLists.txt (version >= 1.10.2)
 sed -i.bak2 "s/^add_subdirectory(testprogs)/#&/" CMakeLists.txt
+# fix CMakeLists.txt (version >= 1.10.5)
+patch -ulbf CMakeLists.txt << EOF
+@@ -588,2 +588,7 @@
+     find_package(Packet)
++    if(NOT Packet_FOUND)
++        set(Packet_INCLUDE_DIRS "$(cygpath -m $MINGWPREFIX)/share/winpcap/include/pcap")
++        set(Packet_LIBRARIES "$(cygpath -m $MINGWPREFIX)/share/winpcap/lib/libpacket.dll.a")
++        set(Packet_FOUND TRUE)
++    endif()
+     if(Packet_FOUND)
+EOF
 mkdir -p build_static build_shared &&
  #wl-showstatus configure &&
- #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_STATIC_RT:BOOL=ON -DDISABLE_DPDK:BOOL=ON -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_STATIC_RT:BOOL=ON -DDISABLE_DPDK:BOOL=ON -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" -S. -Bbuild_static &&
  ##-DPCAP_TYPE:STRING=npf 
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_STATIC_RT:BOOL=OFF -DDISABLE_DPDK:BOOL=ON -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DUSE_STATIC_RT:BOOL=OFF -DDISABLE_DPDK:BOOL=ON -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" -S. -Bbuild_shared &&
  #wl-showstatus build-install &&
  #ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
