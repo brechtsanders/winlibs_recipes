@@ -23,21 +23,38 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix libsigcomp/src/libsigcomp_config.h (version >= master)
+patch -ulbf libsigcomp/src/libsigcomp_config.h << EOF
+@@ -38,3 +38,3 @@
+
+-#if defined(LIBSIGCOMP_EXPORTS)
++#if defined(LIBSIGCOMP_EXPORTS) || (defined(BUILDING_LIBSIGCOMP) && defined(DLL_EXPORT))
+ #      if defined(WIN32) || defined(__SYMBIAN32__)
+@@ -47,3 +47,3 @@
+ #else
+-#      if defined(WIN32) || defined(__SYMBIAN32__)
++#      if (defined(WIN32) || defined(__SYMBIAN32__)) && !defined(BUILDING_LIBSIGCOMP) && !defined(STATIC_LIBSIGCOMP) && !defined(STATIC)
+ #              define LIBSIGCOMP_API __declspec(dllimport)
+EOF
 # fix missing files
 cp -f COPYING libsigcomp/
 touch libsigcomp/AUTHORS libsigcomp/ChangeLog libsigcomp/INSTALL libsigcomp/NEWS libsigcomp/README
+## fix libsigcomp/configure.in (version >= master)
 #mv libsigcomp/configure.in libsigcomp/configure.in.bak &&
-#echo "LT_INIT()" > libsigcomp/configure.in &&
+#echo "AC_PROG_LIBTOOL" > libsigcomp/configure.in &&
+#echo "AC_LIBTOOL_WIN32_DLL" >> libsigcomp/configure.in &&
 #cat libsigcomp/configure.in.bak >> libsigcomp/configure.in
-#mv libsigcomp/configure.in libsigcomp/configure.ac
 wl-showstatus preconfigure &&
  mkdir -p libsigcomp/m4 &&
  cd libsigcomp &&
- #libtoolize -f -i -c &&
+ libtoolize -f -i -c &&
+ # enable building shared libraries (.dll)
+ sed -i.bak -e "s/^AM_INIT_AUTOMAKE/LT_INIT([win32-dll])\n&/" configure.in &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  cd .. &&
  wl-showstatus configure &&
- libsigcomp/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32thread CFLAGS="-DWIN32 -DLIBSIGCOMP_EXPORTS" CXXFLAGS="-DWIN32 -DLIBSIGCOMP_EXPORTS" &&
+ #libsigcomp/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32thread CFLAGS="-DWIN32 -DLIBSIGCOMP_EXPORTS" CXXFLAGS="-DWIN32 -DLIBSIGCOMP_EXPORTS" &&
+ libsigcomp/configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-win32thread CFLAGS="-DBUILDING_LIBSIGCOMP" CXXFLAGS="-DBUILDING_LIBSIGCOMP" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ## fix detection of shared libraries
