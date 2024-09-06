@@ -203,8 +203,11 @@ export TYPE=application
 #export VERSIONDATE=20240614
 #export VERSION=1.80.0
 #export VERSIONDATE=20240726
-export VERSION=1.80.1
-export VERSIONDATE=20240905
+#export VERSION=1.80.1
+#export VERSIONDATE=20240905
+export VERSION=1.81.0
+export VERSIONDATE=20240906
+####Exception: no cargo executable found at prebuilt/bin/cargo
 wl-showstatus --package-version
 export DEPENDENCIES=libiconv
 export OPTIONALDEPENDENCIES=
@@ -213,26 +216,31 @@ export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE-MIT
 export LICENSETYPE="Apache/MIT"
 #export DOWNLOADURL="https://www.rust-lang.org/downloads.html rustc- -src.tar.gz"
-export DOWNLOADURL="https://github.com/rust-lang/rust/releases"
-#export DOWNLOADURL="https://forge.rust-lang.org/infra/other-installation-methods.html rustc- -src.tar.gz"
+#export DOWNLOADURL="https://github.com/rust-lang/rust/releases"
+export DOWNLOADURL="https://forge.rust-lang.org/infra/other-installation-methods.html rustc- -src.tar.gz"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/rust-lang/rust/archive/refs/tags/$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=https://static.rust-lang.org/dist/rustc-$VERSION-src.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/rust-lang/rust/archive/refs/tags/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://static.rust-lang.org/dist/rustc-$VERSION-src.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 #cd rustc-$VERSION
-cd rust-$VERSION
-#tar xz --force-local -f $TARBALLDIR/$BASENAME/rustc-$VERSION-src.tar.gz
-#cd rustc-$VERSION-src
+#cd rust-$VERSION
+tar xz --force-local -f $TARBALLDIR/$BASENAME/rustc-$VERSION-src.tar.gz
+cd rustc-$VERSION-src
+## download prebuilt version
+#mkdir -p prebuilt/download
+#wl-download -v -d prebuilt/download $(sed -ne "s?^\s*\"\(.*\-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu\.tar\.xz\)\".*\$?$(sed -ne "s/^\s*\"dist_server\": \"\(.*\)\".*$/\1/p" src/stage0.json)/\1?p" src/stage0.json)
+#for F in prebuilt/download/*.tar.xz; do
+# tar xfJ $F -Cprebuilt --strip-components=2
+#done
 # download prebuilt version
 mkdir -p prebuilt/download
-wl-download -v -d prebuilt/download $(sed -ne "s?^\s*\"\(.*\-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu\.tar\.xz\)\".*\$?$(sed -ne "s/^\s*\"dist_server\": \"\(.*\)\".*$/\1/p" src/stage0.json)/\1?p" src/stage0.json)
-for F in prebuilt/download/*.tar.xz; do
- tar xfJ $F -Cprebuilt --strip-components=2
-done
+wl-download -v -d $TARBALLDIR/$BASENAME https://static.rust-lang.org/dist/rust-$VERSION-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu.tar.xz
+tar xfJ $TARBALLDIR/$BASENAME/rust-$VERSION-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu.tar.xz -Cprebuilt --strip-components=2
+mv prebuilt/bin/cargo.exe prebuilt/bin/cargo
 ## fix .exe issue
 #mkdir prebuilt/bin/stripexe
 #mv prebuilt/bin/*.exe prebuilt/bin/stripexe/
@@ -286,6 +294,7 @@ patch -ulbf src/bootstrap/configure.py << EOF
 +        set('target.{}.llvm-config'.format(build()), value + '/bin/llvm-config' + exe_suffix())
      elif option.name == 'llvm-config':
 EOF
+sed -i.bak "s/^exec python\b/&.exe/" configure
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --python=$PYDIR/python.exe &&
  #./configure --prefix=$INSTALLPREFIX --python=$PYDIR/python.exe --disable-clang &&
@@ -297,6 +306,7 @@ wl-showstatus configure &&
  #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --enable-use-libcxx --disable-debug --disable-docs --python=$PYDIR/python.exe &&
  #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$TARGETPLATFORM --disable-debug --disable-llvm-assertions --disable-docs --python=$PYDIR/python.exe &&
  #MSYS2_ARG_CONV_EXCL="--prefix;--sysconfdir;--localstatedir" GIT_DIR=/dev/null $PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --target=$TARGETPLATFORM --sysconfdir=$INSTALLPREFIX/etc --localstatedir=$INSTALLPREFIX/var/lib --enable-ninja --disable-debug --disable-llvm-assertions --disable-docs --enable-local-rust --local-rust-root=$PWD/prebuilt --python=$PYDIR/python.exe &&
+ #PATH=$PYDIR:$PATH \
  MSYS2_ARG_CONV_EXCL="--prefix;--sysconfdir;--localstatedir" GIT_DIR=/dev/null $PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --build=$(echo $BUILDPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --host=$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --target=$(echo $TARGETPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --sysconfdir=$INSTALLPREFIX/etc --localstatedir=$INSTALLPREFIX/var/lib --enable-ninja --disable-debug --disable-llvm-assertions --disable-docs --enable-local-rust --local-rust-root=$PWD/prebuilt --python=$PYDIR/python.exe &&
  #--enable-extended 
  #--enable-use-libcxx 
