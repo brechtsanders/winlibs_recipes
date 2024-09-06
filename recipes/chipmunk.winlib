@@ -42,10 +42,21 @@ sed -e "s?\(#include <sys/sysctl.h>\)?//\1?" src/cpHastySpace.c.bak > src/cpHast
 for F in $(grep -l GL/glfw\.h demo/*.c); do
  sed -i.orig -e "s?GL/glfw\.h?GLFW/glfw3.h?" $F
 done
+# fix missing __declspec(dllimport) in include/chipmunk/chipmunk.h (version >= 7.0.3)
+####Bug reported here: https://github.com/slembcke/Chipmunk2D/pull/252
+patch -ulbf include/chipmunk/chipmunk.h << EOF
+@@ -38,3 +38,7 @@
+ #ifdef _WIN32
++    #ifdef chipmunk_EXPORTS
+        #define CP_EXPORT __declspec(dllexport)
++    #else
++       #define CP_EXPORT __declspec(dllimport)
++    #endif
+ #else
+EOF
 wl-showstatus configure &&
-cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED:BOOL=ON -DBUILD_STATIC:BOOL=ON -DINSTALL_STATIC:BOOL=ON -DINSTALL_DEMOS:BOOL=OFF -DGLEW_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DGLEW_LIBRARIES:FILEPATH=$MINGWPREFIX/bin/glew32.dll -DGLFW_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DGLFW_LIBRARIES:FILEPATH=$MINGWPREFIX/bin/glfw.dll . &&
- mv src/CMakeFiles/chipmunk.dir/linklibs.rsp src/CMakeFiles/chipmunk.dir/linklibs.rsp.bak &&
- sed -e "s/\(-ladvapi32\)/\1 -Wl,--as-needed -lpthread/" src/CMakeFiles/chipmunk.dir/linklibs.rsp.bak > src/CMakeFiles/chipmunk.dir/linklibs.rsp &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED:BOOL=ON -DBUILD_STATIC:BOOL=ON -DINSTALL_STATIC:BOOL=ON -DINSTALL_DEMOS:BOOL=OFF -DGLEW_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DGLEW_LIBRARIES:FILEPATH=$MINGWPREFIX/bin/glew32.dll -DGLFW_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DGLFW_LIBRARIES:FILEPATH=$MINGWPREFIX/bin/glfw.dll . &&
+ sed -i.bak -e "s/\(-ladvapi32\)/\1 -Wl,--as-needed -lpthread/" src/CMakeFiles/chipmunk.dir/linklibs.rsp &&
  wl-showstatus build-install &&
  ( make install/strip || ( make -i install/strip && ls -1 $INSTALLPREFIX/lib/libchipmunk.a &> /dev/null )) &&
  #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Chipmunk-$VERSION
