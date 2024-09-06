@@ -1,0 +1,87 @@
+export NAME="sparkey"
+export STATUS=
+export URL=https://github.com/spotify/sparkey
+export BASENAME=sparkey
+export DESCRIPTION="Simple constant key/value storage library, for read-heavy systems with infrequent large bulk inserts."
+export CATEGORY=database
+export TYPE=library
+export VERSION=1.0.0
+export VERSIONDATE=20240906
+wl-showstatus --package-version
+export DEPENDENCIES=mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/spotify/sparkey/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/spotify/sparkey/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd sparkey-sparkey-$VERSION
+# fix missing byteswap.h in src/endiantools.c (version >= 1.0.0)
+patch -ulbf src/endiantools.c << EOF
+@@ -21,2 +21,15 @@
+ #define bswap_64 OSSwapInt64
++#elif defined(_WIN32)
++#define bswap_32(x) (((x) << 24)   & 0xFF000000) \\
++                    | (((x) << 8)  & 0x00FF0000) \\
++                    | (((x) >> 8)  & 0x0000FF00) \\
++                    | (((x) >> 24) & 0x000000FF )
++#define bswap_64(x) ((((x)  & 0xFF00000000000000ULL) >> 56) \\
++                    | (((x) & 0X00FF000000000000ULL) >> 40) \\
++                    | (((x) & 0X0000FF0000000000ULL) >> 24) \\
++                    | (((x) & 0X000000FF00000000ULL) >> 8) \\
++                    | (((x) & 0X00000000FF000000ULL) << 8) \\
++                    | (((x) & 0X0000000000FF0000ULL) << 24) \\
++                    | (((x) & 0X000000000000FF00ULL) << 40) \\
++                    | (((x) & 0X00000000000000FFULL) << 56))
+ #else
+EOF
+# fix undefined DT_DIR/DT_REG in src/bench.c (version >= 1.0.0)
+patch -ulbf src/bench.c << EOF
+@@ -44,5 +44,15 @@
+          strcmp(d->d_name, "..")) {
+-        if (d->d_type == DT_DIR) {
++#ifdef _WIN32
++        struct stat statbuf;
++       stat(dir, &statbuf);
++       if (S_ISDIR(statbuf.st_mode)) {
++#else
++       if (d->d_type == DT_DIR) {
++#endif
+           rm_rec(subdir);
++#ifdef _WIN32
++        } else if (S_ISREG(statbuf.st_mode)) {
++#else
+         } else if (d->d_type == DT_REG) {
++#endif
+           remove(subdir);
+EOF
+# skip building benchmark
+sed -i.bak -e "s/\(bin_PROGRAMS\s*=.*\)\bbench\b/\1/; s/^bench_SOURCES\s*=/#&/" src/Makefile.am
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ # don't abort when -lrt test fails
+ sed -i.bak -e "s/as_fn_error\(.*Could not find rt\)/echo\1/" configure &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -lmman" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build &&
+ ( make || make CFLAGS="-O3 -I$MINGWPREFIX/include/mman-win32" ) &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #rm -f $INSTALLPREFIX/bin/bench.exe &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf sparkey-sparkey-$VERSION
+####Note: benchmark fails
+
+
+
