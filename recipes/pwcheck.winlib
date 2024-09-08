@@ -1,0 +1,44 @@
+export NAME="pwcheck"
+export STATUS=
+export URL=https://github.com/skeeto/pwcheck
+export BASENAME=pwcheck
+export DESCRIPTION="Database Lookup for \"Have I Been Pwned\""
+export CATEGORY=security
+export TYPE=library,application
+export VERSION=master
+export VERSIONDATE=20240908
+wl-showstatus --package-version
+export DEPENDENCIES=mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=UNLICENSE
+export LICENSETYPE=Unlicense
+export DOWNLOADURL="https://github.com/skeeto/pwcheck/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/skeeto/pwcheck/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+wl-showstatus build &&
+ ${CC:-gcc} -c -o pwcheck.o pwcheck.c -I. -I$MINGWPREFIX/include/mman-win32 -O3 &&
+ ${CC:-gcc} -c -o sha1.o sha1.c -I. -O3 &&
+ ${CC:-gcc} -c -o pwcheck_cmd.o pwcheck.c -I. -I$MINGWPREFIX/include/mman-win32 -O3 -DCMDLINE &&
+ ${CC:-gcc} -o pwcheck.exe pwcheck_cmd.o sha1.o -s -Wl,--as-needed -lmman &&
+ ${CC:-gcc} -c -o compact.o compact.c -I. -O3 &&
+ ${CC:-gcc} -o pwcompact.exe compact.o -s &&
+ ${AR:-ar} cru libpwcheck.a pwcheck.o sha1.o &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libpwcheck.a | sed -n -e "s/^\(pwcheck_[^ ]*\) T .*$/\1/p" ) > pwcheck.def &&
+ ${CC:-gcc} -shared -s -mwindows -def pwcheck.def -o pwcheck.dll libpwcheck.a -Wl,--out-implib,libpwcheck.dll.a -Wl,--as-needed -lmman &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
