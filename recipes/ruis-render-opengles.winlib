@@ -30,7 +30,7 @@ export TYPE=library
 export VERSION=0.1.65
 export VERSIONDATE=20240910
 wl-showstatus --package-version
-export DEPENDENCIES=ruis,khronos-opengl-registry,freeglut
+export DEPENDENCIES=ruis,khronos-opengl-registry,libglvnd
 #export DEPENDENCIES=ruis,angle
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=prorab,prorab-extra
@@ -46,15 +46,32 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-echo "#include <GL/gl.h>" >> src/ruis/render/opengles/util.hpp
-echo "#include <GL/glext.h>" >> src/ruis/render/opengles/util.hpp
+# fix undefined utki::log() in src/ruis/render/opengles/shader_base.cpp (version >= 0.1.65)
+patch -ulbf src/ruis/render/opengles/shader_base.cpp << EOF
+@@ -67,2 +67,3 @@
+                        assert_opengl_no_error();
++#ifdef DEBUG
+                        utki::log([&](auto& o) {
+@@ -74,2 +75,3 @@
+                        });
++#endif
+                }
+@@ -97,2 +99,3 @@
+                        assert_opengl_no_error();
++#ifdef DEBUG
+                        utki::log([&](auto& o) {
+@@ -100,2 +103,3 @@
+                        });
++#endif
+                }
+EOF
+#echo "#include <GL/gl.h>" >> src/ruis/render/opengles/util.hpp
+#echo "#include <GL/glext.h>" >> src/ruis/render/opengles/util.hpp
 wl-showstatus build &&
  #make -I$MINGWPREFIX/include install this_lint_cmd= CC=${CC:-gcc} CXX=${CXX:-g++} AR=${AR:-ar} CXXFLAGS="-I$MINGWPREFIX/include/khronos" LDFLAGS="-lopengl32" PREFIX=$INSTALLPREFIX &&
  #make -I$MINGWPREFIX/include install this_lint_cmd= CC=${CC:-gcc} CXX="${CXX:-g++} -I$MINGWPREFIX/include/khronos" AR=${AR:-ar} PREFIX=$INSTALLPREFIX &&
- make -I$MINGWPREFIX/include install this_lint_cmd= CC=${CC:-gcc} CXX="${CXX:-g++} -I$MINGWPREFIX/include/khronos -Wno-attributes" AR=${AR:-ar} PREFIX=$INSTALLPREFIX &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####Requires this to work: pkg-config --libs glesv2
+ PKG_CONFIG_PATH=$MINGWPREFIX/share/libglvnd/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} make -I$MINGWPREFIX/include install this_lint_cmd= CC=${CC:-gcc} CXX="${CXX:-g++} -I$MINGWPREFIX/include/khronos -Wno-attributes" AR=${AR:-ar} PREFIX=$INSTALLPREFIX &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 
