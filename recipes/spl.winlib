@@ -1,0 +1,83 @@
+export NAME="Stanford Portable Library (SPL)"
+export STATUS=
+export URL=https://cs50.github.io/spl/
+export BASENAME=spl
+export DESCRIPTION="The cslib package defines a set of interface files that simplify writing C programs, particularly at the novice level."
+export CATEGORY=development
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20240912
+wl-showstatus --package-version
+export DEPENDENCIES=libdl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/cs50/spl/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/cs50/spl/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix c/src/platform.c
+patch -ulbf c/src/platform.c << EOF
+@@ -26,2 +26,3 @@
+ #ifdef _MSC_VER
++#  undef __STDC_HOSTED__
+ #  include <windows.h>
+@@ -136,3 +137,3 @@
+ static void initPipe() {
+-   HANDLE rdtmp, wrtmp;
++   HANDLE hrd, hwr, wrFromJBE;
+    SECURITY_ATTRIBUTES attr;
+@@ -156,3 +157,3 @@
+    }
+-   if (!DuplicateHandle(GetCurrentProcess(), hwr
++   if (!DuplicateHandle(GetCurrentProcess(), hwr,
+                         GetCurrentProcess(), &wrFromJBE,
+@@ -163,9 +164,7 @@
+    if (!CloseHandle(hrd)) error("Can't close temporary read channel");
+-   string cmd = "java -jar spl.jar " + programName;
+-   int n = cmd.length();
+-   char *cmdLine = new char[n + 1];
+-   for (int i = 0; i < n; i++) {
+-      cmdLine[i] = cmd[i];
+-   }
+-   cmdLine[n] = '\\0';
++   static const char *cmd = "java -jar spl.jar ";
++   int n = strlen(cmd) + strlen(programName) + 1;
++   char *cmdLine = (char*)malloc(n + 1);
++   strcpy(cmdLine, cmd);
++   strcat(cmdLine, programName);
+    memset(&pInfo, 0, sizeof(PROCESS_INFORMATION));
+@@ -186,2 +185,3 @@
+    if (!CloseHandle(pInfo.hThread)) error("Can't close hThread");
++   free(cmdLine);
+ }
+EOF
+# use winfile.c instead of unixfile.c
+mv c/src/unixfile.c c/src/unixfile.c.bak &&
+cp c/src/winfile.c c/src/unixfile.c
+# use specified C compiler
+sed -i.bak -e "s/\bgcc\b/\$(CC)/g; s/\bar\b/\$(AR)/g; s/\branlib\b/\$(RANLIB)/g" $(grep -lw "gcc\|ar\|ranlib" $(find -name Makefile))
+# don't build Java
+sed -i.bak2 -e "s/^\(all:.*\)\$(JAR)/\1/" Makefile
+wl-showstatus build &&
+ make CC="${CC:-gcc} -D_MSC_VER=1200 -I$MINGWPREFIX/include/libdl-win32" AR=${AR:-ar} RANLIB=${RANLIB:-ranlib} &&
+ #( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p build/lib/libcs.a | sed -n -e "s/^_\{0,1\}\([^ ]*\) T .*$/\1/p" ) > cs.def &&
+ #${CC:-gcc} -shared -s -mwindows -def cs.def -o cs.dll build/lib/libcs.a -Wl,--out-implib,build/lib/libcs.dll.a -Wl,--as-needed -ldl &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/spl $INSTALLPREFIX/lib &&
+ cp -rf build/include/* $INSTALLPREFIX/include/spl/ &&
+ cp -f build/lib/*.a $INSTALLPREFIX/lib/ &&
+ #mkdir -p $INSTALLPREFIX/bin &&
+ #cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: shared library not possible because the library replaces main()
+
+
+
