@@ -43,11 +43,42 @@ cd $BASENAME-$VERSION
 mkdir -p winfix/sys winfix/netinet winfix/arpa
 echo "#include <winsock2.h>" > winfix/sys/socket.h
 echo "#include <wspiapi.h>" >> winfix/sys/socket.h
-touch winfix/netinet/in.h winfix/netinet/tcp.h winfix/arpa/inet.h winfix/netdb.h winfix/sys/poll.h winfix/sys/wait.h winfix/sys/resource.h
-# fix redefinition of ERROR in include/defines.h
-mv include/defines.h include/defines.h.bak &&
-echo "#undef ERROR" > include/defines.h &&
-cat include/defines.h.bak >> include/defines.h
+echo "#include <ws2tcpip.h>" >> winfix/netinet/ip6.h
+touch winfix/netinet/in.h winfix/netinet/tcp.h winfix/arpa/inet.h winfix/netdb.h winfix/sys/poll.h winfix/sys/wait.h winfix/sys/resource.h winfix/netinet/udp.h
+## fix redefinition of ERROR in include/defines.h
+#mv include/defines.h include/defines.h.bak &&
+#echo "#undef ERROR" > include/defines.h &&
+#cat include/defines.h.bak >> include/defines.h
+# fix include/defines.h (version >= 3.7.3)
+patch -ulbf include/defines.h << EOF
+@@ -1 +1,2 @@
++#undef ERROR
+ /*
+@@ -31,3 +32,6 @@
+
++#ifndef MAX_PATH
+ #define MAX_PATH                   250
++#endif
++#undef ERROR
+
+EOF
+# fix unsupported %zu in src/actions.cpp (version >= 3.7.3)
+patch -ulbf src/actions.cpp << EOF
+@@ -686,4 +686,4 @@
+     if (strlen(P_value) >= sizeof(argument_buf)) {
+-        ERROR("Filename/Pattern keyword %s is too long -- maximum supported length %zu",
+-            P_value, sizeof(argument_buf) - 1);
++        ERROR("Filename/Pattern keyword %s is too long -- maximum supported length %lu",
++            P_value, (unsigned long)sizeof(argument_buf) - 1);
+     }
+@@ -717,4 +717,4 @@
+             if (strlen(found_file) >= sizeof(M_rtpstream_actinfo.filename)) {
+-                ERROR("Filename/Pattern keyword %s is too long -- maximum supported length %zu",
+-                    found_file, sizeof(M_rtpstream_actinfo.filename) - 1);
++                ERROR("Filename/Pattern keyword %s is too long -- maximum supported length %lu",
++                    found_file, (unsigned long)sizeof(M_rtpstream_actinfo.filename) - 1);
+             }
+EOF
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
  ## fix building DLLs
