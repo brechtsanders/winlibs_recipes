@@ -1,3 +1,192 @@
+#export NAME="boringssl"
+#export STATUS=
+#export URL=https://boringssl.googlesource.com/boringssl/
+##export URL=https://github.com/google/boringssl
+#export BASENAME=boringssl
+#export DESCRIPTION="BoringSSL is a fork of OpenSSL that is designed to meet Google's needs."
+#export CATEGORY=security
+#export TYPE=library
+##export VERSION=2214
+##export VERSIONDATE=20180704
+##export VERSION=3359
+##export VERSIONDATE=20180705
+#####Could not find Go
+#export VERSION=3538
+#export VERSIONDATE=20181019
+##export VERSION=3945
+##export VERSIONDATE=20191024
+#####include/openssl/bn.h:156:28: error: expected ')' before 'PRIx64'
+#wl-showstatus --package-version
+#export DEPENDENCIES=go,pthreads
+#export OPTIONALDEPENDENCIES=
+##export BUILDDEPENDENCIES=cmake
+##export OPTIONALBUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=
+#export DOWNLOADURL="https://boringssl.googlesource.com/boringssl/+refs"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://boringssl.googlesource.com/boringssl/+archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#mkdir -p $BASENAME-$VERSION
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz -C$BASENAME-$VERSION
+#cd $BASENAME-$VERSION
+## fix invalid suffix UI64 in crypto/internal.h
+#patch -ulbf crypto/internal.h << EOF
+#@@ -134,3 +134,3 @@
+#
+#-#if defined(OPENSSL_WINDOWS)
+#+#if defined(OPENSSL_WINDOWS) && !defined(__MINGW32__)
+# #define OPENSSL_U64(x) x##UI64
+#
+#EOF
+## fix ssl/d1_lib.c
+#mv ssl/d1_lib.c ssl/d1_lib.c.bak &&
+#echo "#include <winsock2.h>" > ssl/d1_lib.c &&
+#cat ssl/d1_lib.c.bak >> ssl/d1_lib.c
+### fix missing inet_pton in crypto/bio/bio_test.c (version <= 2214)
+##mv crypto/bio/bio_test.c crypto/bio/bio_test.c.bak &&
+##echo "#define _WIN32_WINNT 0x0600" > crypto/bio/bio_test.c &&
+##cat crypto/bio/bio_test.c.bak >> crypto/bio/bio_test.c
+## fix missing inet_pton in crypto/bio/bio_test.cc (version >= 3359)
+#mv crypto/bio/bio_test.cc crypto/bio/bio_test.cc.bak &&
+#echo "#define _WIN32_WINNT 0x0600" > crypto/bio/bio_test.cc &&
+#cat crypto/bio/bio_test.cc.bak >> crypto/bio/bio_test.cc
+## fix missing GetTickCount64 in tool/speed.cc
+#mv tool/speed.cc tool/speed.cc.bak &&
+#echo "#define _WIN32_WINNT 0x0600" > tool/speed.cc &&
+#cat tool/speed.cc.bak >> tool/speed.cc
+## fix redefinition of X509_NAME/X509_CERT_PAIR in include/openssl/x509.h
+#patch -ulf include/openssl/x509.h << EOF
+#@@ -144,2 +144,3 @@
+#
+#+#undef X509_NAME
+# /* we always keep X509_NAMEs in 2 forms. */
+#@@ -163,2 +164,3 @@
+# #define X509_EX_V_INIT                 0x0001
+#+#undef X509_EXTENSIONS
+# typedef struct X509_extension_st
+#@@ -281,2 +283,3 @@
+#
+#+#undef X509_CERT_PAIR
+# typedef struct x509_cert_pair_st {
+#EOF
+## avoid alignas arrors in crypto/cipher_extra/aead_test.cc (version >= 3538)
+#sed -i.bak -e "s/alignas(64) //" crypto/cipher_extra/aead_test.cc
+## avoid alignas arrors in crypto/fipsmodule/ec/p256-x86_64_test.cc (version >= 3538)
+#sed -i.bak -e "s/alignas(64) //" crypto/fipsmodule/ec/p256-x86_64_test.cc
+## fix redefinition of PATH_MAX/ssize_t in tool/digest.cc (version >= 3538)
+#patch -ulbf tool/digest.cc << EOF
+#@@ -38,2 +38,3 @@
+# #include <io.h>
+#+#ifndef __MINGW32__
+# #define PATH_MAX MAX_PATH
+#@@ -41,2 +42,3 @@
+# #endif
+#+#endif
+#
+#EOF
+## fix missing ssize_t in tool/transport_common.cc (version >= 3538)
+#patch -ulbf tool/transport_common.cc << EOF
+#@@ -55,3 +55,5 @@
+#
+#+#ifndef __MINGW32__
+# typedef int ssize_t;
+#+#endif
+# OPENSSL_MSVC_PRAGMA(comment(lib, "Ws2_32.lib"))
+#EOF
+## fix missing inet_pton in ssl/test/bssl_shim.cc (version >= 3538)
+#mv ssl/test/bssl_shim.cc ssl/test/bssl_shim.cc.bak &&
+#echo "#define _WIN32_WINNT 0x0600" > ssl/test/bssl_shim.cc &&
+#cat ssl/test/bssl_shim.cc.bak >> ssl/test/bssl_shim.cc
+## fix missing inet_ntop in tool/transport_common.cc (version >= 3538)
+#mv tool/transport_common.cc tool/transport_common.cc.bak &&
+#echo "#define _WIN32_WINNT 0x0600" > tool/transport_common.cc &&
+#cat tool/transport_common.cc.bak >> tool/transport_common.cc
+### fix CMakeLists.txt
+##patch -ulbf CMakeLists.txt << EOF
+##@@ -5,4 +5,4 @@
+## if(CMAKE_COMPILER_IS_GNUCXX OR "\${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+##-       set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} -Wall -Werror -ggdb -std=c89")
+##-       set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} -Wall -Werror -ggdb -std=c++0x")
+##+       set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} -ggdb -std=c89")
+##+       set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} -ggdb -std=c++0x")
+## elseif(MSVC)
+##@@ -20,8 +20,3 @@
+## elseif (\${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64")
+##-       # cmake reports AMD64 on Windows, but we might be building for 32-bit.
+##-       if (CMAKE_CL_64)
+##-               set(ARCH "x86_64")
+##-       else()
+##-               set(ARCH "x86")
+##-       endif()
+##+       set(ARCH "$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo x86; fi)")
+## elseif (\${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86")
+##EOF
+## fix CMakeLists.txt to ignore printf format errors (version >= 3538)
+#sed -i.bak2 -e "s/-Werror\|-Wformat=2//g" CMakeLists.txt
+## fix CMakeLists.txt for 64-bit (version >= 3538)
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# sed -i.bak -e "s/CMAKE_CL_64/& OR MINGW/" CMakeLists.txt
+#fi
+##mkdir -p build_static build_shared &&
+## wl-showstatus configure &&
+## #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
+## cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
+## echo "-Wl,--as-needed -lws2_32" >> build_static/ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
+## echo "-Wl,--as-needed -lws2_32" >> build_static/tool/CMakeFiles/bssl.dir/linklibs.rsp &&
+## wl-showstatus configure &&
+## #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
+## cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
+## echo "-Wl,--as-needed -lws2_32" >> build_shared/ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
+## echo "-Wl,--as-needed -lws2_32" >> build_shared/tool/CMakeFiles/bssl.dir/linklibs.rsp &&
+## echo "-Wl,--as-needed -lws2_32" >> build_shared/crypto/CMakeFiles/crypto.dir/linklibs.rsp &&
+## wl-showstatus build &&
+## make -Cbuild_static &&
+## #wl-showstatus build-install &&
+## #make -Cbuild_static install/strip &&
+## wl-showstatus build &&
+## make -Cbuild_shared &&
+## strip build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe &&
+## #wl-showstatus build-install &&
+## #make -Cbuild_shared install/strip &&
+## wl-showstatus install &&
+## mkdir -p $INSTALLPREFIX/boringssl/include/openssl $INSTALLPREFIX/boringssl/lib $INSTALLPREFIX/boringssl/bin &&
+## cp -rf include/* $INSTALLPREFIX/boringssl/include/openssl &&
+## cp -f build_*/*/*.a $INSTALLPREFIX/boringssl/lib/ &&
+## cp -f build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe $INSTALLPREFIX/boringssl/bin/ &&
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
+# # fix missing link libraries
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
+# # fix missing link libraries
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+# wl-showstatus build &&
+# ninja -Cbuild_static &&
+# #wl-showstatus build-install &&
+# #ninja -Cbuild_static install/strip &&
+# wl-showstatus build &&
+# ninja -Cbuild_shared &&
+# #wl-showstatus build-install &&
+# #ninja -Cbuild_shared install/strip &&
+# wl-showstatus install &&
+# strip build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe &&
+# mkdir -p $INSTALLPREFIX/boringssl/include/openssl $INSTALLPREFIX/boringssl/lib $INSTALLPREFIX/boringssl/bin &&
+# cp -rf include/* $INSTALLPREFIX/boringssl/include/openssl &&
+# cp -f build_*/*/*.a $INSTALLPREFIX/boringssl/lib/ &&
+# cp -f build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe $INSTALLPREFIX/boringssl/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
 export NAME="boringssl"
 export STATUS=
 export URL=https://boringssl.googlesource.com/boringssl/
@@ -6,183 +195,41 @@ export BASENAME=boringssl
 export DESCRIPTION="BoringSSL is a fork of OpenSSL that is designed to meet Google's needs."
 export CATEGORY=security
 export TYPE=library
-#export VERSION=2214
-#export VERSIONDATE=20180704
-#export VERSION=3359
-#export VERSIONDATE=20180705
-####Could not find Go
-export VERSION=3538
-export VERSIONDATE=20181019
-#export VERSION=3945
-#export VERSIONDATE=20191024
-####include/openssl/bn.h:156:28: error: expected ')' before 'PRIx64'
+export VERSION=5414
+export VERSIONDATE=20240914
 wl-showstatus --package-version
 export DEPENDENCIES=go,pthreads
 export OPTIONALDEPENDENCIES=
-#export BUILDDEPENDENCIES=cmake
-#export OPTIONALBUILDDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=
-export DOWNLOADURL="https://boringssl.googlesource.com/boringssl/+refs"
+export DOWNLOADURL="https://boringssl.googlesource.com/boringssl/+refs chromium-"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://boringssl.googlesource.com/boringssl/+archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://boringssl.googlesource.com/boringssl/+archive/refs/heads/chromium-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 mkdir -p $BASENAME-$VERSION
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz -C$BASENAME-$VERSION
+tar xz --force-local -f $TARBALLDIR/$BASENAME/chromium-$VERSION.tar.gz -C$BASENAME-$VERSION
 cd $BASENAME-$VERSION
-# fix invalid suffix UI64 in crypto/internal.h
-patch -ulbf crypto/internal.h << EOF
-@@ -134,3 +134,3 @@
-
--#if defined(OPENSSL_WINDOWS)
-+#if defined(OPENSSL_WINDOWS) && !defined(__MINGW32__)
- #define OPENSSL_U64(x) x##UI64
-
-EOF
-# fix ssl/d1_lib.c
-mv ssl/d1_lib.c ssl/d1_lib.c.bak &&
-echo "#include <winsock2.h>" > ssl/d1_lib.c &&
-cat ssl/d1_lib.c.bak >> ssl/d1_lib.c
-## fix missing inet_pton in crypto/bio/bio_test.c (version <= 2214)
-#mv crypto/bio/bio_test.c crypto/bio/bio_test.c.bak &&
-#echo "#define _WIN32_WINNT 0x0600" > crypto/bio/bio_test.c &&
-#cat crypto/bio/bio_test.c.bak >> crypto/bio/bio_test.c
-# fix missing inet_pton in crypto/bio/bio_test.cc (version >= 3359)
-mv crypto/bio/bio_test.cc crypto/bio/bio_test.cc.bak &&
-echo "#define _WIN32_WINNT 0x0600" > crypto/bio/bio_test.cc &&
-cat crypto/bio/bio_test.cc.bak >> crypto/bio/bio_test.cc
-# fix missing GetTickCount64 in tool/speed.cc
-mv tool/speed.cc tool/speed.cc.bak &&
-echo "#define _WIN32_WINNT 0x0600" > tool/speed.cc &&
-cat tool/speed.cc.bak >> tool/speed.cc
-# fix redefinition of X509_NAME/X509_CERT_PAIR in include/openssl/x509.h
-patch -ulf include/openssl/x509.h << EOF
-@@ -144,2 +144,3 @@
-
-+#undef X509_NAME
- /* we always keep X509_NAMEs in 2 forms. */
-@@ -163,2 +164,3 @@
- #define X509_EX_V_INIT                 0x0001
-+#undef X509_EXTENSIONS
- typedef struct X509_extension_st
-@@ -281,2 +283,3 @@
-
-+#undef X509_CERT_PAIR
- typedef struct x509_cert_pair_st {
-EOF
-# avoid alignas arrors in crypto/cipher_extra/aead_test.cc (version >= 3538)
-sed -i.bak -e "s/alignas(64) //" crypto/cipher_extra/aead_test.cc
-# avoid alignas arrors in crypto/fipsmodule/ec/p256-x86_64_test.cc (version >= 3538)
-sed -i.bak -e "s/alignas(64) //" crypto/fipsmodule/ec/p256-x86_64_test.cc
-# fix redefinition of PATH_MAX/ssize_t in tool/digest.cc (version >= 3538)
-patch -ulbf tool/digest.cc << EOF
-@@ -38,2 +38,3 @@
- #include <io.h>
-+#ifndef __MINGW32__
- #define PATH_MAX MAX_PATH
-@@ -41,2 +42,3 @@
- #endif
-+#endif
-
-EOF
-# fix missing ssize_t in tool/transport_common.cc (version >= 3538)
-patch -ulbf tool/transport_common.cc << EOF
-@@ -55,3 +55,5 @@
-
-+#ifndef __MINGW32__
- typedef int ssize_t;
-+#endif
- OPENSSL_MSVC_PRAGMA(comment(lib, "Ws2_32.lib"))
-EOF
-# fix missing inet_pton in ssl/test/bssl_shim.cc (version >= 3538)
-mv ssl/test/bssl_shim.cc ssl/test/bssl_shim.cc.bak &&
-echo "#define _WIN32_WINNT 0x0600" > ssl/test/bssl_shim.cc &&
-cat ssl/test/bssl_shim.cc.bak >> ssl/test/bssl_shim.cc
-# fix missing inet_ntop in tool/transport_common.cc (version >= 3538)
-mv tool/transport_common.cc tool/transport_common.cc.bak &&
-echo "#define _WIN32_WINNT 0x0600" > tool/transport_common.cc &&
-cat tool/transport_common.cc.bak >> tool/transport_common.cc
-## fix CMakeLists.txt
-#patch -ulbf CMakeLists.txt << EOF
-#@@ -5,4 +5,4 @@
-# if(CMAKE_COMPILER_IS_GNUCXX OR "\${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-#-       set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} -Wall -Werror -ggdb -std=c89")
-#-       set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} -Wall -Werror -ggdb -std=c++0x")
-#+       set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} -ggdb -std=c89")
-#+       set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} -ggdb -std=c++0x")
-# elseif(MSVC)
-#@@ -20,8 +20,3 @@
-# elseif (\${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64")
-#-       # cmake reports AMD64 on Windows, but we might be building for 32-bit.
-#-       if (CMAKE_CL_64)
-#-               set(ARCH "x86_64")
-#-       else()
-#-               set(ARCH "x86")
-#-       endif()
-#+       set(ARCH "$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo x86_64; else echo x86; fi)")
-# elseif (\${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86")
-#EOF
 # fix CMakeLists.txt to ignore printf format errors (version >= 3538)
 sed -i.bak2 -e "s/-Werror\|-Wformat=2//g" CMakeLists.txt
 # fix CMakeLists.txt for 64-bit (version >= 3538)
-if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- sed -i.bak -e "s/CMAKE_CL_64/& OR MINGW/" CMakeLists.txt
-fi
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure &&
-# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
-# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
-# echo "-Wl,--as-needed -lws2_32" >> build_static/ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
-# echo "-Wl,--as-needed -lws2_32" >> build_static/tool/CMakeFiles/bssl.dir/linklibs.rsp &&
-# wl-showstatus configure &&
-# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
-# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
-# echo "-Wl,--as-needed -lws2_32" >> build_shared/ssl/test/CMakeFiles/bssl_shim.dir/linklibs.rsp &&
-# echo "-Wl,--as-needed -lws2_32" >> build_shared/tool/CMakeFiles/bssl.dir/linklibs.rsp &&
-# echo "-Wl,--as-needed -lws2_32" >> build_shared/crypto/CMakeFiles/crypto.dir/linklibs.rsp &&
-# wl-showstatus build &&
-# make -Cbuild_static &&
-# #wl-showstatus build-install &&
-# #make -Cbuild_static install/strip &&
-# wl-showstatus build &&
-# make -Cbuild_shared &&
-# strip build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe &&
-# #wl-showstatus build-install &&
-# #make -Cbuild_shared install/strip &&
-# wl-showstatus install &&
-# mkdir -p $INSTALLPREFIX/boringssl/include/openssl $INSTALLPREFIX/boringssl/lib $INSTALLPREFIX/boringssl/bin &&
-# cp -rf include/* $INSTALLPREFIX/boringssl/include/openssl &&
-# cp -f build_*/*/*.a $INSTALLPREFIX/boringssl/lib/ &&
-# cp -f build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe $INSTALLPREFIX/boringssl/bin/ &&
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/boringssl -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_static &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/boringssl -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_ASM_NASM_COMPILER:FILEPATH="$(which nasm.exe)" -DCMAKE_C_COMPILER:STRING="${CC:-gcc}" -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DGO_EXECUTABLE:FILEPATH=$MINGWPREFIX/go/bin/go.exe -S. -Bbuild_shared &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
- wl-showstatus build &&
- ninja -Cbuild_static &&
- #wl-showstatus build-install &&
- #ninja -Cbuild_static install/strip &&
- wl-showstatus build &&
- ninja -Cbuild_shared &&
- #wl-showstatus build-install &&
- #ninja -Cbuild_shared install/strip &&
- wl-showstatus install &&
- strip build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe &&
- mkdir -p $INSTALLPREFIX/boringssl/include/openssl $INSTALLPREFIX/boringssl/lib $INSTALLPREFIX/boringssl/bin &&
- cp -rf include/* $INSTALLPREFIX/boringssl/include/openssl &&
- cp -f build_*/*/*.a $INSTALLPREFIX/boringssl/lib/ &&
- cp -f build_shared/*/*.dll build_shared/*/*.exe build_shared/*/*/*.exe $INSTALLPREFIX/boringssl/bin/ &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
