@@ -5,8 +5,10 @@ export BASENAME=braa
 export DESCRIPTION="Braa is a mass snmp scanner. The intended usage of such a tool is of course making SNMP queries - but unlike snmpget or snmpwalk from net-snmp, it is able to query dozens or hundreds of hosts simultaneously, and in a single process. Thus, it consumes very few system resources and does the scanning VERY fast."
 export CATEGORY=communication
 export TYPE=application
-export VERSION=0.82
-export VERSIONDATE=20190201
+#export VERSION=0.82
+#export VERSIONDATE=20190201
+export VERSION=0.9.1
+export VERSIONDATE=20240914
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -14,22 +16,30 @@ export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
-export DOWNLOADURL="http://s-tech.elsat.net.pl/braa/"
-#export DOWNLOADURL="https://github.com/mteg/braa/releases"
+#export DOWNLOADURL="http://s-tech.elsat.net.pl/braa/"
+export DOWNLOADURL="https://github.com/mteg/braa/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=http://s-tech.elsat.net.pl/braa/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://s-tech.elsat.net.pl/braa/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/mteg/braa/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing u_int64_t
-#sed -i.bak -e "s/u_\(int[0-9]*_t\)/u\1/g" $(grep -l "u_int[0-9]*_t" *.c *.h)
-for F in $(grep -l "u_int[0-9]*_t" *.c *.h); do
+## fix missing u_int64_t (version <= 0.82
+##sed -i.bak -e "s/u_\(int[0-9]*_t\)/u\1/g" $(grep -l "u_int[0-9]*_t" *.c *.h)
+#for F in $(grep -l "u_int[0-9]*_t" *.c *.h); do
+# mv -f $F $F.bak &&
+# echo "#include <stdint.h>" > $F &&
+# sed -e "s/u_\(int[0-9]*_t\)/u\1/g" $F.bak >> $F
+#done
+# fix missing uint32_t (version >= 0.9.1)
+for F in $(grep -l "uint[0-9]*_t" *.c *.h); do
  mv -f $F $F.bak &&
  echo "#include <stdint.h>" > $F &&
- sed -e "s/u_\(int[0-9]*_t\)/u\1/g" $F.bak >> $F
+ cat $F.bak >> $F
 done
 # fix missing inet_aton
 for F in $(grep -l "inet_aton" *.c); do
@@ -83,9 +93,9 @@ echo "#include <winsock2.h>" > winfix/sys/socket.h
 echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
 touch winfix/netinet/in.h winfix/arpa/inet.h
 # fix Makefile
-sed -i.bak -e "s/cc /gcc /" Makefile
+sed -i.bak -e "s/\bcc /\$(CC) /" Makefile
 wl-showstatus build &&
- make CC="${CC:-gcc} -I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" OUT=braa.exe &&
+ make OUT=braa.exe CC=${CC:-gcc} CFLAGS="-I$PWD/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####Doesn't work
