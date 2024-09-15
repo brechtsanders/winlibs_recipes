@@ -7,14 +7,14 @@ export CATEGORY=development
 export TYPE=application
 #export VERSION=0.9.2
 #export VERSIONDATE=20200215
-export VERSION=0.9.3
-export VERSIONDATE=20210222
-export DEPENDENCIES=
-export OPTIONALDEPENDENCIES=
-#export BUILDDEPENDENCIES=cmake
+#export VERSION=0.9.3
+#export VERSIONDATE=20210222
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+##export BUILDDEPENDENCIES=cmake
+##export OPTIONALBUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
 #export OPTIONALBUILDDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake,ninja
-export OPTIONALBUILDDEPENDENCIES=
 #export VERSION=0.9.4
 #export VERSIONDATE=20210501
 #export VERSION=0.9.5
@@ -25,13 +25,13 @@ export OPTIONALBUILDDEPENDENCIES=
 #export VERSIONDATE=20221012
 #export VERSION=0.9.9
 #export VERSIONDATE=20221222
-#export VERSION=0.9.11
-#export VERSIONDATE=20230425
+export VERSION=0.9.11
+export VERSIONDATE=20230425
 wl-showstatus --package-version
-#export DEPENDENCIES=libdwarf
-#export OPTIONALDEPENDENCIES=
-#export BUILDDEPENDENCIES=cmake,ninja
-#export OPTIONALBUILDDEPENDENCIES=
+export DEPENDENCIES=libdwarf
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.txt
 export LICENSETYPE=LGPL
 export DOWNLOADURL="https://github.com/jrfonseca/drmingw/releases"
@@ -71,12 +71,21 @@ cd $BASENAME-$VERSION
 #-add_subdirectory (tests)
 #
 #EOF
+# fix missing thirdparty/libdwarf/cmake/config.h.cmake (version >= 0.9.11)
+mkdir -p thirdparty/libdwarf/cmake
+touch thirdparty/libdwarf/cmake/config.h.cmake
+# fix CMakeLists.txt (version >= 0.9.11)
+sed -i.bak2 "s/SEND_ERROR\(.*Win32 threads required\)/WARNING\1/" CMakeLists.txt
+# fix thirdparty/CMakeLists.txt (version >= 0.9.11)
+sed -i.bak -e "s/^include\s*(\(zlib\|libdwarf\)\.cmake)/#&/" thirdparty/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
- #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win -DCMAKE_CXX_FLAGS:STRING="-D_GLIBCXX_HAS_GTHREADS" &&
- #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdwarf" &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #-DCMAKE_CXX_FLAGS:STRING="-D_GLIBCXX_HAS_GTHREADS" 
  #-DPOSIX_THREADS:BOOL=ON 
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/libdwarf -fpermissive" &&
+ # fix missing link library
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ldwarf.dll/" build_win/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
