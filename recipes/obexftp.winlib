@@ -13,7 +13,7 @@ export VERSIONDATE=20160118
 wl-showstatus --package-version
 export DEPENDENCIES=openobex
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=
 export LICENSETYPE=
@@ -36,6 +36,10 @@ cat > obexftp/cache.c << EOF
 #define strcasestr StrStrIA
 EOF
 cat obexftp/cache.c.bak >> obexftp/cache.c
+# fix missing _mkdir() in apps/obexftpd.c (version >= 0.24)
+mv apps/obexftpd.c apps/obexftpd.c.bak &&
+echo "#include <direct.h>" > apps/obexftpd.c &&
+cat apps/obexftpd.c.bak >> apps/obexftpd.c
 # fix linking with ws2_32
 patch -ulbf obexftp/CMakeLists.txt << EOF
 --- obexftp/CMakeLists.txt  2013-03-05 21:43:50.000000000 +0100
@@ -45,21 +49,31 @@ patch -ulbf obexftp/CMakeLists.txt << EOF
 +  -Wl,--as-needed -lws2_32
  )
 EOF
+# skip building fuse directory (version >= 0.24)
+sed -i.bak -e "s/^add_subdirectory ( fuse )/#&/" CMakeLists.txt
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$PWD/winfix $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=incompatible-pointer-types"; fi)" -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$PWD/winfix $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=incompatible-pointer-types"; fi)" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" -S. -Bbuild_shared &&
+# echo "-Wl,--as-needed -lws2_32" >> build_shared/bfb/CMakeFiles/bfb.dir/linklibs.rsp &&
+# echo "-Wl,--as-needed -lopenobex" >> build_shared/multicobex/CMakeFiles/multicobex.dir/linklibs.rsp &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf obexftp-$VERSION-Source
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cd build_static &&
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$(pwd)/../winfix" .. &&
- cd .. &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$PWD/winfix $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=incompatible-pointer-types"; fi)" -S. -Bbuild_static &&
  wl-showstatus configure &&
- cd build_shared &&
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$(pwd)/../winfix" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" .. &&
- echo "-Wl,--as-needed -lws2_32" >> bfb/CMakeFiles/bfb.dir/linklibs.rsp &&
- echo "-Wl,--as-needed -lopenobex" >> multicobex/CMakeFiles/multicobex.dir/linklibs.rsp &&
- cd .. &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CONFIGURATION_TYPES:STRING=Release -DENABLE_PYTHON:BOOL=OFF -DENABLE_PERL:BOOL=OFF -DENABLE_RUBY:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$PWD/winfix $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=incompatible-pointer-types"; fi)" -DCMAKE_EXE_LINKER_FLAGS:STRING="-Wl,--as-needed -lws2_32" -S. -Bbuild_shared &&
+ # add linker flag
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32 -lopenobex/" build_shared/build.ninja &&
  wl-showstatus build-install &&
- make -Cbuild_static install/strip &&
+ ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
- make -Cbuild_shared install/strip &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf obexftp-$VERSION-Source
 
 

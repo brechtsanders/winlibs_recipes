@@ -1,0 +1,56 @@
+export NAME="GetData"
+export STATUS=
+export URL=https://getdata.sourceforge.net/
+#export URL=https://github.com/ketiltrout/getdata
+export BASENAME=getdata
+export DESCRIPTION="The GetData Project is the reference implementation of the Dirfile Standards, a filesystem-based, column-oriented database format for time-ordered binary data. The Dirfile database format is designed to provide a fast, simple format for storing and reading data."
+export CATEGORY=database
+export TYPE=library
+export VERSION=0.11.0
+export VERSIONDATE=20221216
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,libbz2,xz,flac,zziplib,pcre
+export OPTIONALDEPENDENCIES=slim
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/ketiltrout/getdata/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/ketiltrout/getdata/releases/download/v$VERSION/$BASENAME-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
+cd $BASENAME-$VERSION
+# fix additional parameter in src/open.c
+patch -ulbf src/open.c << EOF
+@@ -299,3 +299,7 @@
+     if (dirfd < 0) {
++#ifdef _WIN32
++      if (mkdir(dirfile) < 0) {
++#else
+       if (mkdir(dirfile, 0777) < 0) {
++#endif
+         _GD_SetError(D, GD_E_CREAT, GD_E_CREAT_DIR, dirfile, 0, NULL);
+EOF
+# avoid missing _GD_SetError in src/zzslim.c (version >= 0.11.0)
+patch -ulbf src/zzslim.c << EOF
+@@ -46,3 +46,3 @@
+     if (file->name == NULL) {
+-      _GD_SetError(D, GD_E_ALLOC, 0, NULL, 0, NULL);
++      //_GD_SetError(D, GD_E_ALLOC, 0, NULL, 0, NULL);
+       dreturn("%i", -1);
+EOF
+wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-perl --with-python=$PYDIR/python.exe &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-perl --with-python=$PYDIR/python.exe CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
