@@ -5,10 +5,12 @@ export BASENAME=libspelling
 export DESCRIPTION="A spellcheck library for GTK 4"
 export CATEGORY=language
 export TYPE=library
-export VERSION=0.4.0
-export VERSIONDATE=20240914
+#export VERSION=0.4.0
+#export VERSIONDATE=20240914
+export VERSION=0.4.1
+export VERSIONDATE=20240927
 wl-showstatus --package-version
-export DEPENDENCIES=gtk4,enchant2,gobject-introspection,vala
+export DEPENDENCIES=gtk4,gtksourceview5,enchant2,gobject-introspection,vala
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=meson,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -23,11 +25,30 @@ wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
+# fix meson.build (version >= 0.4.1)
+patch -ulbf meson.build << EOF
+@@ -6,6 +6,2 @@
+
+-libgtk_dep = dependency('gtk4', version: '>= 4.15.5')
+-gtksource_dep = dependency('gtksourceview-5', version: '>= 5.10.0')
+-libgio_dep = dependency('gio-2.0')
+-
+ cc = meson.get_compiler('c')
+@@ -146,2 +142,6 @@
+
++libgtk_dep = dependency('gtk4', version: '>= 4.15.5')
++gtksource_dep = dependency('gtksourceview-5', version: '>= 5.10.0')
++libgio_dep = dependency('gio-2.0')
++
+ configure_file(output: 'config.h', configuration: config_h)
+EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
- PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dsysprof=false -Dintrospection=enabled -Dvapi=true -Ddocs=false . build_both &&
+ #PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dsysprof=false -Dintrospection=enabled -Dvapi=true -Ddocs=false . build_both &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dsysprof=false -Dintrospection=enabled -Dvapi=true -Ddocs=false -Dc_link_args="-Wl,--allow-multiple-definition" . build_both &&
  wl-showstatus build-install &&
- ninja -Cbuild_both install &&
+ #ninja -Cbuild_both install &&
+ PATH=$PYDIR:$PATH ninja -Cbuild_both install &&
  # manually copy static library
  cp -n build_both/lib/*.a $INSTALLPREFIX/lib/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
