@@ -100,7 +100,7 @@ EOF
 # disable stack protector
 sed -i.bak -e "s/^.*fstack-protector/#&/" cmake/EthCompilerSettings.cmake
 # don't treat warnings as errors
-sed -i.bak -e "s/add_compile_options(\(-Wall\|-Wextra\))/#&/" cmake/EthCompilerSettings.cmake
+sed -i.bak -e "s/add_compile_options(\(-Wall\|-Werror\|-Wextra\))/#&/" cmake/EthCompilerSettings.cmake
 # skip building tests
 sed -i.bak -e "s/add_subdirectory(test)/#&/" CMakeLists.txt
 ## avoid unescaped colon issue in cmake/EthCompilerSettings.cmake (version >= 0.8.4)
@@ -131,11 +131,25 @@ sed -i.bak -e "s/add_subdirectory(test)/#&/" CMakeLists.txt
 mv liblangutil/Token.h liblangutil/Token.h.bak &&
 echo "#include <stdint.h>" > liblangutil/Token.h &&
 cat liblangutil/Token.h.bak >> liblangutil/Token.h
+# fix undefined uint64_t in libyul/YulString.h (version >= 0.8.3)
+mv libyul/YulString.h libyul/YulString.h.bak &&
+echo "#include <cstdint>" > libyul/YulString.h &&
+cat libyul/YulString.h.bak >> libyul/YulString.h
+# fix solc/CommandLineInterface.cpp (version >= 0.8.3)
+####solc/CommandLineInterface.cpp:793:39: error: 'basename' is not a member of 'boost::filesystem'
+patch -ulbf solc/CommandLineInterface.cpp << EOF
+@@ -792,3 +792,3 @@
+ {
+-       createFile(boost::filesystem::basename(_fileName) + string(".json"), _json);
++       createFile(boost::filesystem::path(_fileName).stem().string() + string(".json"), _json);
+ }
+EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -S. -Bbuild_win &&
  #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=conversion" -S. -Bbuild_win &&
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DSTRICT_Z3_VERSION:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=conversion" -S. -Bbuild_win &&
+ #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DSTRICT_Z3_VERSION:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=conversion" -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DSTRICT_Z3_VERSION:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-error=conversion -Wno-error=deprecated-declarations -Wno-error=aggressive-loop-optimizations" -S. -Bbuild_win &&
  #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DCCACHE:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCOVERAGE:BOOL=OFF -S. -Bbuild_win &&
  #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOLC_LINK_STATIC:BOOL=OFF -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -DCCACHE:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DFETCHCONTENT_QUIET:BOOL=OFF -DUSE_LD_GOLD:BOOL=OFF -DCOVERAGE:BOOL=OFF -S. -Bbuild_win &&
  wl-showstatus build-install &&
