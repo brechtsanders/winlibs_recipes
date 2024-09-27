@@ -55,8 +55,10 @@ export TYPE=application
 #export VERSIONDATE=20211123
 #export VERSION=8.6.14
 #export VERSIONDATE=20240229
-export VERSION=8.6.15
-export VERSIONDATE=20240917
+#export VERSION=8.6.15
+#export VERSIONDATE=20240917
+export VERSION=9.0.0
+export VERSIONDATE=20240927
 wl-showstatus --package-version
 export DEPENDENCIES=tcl
 export OPTIONALDEPENDENCIES=
@@ -134,7 +136,13 @@ echo "#define _WIN32_WINNT 0x0403" > tkWinX.c
 cat tkWinX.c.bak >> tkWinX.c
 # fix missing SetLayeredWindowAttributes in tkWinWm.c (version >= 8.6.1)
 mv tkWinWm.c tkWinWm.c.bak
-echo "#define _WIN32_WINNT 0x0500" > tkWinWm.c
+cat > tkWinWm.c << EOF
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0500
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0500
+#endif
+#include "tkWin.h"
+EOF
 cat tkWinWm.c.bak >> tkWinWm.c
 # fix redefinition of EXCEPTION_REGISTRATION (version >= 8.6.1)
 if grep -w EXCEPTION_REGISTRATION $MINGWDIR/*mingw32/include/winnt.h > /dev/null; then
@@ -146,11 +154,36 @@ fi
 # fix missing shobjidl.h in tkWinDialog.c (version >= 8.6.4)
 mv tkWinDialog.c tkWinDialog.c.bak
 grep -v "shobjidl\.h" tkWinDialog.c.bak > tkWinDialog.c
+# fix tkWin.h (version >= 9.0.0)
+patch -ulbf tkWin.h << EOF
+@@ -39,3 +39,9 @@
+ #define WIN32_LEAN_AND_MEAN
++#undef VOID
++#undef WINAPI_FAMILY
++#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+ #include <windows.h>
++#ifndef VOID
++#define VOID void
++#endif
+ #undef WIN32_LEAN_AND_MEAN
+EOF
+# fix winMain.c (version >= 9.0.0)
+patch -ulbf winMain.c << EOF
+@@ -34,5 +34,3 @@
+ #include "tk.h"
+-#define WIN32_LEAN_AND_MEAN
+-#include <windows.h>
+-#undef WIN32_LEAN_AND_MEAN
++#include "tkWin.h"
+ #include <locale.h>
+EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=$MINGWPREFIX/bin --enable-threads --enable-shared &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=$MINGWPREFIX/bin --enable-threads --enable-shared $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo --enable-64bit; fi) &&
- # fix invalid library location (version >= 8.6.10)
+ ## fix invalid library location (version >= 8.6.10)
  #sed -i.bak -e "s?bin\(/libtcl.*\.a\)?lib\1?" Makefile &&
+ # fix invalid library location (version >= 9.0.00)
+ sed -i.bak -e "s?bin\(/libtcl[a-z0-9.]*\.a\)?lib\1?" Makefile &&
  wl-showstatus build &&
  #( make || make -j1 ) &&
  ( make || make -j1 TCL_LIB_FILE="-Wl,--as-needed -ltcl$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\).*/\1\2/")" TCL_STUB_LIB_FILE="-Wl,--as-needed -ltcl$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\).*/\1\2/") -ltclstub$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\).*/\1\2/")" ) &&
