@@ -709,6 +709,14 @@ sed -i.bak -e "s/\(lsicu..\)d/\1/g" qtbase/src/corelib/configure.json
 #echo "#error DISABLE D3D12" >> qtdeclarative/config.tests/d3d12/d3d12.cpp
 # avoid missing shader compiler (fxc.exe) issue for mingw-w64 version 8.0.0 or higher
 sed -i.bak -e "s/d3d12/DISABLE_&/g" qtdeclarative/config.tests/d3d12/d3d12.cpp qtdeclarative/config.tests/d3d12/d3d12.pro
+# fix qttools/src/assistant/qcollectiongenerator/main.c (version >= 5.15.11)
+patch -ulbf qttools/src/assistant/qcollectiongenerator/main.c << EOF
+@@ -100,3 +100,3 @@
+ #ifdef _WIN32
+-    const intptr_t ret = _spawnvp(_P_WAIT, newPath, argv);
++    const intptr_t ret = _spawnvp(_P_WAIT, newPath, (const char * const*)argv);
+     if (ret == -1) {
+EOF
 #rm -f ../.qmake.stash ../.qmake.super
 # fix configure (version >= 5.15.11)
 patch -ulbf configure << EOF
@@ -766,50 +774,94 @@ mkdir -p build_static build_shared &&
  export MSYS2_ARG_CONV_EXCL='*' &&
  wl-showstatus build &&
  #PATH=$PATH:$PY2DIR mingw32-make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" &&
+ #(
+ # PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" || 
+ # (
+ #  PATH=$PATH:$PY2DIR make -i -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ #  # fix issue calling executable file from wrapper script (version >= 5.15.2)
+ #  ####See also: https://forum.qt.io/topic/117299/qt-5-15-0-cross-compile-from-source-fails/4
+ #  sed -i.bak -e "s/^exec \('[^']*\.exe'\)/\1/" $(grep -l "^exec '[^']*\.exe'" $(find build_static -name '*_wrapper.sh')) &&
+ #  PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ # ) || (
+ #  sed -i.bak -e "s/\(-lclang\)\(\.dll\)*\.a/\1 -lpthread/" build_static/qttools/src/qdoc/Makefile.* &&
+ #  make -Cbuild_static/qttools/src/qdoc &&
+ #  PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ # ) || (
+ #  echo '#include "../../../../src/quicktemplates2/qtquicktemplates2-config_p.h"' > build_static/qtquickcontrols2/include/QtQuickTemplates2/$VERSION/QtQuickTemplates2/private/qtquicktemplates2-config_p.h &&
+ #  PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ # ) ||
+ # PATH=$PATH:$PY2DIR make -j1 -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
+ # PATH=$PATH:$PY2DIR make -j1 -Cbuild_static release CXX="${CXX:-g++} -fpermissive" QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ #) &&
  (
-  PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" || 
+  PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" || 
   (
-   PATH=$PATH:$PY2DIR make -i -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -i -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
    # fix issue calling executable file from wrapper script (version >= 5.15.2)
    ####See also: https://forum.qt.io/topic/117299/qt-5-15-0-cross-compile-from-source-fails/4
    sed -i.bak -e "s/^exec \('[^']*\.exe'\)/\1/" $(grep -l "^exec '[^']*\.exe'" $(find build_static -name '*_wrapper.sh')) &&
-   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
   ) || (
    sed -i.bak -e "s/\(-lclang\)\(\.dll\)*\.a/\1 -lpthread/" build_static/qttools/src/qdoc/Makefile.* &&
    make -Cbuild_static/qttools/src/qdoc &&
-   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
   ) || (
    echo '#include "../../../../src/quicktemplates2/qtquicktemplates2-config_p.h"' > build_static/qtquickcontrols2/include/QtQuickTemplates2/$VERSION/QtQuickTemplates2/private/qtquicktemplates2-config_p.h &&
-   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
   ) ||
-  PATH=$PATH:$PY2DIR make -j1 -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
-  PATH=$PATH:$PY2DIR make -j1 -Cbuild_static release CXX="${CXX:-g++} -fpermissive" QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+  PATH=$PATH:$PY2DIR make -j1 -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
+  PATH=$PATH:$PY2DIR make -j1 -Cbuild_static release CXX="${CXX:-g++} -fpermissive" QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
  ) &&
  wl-showstatus build &&
+ #(
+ # #PATH=$(pwd)/build_shared/qtbase/bin/Qt5Core.dll:$PY2DIR:$PATH mingw32-make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
+ # PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" || 
+ # (
+ #  # fix missing MFGetService or avoid with -no-evr (version >= 5.15.0)
+ #  sed -i.bak -e "s/LIBS\s*=.*$/& -Wl,--as-needed -lamstrmid/" build_shared/qtmultimedia/src/plugins/wmf/Makefile.* &&
+ #  PATH=$PATH:$PY2DIR make -i -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ #  # fix issue calling executable file from wrapper script (version >= 5.15.2)
+ #  sed -i.bak -e "s/^exec \('[^']*\.exe'\)/\1/" $(grep -l "^exec '[^']*\.exe'" $(find build_shared -name '*_wrapper.sh')) &&
+ #  PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ # ) || (
+ #  sed -i.bak -e "s/\(-lclang\)\(\.dll\)*\.a/\1 -lpthread/" build_shared/qttools/src/qdoc/Makefile.* &&
+ #  make -Cbuild_shared/qttools/src/qdoc &&
+ #  PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ # ) || (
+ #  sed -i.bak -e "s/LIBS\s*=.*$/& -Wl,--as-needed -lamstrmid/" build_shared/qtmultimedia/src/plugins/wmf/Makefile.* &&
+ #  make -Cbuild_shared/qtmultimedia/src/plugins/wmf &&
+ #  PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ # ) || (
+ #  echo '#include "../../../../src/quicktemplates2/qtquicktemplates2-config_p.h"' > build_shared/qtquickcontrols2/include/QtQuickTemplates2/$VERSION/QtQuickTemplates2/private/qtquicktemplates2-config_p.h &&
+ #  PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ # ) ||
+ # PATH=$PATH:$PY2DIR make -j1 -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
+ # PATH=$PATH:$PY2DIR make -j1 -Cbuild_shared release CXX="${CXX:-g++} -fpermissive" QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+ #) &&
  (
-  #PATH=$(pwd)/build_shared/qtbase/bin/Qt5Core.dll:$PY2DIR:$PATH mingw32-make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
-  PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" || 
+  #PATH=$(pwd)/build_shared/qtbase/bin/Qt5Core.dll:$PY2DIR:$PATH mingw32-make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
+  PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" || 
   (
    # fix missing MFGetService or avoid with -no-evr (version >= 5.15.0)
    sed -i.bak -e "s/LIBS\s*=.*$/& -Wl,--as-needed -lamstrmid/" build_shared/qtmultimedia/src/plugins/wmf/Makefile.* &&
-   PATH=$PATH:$PY2DIR make -i -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -i -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
    # fix issue calling executable file from wrapper script (version >= 5.15.2)
    sed -i.bak -e "s/^exec \('[^']*\.exe'\)/\1/" $(grep -l "^exec '[^']*\.exe'" $(find build_shared -name '*_wrapper.sh')) &&
-   PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
   ) || (
    sed -i.bak -e "s/\(-lclang\)\(\.dll\)*\.a/\1 -lpthread/" build_shared/qttools/src/qdoc/Makefile.* &&
    make -Cbuild_shared/qttools/src/qdoc &&
-   PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
   ) || (
    sed -i.bak -e "s/LIBS\s*=.*$/& -Wl,--as-needed -lamstrmid/" build_shared/qtmultimedia/src/plugins/wmf/Makefile.* &&
    make -Cbuild_shared/qtmultimedia/src/plugins/wmf &&
-   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
   ) || (
    echo '#include "../../../../src/quicktemplates2/qtquicktemplates2-config_p.h"' > build_shared/qtquickcontrols2/include/QtQuickTemplates2/$VERSION/QtQuickTemplates2/private/qtquicktemplates2-config_p.h &&
-   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+   PATH=$PATH:$PY2DIR make -Cbuild_static release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
   ) ||
-  PATH=$PATH:$PY2DIR make -j1 -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
-  PATH=$PATH:$PY2DIR make -j1 -Cbuild_shared release CXX="${CXX:-g++} -fpermissive" QMAKE_CXXFLAGS="-fcommon" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
+  PATH=$PATH:$PY2DIR make -j1 -Cbuild_shared release QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition" ||
+  PATH=$PATH:$PY2DIR make -j1 -Cbuild_shared release CXX="${CXX:-g++} -fpermissive" QMAKE_CXXFLAGS="-fcommon $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" QMAKE_LFLAGS="-Wl,-allow-multiple-definition"
  ) &&
  wl-showstatus build-install &&
  # workaround for missing qmake.exe
