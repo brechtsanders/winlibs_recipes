@@ -1,0 +1,56 @@
+export NAME="libgssglue"
+export STATUS=
+export URL=https://cblfs.clfs.org/Libgssglue
+export BASENAME=libgssglue
+export DESCRIPTION="This library exports a gssapi interface, but doesn't implement any gssapi mechanisms itself; instead it calls gssapi routines in other libraries, depending on the mechanism."
+export CATEGORY=security
+export TYPE=library
+export VERSION=0.4
+export VERSIONDATE=20240928
+####src/gssglue/gssapi/gssapi.h:75:10: fatal error: win-mac.h: No such file or directory
+wl-showstatus --package-version
+export DEPENDENCIES=libdl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=
+export DOWNLOADURL="http://www.citi.umich.edu/projects/nfsv4/linux/libgssglue/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=http://www.citi.umich.edu/projects/nfsv4/linux/libgssglue/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing syslog.h
+mkdir -p winfix
+cat > winfix/syslog.h << EOF
+#define LOG_WARNING "Warning"
+#define syslog(lvl, ...) fprintf(stderr, lvl ": " __VA_ARGS__);
+EOF
+# fix src/gssglue/gssapi/gssapi.h (version >= 0.4)
+patch -ulbf src/gssglue/gssapi/gssapi.h << EOF
+@@ -73,3 +73,3 @@
+
+-#if defined(_MSDOS) || defined(_WIN32)
++#if (defined(_MSDOS) || defined(_WIN32)) && !defined(__MINGW32__)
+ #include <win-mac.h>
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PWD/winfix -I$MINGWPREFIX/include/libdl-win32 $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" LDFLAGS="-Wl,--as-needed -ldl" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
