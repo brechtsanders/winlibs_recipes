@@ -74,8 +74,10 @@ export TYPE=library
 #export VERSIONDATE=20230118
 #export VERSION=8.0
 #export VERSIONDATE=20240502
-export VERSION=8.1
-export VERSIONDATE=20240727
+#export VERSION=8.1
+#export VERSIONDATE=20240727
+export VERSION=8.2
+export VERSIONDATE=20241004
 wl-showstatus --package-version
 export DEPENDENCIES=gettext,libiconv,ncurses,zlib,file,sys_wait_h
 export OPTIONALDEPENDENCIES=
@@ -101,6 +103,71 @@ cat > src/history.c << EOF
 #define mkdir(d,m) mkdir(d)
 EOF
 cat src/history.c.bak >> src/history.c
+# fix missing strcasestr in src/chars.c (version >= 8.2)
+mv src/chars.c src/chars.c.bak
+cat > src/chars.c << EOF
+#include <shlwapi.h>
+#define strcasestr StrStrIA
+EOF
+cat src/chars.c.bak >> src/chars.c
+# fix src/files.c (version >= 8.2)
+patch -ulbf src/files.c << EOF
+@@ -31,3 +31,8 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
++#else
+ #include <sys/wait.h>
++#endif
+
+@@ -1473,2 +1478,9 @@
+        strcat(tempfile_name, "nano.XXXXXX");
++#ifdef _WIN32
++        *stream = NULL;
++        if (_mktemp_s(tempfile_name, strlen(tempfile_name)) == 0)
++               *stream = fopen(tempfile_name, "r+b");
++       if (*stream == NULL)
++               return NULL;
++#else
+        strcat(tempfile_name, extension);
+@@ -1485,2 +1497,3 @@
+        }
++#endif
+
+EOF
+# fix src/nano.c (version >= 8.2)
+patch -ulbf src/nano.c << EOF
+@@ -62,4 +62,6 @@
+
++#ifndef _WIN32
+ static struct sigaction oldaction, newaction;
+                /* Containers for the original and the temporary handler for SIGINT. */
++#endif
+
+@@ -830,2 +832,3 @@
+ {
++#ifndef _WIN32
+        /* Enable the generation of a SIGINT when ^C is pressed. */
+@@ -837,2 +840,3 @@
+        sigaction(SIGINT, &newaction, &oldaction);
++#endif
+ }
+@@ -842,3 +846,5 @@
+ {
++#ifndef _WIN32
+        sigaction(SIGINT, &oldaction, NULL);
++#endif
+        disable_kb_interrupt();
+@@ -908,2 +914,3 @@
+ {
++#ifndef _WIN32
+        struct sigaction deed = {{0}};
+@@ -954,2 +961,3 @@
+ #endif
++#endif
+ }
+EOF
 # fix missing lib/Makefile.in (version <= 3.2)
 mkdir lib &&
 cat > lib/Makefile.in << EOF
