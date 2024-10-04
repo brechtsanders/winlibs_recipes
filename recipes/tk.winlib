@@ -151,9 +151,19 @@ if grep -w EXCEPTION_REGISTRATION $MINGWDIR/*mingw32/include/winnt.h > /dev/null
  echo "#define __MINGW_EXCPT_DEFINE_PSDK 1" > tkWin32Dll.c
  cat tkWin32Dll.c.bak >> tkWin32Dll.c
 fi
-# fix missing shobjidl.h in tkWinDialog.c (version >= 8.6.4)
+## fix missing shobjidl.h in tkWinDialog.c (version >= 8.6.4 <= 8.6.15)
+#mv tkWinDialog.c tkWinDialog.c.bak
+#grep -v "shobjidl\.h" tkWinDialog.c.bak > tkWinDialog.c
+# fix undefined SHCreateItemFromParsingName in tkWinDialog.c (version >= 9.0.0)
 mv tkWinDialog.c tkWinDialog.c.bak
-grep -v "shobjidl\.h" tkWinDialog.c.bak > tkWinDialog.c
+cat > tkWinDialog.c << EOF
+#include <windows.h>
+#if !defined(_WIN32_IE) || _WIN32_IE < _WIN32_IE_IE70
+#undef _WIN32_IE
+#define _WIN32_IE _WIN32_IE_IE70
+#endif
+EOF
+cat tkWinDialog.c.bak >> tkWinDialog.c
 # fix tkWin.h (version >= 9.0.0)
 patch -ulbf tkWin.h << EOF
 @@ -39,3 +39,9 @@
@@ -177,6 +187,8 @@ patch -ulbf winMain.c << EOF
 +#include "tkWin.h"
  #include <locale.h>
 EOF
+# fix unknown target minizip (version >= 9.0.0)
+touch minizip
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=$MINGWPREFIX/bin --enable-threads --enable-shared &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tcl=$MINGWPREFIX/bin --enable-threads --enable-shared $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo --enable-64bit; fi) &&
