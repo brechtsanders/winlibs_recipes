@@ -74,7 +74,8 @@ export VERSIONDATE=20230219
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libbz2,libb2,popt
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+#export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=LGPL
@@ -86,6 +87,29 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix CMakeLists.txt (version >= 2.3.4)
+patch -ulbf CMakeLists.txt << EOF
+@@ -302,7 +302,2 @@
+
+-add_executable(checksum_test
+-    tests/checksum_test.c src/checksum.c src/rollsum.c src/rabinkarp.c src/mdfour.c \${blake2_SRCS})
+-target_compile_options(checksum_test PRIVATE -DLIBRSYNC_STATIC_DEFINE)
+-target_link_libraries(checksum_test \${blake2_LIBS})
+-add_test(NAME checksum_test COMMAND checksum_test)
+
+@@ -357,11 +352,2 @@
+ endif (BUILD_RDIFF)
+-add_custom_target(check COMMAND \${CMAKE_CTEST_COMMAND} -C Debug)
+-add_dependencies(check \${LAST_TARGET}
+-    isprefix_test
+-    netint_test
+-    rollsum_test
+-    rabinkarp_test
+-    hashtable_test
+-    checksum_test
+-    sumset_test)
+
+EOF
 ## fix for also building static library
 #sed -i.bak -e "s/^\(.*add_library *(\)\([^ ]*\) SHARED\( *.*\)$/&\n\1\2_static STATIC\3\nset_target_properties(\2_static PROPERTIES OUTPUT_NAME \2)/" CMakeLists.txt
 #wl-showstatus configure &&
@@ -95,15 +119,25 @@ cd $BASENAME-$VERSION
 # make install/strip &&
 # cp -f librsync.a $INSTALLPREFIX/lib/ &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_COMPRESSION:BOOL=ON -DUSE_LIBB2:BOOL=ON -DBUILD_RDIFF:BOOL=ON -DBUILD_HOSTNAME:STRING="MinGW-Windows-pc" -S. -Bbuild_static &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_COMPRESSION:BOOL=ON -DUSE_LIBB2:BOOL=ON -DBUILD_RDIFF:BOOL=ON -DBUILD_HOSTNAME:STRING="MinGW-Windows-pc" -S. -Bbuild_shared &&
+# wl-showstatus build-install &&
+# make -Cbuild_static install/strip &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_COMPRESSION:BOOL=ON -DUSE_LIBB2:BOOL=ON -DBUILD_RDIFF:BOOL=ON -DBUILD_HOSTNAME:STRING="MinGW-Windows-pc" -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_COMPRESSION:BOOL=ON -DUSE_LIBB2:BOOL=ON -DBUILD_RDIFF:BOOL=ON -DBUILD_HOSTNAME:STRING="MinGW-Windows-pc" -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_COMPRESSION:BOOL=ON -DUSE_LIBB2:BOOL=ON -DBUILD_RDIFF:BOOL=ON -DBUILD_HOSTNAME:STRING="MinGW-Windows-pc" -S. -Bbuild_shared &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_COMPRESSION:BOOL=ON -DUSE_LIBB2:BOOL=ON -DBUILD_RDIFF:BOOL=ON -DBUILD_HOSTNAME:STRING="MinGW-Windows-pc" -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- make -Cbuild_static install/strip &&
+ ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
- make -Cbuild_shared install/strip &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
