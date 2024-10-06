@@ -49,8 +49,10 @@ export TYPE=application
 #export OPTIONALDEPENDENCIES=
 #export BUILDDEPENDENCIES=
 #export OPTIONALBUILDDEPENDENCIES=
-export VERSION=1.8.26
-export VERSIONDATE=20240501
+#export VERSION=1.8.26
+#export VERSIONDATE=20240501
+export VERSION=1.8.27
+export VERSIONDATE=20241006
 wl-showstatus --package-version
 export DEPENDENCIES=gettext,libiconv,gnutls,libidn2,libsecret,libgsasl
 export OPTIONALDEPENDENCIES=
@@ -67,12 +69,42 @@ wl-wait4deps
 wl-showstatus extract
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
+# fix src/net.c (version >= 1.8.27)
+patch -ulbf src/net.c << EOF
+@@ -447,3 +447,3 @@
+             optlen = sizeof(err);
+-            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &optlen) < 0)
++            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (void*)&err, &optlen) < 0)
+             {
+@@ -492,4 +492,4 @@
+         milliseconds = seconds * 1000;
+-        (void)setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &milliseconds, sizeof(int));
+-        (void)setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, &milliseconds, sizeof(int));
++        (void)setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (void*)&milliseconds, sizeof(int));
++        (void)setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (void*)&milliseconds, sizeof(int));
+     }
+EOF
+# fix src/tools.c (version >= 1.8.27)
+patch -ulbf src/tools.c << EOF
+@@ -52,3 +52,5 @@
+ # include <locale.h>
++# ifndef _WIN32
+ # include <langinfo.h>
++# endif
+ #endif
+@@ -936,3 +938,3 @@
+         char* encoding =
+-#ifdef ENABLE_NLS
++#if defined(ENABLE_NLS) && !defined(_WIN32)
+                 nl_langinfo(CODESET);
+EOF
 ## fix undefined reference to undefined reference to md5_digest in src/Makefile.in (version >= 1.8.21)
 #sed -i.bak -e "s/^am_msmtp_OBJECTS = /&md5-apps.\$(OBJEXT) /" src/Makefile.in
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libiconv-prefix --with-libintl-prefix --with-tls=gnutls --without-libgsasl --with-libidn --with-libsecret --without-msmtpd &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libiconv-prefix --with-libintl-prefix --with-tls=gnutls --with-libgsasl --with-libidn --with-libsecret --without-msmtpd &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libiconv-prefix --with-libintl-prefix --with-tls=gnutls --with-libgsasl --with-libidn --with-libsecret --without-msmtpd LDFLAGS="-pthread" &&
+ #--disable-nls 
  wl-showstatus build-install &&
  make install-strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION

@@ -25,6 +25,27 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix liblouisxml/transcriber.c (version >= 2.4.0)
+patch -ulbf liblouisxml/transcriber.c << EOF
+@@ -80,8 +80,2 @@
+ void
+-widestrcpy(widechar* to, const widechar* from)
+-{
+-  widecharcpy(to, from, -1);
+-}
+-
+-void
+ widecharcpy(widechar* to, const widechar* from, int length)
+@@ -101,2 +95,8 @@
+ }
++
++void
++widestrcpy(widechar* to, const widechar* from)
++{
++  widecharcpy(to, from, -1);
++}
+
+EOF
 # skip building man
 cat > man/Makefile.in << EOF
 clean:
@@ -33,7 +54,8 @@ install:
 install-strip:
 EOF
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" &&
  wl-showstatus build-install &&
  #make install-strip &&
  ( make install-strip || make install-strip MAKEINFO="$PERLDIR/bin/perl.exe -I$MINGWPREFIX/share/texinfo -I$MINGWPREFIX/share/texinfo/lib/libintl-perl/lib -I$MINGWPREFIX/share/texinfo/lib/Text-Unidecode/lib -I$MINGWPREFIX/share/texinfo/lib/Unicode-EastAsianWidth/lib $(which makeinfo) --split-size=5000000" ) &&

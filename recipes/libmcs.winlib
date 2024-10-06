@@ -9,7 +9,7 @@ export TYPE=library
 export VERSION=0.7.2
 export VERSIONDATE=20101222
 wl-showstatus --package-version
-export DEPENDENCIES=libmowgli,gconf
+export DEPENDENCIES=libmowgli,gconf,libdl
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -31,11 +31,24 @@ cd $BASENAME-$VERSION
 mv src/backends/default/keyfile.c src/backends/default/keyfile.c.bak
 echo "#define fsync(fd) _commit(fd)" > src/backends/default/keyfile.c
 cat src/backends/default/keyfile.c.bak >> src/backends/default/keyfile.c
+# fix src/libmcs/mcs_loader.c (version >= 0.7.2)
+patch -ulbf src/libmcs/mcs_loader.c << EOF
+@@ -33,2 +33,3 @@
+ #include "libmcs/mcs.h"
++#include <libdl-win32/dlfcn.h>
+
+@@ -60,3 +61,3 @@
+                dl_handle = dlopen(fn
+-#ifndef __WIN32__
++#if !defined(__WIN32__) || defined(__MINGW32__)
+                                                   , RTLD_LAZY
+EOF
 wl-showstatus configure &&
-#./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" &&
  wl-showstatus build-install &&
- ( make install || make install LIBS="-Wl,--as-needed -lglib-2.0.dll -lgobject-2.0.dll -lgconf-2.dll -lmowgli.dll -L`pwd`/src/libmcs -lmcs" ) &&
+ ( make install || make install LIBS="-Wl,--as-needed -lglib-2.0.dll -lgobject-2.0.dll -lgconf-2.dll -lmowgli.dll -L$PWD/src/libmcs -lmcs" ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
