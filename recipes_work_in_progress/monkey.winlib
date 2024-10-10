@@ -26,7 +26,7 @@ export VERSIONDATE=20241010
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=Apache
@@ -255,15 +255,50 @@ EOF
 mv mk_core/mk_rconf.c mk_core/mk_rconf.c.bak &&
 echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > mk_core/mk_rconf.c &&
 cat mk_core/mk_rconf.c.bak >> mk_core/mk_rconf.c
-
-#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
+# fix include/monkey/mk_core/external/dirent.h (version >= 1.8.1)
+patch -ulbf include/monkey/mk_core/external/dirent.h << EOF
+@@ -1 +1,5 @@
++#ifdef __MINGW32__
++#include <windows.h>
++#include <dirent.h>
++#else
+ /*
+@@ -1027 +1031,2 @@
+ #endif /*DIRENT_H*/
++#endif
+EOF
+# fix plugins/dirlisting/dirlisting.c (version >= 1.8.1)
+patch -ulbf plugins/dirlisting/dirlisting.c << EOF
+@@ -131,3 +131,3 @@
+ #ifdef _WIN32
+-    if ((dirhandle = FindFirstFileA(dir, &ent)) != INVALID_HANDLE_VALUE) {
++    if ((dirhandle = FindFirstFileA(path, &ent)) != INVALID_HANDLE_VALUE) {
+       do {
+EOF
+# fix mk_server/mk_header.c (version >= 1.8.1)
+patch -ulbf mk_server/mk_header.c << EOF
+@@ -447,3 +447,3 @@
+     iov = &header->headers_iov;
+-    iov->io          = (struct iovec *) &header->__iov_io;
++    iov->io          = (struct mk_iovec *) &header->__iov_io;
+     iov->buf_to_free = (void *) &header->__iov_buf;
+EOF
+# fix send/recv/setsockopt/getsockopt (version >= 1.8.1)
+sed -i.bak -e "s/\(\(send\|recv\)([^ ]*, \)\(&val, sizeof(\)/\1(void*)\3/" mk_server/mk_lib.c mk_server/mk_scheduler.c
+sed -i.bak -e "s/\(\(send\|recv\)([^ ]*, \)\(&val, sizeof(\)/\1(void*)\3/" mk_server/mk_server.c
+sed -i.bak -e "s/\(setsockopt([^,]*,[^,]*,[^,]*, \)\(&[^,]*, sizeof(\)/\1(void*)\2/" mk_server/mk_socket.c
+sed -i.bak -e "s/\(setsockopt([^,]*,[^,]*,[^,]*, \)\(&[^,]*, sizeof(\)/\1(void*)\2/" mk_server/mk_server.c
+sed -i.bak -e "s/\(getsockopt([^,]*,[^,]*,[^,]*, \)\(&[^,]*, \)/\1(void*)\2/" mk_server/mk_net.c
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
- #wl-showstatus build &&
- #ninja -Cbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
  wl-showstatus build-install &&
- make -Cbuild_win install/strip &&
+ cp -u include/monkey/mk_core.h include/ &&
+ ninja -Cbuild_win install/strip &&
     echo OK
 
 #export BUILDDEPENDENCIES=cmake,ninja
