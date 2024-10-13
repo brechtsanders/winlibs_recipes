@@ -38,8 +38,10 @@ export TYPE=application
 #export VERSIONDATE=20240401
 #export VERSION=5.9.2
 #export VERSIONDATE=20240521
-export VERSION=5.9.4
-export VERSIONDATE=20240809
+#export VERSION=5.9.4
+#export VERSIONDATE=20240809
+export VERSION=5.9.6
+export VERSIONDATE=20241013
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libzip,liblz4,xxhash,file,capstone,libuv
 export OPTIONALDEPENDENCIES=
@@ -85,6 +87,17 @@ EOF
 mv libr/core/rtr.c libr/core/rtr.c.bak &&
 echo "#include <winsock2.h>" > libr/core/rtr.c &&
 cat libr/core/rtr.c.bak >> libr/core/rtr.c
+# fix undefined gettimeofday() in libr/util/prof.c (version >= 5.9.6)
+mv libr/util/prof.c libr/util/prof.c.bak &&
+echo "#include <sys/time.h>" > libr/util/prof.c &&
+cat libr/util/prof.c.bak >> libr/util/prof.c
+# fix undefined ftruncate() in libr/util/sandbox.c (version >= 5.9.6)
+mv libr/util/sandbox.c libr/util/sandbox.c.bak &&
+echo "#include <unistd.h>" > libr/util/sandbox.c &&
+cat libr/util/sandbox.c.bak >> libr/util/sandbox.c
+# fix undefined HAVE_FORK (version >= 5.9.6)
+sed -i.bak -e "s/^#if HAVE_FORK/#ifndef HAVE_FORK\n#defined HAVE_FORK 0\n#endif\n&/" $(grep -l "#if HAVE_FORK" $(find -name '*.h' -or -name '*.c'))
+#sed -i.bak2 -e "1i #ifdef R2__WINDOWS__\n#undef\n#endif\n#define R2__WINDOWS__ 1\n#include \"../include/r_util/r_w32.h\"" $(grep -l "r_w32_" $(find -name '*.c'))
 # avoid bad definition of R2_BIRTH in libr/include/r_version.h.in (version >= 5.9.4)                            
 patch -ulbf libr/include/r_version.h.in << EOF                                  
 @@ -11,3 +11,3 @@                                                               
@@ -92,7 +105,7 @@ patch -ulbf libr/include/r_version.h.in << EOF
 -#define R2_BIRTH "@R2_BIRTH@"                                                  
 +#define R2_BIRTH "unknown"                                                     
  #endif                                                                         
-EOF                                                                             
+EOF
 ## fix libr/socket/meson.build (version >= 5.6.6 <= 5.8.8)
 #patch -ulbf libr/socket/meson.build << EOF
 #@@ -13,2 +13,3 @@
@@ -136,16 +149,29 @@ EOF
 sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
 ## fix missing shlr/zip/meson.build in meson.build (version >= 5.8.8)
 #sed -i.bak2 -e "s?^subdir('shlr/zip')?#&?" meson.build
+# fix libr/syscall/meson.build (version >= 5.9.6)
+sed -i.bak -e "s/^subdir('d')/#subdir('d')/" libr/syscall/meson.build
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_sys_openssl=true -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
  #PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_sys_openssl=true -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
- PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_ssl_crypto=true -Duse_sys_openssl=false -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
- #-Dc_link_args="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" 
+ #PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_ssl_crypto=true -Duse_sys_openssl=false -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_ssl_crypto=true -Duse_sys_openssl=false -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false -Dc_args="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" . build_both &&
  wl-showstatus build-install &&
  #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib ninja -Cbuild_both install &&
  ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#wl-showstatus configure &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-ostype=mingw32 --with-sysmagic --without-fork --with-syslz4 --with-syszip --with-sysxxhash --with-libuv &&
+# wl-showstatus build &&
+# make CC=${CC:-gcc} &&
+# wl-showstatus build-install &&
+# make install-strip &&
+# #( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
+#    echo OK
 
 
 
