@@ -107,8 +107,15 @@ wl-showstatus extract
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
 # fix missing unlink in libmediaart/extract.c (version >= 1.9.5)
-mv libmediaart/extract.c libmediaart/extract.c.bak &&
-echo "#define symlink(src,dst) (CreateSymbolicLinkA(dst,src) ? 0 : -1)" > libmediaart/extract.c &&
+mv libmediaart/extract.c libmediaart/extract.c.bak
+#echo "#define symlink(src,dst) (CreateSymbolicLinkA(dst,src) ? 0 : -1)" > libmediaart/extract.c
+cat > libmediaart/extract.c << EOF
+#if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600
+#define symlink(src,dst) (CreateSymbolicLinkA(dst,src) ? 0 : -1)
+#else
+#define symlink(src,dst) -1
+#endif
+EOF
 cat libmediaart/extract.c.bak >> libmediaart/extract.c
 # fix missing gio-unix
 sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
@@ -120,7 +127,8 @@ mkdir -p build_both &&
  PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dimage_library=gdk-pixbuf -Dgtk_doc=false . build_both &&
  wl-showstatus build-install &&
  #PKG_CONFIG= PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
- PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
