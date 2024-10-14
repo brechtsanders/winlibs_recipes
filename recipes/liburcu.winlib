@@ -159,6 +159,25 @@ sed -e "s/\bsigset_t/_sigset_t/g" src/rculfhash.c.bak >> src/rculfhash.c
 #echo "#define __INCLUDED_URCU_MEMB_H__" >> include/urcu/map/urcu-memb.h &&
 #cat include/urcu/map/urcu-memb.h.bak >> include/urcu/map/urcu-memb.h &&
 #echo "#endif /* __INCLUDED_URCU_MEMB_H__ */" >> include/urcu/map/urcu-memb.h
+# fix undefined getpagesize() in src/rculfhash-mm-mmap.c (version >= 0.13.4)
+patch -ulbf src/rculfhash-mm-mmap.c << EOF
+@@ -27,2 +27,5 @@
+ #include <sys/mman.h>
++#ifdef __MINGW32__
++#include <windows.h>
++#endif
+ #include "rculfhash-internal.h"
+@@ -193,3 +196,9 @@
+
++#ifndef __MINGW32__
+        page_bucket_size = getpagesize() / sizeof(struct cds_lfht_node);
++#else
++       SYSTEM_INFO sysinfo;
++       GetSystemInfo(&sysinfo);
++       page_bucket_size = sysinfo.dwPageSize / sizeof(struct cds_lfht_node);
++#endif
+        if (max_nr_buckets <= page_bucket_size) {
+EOF
 # skip building tests (version >= 0.12.2)
 sed -i.bak -e "s/^\(SUBDIRS\s*=.* \)\(tests\|examples\)/\1/" Makefile.am doc/Makefile.am
 wl-showstatus configure &&
