@@ -1,0 +1,80 @@
+export NAME="broff"
+export STATUS=
+export URL=https://github.com/mikejzx/broff
+export BASENAME=broff
+export DESCRIPTION="roff to HTML with additional niceties"
+export CATEGORY=fileformat
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20241014
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/mikejzx/broff/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/mikejzx/broff/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing getline in broff.c
+mv broff.c broff.c.bak
+cat > broff.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat broff.c.bak >> broff.c
+# fix using specified compiler
+sed -i.bak "s/gcc /\$(CC) /" Makefile
+wl-showstatus build &&
+ make CC=${CC:-gcc} CFLAGS="-O2 -s" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
