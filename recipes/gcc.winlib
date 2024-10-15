@@ -1027,6 +1027,25 @@ EOF
 # fix gcc/cp/parser.cc (version >= 14.1.0)
 #### See also bug reported here: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=115312
 sed -i.bak -e "s?gcc_assert (\!the_parser);?//&?" gcc/cp/parser.cc
+## fix support for MinGW-w64 on ARM64 (aarch64) in gcc/config.gcc (version >= 15-20241013)
+#patch -ulbf gcc/config.gcc << EOF
+#@@ -1291,2 +1291,3 @@
+#        c_target_objs="\${c_target_objs} msformat-c.o"
+#+       cxx_target_objs="\${cxx_target_objs} winnt-cxx.o msformat-c.o"
+#        d_target_objs="\${d_target_objs} winnt-d.o"
+#EOF
+## fix support for MinGW-w64 on ARM64 (aarch64) in gcc/config.host (version >= 15-20241013)
+#patch -ulbf gcc/config.host << EOF
+#@@ -102,3 +102,3 @@
+#   aarch64*-*-freebsd* | aarch64*-*-linux* | aarch64*-*-fuchsia* |\\
+#-  aarch64*-*-darwin*)
+#+  aarch64*-*-darwin* | aarch64-*-mingw*)
+#     case \${target} in
+#EOF
+## fix support for MinGW-w64 on ARM64 (aarch64) in gcc/config.host (version >= 15-20241013)
+#mkdir -p build_mingw/mingw-w64/usr/include
+#mkdir -p build_mingw/libiberty
+#cp -u libiberty/at-file.texi build_mingw/libiberty/
 ## fix missing -lmman (version >= 12.1.0)
 #sed -i.bak -e "s/^NETLIBS := /&-lmman /" c++tools/Makefile.in
 #sed -i.bak -e "s/-o \$(FI).*$/& -lmman /" fixincludes/Makefile.in
@@ -1283,14 +1302,18 @@ fi
 ## fix linker error: export ordinal too large (version >= 13)
 ##sed -i.bak "s/--export-all-symbols/--discard-all/" gcc/configure
 ##sed -i.bak "s/--export-all-symbols/--gc-keep-exported/" gcc/configure
-sed -i.bak "s/--export-all-symbols/--gc-keep-exported/" $(grep -l "\--export-all-symbols" $(find -name configure))
+if ! ${CC:-gcc} --version|grep -q "^clang"; then
+ sed -i.bak "s/--export-all-symbols/--gc-keep-exported/" $(grep -l "\--export-all-symbols" $(find -name configure))
+fi
 ## missing mmap/munmap
 #for F in $(find -name config.h.in); do echo "#include <sys/mman.h>" >> $F; done
 # fix missing mmap/munmap and linker error: export ordinal too large
 ##sed -i.bak "s/\(\$wl\)--export-all-symbols/\1--gc-keep-exported \1-lmman/" gcc/configure
 ##sed -i.bak "s/\(\$wl\)--export-all-symbols/\1--discard-all/" libgo/configure
 ##sed -i.bak "s/\(\$wl\)--export-all-symbols/\1--gc-keep-exported \1-lmman/" $(grep -l "\${wl}--export-all-symbols" $(find -name configure))
-sed -i.bak "s/\(\${wl}\)--export-all-symbols/\1--gc-keep-exported \1-lmman/" $(grep -l "\${wl}--export-all-symbols" $(find -name configure))
+if ! ${CC:-gcc} --version|grep -q "^clang"; then
+ sed -i.bak "s/\(\${wl}\)--export-all-symbols/\1--gc-keep-exported \1-lmman/" $(grep -l "\${wl}--export-all-symbols" $(find -name configure))
+fi
 # fix detection of GMP/MPFR/MPC
 sed -i.bak -e  "s/#include [<\"]\(gmp\|mpc\|mpfr\|isl\)\.h[>\"]/#include <stdio.h>\n&/" configure
 # copy MinGW-w64 files
