@@ -253,6 +253,8 @@ export VERSIONDATE=20240415
 #export VERSIONDATE=20240729
 #export VERSION=8.0.2
 #export VERSIONDATE=20240926
+#export VERSION=8.0.3
+#export VERSIONDATE=20241016
 ####modules/juce_graphics/juce_graphics.cpp:68:11: fatal error: d2d1_3.h: No such file or directory
 wl-showstatus --package-version
 export DEPENDENCIES=libcurl
@@ -270,6 +272,20 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd JUCE-$VERSION
+## fix undefined memset() in modules/juce_core/memory/juce_Memory.h (version >= 8.0.3)
+#sed -i.bak -e "1i #include <cstring>" modules/juce_core/memory/juce_Memory.h
+## fix undefined __cpuid() in modules/juce_core/native/juce_SystemStats_windows.cpp (version >= 8.0.3)
+#sed -i.bak -e "1i #include <intrin.h>" modules/juce_core/native/juce_SystemStats_windows.cpp
+## fix undefined boolean in modules/juce_graphics/image_formats/juce_JPEGLoader.cpp (version >= 8.0.3)
+#sed -i.bak -e "1i #include <jpeglib.h>" modules/juce_graphics/image_formats/juce_JPEGLoader.cpp
+## fix modules/juce_core/system/juce_CompilerWarnings.h (version >= 8.0.3)
+#patch -ulbf modules/juce_core/system/juce_CompilerWarnings.h << EOF
+#@@ -162,3 +162,3 @@
+#
+#-#if JUCE_CLANG || JUCE_GCC
+#+#if (JUCE_CLANG || JUCE_GCC) && !defined(_WIN32)
+#     #define JUCE_IGNORE_GCC_IMPL_(compiler, warning)
+#EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DJUCE_COPY_PLUGIN_AFTER_BUILD:BOOL=OFF -DJUCE_BUILD_EXTRAS:BOOL=OFF -DJUCE_BUILD_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
