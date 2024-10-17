@@ -14,27 +14,15 @@ export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=Apache
-export DOWNLOADURL="https://github.com/intel/ipp-crypto/releases/ ippcp_"
+export DOWNLOADURL="https://github.com/intel/cryptography-primitives/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/intel/cryptography-primitives/releases
+export DOWNLOADSOURCEURL=https://github.com/intel/cryptography-primitives/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix sources/include/owndefs.h
-patch -ulbf sources/include/owndefs.h << EOF
-@@ -222,3 +222,3 @@
- #if defined( IPP_W32DLL )
--  #if defined( _MSC_VER ) || defined( __INTEL_COMPILER )
-+  #if defined( _WIN32 ) || defined( _MSC_VER ) || defined( __INTEL_COMPILER )
-     #define IPPFUN(type,name,arg) __declspec(dllexport) type IPP_CALL name arg
-EOF
-# fix missing __int64 in include/ippcpdefs.h
-mv include/ippcpdefs.h include/ippcpdefs.h.bak &&
-echo "#include <sys/types.h>" > include/ippcpdefs.h &&
-cat include/ippcpdefs.h.bak >> include/ippcpdefs.h
 ## fix missing winres.h in sources/include/ippres.gen (version <= 2020u3)
 #patch -ulbf sources/include/ippres.gen << EOF
 #@@ -17,3 +17,7 @@
@@ -51,28 +39,53 @@ cat include/ippcpdefs.h.bak >> include/ippcpdefs.h
 #+            VALUE "FileVersion", STR_VERSION() "\\0"
 #             VALUE "ProductName", IPP_LIB_SHORTNAME() ". Intel(R) Integrated Performance Primitives. " IPP_LIB_LONGNAME() ".\\0"
 #EOF
-# fix sources/ippcp/crypto_mb/src/common/crypto_mb_res.gen (version >= 2021.8)
-patch -ulbf sources/ippcp/crypto_mb/src/common/crypto_mb_res.gen << EOF
-@@ -41,3 +41,3 @@
-             VALUE "CompanyName", "Intel Corporation.\\0"
--            VALUE "FileVersion", STR( MBX_VERSION() ) "\\0"
-+            VALUE "FileVersion", "$VERSION\\0"
-             VALUE "ProductName", MBX_LIB_SHORTNAME() ". Intel(R) Integrated Performance Primitives. " MBX_LIB_LONGNAME() ".\\0"
+## fix sources/ippcp/crypto_mb/src/common/crypto_mb_res.gen (version >= 2021.8)
+#patch -ulbf sources/ippcp/crypto_mb/src/common/crypto_mb_res.gen << EOF
+#@@ -41,3 +41,3 @@
+#             VALUE "CompanyName", "Intel Corporation.\\0"
+#-            VALUE "FileVersion", STR( MBX_VERSION() ) "\\0"
+#+            VALUE "FileVersion", "$VERSION\\0"
+#             VALUE "ProductName", MBX_LIB_SHORTNAME() ". Intel(R) Integrated Performance Primitives. " MBX_LIB_LONGNAME() ".\\0"
+#EOF
+## fix sources/include/ippres.gen (version >= 2021.8)
+#patch -ulbf sources/include/ippres.gen << EOF
+#@@ -45,3 +45,3 @@
+#             VALUE "CompanyName", "Intel Corporation.\\0"
+#-            VALUE "FileVersion", STR( VERSION() ) "\\0"
+#+            VALUE "FileVersion", STR_VERSION() "\\0"
+#             VALUE "ProductName", IPP_LIB_SHORTNAME() ". Intel(R) Integrated Performance Primitives. " IPP_LIB_LONGNAME() ".\\0"
+#EOF
+# fix sources/include/owndefs.h (version >= 1.0.0)
+patch -ulbf sources/include/owndefs.h << EOF
+@@ -74,3 +74,3 @@
+ #if defined( IPP_W32DLL )
+-  #if defined( _MSC_VER ) || defined( __INTEL_COMPILER ) || defined(__INTEL_LLVM_COMPILER)
++  #if defined( _WIN32 ) || defined( __INTEL_COMPILER ) || defined(__INTEL_LLVM_COMPILER)
+     #define IPPDEF(type) __declspec(dllexport) type
+@@ -233,3 +233,3 @@
+ #if defined( IPP_W32DLL )
+-  #if defined( _MSC_VER ) || defined( __INTEL_COMPILER ) || defined(__INTEL_LLVM_COMPILER)
++  #if defined( _WIN32 ) || defined( __INTEL_COMPILER ) || defined(__INTEL_LLVM_COMPILER)
+     #define IPPFUN(type,name,arg) __declspec(dllexport) type IPP_CALL name arg
 EOF
-# fix sources/include/ippres.gen (version >= 2021.8)
-patch -ulbf sources/include/ippres.gen << EOF
-@@ -45,3 +45,3 @@
-             VALUE "CompanyName", "Intel Corporation.\\0"
--            VALUE "FileVersion", STR( VERSION() ) "\\0"
-+            VALUE "FileVersion", STR_VERSION() "\\0"
-             VALUE "ProductName", IPP_LIB_SHORTNAME() ". Intel(R) Integrated Performance Primitives. " IPP_LIB_LONGNAME() ".\\0"
-EOF
+# fix missing __int64 in include/ippcpdefs.h
+mv include/ippcpdefs.h include/ippcpdefs.h.bak &&
+echo "#include <sys/types.h>" > include/ippcpdefs.h &&
+cat include/ippcpdefs.h.bak >> include/ippcpdefs.h
 # fix invalid __asm in sources/dispatcher/gen_disp_win32.py
 #sed -i.bak -e "s/__asm {{\(.*\)}}/__asm__ (\\\\\"\1\\\\\\\\n\\\\\");/" sources/dispatcher/gen_disp_win32.py
 #mv sources/dispatcher/gen_disp_win32.py sources/dispatcher/gen_disp_win32.py.bak &&
 #grep -v "global " sources/dispatcher/gen_disp_lin32.py > sources/dispatcher/gen_disp_win32.py
 #cat sources/dispatcher/gen_disp_lin32.py > sources/dispatcher/gen_disp_win32.py
-#cat sources/dispatcher/gen_disp_lin32.nonpic.py > sources/dispatcher/gen_disp_win32.py
+cat sources/dispatcher/gen_disp_lin32.nonpic.py > sources/dispatcher/gen_disp_win32.py
+# avoid installing in lib32 and bin32 folders (version >= 2021.9.0)
+sed -i.bak -e "s/\(lib\|bin\)32/\1/" sources/cmake/ippcp-gen-pkg-config.cmake sources/cmake/ippcp-gen-config.cmake include/ippcpdefs.h
+# fix sources/ippcp/crypto_mb/dispatcher/gen_disp_common_crypto_mb.py
+sed -i.bak -e "s?\(re\.sub(\s*\)\([^,]*, \s*\)\([^,]*,\)?\1r\2r\3?; s?\(re\.match(\s*\)\([^,]*,\)?\1r\2?" sources/ippcp/crypto_mb/dispatcher/gen_disp_common_crypto_mb.py
+# fix GCC build flags (version >= 2021.8)
+cp -u sources/cmake/windows/GNU8.2.0.cmake sources/cmake/windows/GNU.cmake
+cp -u sources/ippcp/crypto_mb/src/cmake/linux/GNU.cmake sources/ippcp/crypto_mb/src/cmake/windows/GNU.cmake
+#sed -i.bak -e "s?/Od??" sources/ippcp/crypto_mb/src/CMakeLists.txt
 # fix missing file
 cp -f sources/cmake/linux/GNU8.2.0.cmake sources/cmake/windows/GNU8.2.0.cmake &&
 grep "^set(.*_opt" sources/cmake/linux/GNU8.2.0.cmake >> sources/cmake/windows/GNU8.2.0.cmake &&
@@ -81,26 +94,13 @@ set(LINK_FLAG_STATIC_WINDOWS " ")
 set(LINK_FLAG_DYNAMIC_WINDOWS " ")
 set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} -DIPP_W32DLL")
 EOF
-# fix GCC build flags (version >= 2021.8)
-cp -u sources/cmake/windows/GNU8.2.0.cmake sources/cmake/windows/GNU.cmake
-cp -u sources/ippcp/crypto_mb/src/cmake/linux/GNU.cmake sources/ippcp/crypto_mb/src/cmake/windows/GNU.cmake
-patch -ulbf sources/ippcp/crypto_mb/src/cmake/common.cmake << EOF
-@@ -26,3 +26,3 @@
-     set(OS_STRING "windows")
--    set(OS_DEFAULT_COMPILER Intel)
-+    set(OS_DEFAULT_COMPILER "GNU")
- endif()
-EOF
-sed -i.bak -e "s?/Od??" sources/ippcp/crypto_mb/src/CMakeLists.txt
-# avoid installing in lib32 and bin32 folders (version >= 2021.9.0)
-sed -i.bak -e "s/\(lib\|bin\)32/\1/" sources/cmake/ippcp-gen-pkg-config.cmake sources/cmake/ippcp-gen-config.cmake include/ippcpdefs.h
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DARCH:STRING=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "intel64"; else echo "ia32"; fi) -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_EXAMPLES:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -S. -Bbuild_win &&
- sed -i.bak -e "s?/MT /O3 /DNDEBUG?-O3 -pthread?; s?/Qfnalign:?-falign-functions=?; s?/Qalign-loops:?-falign-loops=?; s?-ffreestanding?& -fno-asynchronous-unwind-tables?; s?-wd10120??; s?-QxCORE-AVX512 -Qopt-zmm-usage:high?-march=skylake-avx512?; s?-Werror?& -Wno-error=stringop-overflow?" build_win/build.ninja &&
- #sed -i.bak2 -e "s?\(/GS\|/W3\|/WX\|/Qcf-protection:full\|/Qfreestanding\)??g; s?/Qstd=\(c99\)?-std=\1?" build_win/build.ninja &&
- # avoid -z linker flags (version >= 2021.8)
- sed -i.bak3 -e "s/-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack//" build_win/build.ninja &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DARCH:STRING=$(if ( echo $RUNPLATFORM | grep -q "^i.86" ); then echo "ia32"; else echo "intel64"; fi) -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_EXAMPLES:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -S. -Bbuild_win &&
+ #sed -i.bak -e "s?/MT /O3 /DNDEBUG?-O3 -pthread?; s?/Qfnalign:?-falign-functions=?; s?/Qalign-loops:?-falign-loops=?; s?-ffreestanding?& -fno-asynchronous-unwind-tables?; s?-wd10120??; s?-QxCORE-AVX512 -Qopt-zmm-usage:high?-march=skylake-avx512?; s?-Werror?& -Wno-error=stringop-overflow?" build_win/build.ninja &&
+ ##sed -i.bak2 -e "s?\(/GS\|/W3\|/WX\|/Qcf-protection:full\|/Qfreestanding\)??g; s?/Qstd=\(c99\)?-std=\1?" build_win/build.ninja &&
+ ## avoid -z linker flags (version >= 2021.8)
+ #sed -i.bak3 -e "s/-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack//" build_win/build.ninja &&
  ## add linker flags
  #sed -i.bak4 -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lssp/" build_win/build.ninja &&
  wl-showstatus build-install &&
