@@ -7,8 +7,10 @@ export CATEGORY=
 export TYPE=library
 #export VERSION=0.1.0
 #export VERSIONDATE=20220928
-export VERSION=0.2.0
-export VERSIONDATE=20240709
+#export VERSION=0.2.0
+#export VERSIONDATE=20240709
+export VERSION=0.3.0
+export VERSIONDATE=20241018
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -29,20 +31,101 @@ mkdir -p $BASENAME-$VERSION
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/omr-v$VERSION-source.tgz -C$BASENAME-$VERSION
 tar xz --force-local -f $TARBALLDIR/$BASENAME/omr-$VERSION.tar.gz -C$BASENAME-$VERSION
 cd $BASENAME-$VERSION/omr*
+# fix omrmakefiles/rules.win.mk (version >= 0.3.0)
+patch -ulbf omrmakefiles/rules.win.mk << EOF
+@@ -29,3 +29,3 @@
+ ifeq (1,\$(OMR_ENV_DATA64))
+-  GLOBAL_ASFLAGS+=/c /Cp /nologo -DOMR_OS_WINDOWS -DWIN32 -DWIN64 -DJ9HAMMER
++  GLOBAL_ASFLAGS+=-c -DOMR_OS_WINDOWS -DWIN32 -DWIN64 -DJ9HAMMER
+   GLOBAL_CPPFLAGS+=-D_AMD64_=1 -DOMR_OS_WINDOWS -DWIN64 -D_WIN64 -DWIN32 -D_WIN32 -DJ9HAMMER
+@@ -38,3 +38,3 @@
+   # /Zm Enable MASM 5.10 compatibility
+-  GLOBAL_ASFLAGS+=/c /Cp /nologo /safeseh /coff /Gd -DOMR_OS_WINDOWS -DWIN32 /Zm
++  GLOBAL_ASFLAGS+=-c /safeseh /coff /Gd -DOMR_OS_WINDOWS -DWIN32 /Zm
+   GLOBAL_CPPFLAGS+=-D_X86_=1 -DWIN32 -D_WIN32 -DOMR_OS_WINDOWS
+@@ -44,4 +44,4 @@
+ GLOBAL_CPPFLAGS+=-D_CRT_SECURE_NO_WARNINGS
+-GLOBAL_CPPFLAGS+=-DCRTAPI1=_cdecl -DCRTAPI2=_cdecl -nologo
+-GLOBAL_CPPFLAGS+=-D_WIN95 -D_WIN32_WINDOWS=0x0500 /D_WIN32_DCOM
++GLOBAL_CPPFLAGS+=-DCRTAPI1=_cdecl -DCRTAPI2=_cdecl
++GLOBAL_CPPFLAGS+=-D_WIN95 -D_WIN32_WINDOWS=0x0500 -D_WIN32_DCOM
+ GLOBAL_CPPFLAGS+=-D_MT
+@@ -60,4 +60,4 @@
+ # -Zm400 max memory is 400% the default maxiumum (~300 mb)
+-GLOBAL_CFLAGS+=-Zm400
+-GLOBAL_CXXFLAGS+=-Zm400
++GLOBAL_CFLAGS+=
++GLOBAL_CXXFLAGS+=
 
-  ./configure --help 2> /dev/null
-  cat meson_options.txt 2> /dev/null
-  head COPYING* LICENSE* LICENCE* COPYRIGHT*
-  ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
+@@ -70,3 +70,3 @@
+ ifeq (\$(OMR_OPTIMIZE),1)
+-  COPTFLAGS=/Ox
++  COPTFLAGS=-O3
+ endif
+@@ -77,4 +77,4 @@
+ ifeq (\$(OMR_WARNINGS_AS_ERRORS),1)
+-    GLOBAL_CFLAGS+=-WX
+-    GLOBAL_CXXFLAGS+=-WX
++    GLOBAL_CFLAGS+=-Wall
++    GLOBAL_CXXFLAGS+=-Wall
+ endif
+@@ -83,5 +83,5 @@
+ ifeq (\$(OMR_ENHANCED_WARNINGS),1)
+-    GLOBAL_CFLAGS+=-W3
+-    GLOBAL_CXXFLAGS+=-W3
+-    GLOBAL_ASFLAGS+=-W3
++    GLOBAL_CFLAGS+=-pedantic-errors
++    GLOBAL_CXXFLAGS+=-pedantic-errors
++    GLOBAL_ASFLAGS+=-pedantic-errors
+ endif
+@@ -95,6 +95,6 @@
+     # /Zi add debug symbols
+-    GLOBAL_LDFLAGS+=/debug
+-    GLOBAL_ASFLAGS+=/Zi /Zd
+-    GLOBAL_CFLAGS+=/Zi
+-    GLOBAL_CXXFLAGS+=/Zi
++    GLOBAL_LDFLAGS+=
++    GLOBAL_ASFLAGS+=
++    GLOBAL_CFLAGS+=
++    GLOBAL_CXXFLAGS+=
+ endif
+@@ -108,5 +108,5 @@
+ ifeq (1,\$(DO_LINK))
+-  GLOBAL_LDFLAGS+=/opt:icf /opt:ref
++  GLOBAL_LDFLAGS+=
+   ifeq (0,\$(OMR_ENV_DATA64))
+-    GLOBAL_LDFLAGS+=/SAFESEH
++    GLOBAL_LDFLAGS+=
+   endif
+@@ -125,9 +125,9 @@
 
-wl-showstatus build &&
- make &&
- #make CC=${CC:-gcc} &&
-    echo OK
+-  GLOBAL_LDFLAGS+=-subsystem:\$(WIN_SUBSYSTEM_TYPE) -machine:\$(WIN_TARGET_MACHINE)
++  GLOBAL_LDFLAGS+=-m\$(WIN_SUBSYSTEM_TYPE)
 
-#GCCFLAG_ASNEEDED=$(echo "int main () { return 0; }"|gcc -xc - -Wl,--as-needed &>/dev/null && echo "-Wl,--as-needed")
-#GCCFLAG_ASNEEDED=$(if gcc --help -v 2>/dev/null | grep -q " --as-needed"; then echo "-Wl,--as-needed"; fi)
+   ## EXE-specific options
+-  OMR_MK_EXEFLAGS+=/INCREMENTAL:NO /NOLOGO /LARGEADDRESSAWARE
++  OMR_MK_EXEFLAGS+= --enable-large-address-aware
 
+   # basic subsystem specific libraries, less the C Run-Time
+-  OMR_MK_EXELIBS+=kernel32.lib wsock32.lib advapi32.lib
++  OMR_MK_EXELIBS+=-lkernel32 -lws2_32 -ladvapi32
+ ## ifdef UMA_NO_CONSOLE
+@@ -142,3 +142,3 @@
+ # Microsoft calls this a "link option"
+-  OMR_MK_EXEFLAGS+=wsetargv.obj
++  OMR_MK_EXEFLAGS+=
+ ## endif # (\$(UMA_NO_CRT),1)
+@@ -146,3 +146,3 @@
+   ifeq (\$(OMR_ENV_DATA64),1)
+-    OMR_MK_EXEFLAGS+=/NODEFAULTLIB:MSVCRTD
++    OMR_MK_EXEFLAGS+=
+   endif
+@@ -150,3 +150,3 @@
+   ## DLL-specific options
+-  OMR_MK_DLLFLAGS+=/INCREMENTAL:NO /NOLOGO
++  OMR_MK_DLLFLAGS+=
+   ifeq (1,\$(OMR_ENV_DATA64))
+EOF
 wl-showstatus configure &&
  #wl-showstatus preconfigure &&
  #mkdir -p m4 &&
