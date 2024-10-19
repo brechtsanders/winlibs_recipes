@@ -26,8 +26,10 @@ export TYPE=library
 #export VERSIONDATE=20230417
 #export VERSION=4.19.1
 #export VERSIONDATE=20231017
-export VERSION=4.19.2
-export VERSIONDATE=20240229
+#export VERSION=4.19.2
+#export VERSIONDATE=20240229
+export VERSION=4.19.3
+export VERSIONDATE=20241019
 wl-showstatus --package-version
 export DEPENDENCIES=libxfce4util,glib2
 #export DEPENDENCIES=libxfce4util,glib2,gobject-introspection,vala
@@ -106,53 +108,99 @@ EOF
 #+#endif
 #
 #EOF
-# fix xfconfd/main.c (version >= 4.17.0)
+## fix xfconfd/main.c (version >= 4.17.0)
+#patch -ulbf xfconfd/main.c << EOF
+#@@ -69,2 +69,3 @@
+#
+#+#ifndef _WIN32
+# static void
+#@@ -87,2 +88,3 @@
+# }
+#+#endif
+#
+#@@ -140,3 +142,5 @@
+#     GError *error = NULL;
+#+#ifndef _WIN32
+#     struct sigaction act = {0};
+#+#endif
+#     GIOChannel *signal_io;
+#@@ -160,2 +164,3 @@
+#     };
+#+#ifndef _WIN32
+#
+#@@ -172,2 +177,3 @@
+#     sigaction(SIGPIPE, &act, NULL);
+#+#endif
+#
+#@@ -198,3 +204,6 @@
+#     mloop = g_main_loop_new(NULL, FALSE);
+#-
+#+
+#+#ifdef _WIN32
+#+    g_warning("No signal support on Windows.  Signals will be ignored.");
+#+#else
+#     if(pipe(signal_pipe))
+#@@ -218,2 +227,3 @@
+#     }
+#+#endif
+#
+#@@ -251,2 +261,6 @@
+#
+#+#ifdef _WIN32
+#+        g_printerr("No fork() on Windows\\n");
+#+        return 1;
+#+#else
+#         child_pid = fork();
+#@@ -259,2 +273,3 @@
+#         }
+#+#endif
+#
+#EOF
+# fix xfconfd/main.c (version >= 4.19.3)
 patch -ulbf xfconfd/main.c << EOF
-@@ -69,2 +69,3 @@
-
+@@ -68,2 +68,3 @@
+ 
 +#ifndef _WIN32
  static void
-@@ -87,2 +88,3 @@
+@@ -86,2 +87,3 @@
  }
 +#endif
-
-@@ -140,3 +142,5 @@
+ 
+@@ -136,3 +138,5 @@
      GError *error = NULL;
 +#ifndef _WIN32
-     struct sigaction act = {0};
+     struct sigaction act = { 0 };
 +#endif
      GIOChannel *signal_io;
-@@ -160,2 +164,3 @@
+@@ -158,2 +162,3 @@
      };
 +#ifndef _WIN32
-
-@@ -172,2 +177,3 @@
+ 
+@@ -170,2 +175,3 @@
      sigaction(SIGPIPE, &act, NULL);
 +#endif
-
-@@ -198,3 +204,6 @@
-     mloop = g_main_loop_new(NULL, FALSE);
--
-+
+ 
+@@ -197,2 +203,5 @@
+ 
 +#ifdef _WIN32
 +    g_warning("No signal support on Windows.  Signals will be ignored.");
 +#else
-     if(pipe(signal_pipe))
-@@ -218,2 +227,3 @@
+     if (pipe(signal_pipe)) {
+@@ -216,2 +225,3 @@
      }
 +#endif
-
-@@ -251,2 +261,6 @@
-
+ 
+@@ -249,2 +259,6 @@
+ 
 +#ifdef _WIN32
 +        g_printerr("No fork() on Windows\\n");
 +        return 1;
 +#else
          child_pid = fork();
-@@ -259,2 +273,3 @@
+@@ -257,2 +271,3 @@
          }
 +#endif
-
+ 
 EOF
 # disable user/group stuff in xfconfd/xfconf-locking-utils.c (version >= 4.16.0)
 patch -ulbf xfconfd/xfconf-locking-utils.c << EOF
