@@ -18,6 +18,7 @@ export LICENSEFILE=COPYING
 #export LICENSEFILE=LICENSE
 export LICENSETYPE=
 export DOWNLOADURL="https://www.salome-platform.org/downloads/ med-"
+#export DOWNLOADURL="https://github.com/icosaeder/libmed/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 export DOWNLOADSOURCEURL=http://files.salome-platform.org/Salome/other/med-$VERSION.tar.gz
 wl-showstatus download
@@ -39,11 +40,15 @@ patch -ulbf config/cmake_files/medMacros.cmake << EOF
 +    IF (NOT HDF_VERSION_MAJOR_REF EQUAL 1 OR HDF_VERSION_MINOR_REF LESS 10)
          MESSAGE(FATAL_ERROR "HDF5 version is \${HDF_VERSION_REF}. Only versions >= 1.10.2 are supported.")
 EOF
+# fix undefined access() in src/ci/MEDfileExist.c and src/misc/_MEDaccess.c (version >= 4.1.0)
+sed -i.bak -e "1i #include <io.h>" src/ci/MEDfileExist.c src/misc/_MEDaccess.c
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_STATIC_LIBS:BOOL=ON -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_STATIC_LIBS:BOOL=ON -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_STATIC_LIBS:BOOL=ON -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_STATIC_LIBS:BOOL=OFF -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_STATIC_LIBS:BOOL=OFF -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_STATIC_LIBS:BOOL=OFF -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -S. -Bbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
