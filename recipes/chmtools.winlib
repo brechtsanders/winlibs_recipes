@@ -25,6 +25,38 @@ tar xz --force-local -f $TARBALLDIR/$BASENAME/chmtools.tar.gz
 cd chmtools
 # fix undefined ushort
 sed -i.bak -e "s/ushort/unsigned short/g" $(grep -lw "ushort" $(find -name '*.h' -or -name '*.c'))
+# fix undefined memcpy() / free()
+sed  -i.bak -e '1i #include <stdlib.h>\n#include <string.h>' *.c
+# fix undefined LZXinit() / LZXdecompress()
+sed  -i.bak2 -e '1i #include \"lzx.h\"' chmlib.c
+# fix chmdump.c (version >= current)
+patch -ulbf chmdump.c << EOF
+@@ -4,2 +6,3 @@
+ #include <stdio.h>
++#include <io.h>
+ #include <limits.h>
+@@ -13,3 +16,3 @@
+
+-main(int argc, char *argv[])
++int main(int argc, char *argv[])
+ {
+@@ -35,3 +38,7 @@
+   outdirname = argv[2];
++#ifdef _WIN32
++  err = mkdir(outdirname);
++#else
+   err = mkdir(outdirname, 0777);
++#endif
+   if (err) {
+@@ -67,3 +74,7 @@
+        dirname[namelen-2] = 0;
++#ifdef _WIN32
++       err = mkdir(dirname);
++#else
+        err = mkdir(dirname, 0777);
++#endif
+        if (err != 0) {
+EOF
 wl-showstatus build &&
  make CC=${CC:-gcc} &&
  strip *.exe &&
