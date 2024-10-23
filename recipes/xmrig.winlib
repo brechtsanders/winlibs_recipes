@@ -1,0 +1,51 @@
+export NAME="XMRig"
+export STATUS=
+export URL=https://github.com/xmrig/xmrig
+export BASENAME=xmrig
+export DESCRIPTION="XMRig is a high performance, open source, cross platform RandomX, KawPow, CryptoNight and GhostRider unified CPU/GPU miner and RandomX benchmark."
+export CATEGORY=cryptocurrency
+export TYPE=application
+#export VERSION=6.21.3
+#export VERSIONDATE=20240709
+#export VERSION=6.22.0
+#export VERSIONDATE=20240812
+export VERSION=6.22.1
+export VERSIONDATE=20241023
+wl-showstatus --package-version
+export DEPENDENCIES=hwloc,libuv,khronos-opencl-headers,khronos-opencl-icd-loader
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/xmrig/xmrig/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/xmrig/xmrig/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefine CL_EXT_PREFIX__VERSION_1_2_DEPRECATED in src/3rdparty/CL/cl.h (version >= 6.22.0)
+sed -i.bak -e "s?\(#include \)<\(CL/cl_platform\.h\)>?\1\"../../3rdparty/\2\"?" src/3rdparty/CL/cl.h
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=OFF -DWITH_OPENCL:BOOL=ON -DWITH_HWLOC:BOOL=ON -DWITH_ARGON2:BOOL=ON -DWITH_BENCHMARK:BOOL=OFF -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lhwloc.dll/" build_win/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_win install/strip &&
+ #wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/etc &&
+ cp -f build_win/*.exe $INSTALLPREFIX/bin/ &&
+ cp -f src/config.json $INSTALLPREFIX/etc/xmrig.json &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####build_win/xmrig.exe -c src/config.json
+####$MINGWPREFIX/bin/xmrig.exe -c $MINGWPREFIX/etc/xmrig.json
+####$MINGWPREFIX/bin/xmrig.exe -c $MINGWPREFIX/etc/xmrig.json --opencl --opencl-platform=0
+
+
+
