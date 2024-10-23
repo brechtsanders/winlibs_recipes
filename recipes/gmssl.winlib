@@ -1,0 +1,60 @@
+export NAME="GmSSL"
+export STATUS=
+export URL=http://gmssl.org/english.html
+export BASENAME=gmssl
+export DESCRIPTION="GmSSL is an open source cryptographic toolbox that supports SM2 / SM3 / SM4 / SM9 and other national secret (national commercial password) algorithm, SM2 digital certificate and SM2 certificate based on SSL / TLS secure communication protocol to support the national security hardware password device."
+export CATEGORY=security
+export TYPE=library
+export VERSION=3.1.1
+export VERSIONDATE=20241023
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/guanzhi/GmSSL/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/guanzhi/GmSSL/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd GmSSL-$VERSION
+# fix include/gmssl/api.h (version >= 3.1.1)
+patch -ulbf include/gmssl/api.h << EOF
+@@ -14,3 +14,9 @@
+ #ifdef WIN32
++#ifdef gmssl_EXPORTS
+ #define _gmssl_export  __declspec(dllexport)
++#elif !defined(STATIC)
++#define _gmssl_export  __declspec(dllimport)
++#else
++#define _gmssl_export
++#endif
+ #elif defined(__GNUC__)
+EOF
+rm -f include/gmssl/api.h.bak
+# fix CMakeLists.txt (version >= 3.1.1)
+patch -ulbf CMakeLists.txt << EOF
+@@ -342,3 +342,3 @@
+
+-if (NOT \${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
++if (NOT \${CMAKE_SYSTEM_NAME} STREQUAL "iOS" AND NOT MINGW)
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DWIN32 -DSTATIC" -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-DWIN32" -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf GmSSL-$VERSION
+
+
+
