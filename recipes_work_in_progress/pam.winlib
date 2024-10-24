@@ -15,12 +15,18 @@ export TYPE=library
 #export VERSIONDATE=20231217
 #export VERSION=1.6.0
 #export VERSIONDATE=20240118
-export VERSION=1.6.1
-export VERSIONDATE=20240410
+#export VERSION=1.6.1
+#export VERSIONDATE=20240410
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+export VERSION=1.7.0
+export VERSIONDATE=20241024
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=libdl,sys_wait_h,fnmatch-win32
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=
@@ -40,20 +46,29 @@ wl-wait4deps
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/Linux-PAM-$VERSION.tar.xz
 cd Linux-PAM-$VERSION
 #cd linux-pam-Linux-PAM-$VERSION
+mkdir -p winfix
 # create dummy syslog.h
-cat > syslog.h << EOF
+cat > winfix/syslog.h << EOF
 #ifndef LOG_CRIT
 #define LOG_CRIT 2
 #define LOG_ERR 3
 #define LOG_WARNING 4
+#define LOG_NOTICE 5
+#define LOG_INFO 6
+#define LOG_DEBUG 7
 #define LOG_AUTH (4<<3)
-inline static void syslog (int priority, const char *format, ...) {}
+//inline static void syslog (int priority, const char *format, ...) {}
+#define syslog(...)
+#define vsyslog(...)
+#define closelog()
 #endif
 EOF
 # create missing pwd.h
-cat > pwd.h << EOF
+cat > winfix/pwd.h << EOF
 #ifndef INCLUDED_PWD_H
 #define INCLUDED_PWD_H
+#define uid_t int
+#define getuid() 0
 #define getpwuid(uid) NULL
 #define getpwnam(username) NULL
 struct passwd {
@@ -66,9 +81,10 @@ struct passwd {
 #endif
 EOF
 # create missing grp.h
-cat > grp.h << EOF
+cat > winfix/grp.h << EOF
 #ifndef INCLUDED_GRP_H
 #define INCLUDED_GRP_H
+#define gid_t int
 #define getgrnam(groupname) NULL
 #define getgrgid(gid) NULL
 struct group {
@@ -79,10 +95,10 @@ struct group {
 #endif
 EOF
 # create missing shadow.h
-cat > shadow.h << EOF
+cat > winfix/shadow.h << EOF
 EOF
 # create missing utmp.h
-cat > utmp.h << EOF
+cat > winfix/utmp.h << EOF
 struct utmp { char* ut_line; char* ut_user; };
 inline struct utmp *getutline(struct utmp *ut) { return NULL; }
 inline void setutent(void) {}
@@ -90,24 +106,36 @@ inline void endutent(void) {}
 #define ttyname(n) NULL
 EOF
 # create missing sys/fsuid.h
-mkdir -p sys
-cat > sys/fsuid.h << EOF
+mkdir -p winfix/sys
+cat > winfix/sys/fsuid.h << EOF
 EOF
 # create missing sys/resource.h
-cat > sys/resource.h << EOF
+cat > winfix/sys/resource.h << EOF
 EOF
-wl-showstatus configure &&
- #umask 022 && touch ChangeLog && autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-no-undefined -Wl,-no-undefined" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+#wl-showstatus configure &&
+# #umask 022 && touch ChangeLog && autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PWD/winfix" LDFLAGS="-no-undefined -Wl,-no-undefined" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PWD/winfix" &&
+# wl-showstatus build-install &&
+# make install-strip &&
+#    echo OK
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dpam_unix=disabled -Ddb=gdbm -Ddocs=disabled -Dexamples=false -Dxtests=false -Dc_args="-I$(cygpath -m $PWD/winfix) -I$(cygpath -m $MINGWPREFIX/include/libdl-win32) -I$(cygpath -m $MINGWPREFIX/win32ports/include) -I$(cygpath -m $MINGWPREFIX/include/fnmatch)" . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
  wl-showstatus build-install &&
- make install-strip &&
-    ls -l $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/share/pkgconfig
-####pam_modutil_getlogin.c:25: error: storage size of 'line' isn't known
-    make install-pkgconfigDATA
-#    cmake.exe . -LH; rm CMakeCache.txt &&
-#cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
-# make install/strip &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib \
+ #PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} \
+ #ninja -Cbuild_both install/strip &&
+ ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf Linux-PAM-$VERSION
 # #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf linux-pam-Linux-PAM-$VERSION
 
