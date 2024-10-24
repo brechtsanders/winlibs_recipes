@@ -348,7 +348,7 @@
 #+#ifdef _WIN32
 #+               putenv("TERM=vt220");
 #+#else
-#                setenv("TERM", "vt220", 0);
+#+               setenv("TERM", "vt220", 0);
 #+#endif
 #
 #EOF
@@ -415,7 +415,7 @@ export TYPE=application
 export VERSION=8.2
 export VERSIONDATE=20240905
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,pcre,libiconv,gettext,ncurses,file
+export DEPENDENCIES=zlib,pcre,libiconv,gettext,ncurses,file,mman-win32
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -437,12 +437,94 @@ cd $BASENAME-$VERSION
 #mv src/browser.c src/browser.c.bak &&
 #echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > src/browser.c &&
 #cat src/browser.c.bak >> src/browser.c
+# support relative paths in src/rcfile.c (version >= 8.2)
+patch -ulbf src/rcfile.c << EOF
+@@ -32,2 +32,5 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -973,3 +976,8 @@
+        char *pattern, *expanded;
++#ifdef _WIN32
++       HANDLE dirhandle;
++       WIN32_FIND_DATAA currentfile;
++#else
+        glob_t files;
++#endif
+        int result;
+@@ -990,2 +998,34 @@
+        expanded = real_dir_from_tilde(pattern);
++#ifdef _WIN32
++/* On Windows expand directory relative to runing executable. */
++        if (pattern[0] == '.') {
++                char buf[MAX_PATH];
++                char* p;
++                size_t expandedlen;
++                size_t buflen;
++                free(nanorc);
++                nanorc = NULL;
++                if (GetModuleFileNameA(0, buf, MAX_PATH) && (p = strrchr(buf, '\\\\')) != NULL) {
++                        expandedlen = strlen(expanded);
++                        buflen = p + 1 - buf;
++                        expanded = (char*)realloc(expanded, buflen + expandedlen + 1);
++                        memmove(expanded + buflen, expanded, expandedlen + 1);
++                        memcpy(expanded, buf, buflen);
++                }
++        }
++        if ((dirhandle = FindFirstFileA(expanded, &currentfile)) == INVALID_HANDLE_VALUE) {
++                jot_error(N_("Error expanding %s"), expanded);
++        } else {
++                char fullpath[MAX_PATH];
++                size_t pathlen = strlen(expanded);
++                memcpy(fullpath, expanded, pathlen);
++                while (pathlen > 0 && expanded[pathlen - 1] != '/' && expanded[pathlen - 1] != '\\\\' && expanded[pathlen - 1] != ':')
++                        pathlen--;
++                do {
++                        strcpy(fullpath + pathlen, currentfile.cFileName);
++                        parse_one_include(fullpath, NULL);
++                } while (FindNextFileA(dirhandle, &currentfile));
++                FindClose(dirhandle);
++        }
++#else
+        result = glob(expanded, GLOB_ERR|GLOB_NOCHECK, NULL, &files);
+@@ -998,5 +1037,6 @@
+        } else if (result != GLOB_NOMATCH)
+-               jot_error(N_("Error expanding %s: %s"), pattern, strerror(errno));
++               jot_error(N_("Error expanding %s: %s"), expanded, strerror(errno));
+
+        globfree(&files);
++#endif
+        free(expanded);
+@@ -1737,2 +1777,18 @@
+                parse_one_nanorc();
++#ifdef _WIN32
++        else {
++                char buf[MAX_PATH];
++                char* p;
++                free(nanorc);
++                nanorc = NULL;
++                if (GetModuleFileNameA(0, buf, MAX_PATH) && (p = strrchr(buf, '\\\\')) != NULL) {
++                        *p = 0;
++                        if ((p = strrchr(buf, '\\\\')) != NULL) {
++                                strcpy(p + 1, "etc\\\\nanorc");
++                                nanorc = strdup(buf);
++                                parse_one_nanorc();
++                        }
++                }
++        }
++#endif
+
+EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-utf8 --enable-threads=windows --enable-utf8 --without-included-regex CFLAGS="-I$MINGWPREFIX/include/ncurses" NCURSES_CFLAGS="-I$MINGWPREFIX/include/ncursesw" NCURSESW_CFLAGS="-I$MINGWPREFIX/include/ncursesw" LDFLAGS="-Wl,--as-needed" LIBS="-lregex -lncurses -lbcrypt" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-utf8 --enable-threads=windows --enable-utf8 --without-included-regex CFLAGS="-I$MINGWPREFIX/include/ncurses" NCURSES_CFLAGS="-I$MINGWPREFIX/include/ncursesw" NCURSESW_CFLAGS="-I$MINGWPREFIX/include/ncursesw -Wno-incompatible-pointer-types" LDFLAGS="-Wl,--as-needed" LIBS="-lregex -lncurses -lbcrypt" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-utf8 --enable-threads=windows --enable-utf8 --without-included-regex --enable-color --enable-comment --enable-formatter --enable-libmagic CFLAGS="-I$MINGWPREFIX/include/ncurses $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" NCURSES_CFLAGS="-I$MINGWPREFIX/include/ncursesw" NCURSESW_CFLAGS="-I$MINGWPREFIX/include/ncursesw" LDFLAGS="-Wl,--as-needed" LIBS="-lregex -lncurses -lbcrypt" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-utf8 --enable-threads=windows --enable-utf8 --without-included-regex --enable-color --enable-comment --enable-formatter --enable-libmagic CFLAGS="-I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/ncurses $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" NCURSES_CFLAGS="-I$MINGWPREFIX/include/ncursesw" NCURSESW_CFLAGS="-I$MINGWPREFIX/include/ncursesw" LDFLAGS="-Wl,--as-needed" LIBS="-lregex -lncurses -lbcrypt -lmman" &&
  wl-showstatus build-install &&
  make install-strip &&
+ mkdir -p $INSTALLPREFIX/etc &&
+ sed -e "s/^# include.*\*\.nanorc$/&\ninclude ..\/share\/nano\/*.nanorc/" doc/sample.nanorc > $INSTALLPREFIX/etc/nanorc &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
 
 
