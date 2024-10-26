@@ -68,8 +68,10 @@ export TYPE=application
 #export VERSIONDATE=20200619
 #export VERSION=0.26
 #export VERSIONDATE=20200620
-export VERSION=0.27
-export VERSIONDATE=20231006
+#export VERSION=0.27
+#export VERSIONDATE=20231006
+export VERSION=0.28
+export VERSIONDATE=20241026
 wl-showstatus --package-version
 export DEPENDENCIES=glib2,gettext
 export OPTIONALDEPENDENCIES=
@@ -96,26 +98,37 @@ patch -ulbf src/update-desktop-database.c << EOF
 +#endif
 
 EOF
-# avoid symlink in install.py (version >= 0.25)
-patch -ulbf install.py << EOF
-@@ -3,6 +3,7 @@
- import os
-+import shutil
+## avoid symlink in install.py (version >= 0.25 <= 0.27)
+#patch -ulbf install.py << EOF
+#@@ -3,6 +3,7 @@
+# import os
+#+import shutil
+#
+#-os.symlink(
+#-    'desktop-file-install',
+#-    os.getenv('MESON_INSTALL_DESTDIR_PREFIX') + '/bin/desktop-file-edit'
+#+shutil.copyfile(
+#+    'src/desktop-file-install.exe',
+#+    os.getenv('MESON_INSTALL_DESTDIR_PREFIX') + '/bin/desktop-file-edit.exe'
+# )
+#EOF
+# fix avoid symlink in meson.build (version >= 0.28)
+patch -ulbf meson.build << EOF
+@@ -77,7 +77,2 @@
 
--os.symlink(
--    'desktop-file-install',
--    os.getenv('MESON_INSTALL_DESTDIR_PREFIX') + '/bin/desktop-file-edit'
-+shutil.copyfile(
-+    'src/desktop-file-install.exe',
-+    os.getenv('MESON_INSTALL_DESTDIR_PREFIX') + '/bin/desktop-file-edit.exe'
- )
+-install_symlink(
+-  'desktop-file-edit',
+-  install_dir: 'bin',
+-  pointing_to: 'desktop-file-install'
+-)
+
 EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both . build_both &&
  PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both . build_both &&
  wl-showstatus build-install &&
- PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -C build_both install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
  strip $INSTALLPREFIX/bin/*.exe &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
