@@ -69,10 +69,34 @@ touch libshout.ckport
 #cat src/common/net/sock.c.bak >> src/common/net/sock.c
 # fix missing SSLeay_add_all_algorithms in src/tls.c on OpenSSL 1.1.0 or higher
 sed -i.bak "s?\bSSLeay_add_all_algorithms?//&?" src/tls.c
-# fix building DLLs on 64-bit
-if ( echo $RUNPLATFORM | grep -q x86_64 ); then
- autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
-fi
+# fix undefined gettimeofday() in src/common/timing/timing.c (version >= 2.4.6)
+patch -ulbf src/common/timing/timing.c << EOF
+@@ -34,3 +34,7 @@
+
+-#ifdef _WIN32
++#if defined(__MINGW32__)
++#  include <sys/time.h>
++#  include <time.h>
++#  include <windows.h>
++#elif defined(_WIN32)
+ #include <windows.h>
+@@ -88,2 +92,5 @@
+ {
++#ifdef WIN32
++    Sleep(sleeptime);
++#else
+     struct timeval sleeper;
+@@ -98,5 +105,2 @@
+      */
+-#ifdef WIN32
+-       Sleep(sleeptime);
+-#else
+     select(1, NULL, NULL, NULL, &sleeper);
+EOF
+## fix building DLLs on 64-bit
+#if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+#fi
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-lspeex -no-undefined -Wl,-no-undefined" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lspeex -Wl,-no-undefined" &&
