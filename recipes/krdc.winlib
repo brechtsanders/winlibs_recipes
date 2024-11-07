@@ -119,22 +119,107 @@ patch -ulbf factorwidget.h << EOF
 +class FactorWidget : public QWidgetAction
  {
 EOF
+# fix rdp/rdpcliprdr.cpp (version >= 24.08.3)
+patch -ulbf rdp/rdpcliprdr.cpp << EOF
+@@ -123,6 +123,6 @@
+     CLIPRDR_FORMAT_LIST formatList = {};
+-    formatList.msgFlags = CB_RESPONSE_OK;
++    formatList.common.msgFlags = CB_RESPONSE_OK;
+     formatList.numFormats = numFormats;
+     formatList.formats = formats;
+-    formatList.msgType = CB_FORMAT_LIST;
++    formatList.common.msgType = CB_FORMAT_LIST;
+
+@@ -147,4 +147,4 @@
+     CLIPRDR_FORMAT_DATA_REQUEST formatDataRequest = {};
+-    formatDataRequest.msgType = CB_FORMAT_DATA_REQUEST;
+-    formatDataRequest.msgFlags = 0;
++    formatDataRequest.common.msgType = CB_FORMAT_DATA_REQUEST;
++    formatDataRequest.common.msgFlags = 0;
+     formatDataRequest.requestedFormatId = formatId;
+@@ -293,8 +293,8 @@
+     if (data) {
+-        response.msgFlags = CB_RESPONSE_OK;
+-        response.dataLen = size;
++        response.common.msgFlags = CB_RESPONSE_OK;
++        response.common.dataLen = size;
+         response.requestedFormatData = data;
+     } else {
+-        response.msgFlags = CB_RESPONSE_FAIL;
+-        response.dataLen = 0;
++        response.common.msgFlags = CB_RESPONSE_FAIL;
++        response.common.dataLen = 0;
+         response.requestedFormatData = nullptr;
+@@ -331,3 +331,3 @@
+
+-    UINT32 size = formatDataResponse->dataLen;
++    UINT32 size = formatDataResponse->common.dataLen;
+     if (!ClipboardSetData(m_clipboard, formatId, formatDataResponse->requestedFormatData, size)) {
+EOF
+# fix rdp/rdpsession.cpp (version >= 24.08.3)
+patch -ulbf rdp/rdpsession.cpp << EOF
+@@ -32,5 +32,3 @@
+ #include <winpr/synch.h>
+-#ifdef Q_OS_UNIX
+ #include <freerdp/locale/keyboard.h>
+-#endif
+
+@@ -341,3 +339,3 @@
+
+-    auto settings = m_freerdp->settings;
++    auto settings = m_freerdp->context->settings;
+     settings->ServerHostname = qstrdup(m_host.toLocal8Bit().data());
+@@ -545,3 +543,3 @@
+         auto code = freerdp_keyboard_get_rdp_scancode_from_x11_keycode(keyEvent->nativeScanCode());
+-        freerdp_input_send_keyboard_event_ex(input, keyEvent->type() == QEvent::KeyPress, code);
++        freerdp_input_send_keyboard_event_ex(input, keyEvent->type() == QEvent::KeyPress, false, code);
+         return true;
+@@ -655,3 +653,3 @@
+ {
+-    auto settings = m_freerdp->settings;
++    auto settings = m_freerdp->context->settings;
+     settings->OsMajorType = OSMAJORTYPE_UNIX;
+@@ -673,3 +671,3 @@
+
+-    auto settings = m_freerdp->settings;
++    auto settings = m_freerdp->context->settings;
+
+@@ -690,5 +688,5 @@
+
+-    m_freerdp->update->EndPaint = endPaint;
+-    m_freerdp->update->DesktopResize = resizeDisplay;
+-    m_freerdp->update->PlaySound = playSound;
++    m_freerdp->context->update->EndPaint = endPaint;
++    m_freerdp->context->update->DesktopResize = resizeDisplay;
++    m_freerdp->context->update->PlaySound = playSound;
+
+@@ -807,3 +805,3 @@
+     auto gdi = reinterpret_cast<rdpContext *>(m_context)->gdi;
+-    auto settings = m_freerdp->settings;
++    auto settings = m_freerdp->context->settings;
+
+EOF
 # ignore version when detecting FreeRDP
 sed -i.bak -e "s/\(find_package(\)\(FreeRDP\|FreeRDP-Client\|WinPR\) [0-9]*\.[0-9.]*\()\)/\1\2\3/" CMakeLists.txt
 # also allow building static library
 sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" core/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- PATH=$PATH:$MINGWPREFIX/qt6/bin cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_WITH_QT6:BOOL=ON -DWITH_RDP:BOOL=OFF -DWITH_VNC:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DKRDCCORE_STATIC_DEFINE" -S. -Bbuild_static &&
- #-DWITH_RDP:BOOL=ON 
+ PATH=$PATH:$MINGWPREFIX/qt6/bin cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_WITH_QT6:BOOL=ON -DWITH_RDP:BOOL=ON -DWITH_VNC:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive -DKRDCCORE_STATIC_DEFINE" -S. -Bbuild_static &&
  wl-showstatus configure &&
- PATH=$PATH:$MINGWPREFIX/qt6/bin cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_WITH_QT6:BOOL=ON -DWITH_RDP:BOOL=OFF -DWITH_VNC:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_WITH_QT6:BOOL=ON -DWITH_RDP:BOOL=ON -DWITH_VNC:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_shared &&
  wl-showstatus build-install &&
  PATH=$PATH:$MINGWPREFIX/qt6/bin ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
  PATH=$PATH:$MINGWPREFIX/qt6/bin ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf krdc-v$VERSION
-####TO DO: enable FreeRDP support
+####PATH=$MINGWPREFIX/qt6/bin:$PATH $MINGWPREFIX/bin/krdc.exe
 
 
 
+#mkdir -p krdc/platforms krdc/plugins/krdc/kcms &&
+# PATH=$MINGWPREFIX/qt6/bin:$MINGWPREFIX/ffmpeg5/bin:$PATH copypedeps -r $MINGWPREFIX/bin/krdc.exe $MINGWPREFIX/lib/plugins/krdc/krdc_*plugin.dll $MINGWPREFIX/lib/plugins/krdc/kcms/libkcm_krdc_*plugin.dll $MINGWPREFIX/qt6/plugins/platforms/qwindows.dll krdc/ &&
+# mv -f krdc/qwindows.dll krdc/platforms/ &&
+# mv -f krdc/krdc_*plugin.dll krdc/plugins/krdc/ &&
+# mv -f krdc/libkcm_krdc_*plugin.dll krdc/plugins/krdc/kcms/ &&
+#   echo OK
