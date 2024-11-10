@@ -7,11 +7,18 @@ export CATEGORY=
 export TYPE=library
 export VERSION=0.2.3
 export VERSIONDATE=20241006
-wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
+#export VERSION=0.2.4
+#export VERSIONDATE=20241110
+####Bug reported here: https://github.com/hyprwm/hyprutils/issues/18
+wl-showstatus --package-version
+#export DEPENDENCIES=sys_wait_h,win32-fork
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=BSD
 export DOWNLOADURL="https://github.com/hyprwm/hyprutils/releases"
@@ -23,13 +30,38 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+## fix src/os/Process.cpp (version >= 0.2.4)
+#patch -ulbf src/os/Process.cpp << EOF
+#@@ -8,2 +8,7 @@
+#
+#+#ifdef _WIN32
+#+#include <win32fork.h>
+#+#include <fcntl.h>
+#+#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
+#+#endif
+# #include <sys/wait.h>
+#@@ -103,2 +108,3 @@
+#         // run in child
+#+#ifndef _WIN32
+#         sigset_t set;
+#@@ -106,2 +112,3 @@
+#         sigprocmask(SIG_SETMASK, &set, NULL);
+#+#endif
+#
+#EOF
 # also allow building static library
 sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure-static &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-D_XOPEN_SOURCE -I$(cygpath -m $MINGWPREFIX/win32ports/include)" -S. -Bbuild_static &&
+ ## add linker flag
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lwin32fork/" build_static/build.ninja &&
  wl-showstatus configure-shared &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-D_XOPEN_SOURCE -I$(cygpath -m $MINGWPREFIX/win32ports/include)" -S. -Bbuild_shared &&
+ ## add linker flag
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lwin32fork/" build_shared/build.ninja &&
  wl-showstatus build-install-static &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install-shared &&
