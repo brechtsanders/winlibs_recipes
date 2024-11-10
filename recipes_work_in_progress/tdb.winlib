@@ -87,7 +87,7 @@ export TYPE=library
 export VERSION=1.4.12
 export VERSIONDATE=20240807
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=mman-win32,libdl
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -95,19 +95,127 @@ export LICENSEFILE=COPYING
 export LICENSETYPE=GPL2
 #export DOWNLOADURL="http://sourceforge.net/projects/tdb/files/"
 #export DOWNLOADURL="http://sourceforge.net/projects/tdb/files/tdb/"
-export DOWNLOADURL="http://www.samba.org/ftp/tdb/"
+#export DOWNLOADURL="http://www.samba.org/ftp/tdb/"
+export DOWNLOADURL="https://www.samba.org/ftp/tdb/"
 #export DOWNLOADURL="https://download.samba.org/pub/tdb/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/tdb/tdb/$VERSION/$BASENAME-$VERSION.tar.gz
-export DOWNLOADSOURCEURL=http://www.samba.org/ftp/tdb/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=http://www.samba.org/ftp/tdb/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://www.samba.org/ftp/tdb/$BASENAME-$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing sys/mman.h
-mkdir sys
-touch sys/mman.h
+# fix lib/replace/win32_replace.h (version >= 1.4.12)
+patch -ulbf lib/replace/win32_replace.h << EOF
+@@ -17,2 +17,3 @@
+
++#ifndef ENOTSUP
+ #define EAFNOSUPPORT   WSAEAFNOSUPPORT
+@@ -27,2 +28,5 @@
+ #define ENOTSUP                134
++#endif
++typedef int uid_t;
++typedef int gid_t;
+
+EOF
+# fix definition of mkdir(), mismatching redefinition of rep_readlink(), getting page size in lib/replace/replace.c (version >= 1.4.12)
+patch -ulbf lib/replace/replace.c << EOF
+@@ -40,3 +40,5 @@
+ #ifdef _WIN32
+-#define mkdir(d,m) _mkdir(d)
++#include <windows.h>
++#undef mkdir
++#define mkdir(d,m) CreateDirectory((d), NULL)
+ #endif
+@@ -717,3 +719,3 @@
+ #ifndef HAVE_READLINK
+-int rep_readlink(const char *path, char *buf, size_t bufsiz)
++ssize_t rep_readlink(const char *path, char *buf, size_t bufsiz)
+ {
+@@ -881,3 +883,7 @@
+         * be aligned on allocations of > pagesize. */
+-#if defined(SYSCONF_SC_PAGESIZE)
++#ifdef _WIN32
++        SYSTEM_INFO sysinfo;
++        GetSystemInfo(&sysinfo);
++       size_t pagesize = (size_t)sysinfo.dwPageSize;
++#elif defined(SYSCONF_SC_PAGESIZE)
+        size_t pagesize = (size_t)sysconf(_SC_PAGESIZE);
+EOF
+# fix lib/replace/system/network.h (version >= 1.4.12)
+patch -ulbf lib/replace/system/network.h << EOF
+@@ -356,3 +356,3 @@
+
+-#ifndef HAVE_STRUCT_ADDRINFO
++#if !defined(HAVE_STRUCT_ADDRINFO) && !defined(__MINGW32__)
+ #define HAVE_STRUCT_ADDRINFO
+EOF
+# fix lib/replace/closefrom.c (version >= 1.4.12)
+patch -ulbf lib/replace/closefrom.c << EOF
+@@ -32,3 +32,7 @@
+
++#ifdef _SC_OPEN_MAX
+        max_files = sysconf(_SC_OPEN_MAX);
++#else
++       max_files = FOPEN_MAX;
++#endif
+        if (max_files == -1) {
+@@ -46,2 +50,5 @@
+ {
++#ifdef _WIN32
++       return ENOSYS;
++#else
+        DIR *dirp;
+@@ -125,2 +132,3 @@
+        return ret;
++#endif
+ }
+EOF
+patch -ulbf lib/replace/system/filesys.h << EOF
+@@ -200,3 +200,6 @@
+ #ifdef _WIN32
+-#define mkdir(d,m) _mkdir(d)
++#include <windows.h>
++#undef mkdir
++#define mkdir(d,m) CreateDirectory((d), NULL)
++#define HAVE_MKDIR_MODE
+ #endif
+EOF
+# fix missing pipe() in lib/replace/socketpair.c (version >= 1.4.12)
+patch -ulbf lib/replace/socketpair.c << EOF
+@@ -26,2 +26,6 @@
+ #include "system/network.h"
++#ifdef _WIN32
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#endif
+
+EOF
+# fix lib/replace/system/select.h (version >= 1.4.12)
+patch -ulbf lib/replace/system/select.h << EOF
+@@ -40,3 +40,7 @@
+
+-#ifdef HAVE_POLL
++#ifdef _WIN32
++#include <windows.h>
++typedef unsigned long int nfds_t;
++#define HAVE_POLL
++#elif defined(HAVE_POLL)
+
+EOF
+# fix lib/replace/poll.c (version >= 1.4.12)
+patch -ulbf lib/replace/poll.c << EOF
+@@ -109,2 +109,3 @@
+
++#ifndef WIN32
+                if (FD_ISSET(fds[i].fd, &rfds)) {
+@@ -125,2 +126,3 @@
+                }
++#endif
+                if (FD_ISSET(fds[i].fd, &wfds)) {
+EOF
 # fix buildtools/wafsamba/wscript
 patch -ulbf buildtools/wafsamba/wscript << EOF
 --- buildtools/wafsamba/wscript  2012-11-30 09:51:32 +0100
@@ -208,7 +316,7 @@ patch -ulbf lib/replace/wscript << EOF
 EOF
 wl-showstatus configure &&
  #PATH=$PYDIR:$PATH ./configure configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
- PATH=$PYDIR:$PATH PYTHONHASHSEED=1 $PYDIR/python.exe buildtools/bin/waf configure --prefix=$INSTALLPREFIX --bundled-libraries=NONE &&
+ PATH=$PYDIR:$PATH PYTHONHASHSEED=1 CFLAGS="-I$(cygpath -m $MINGWPREFIX/include/mman-win32) -I$(cygpath -m $MINGWPREFIX/include/libdl-win32)" LINKFLAGS="-Wl,--as-needed -lmman -ldl" $PYDIR/python.exe buildtools/bin/waf configure --prefix=$INSTALLPREFIX --bundled-libraries=NONE &&
  #$PYDIR/python.exe -v buildtools/bin/waf configure --prefix=$INSTALLPREFIX --bundled-libraries=NONE &&
  wl-showstatus build-install &&
  #echo "#include <plibc.h>" >> config.h &&
