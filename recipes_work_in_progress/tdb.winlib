@@ -216,6 +216,40 @@ patch -ulbf lib/replace/poll.c << EOF
 +#endif
                 if (FD_ISSET(fds[i].fd, &wfds)) {
 EOF
+# fix lib/replace/getaddrinfo.c (version >= 1.4.12)
+patch -ulbf lib/replace/getaddrinfo.c << EOF
+@@ -109,3 +109,3 @@
+        return canon_name_from_hostent(
+-                       gethostbyaddr(&ip, sizeof(ip), AF_INET),
++                       gethostbyaddr((void*)&ip, sizeof(ip), AF_INET),
+                        perr);
+@@ -398,3 +398,3 @@
+                struct hostent *hp = gethostbyaddr(
+-                               &((struct sockaddr_in *)sa)->sin_addr,
++                               (void*)&((struct sockaddr_in *)sa)->sin_addr,
+                                sizeof(struct in_addr),
+EOF
+# fix common/tdb_private.h (version >= 1.4.12)
+patch -ulbf common/tdb_private.h << EOF
+@@ -273,2 +273,17 @@
+ int tdb_mmap(struct tdb_context *tdb);
++#ifndef F_SETLKW
++#define F_SETLKW 0
++#endif
++#ifndef F_SETLK
++#define F_SETLK  1
++#endif
++#ifndef F_RDLCK
++#define F_RDLCK  2
++#endif
++#ifndef F_WRLCK
++#define F_WRLCK  3
++#endif
++#ifndef F_UNLCK
++#define F_UNLCK  4
++#endif
+ int tdb_lock(struct tdb_context *tdb, int list, int ltype);
+EOF
 # fix buildtools/wafsamba/wscript
 patch -ulbf buildtools/wafsamba/wscript << EOF
 --- buildtools/wafsamba/wscript  2012-11-30 09:51:32 +0100
@@ -302,6 +336,49 @@ patch -ulbf buildtools/wafsamba/samba_utils.py << EOF
 EOF
 # fix buildtools/wafsamba/samba_python.py (version >= 1.4.6)
 sed -i.bak -e "s/python3/python/" buildtools/wafsamba/samba_python.py
+# fix skip tests in  wscript (version >= 1.4.12)
+patch -ulbf wscript << EOF
+@@ -23,39 +23,2 @@
+ tdb1_unit_tests = [
+-    'run-3G-file',
+-    'run-bad-tdb-header',
+-    'run',
+-    'run-check',
+-    'run-corrupt',
+-    'run-die-during-transaction',
+-    'run-endian',
+-    'run-incompatible',
+-    'run-nested-transactions',
+-    'run-nested-traverse',
+-    'run-no-lock-during-traverse',
+-    'run-oldhash',
+-    'run-open-during-transaction',
+-    'run-readonly-check',
+-    'run-rescue',
+-    'run-rescue-find_entry',
+-    'run-rdlock-upgrade',
+-    'run-rwlock-check',
+-    'run-summary',
+-    'run-transaction-expand',
+-    'run-traverse-in-transaction',
+-    'run-wronghash-fail',
+-    'run-zero-append',
+-    'run-fcntl-deadlock',
+-    'run-marklock-deadlock',
+-    'run-allrecord-traverse-deadlock',
+-    'run-mutex-openflags2',
+-    'run-mutex-trylock',
+-    'run-mutex-allrecord-bench',
+-    'run-mutex-allrecord-trylock',
+-    'run-mutex-allrecord-block',
+-    'run-mutex-transaction1',
+-    'run-mutex-die',
+-    'run-mutex1',
+-    'run-circular-chain',
+-    'run-circular-freelist',
+-    'run-traverse-chain',
+ ]
+EOF
 # fix lib/replace/wscript
 patch -ulbf lib/replace/wscript << EOF
 --- lib/replace/wscript  2012-11-30 09:51:32 +0100
@@ -314,6 +391,7 @@ patch -ulbf lib/replace/wscript << EOF
 +                    mandatory=False) # lets see if we get a mandatory failure for this one
 
 EOF
+sed -i.bak -e "s/os\.symlink/#&/" buildtools/wafsamba/samba_utils.py buildtools/wafsamba/samba_install.py
 wl-showstatus configure &&
  #PATH=$PYDIR:$PATH ./configure configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  PATH=$PYDIR:$PATH PYTHONHASHSEED=1 CFLAGS="-I$(cygpath -m $MINGWPREFIX/include/mman-win32) -I$(cygpath -m $MINGWPREFIX/include/libdl-win32)" LINKFLAGS="-Wl,--as-needed -lmman -ldl" $PYDIR/python.exe buildtools/bin/waf configure --prefix=$INSTALLPREFIX --bundled-libraries=NONE &&
