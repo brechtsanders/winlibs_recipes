@@ -1,0 +1,55 @@
+export NAME="nauty and Traces"
+export STATUS=
+export URL=https://pallini.di.uniroma1.it/
+export BASENAME=nauty
+export DESCRIPTION="nauty and Traces are programs for computing automorphism groups of graphs and digraphs. They can also produce a canonical label. They are written in a portable subset of C, and run on a considerable number of different systems."
+export CATEGORY=math
+export TYPE=library
+export VERSION=2.8.9
+export VERSIONDATE=20241112
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYRIGHT
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://pallini.di.uniroma1.it/"
+#export DOWNLOADURL="https://github.com/lonnen/nauty/releases"
+#export DOWNLOADURL="https://github.com/mkoeppe/nauty/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://pallini.di.uniroma1.it/$BASENAME$(echo $VERSION|tr . _).tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/lonnen/nauty/archive/refs/tags/$BASENAME$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME$(echo $VERSION|tr . _).tar.gz
+cd $BASENAME$(echo $VERSION|tr . _)
+# create missing FindNAUTY.cmake
+cat > FindNAUTY.cmake << EOF
+IF (NAUTY_INCLUDE_DIR AND NAUTY_LIBRARIES)
+  SET(NAUTY_FIND_QUIETLY TRUE)
+ENDIF (NAUTY_INCLUDE_DIR AND NAUTY_LIBRARIES)
+FIND_PATH(NAUTY_INCLUDE_DIR nauty.h)
+FIND_LIBRARY(NAUTY_LIBRARIES NAMES nauty libnauty.dll.a libnauty.a)
+INCLUDE(FindPackageHandleStandardArgs)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(NAUTY DEFAULT_MSG NAUTY_LIBRARIES NAUTY_INCLUDE_DIR)
+MARK_AS_ADVANCED(NAUTY_INCLUDE_DIR NAUTY_LIBRARIES)
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-generic --enable-ansi &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build-install &&
+ make install &&
+ strip $INSTALLPREFIX/bin/*.{dll,exe} &&
+ # install missing FindNAUTY.cmake
+ mkdir -p $INSTALLPREFIX/cmake &&
+ cp -f FindNAUTY.cmake $INSTALLPREFIX/cmake/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME$(echo $VERSION|tr . _)
+
+
+
