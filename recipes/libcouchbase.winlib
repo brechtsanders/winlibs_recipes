@@ -175,8 +175,10 @@ export TYPE=library
 #export VERSIONDATE=20240126
 #export VERSION=3.3.12
 #export VERSIONDATE=20240303
-export VERSION=3.3.13
-export VERSIONDATE=20240924
+#export VERSION=3.3.13
+#export VERSIONDATE=20240924
+export VERSION=3.3.14
+export VERSIONDATE=20241113
 wl-showstatus --package-version
 export DEPENDENCIES=libevent,pthreads,openssl
 export OPTIONALDEPENDENCIES=libev,libevent,libuv
@@ -244,55 +246,65 @@ cd $BASENAME-$VERSION
 #mv src/dns-srv.cc src/dns-srv.cc.bak &&
 #echo "#include <string>" > src/dns-srv.cc &&
 #cat src/dns-srv.cc.bak >> src/dns-srv.cc
-# fix missing PDNS_RECORDA in src/dns-srv.cc (version >= 2.7.2)
-patch -ulbf src/dns-srv.cc << EOF
---- src/dns-srv.cc  2017-02-21 20:55:16 +0100
-+++ src/dns-srv.cc  2017-03-01 15:04:40 +0100
-@@ -5,4 +5,4 @@
+## fix missing PDNS_RECORDA in src/dns-srv.cc (version >= 2.7.2 <= 3.3.13)
+#patch -ulbf src/dns-srv.cc << EOF
+#--- src/dns-srv.cc  2017-02-21 20:55:16 +0100
+#+++ src/dns-srv.cc  2017-03-01 15:04:40 +0100
+#@@ -5,4 +5,4 @@
+#
+#-#ifndef _WIN32
+# #include <string>
+#+#ifndef _WIN32
+#
+#@@ -90,3 +90,3 @@
+#
+#-#else
+#+#elsifdef __MINGW64_VERSION_MAJOR
+# #include <windns.h>
+#EOF
+## fix type error in src/cbft.cc (version >= 2.7.2 <= 3.3.13)
+#patch -ulbf src/cbft.cc << EOF
+#--- src/cbft.cc  2017-02-21 20:55:16 +0100
+#+++ src/cbft.cc  2017-03-01 15:24:04 +0100
+#@@ -158,3 +158,3 @@
+#     } else {
+#-        root["ctl"]["timeout"] = LCBT_SETTING(instance, n1ql_timeout) / 1000;
+#+        root["ctl"]["timeout"] = (Json::UInt64)(LCBT_SETTING(instance, n1ql_timeout) / 1000);
+#     }
+#EOF
+## fix conflicting types in conflicting types src/mc/mcreq.c (version >= 2.7.2 <= 3.3.13)
+#mv src/mc/mcreq.c src/mc/mcreq.c.bak &&
+#sed "s/lcb_uint32_t/uint32_t/g" src/mc/mcreq.c.bak > src/mc/mcreq.c
+## fix missing strcasecmp in src/errmap.cc (version >= 2.7.6 <= 3.3.13)
+#sed -i.bak -e "s/strcasecmp/stricmp/g" src/errmap.cc
+## fix missing PRIx64 (version >= 2.8.5 <= 3.3.13)
+#for F in $(grep -lrw PRIu64 .); do
+# mv -f $F $F.bak &&
+# echo "#define __STDC_FORMAT_MACROS" > $F
+# echo "#include <inttypes.h>" >> $F
+# cat $F.bak >> $F
+#done
+## fix src/logging.c.bak (version <= 3.3.13)
+#patch -ulbf src/logging.c.bak << EOF
+#@@ -29,3 +29,6 @@
+#
+#-#if defined(unix) || defined(__unix__) || defined(__unix) || defined(_POSIX_VERSION)
+#+#if defined(__MINGW32__)
+#+    #define GET_THREAD_ID() (uint32_t)GetCurrentThreadId()
+#+    #define THREAD_ID_FMT PRIu32
+#+#elif defined(unix) || defined(__unix__) || defined(__unix) || defined(_POSIX_VERSION)
+#     #include <unistd.h>
+#EOF
+# fix contrib/HdrHistogram_c/src/hdr_endian.h (version >= 3.3.14)
+patch -ulbf contrib/HdrHistogram_c/src/hdr_endian.h << EOF
+@@ -75,5 +75,5 @@
 
--#ifndef _WIN32
- #include <string>
-+#ifndef _WIN32
-
-@@ -90,3 +90,3 @@
-
--#else
-+#elsifdef __MINGW64_VERSION_MAJOR
- #include <windns.h>
-EOF
-# fix type error in src/cbft.cc (version >= 2.7.2)
-patch -ulbf src/cbft.cc << EOF
---- src/cbft.cc  2017-02-21 20:55:16 +0100
-+++ src/cbft.cc  2017-03-01 15:24:04 +0100
-@@ -158,3 +158,3 @@
-     } else {
--        root["ctl"]["timeout"] = LCBT_SETTING(instance, n1ql_timeout) / 1000;
-+        root["ctl"]["timeout"] = (Json::UInt64)(LCBT_SETTING(instance, n1ql_timeout) / 1000);
-     }
-EOF
-# fix conflicting types in conflicting types src/mc/mcreq.c (version >= 2.7.2)
-mv src/mc/mcreq.c src/mc/mcreq.c.bak &&
-sed "s/lcb_uint32_t/uint32_t/g" src/mc/mcreq.c.bak > src/mc/mcreq.c
-# fix missing strcasecmp in src/errmap.cc (version >= 2.7.6)
-mv src/errmap.cc src/errmap.cc.bak &&
-sed -e "s/strcasecmp/stricmp/g" src/errmap.cc.bak > src/errmap.cc
-# fix missing PRIx64 (version >= 2.8.5)
-for F in $(grep -lrw PRIu64 .); do
- mv -f $F $F.bak &&
- echo "#define __STDC_FORMAT_MACROS" > $F
- echo "#include <inttypes.h>" >> $F
- cat $F.bak >> $F
-done
-# fix src/logging.c.bak
-patch -ulbf src/logging.c.bak << EOF
-@@ -29,3 +29,6 @@
-
--#if defined(unix) || defined(__unix__) || defined(__unix) || defined(_POSIX_VERSION)
-+#if defined(__MINGW32__)
-+    #define GET_THREAD_ID() (uint32_t)GetCurrentThreadId()
-+    #define THREAD_ID_FMT PRIu32
-+#elif defined(unix) || defined(__unix__) || defined(__unix) || defined(_POSIX_VERSION)
-     #include <unistd.h>
+-#              define htobe64(x) htonll(x)
++#               define htobe64(x) ((((uint64_t)htonl(x & 0xFFFFFFFFUL)) << 32) | htonl((uint64_t)(x >> 32)))
+ #              define htole64(x) (x)
+-#              define be64toh(x) ntohll(x)
++#               define be64toh(x) ((((uint64_t)ntohl(x & 0xFFFFFFFFUL)) << 32) | ntohl((uint64_t)(x >> 32)))
+ #              define le64toh(x) (x)
 EOF
 #wl-showstatus configure &&
 #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-I$(pwd)/winfix" CXXFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32 -lpthread" &&

@@ -213,8 +213,10 @@ export TYPE=application
 ####CMake Error at cmake_modules/YugabyteFunctions.cmake:758 (message): The YB_COMPILER_TYPE CMake variable is already set to 'Full', but the value auto-detected from the build root basename 'build_test' is different: ''.
 #export VERSION=2.23.0.0
 #export VERSIONDATE=20240914
-export VERSION=2024.1.3.0
-export VERSIONDATE=20241009
+#export VERSION=2024.1.3.0
+#export VERSIONDATE=20241009
+export VERSION=2.23.1.0
+export VERSIONDATE=20241113
 ####CMake Error at cmake_modules/YugabyteFunctions.cmake:764 (string): string sub-command REGEX, mode MATCH regex "" matched an empty string.
 wl-showstatus --package-version
 export DEPENDENCIES=
@@ -287,9 +289,21 @@ patch -ulbf CMakeLists.txt << EOF
 +elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
    ADD_CXX_FLAGS("-msse4.2")
 EOF
+## fix cmake_modules/YugabyteFunctions.cmake (version >= 2.23.1.0)
+#patch -ulbf cmake_modules/YugabyteFunctions.cmake << EOF
+#@@ -759,4 +759,7 @@
+#
+#-  execute_process(COMMAND "\${BUILD_SUPPORT_DIR}/show_build_root_name_regex.sh"
+#+  execute_process(COMMAND "sh \${BUILD_SUPPORT_DIR}/show_build_root_name_regex.sh"
+#                OUTPUT_VARIABLE BUILD_ROOT_BASENAME_RE)
+#+  if ("\${BUILD_ROOT_BASENAME_RE}" STREQUAL "")
+#+    set(BUILD_ROOT_BASENAME_RE ".*")
+#+  endif()
+#   # Remove trailing new line from BUILD_ROOT_BASENAME_RE.
+#EOF
 
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
-mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DYB_LINKING_TYPE:STRING=dynamic -DYB_PCH_ON:BOOL=OFF -DYB_COMPILER_TYPE:STRING=Full -DBUILD_SUPPORT_DIR:PATH=$PWD/build-support -DYB_BUILD_TESTS=OFF -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:STRING=Release -DYB_LINKING_TYPE:STRING=dynamic -DYB_PCH_ON:BOOL=OFF -DYB_COMPILER_TYPE:STRING=Full -DBUILD_SUPPORT_DIR:PATH=$PWD/build-support -DYB_BUILD_TESTS=OFF -DCOMPILE_FLAGS:STRING="" -S. -Bbuild_test -LH && echo OK; rm -rf build_test
 
 #export BUILDDEPENDENCIES=cmake
 #export OPTIONALBUILDDEPENDENCIES=
@@ -320,25 +334,25 @@ mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_BUILD_TYPE:
 
 #export BUILDDEPENDENCIES=cmake,ninja
 #export OPTIONALBUILDDEPENDENCIES=
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
-# #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
-# ## fix execution of Python scripts
-# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
-# ## fix missing link libraries
-# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
-# #wl-showstatus build &&
-# #ninja -Cbuild_static &&
-# #wl-showstatus build &&
-# #ninja -Cbuild_shared &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_static install/strip &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_shared install/strip &&
-#    echo OK
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DYB_LINKING_TYPE:STRING=static -DYB_PCH_ON:BOOL=OFF -DYB_COMPILER_TYPE:STRING=Full -DYB_BUILD_TESTS=OFF -DBUILD_SUPPORT_DIR:PATH=$PWD/build-support -DCOMPILE_FLAGS:STRING="" -S. -Bbuild_static &&
+ #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DYB_LINKING_TYPE:STRING=dynamic -DYB_PCH_ON:BOOL=OFF -DYB_COMPILER_TYPE:STRING=Full -DYB_BUILD_TESTS=OFF -DBUILD_SUPPORT_DIR:PATH=$PWD/build-support -DCOMPILE_FLAGS:STRING="" -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
 
 #-DCMAKE_BUILD_TYPE:STRING=MinSizeRel
 
