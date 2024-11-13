@@ -551,6 +551,17 @@ sed -i -e "s/test yes = \"\$GCC\"/true/; s/^\(\s*\)# Assume MSVC wrapper/\1;;\n\
 #    return 0;
 #}
 #EOF
+# fix mingw-w64-crt/math/arm-common/acoshl.c (version >= 12.0.0)
+patch -ulbf mingw-w64-crt/math/arm-common/acoshl.c << EOF
+@@ -10,7 +10,3 @@
+ {
+-#if defined(__arm__) || defined(_ARM_) || defined(__aarch64__) || defined(_ARM64_)
+     return acosh(x);
+-#else
+-#error Not supported on your platform yet
+-#endif
+ }
+EOF
 # copy sources
 mkdir -p $INSTALLPREFIX/src/mingw-w64 &&
 cp -rf * $INSTALLPREFIX/src/mingw-w64/
@@ -681,36 +692,37 @@ wl-showstatus configure &&
 #+#if defined(__MINGW64_VERSION_MAJOR) && !(defined(__ARM_ARCH) || defined(__aarch64__))
 #   restore_modified_sections ();
 #EOF
-mv mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.bak &&
-cat > mingw-w64-crt/crt/pseudo-reloc.c << EOF
-#if defined(__clang__) && (defined(__ARM_ARCH) || defined(__aarch64__))
-void __chkstk ()
-{
-}
-#endif
-EOF
-cat mingw-w64-crt/crt/pseudo-reloc.c.bak >> mingw-w64-crt/crt/pseudo-reloc.c
+## fake missing __chkstk(), instead use compiler flag -mno-stack-arg-probe
+#mv mingw-w64-crt/crt/pseudo-reloc.c mingw-w64-crt/crt/pseudo-reloc.c.bak &&
+#cat > mingw-w64-crt/crt/pseudo-reloc.c << EOF
+##if defined(__clang__) && (defined(__ARM_ARCH) || defined(__aarch64__))
+#void __chkstk ()
+#{
+#}
+##endif
+#EOF
+#cat mingw-w64-crt/crt/pseudo-reloc.c.bak >> mingw-w64-crt/crt/pseudo-reloc.c
 # fix mingw-w64-libraries/winpthreads/src/thread.c (version >= 10.0.0)
-####mingw-w64-libraries/winpthreads/src/thread.c:1525:5: error: a handler attribute must begin with '@' or '%'
-patch -ulbf mingw-w64-libraries/winpthreads/src/thread.c << EOF
-@@ -1522,3 +1522,3 @@
-       /* Provide to this thread a default exception handler.  */
--      #ifdef __SEH__
-+      #if defined(__SEH__) && !(defined(__ARM_ARCH))
-        asm ("\\t.tl_start:\\n"
-@@ -1534,3 +1534,3 @@
-         trslt = (intptr_t) tv->func(tv->ret_arg);
--      #ifdef __SEH__
-+      #if defined(__SEH__) && !(defined(__ARM_ARCH))
-        asm ("\\tnop\\n\\t.tl_end: nop\\n");
-EOF
+#####mingw-w64-libraries/winpthreads/src/thread.c:1525:5: error: a handler attribute must begin with '@' or '%'
+#patch -ulbf mingw-w64-libraries/winpthreads/src/thread.c << EOF
+#@@ -1522,3 +1522,3 @@
+#       /* Provide to this thread a default exception handler.  */
+#-      #ifdef __SEH__
+#+      #if defined(__SEH__) && !(defined(__ARM_ARCH))
+#        asm ("\\t.tl_start:\\n"
+#@@ -1534,3 +1534,3 @@
+#         trslt = (intptr_t) tv->func(tv->ret_arg);
+#-      #ifdef __SEH__
+#+      #if defined(__SEH__) && !(defined(__ARM_ARCH))
+#        asm ("\\tnop\\n\\t.tl_end: nop\\n");
+#EOF
 # force lib as library folder (avoiding lib32/lib64/libarm32/libarm64)
 sed -i.bak "s/\(suffx=lib\)[^ ]*/\1/" mingw-w64-crt/configure
 #archlist="x86_64 i686 aarch64 armv7" &&
 archlist="x86_64 i686 aarch64" &&
  # build MinGW-w64 headers
  mkdir -p build_mingw_w64-headers &&
- wl-showstatus configure &&
+ wl-showstatus configure headers &&
  cd build_mingw_w64-headers &&
  ../mingw-w64-headers/configure --prefix=$INSTALLPREFIX/share/mingw-w64 \
   --build=$BUILDPLATFORM \
@@ -721,7 +733,7 @@ archlist="x86_64 i686 aarch64" &&
   --enable-idl \
   &&
  cd .. &&
- wl-showstatus build-install &&
+ wl-showstatus build-install headers &&
  make -Cbuild_mingw_w64-headers install-strip &&
  # build MinGW-w64 libraries
  for arch in $archlist; do
@@ -794,6 +806,7 @@ archlist="x86_64 i686 aarch64" &&
 
  for arch in $archlist; do
   mkdir -p build_mingw-w64_widl_$arch &&
+  wl-showstatus build-install widl $arch &&
   cd build_mingw-w64_widl_$arch &&
   ../mingw-w64-tools/widl/configure --prefix=$INSTALLPREFIX/share/mingw-w64 \
   --build=$BUILDPLATFORM \
@@ -811,7 +824,7 @@ archlist="x86_64 i686 aarch64" &&
   LDFLAGS="-L$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
   &&
   cd .. &&
-  wl-showstatus build-install $arch &&
+  wl-showstatus build-install widl $arch &&
   make -Cbuild_mingw-w64_widl_$arch install-strip &&
   touch SUCCESS_WIDL_$arch || break
  done &&
@@ -819,6 +832,7 @@ archlist="x86_64 i686 aarch64" &&
 
  for arch in $archlist; do
   mkdir -p build_mingw-w64_winstorecompat_$arch &&
+  wl-showstatus build-install winstorecompat $arch &&
   cd build_mingw-w64_winstorecompat_$arch &&
   ../mingw-w64-tools/widl/configure --prefix=$INSTALLPREFIX/share/mingw-w64 \
   --build=$BUILDPLATFORM \
@@ -836,7 +850,7 @@ archlist="x86_64 i686 aarch64" &&
   LDFLAGS="-L$INSTALLPREFIX/share/mingw-w64/$arch-w64-mingw32/lib" \
   &&
   cd .. &&
-  wl-showstatus build-install $arch &&
+  wl-showstatus build-install winstorecompat $arch &&
   make -Cbuild_mingw-w64_winstorecompat_$arch install-strip &&
   touch SUCCESS_WINSTORECOMPAT_$arch || break
  done &&
