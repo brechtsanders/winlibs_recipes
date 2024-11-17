@@ -103,7 +103,7 @@ export VERSIONDATE=20110128
 wl-showstatus --package-version
 export DEPENDENCIES=glib2,gtk2,pcre,netsnmp,gdk-pixbuf,openssl
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=netpbm
+export BUILDDEPENDENCIES=netpbm,icoutils
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
@@ -147,9 +147,36 @@ patch -ulbf src/icons.h << EOF
  "                ",
 EOF
 # export icons to Windows .ico format
-( echo "I=0"; sed -e "s/\\$/\\\\\$/g; s?^\(static \)const ?I=\$(expr \$I + 1)\necho \"Icon\$I.ico ICON DISCARDABLE \\\\\"\$I.ico\\\\\"\"\n( xpmtoppm | ppmtowinicon ) > \$I.ico << EOF\n/* XPM */\n\1?; s/;$/&\nEOF/" src/icons.h ) | sh > windows_icons.rc &&
+#( echo "I=0"; sed -e "s/\\$/\\\\\$/g; s?^\(static \)const ?I=\$(expr \$I + 1)\necho \"Icon\$I.ico ICON DISCARDABLE \\\\\"\$I.ico\\\\\"\"\n( xpmtoppm | ppmtowinicon ) > \$I.ico << EOF\n/* XPM */\n\1?; s/;$/&\nEOF/" src/icons.h ) | sh > windows_icons.rc &&
+( echo "I=0"; sed -e "s/\\$/\\\\\$/g; s?^\(static \)const ?I=\$(expr \$I + 1)\necho \"Icon\$I.ico ICON DISCARDABLE \\\\\"\$I.ico\\\\\"\"\n( xpmtoppm --alphaout=\$I.alpha.pbm ) > \$I.ppm << EOF\n/* XPM */\n\1?; s/;$/&\nEOF\nppmtopgm < \$I.alpha.pbm > \$I.alpha.pgm \&\& ppmtowinicon -andpgms -truetransparent -output=\$I.ico \$I.ppm \$I.alpha.pgm/" src/icons.h ) | sh > windows_icons.rc &&
  ${WINDRES:-windres} windows_icons.rc -O coff -o windows_icons.o
  #${WINDRES:-windres} windows_icons.rc -O res -o windows_icons.res
+# load inline icons in src/mibtree.c (version >= 0.4.3)
+icotool.exe -x --icon -i1 *.ico -o . &&
+ gdk-pixbuf-csource.exe --build-list snmp_table_xpm 1*.png leaf_xpm 2*.png folder_xpm 3*.png trap 4*.png > src/winicons.h
+patch -ulbf src/mibtree.c << EOF
+@@ -19,3 +19,7 @@
+ #include "details.h"
++#ifdef _WIN32
++#include "winicons.h"
++#else
+ #include "icons.h"
++#endif
+ #include "snmpstuff.h"
+@@ -42,2 +46,8 @@
+ void load_xpm(void) {
++#ifdef _WIN32
++  table_pixbuf = gdk_pixbuf_new_from_inline(-1, snmp_table_xpm, FALSE, NULL);
++  child_pixbuf = gdk_pixbuf_new_from_inline(-1, folder_xpm, FALSE, NULL);
++  end_pixbuf = gdk_pixbuf_new_from_inline(-1, leaf_xpm, FALSE, NULL);
++  trap_pixbuf = gdk_pixbuf_new_from_inline(-1, trap, FALSE, NULL);
++#else
+   table_pixbuf = gdk_pixbuf_new_from_xpm_data(snmp_table_xpm);
+@@ -46,2 +56,3 @@
+   trap_pixbuf = gdk_pixbuf_new_from_xpm_data(trap);
++#endif
+ }
+EOF
 # fix configure script
 patch -ulbf configure << EOF
 @@ -5647,3 +5647,3 @@
