@@ -38,8 +38,8 @@ export TYPE=library
 #export VERSIONDATE=20230607
 #export VERSION=3.8.0
 #export VERSIONDATE=20230622
-export VERSION=3.8.1
-export VERSIONDATE=20231006
+#export VERSION=3.8.1
+#export VERSIONDATE=20231006
 #export VERSION=3.9.0
 #export VERSIONDATE=20231109
 #export VERSION=3.10.0
@@ -50,8 +50,8 @@ export VERSIONDATE=20231006
 #export VERSIONDATE=20240626
 #export VERSION=3.11.0
 #export VERSIONDATE=20241003
-#export VERSION=4.0.0
-#export VERSIONDATE=20241121
+export VERSION=4.0.0
+export VERSIONDATE=20241121
 wl-showstatus --package-version
 export DEPENDENCIES=libbson,mongo-c-driver
 export OPTIONALDEPENDENCIES=
@@ -68,26 +68,39 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/r$VERSION.tar.gz
 cd mongo-cxx-driver-r$VERSION
-## patch for fixing dllexport/dllimport (version >= 4.0.0)
-#cat > fix_MONGOCXX_ABI_EXPORT.patch << EOF
-#@@ -11,6 +11,14 @@
-#         /* We are building this library */
-#-#      define MONGOCXX_ABI_EXPORT __declspec(dllexport)
-#+#      ifdef _WIN32
-#+#        define MONGOCXX_ABI_EXPORT __declspec(dllexport)
-#+#      else
-#+#        define MONGOCXX_ABI_EXPORT
-#+#      endif
-# #    else
-#         /* We are using this library */
-#-#      define MONGOCXX_ABI_EXPORT __declspec(dllimport)
-#+#      ifdef _WIN32
-#+#        define MONGOCXX_ABI_EXPORT __declspec(dllimport)
-#+#      else
-#+#        define MONGOCXX_ABI_EXPORT
-#+#      endif
-# #    endif
-#EOF
+# fix src/bsoncxx/include/bsoncxx/v_noabi/bsoncxx/string/view_or_value.hpp (version >= 4.0.0)
+patch -ulbf src/bsoncxx/include/bsoncxx/v_noabi/bsoncxx/string/view_or_value.hpp << EOF
+@@ -40,3 +40,3 @@
+ ///
+-class view_or_value : public bsoncxx::v_noabi::view_or_value<stdx::string_view, std::string> {
++class BSONCXX_ABI_EXPORT view_or_value : public bsoncxx::v_noabi::view_or_value<stdx::string_view, std::string> {
+    public:
+@@ -50,3 +50,3 @@
+     ///
+-    BSONCXX_ABI_EXPORT_CDECL() view_or_value() = default;
++    view_or_value() = default;
+
+EOF
+# patch for fixing dllexport/dllimport (version >= 4.0.0)
+cat > fix_MONGOCXX_ABI_EXPORT.patch << EOF
+@@ -11,6 +11,14 @@
+         /* We are building this library */
+-#      define MONGOCXX_ABI_EXPORT __declspec(dllexport)
++#      ifdef _WIN32
++#        define MONGOCXX_ABI_EXPORT __declspec(dllexport)
++#      else
++#        define MONGOCXX_ABI_EXPORT
++#      endif
+ #    else
+         /* We are using this library */
+-#      define MONGOCXX_ABI_EXPORT __declspec(dllimport)
++#      ifdef _WIN32
++#        define MONGOCXX_ABI_EXPORT __declspec(dllimport)
++#      else
++#        define MONGOCXX_ABI_EXPORT
++#      endif
+ #    endif
+EOF
 # skip building tests (version >= 3.6.7)
 sed -i.bak -e "s/^add_subdirectory(test)/#&/" src/mongocxx/CMakeLists.txt
 #mkdir -p build_static build_shared &&
@@ -120,11 +133,11 @@ sed -i.bak -e "s/^add_subdirectory(test)/#&/" src/mongocxx/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_SHARED_AND_STATIC_LIBS:BOOL=ON -DMONGOCXX_ENABLE_SSL:BOOL=ON -DBUILD_VERSION:STRING=$VERSION -DENABLE_TESTS:BOOL=OFF -S. -Bbuild_win &&
- ## fix missing link libraries (version >= 4.0.0)
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--allow-multiple-definition/" build_win/build.ninja &&
- ## patch for fixing dllexport/dllimport (version >= 4.0.0)
- #patch -ulbf build_win/src/mongocxx/lib/mongocxx/v_noabi/mongocxx/config/export.hpp < fix_MONGOCXX_ABI_EXPORT.patch &&
- #sed -e "s/MONGOCXX_ABI_EXPORT/BSONCXX_ABI_EXPORT/" fix_MONGOCXX_ABI_EXPORT.patch | patch -ulbf build_win/src/bsoncxx/lib/bsoncxx/v_noabi/bsoncxx/config/export.hpp &&
+ # fix missing link libraries (version >= 4.0.0)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--allow-multiple-definition/" build_win/build.ninja &&
+ # patch for fixing dllexport/dllimport (version >= 4.0.0)
+ patch -ulbf build_win/src/mongocxx/lib/mongocxx/v_noabi/mongocxx/config/export.hpp < fix_MONGOCXX_ABI_EXPORT.patch &&
+ sed -e "s/MONGOCXX_ABI_EXPORT/BSONCXX_ABI_EXPORT/" fix_MONGOCXX_ABI_EXPORT.patch | patch -ulbf build_win/src/bsoncxx/lib/bsoncxx/v_noabi/bsoncxx/config/export.hpp &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  for F in $INSTALLPREFIX/lib/*-static.a; do
