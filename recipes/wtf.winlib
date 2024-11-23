@@ -123,10 +123,14 @@ export TYPE=library
 #export VERSIONDATE=20240601
 #export VERSION=7618.3.11.11.5
 #export VERSIONDATE=20240821
-export VERSION=7619.1.26.30.5
-export VERSIONDATE=20240924
+#export VERSION=7619.1.26.30.5
+#export VERSIONDATE=20240924
 #export VERSION=7619.1.26.31.6
 #export VERSIONDATE=20241001
+#export VERSION=7619.2.8.10.7
+#export VERSIONDATE=20241123
+export VERSION=7619.2.8.11.9
+export VERSIONDATE=20241123
 wl-showstatus --package-version
 export DEPENDENCIES=icu
 export OPTIONALDEPENDENCIES=
@@ -144,6 +148,54 @@ wl-showstatus extract
 mkdir -p $BASENAME-$VERSION
 tar xz --force-local -f $TARBALLDIR/$BASENAME/WebKit-$VERSION.tar.gz -C$BASENAME-$VERSION
 cd $BASENAME-$VERSION/WebKit-WebKit-$VERSION
+# fix Source/WTF/wtf/FunctionTraits.h (version >= 7619.2.8.11.9)
+patch -ulbf Source/WTF/wtf/FunctionTraits.h << EOF
+@@ -82,3 +82,3 @@
+ };
+-#endif
++#else
+
+@@ -87,2 +87,3 @@
+ };
++#endif
+
+@@ -92,3 +93,3 @@
+ };
+-#endif
++#else
+
+@@ -97,2 +98,3 @@
+ };
++#endif
+
+EOF
+# fix Source/WTF/wtf/CurrentTime.cpp (version >= 7619.2.8.11.9)
+patch -ulbf Source/WTF/wtf/CurrentTime.cpp << EOF
+@@ -115,3 +115,3 @@
+         else {
+-            __int64 tickCountLarge = tickCount + 0x100000000I64;
++            __int64 tickCountLarge = tickCount + 0x100000000LL;
+             tickCountElapsed = tickCountLarge - tickCountLast;
+EOF
+# fix undeclared ConstChar16Ptr in Source/WTF/wtf/text/StringView.cpp (version >= 7619.2.8.11.9)
+mv Source/WTF/wtf/text/StringView.cpp Source/WTF/wtf/text/StringView.cpp.bak &&
+echo "#include <unicode/unistr.h>" > Source/WTF/wtf/text/StringView.cpp &&
+cat Source/WTF/wtf/text/StringView.cpp.bak >> Source/WTF/wtf/text/StringView.cpp
+# fix undeclared ConstChar16Ptr in Source/WTF/wtf/unicode/icu/CollatorICU.cpp (version >= 7619.2.8.11.9)
+mv Source/WTF/wtf/unicode/icu/CollatorICU.cpp Source/WTF/wtf/unicode/icu/CollatorICU.cpp.bak &&
+echo "#include <unicode/unistr.h>" > Source/WTF/wtf/unicode/icu/CollatorICU.cpp &&
+cat Source/WTF/wtf/unicode/icu/CollatorICU.cpp.bak >> Source/WTF/wtf/unicode/icu/CollatorICU.cpp
+# fix undefined __try/__except in Source/WTF/wtf/win/ThreadingWin.cpp (version >= 7619.2.8.11.9)
+patch -ulbf Source/WTF/wtf/win/ThreadingWin.cpp << EOF
+@@ -132,2 +132,3 @@
+
++#ifdef _MSC_VER
+     __try {
+@@ -135,2 +136,3 @@
+     } __except(EXCEPTION_CONTINUE_EXECUTION) { }
++#endif
+
+EOF
 # fix Source/WTF/CMakeLists.txt (version >= 7616.1.27.211.1)
 mv Source/WTF/CMakeLists.txt Source/WTF/CMakeLists.txt.bak
 cat > Source/WTF/CMakeLists.txt << EOF
@@ -154,6 +206,7 @@ cat Source/WTF/CMakeLists.txt.bak >> Source/WTF/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=WinCairo -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $PWD/Source/WTF) -I$(cygpath -m $PWD/Source/WTF/wtf)" -SSource/WTF -Bbuild_win &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPORT:STRING=Win -DENABLE_LAYOUT_TESTS:BOOL=OFF -DENABLE_API_TESTS:BOOL=OFF -DCMAKE_MODULE_PATH:PATH=$PWD/Source/cmake -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPERL_EXECUTABLE:FILEPATH=$PERLDIR/bin/perl.exe -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $PWD/Source/WTF) -I$(cygpath -m $PWD/Source/WTF/wtf)" -SSource/WTF -Bbuild_win &&
  wl-showstatus build &&
  ninja -Cbuild_win &&
  #wl-showstatus build-install &&
