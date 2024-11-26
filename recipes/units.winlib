@@ -29,8 +29,10 @@ export TYPE=application
 #export VERSIONDATE=20201116
 #export VERSION=2.22
 #export VERSIONDATE=20220906
-export VERSION=2.23
-export VERSIONDATE=202402198
+#export VERSION=2.23
+#export VERSIONDATE=20240219
+export VERSION=2.24
+export VERSIONDATE=20241126
 wl-showstatus --package-version
 export DEPENDENCIES=readline
 export OPTIONALDEPENDENCIES=
@@ -47,40 +49,48 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix units.c
-####error: conflicting types for '__p__environ'
+## fix units.c (version <= 2.23)
+#####error: conflicting types for '__p__environ'
+#patch -ulbf units.c << EOF
+#--- units.c  2014-04-02 03:03:26 +0200
+#+++ units.c  2014-04-28 16:13:30 +0200
+#@@ -1411,3 +1411,3 @@
+# {
+#-  char *environ;
+#+  char *environment;
+#
+#@@ -1415,15 +1415,15 @@
+#     return 0;
+#-  environ = (char *) malloc(strlen(name) + strlen(val) + 2);
+#-  if (!environ)
+#+  environment = (char *) malloc(strlen(name) + strlen(val) + 2);
+#+  if (!environment)
+#     return 1;
+#-  strcpy(environ, name);
+#-  strcat(environ, "=");
+#-  strcat(environ, val);
+#+  strcpy(environment, name);
+#+  strcat(environment, "=");
+#+  strcat(environment, val);
+#
+#-  /* putenv() doesn't copy its argument, so don't free environ */
+#+  /* putenv() doesn't copy its argument, so don't free environment */
+#
+# #if defined (_WIN32) && defined (_MSC_VER)
+#-  return _putenv(environ);
+#+  return _putenv(environment);
+# #else
+#-  return putenv(environ);
+#+  return putenv(environment);
+# #endif
+#EOF
+# fix units.c (version >= 2.24)
 patch -ulbf units.c << EOF
---- units.c  2014-04-02 03:03:26 +0200
-+++ units.c  2014-04-28 16:13:30 +0200
-@@ -1411,3 +1411,3 @@
- {
--  char *environ;
-+  char *environment;
-
-@@ -1415,15 +1415,15 @@
-     return 0;
--  environ = (char *) malloc(strlen(name) + strlen(val) + 2);
--  if (!environ)
-+  environment = (char *) malloc(strlen(name) + strlen(val) + 2);
-+  if (!environment)
-     return 1;
--  strcpy(environ, name);
--  strcat(environ, "=");
--  strcat(environ, val);
-+  strcpy(environment, name);
-+  strcat(environment, "=");
-+  strcat(environment, val);
-
--  /* putenv() doesn't copy its argument, so don't free environ */
-+  /* putenv() doesn't copy its argument, so don't free environment */
-
- #if defined (_WIN32) && defined (_MSC_VER)
--  return _putenv(environ);
-+  return _putenv(environment);
- #else
--  return putenv(environ);
-+  return putenv(environment);
- #endif
+@@ -5070,3 +5070,3 @@
+     printf("To enable UTF-8: ");
+-    if (! getenv(WINDOWS_TERMINAL))
++    if (! getenv("WINDOWS_TERMINAL"))
+       printf("run in Windows Terminal and ");
 EOF
 wl-showstatus configure &&
 PYTHON=$PYDIR/python.exe ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
