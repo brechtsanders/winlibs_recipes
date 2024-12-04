@@ -851,6 +851,21 @@ EOF
 sed -i.bak -e "s/interface/iface/g" gck/gck.h
 # fix already defined environ in gcr/gcr-gnupg-process.c (version >= 3.41.0)
 sed -i.bak -e "s/\benviron\b/environment/" gcr/gcr-gnupg-process.c
+# fix undefined getpagesize in egg/egg-secure-memory.c (version >= 4.3.0)
+patch -ulbf egg/egg-secure-memory.c << EOF
+@@ -41,2 +41,11 @@
+ #include <assert.h>
++#ifdef _WIN32
++#include <windows.h>
++DWORD getpagesize()
++{
++  SYSTEM_INFO sysinfo;
++  GetSystemInfo(&sysinfo);
++  return sysinfo.dwPageSize;
++}
++#endif
+
+EOF
 # fix missing gio-unix and gtk+-x11
 sed -i.bak -e "s/gio-unix-/gio-windows-/; s/gtk+-x11/gtk+-win32/" meson.build
 # fix issue updating MIME database (version >= 3.41.0)
@@ -884,7 +899,8 @@ mkdir -p build_both &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk4=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
  #PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk4=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
- PYTHONPATH=$PWD/winfix:$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk4=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ #PYTHONPATH=$PWD/winfix:$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk4=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ PYTHONPATH=$PWD/winfix:$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgtk4=true -Dssh_agent=false -Dintrospection=true -Dgtk_doc=false -Dc_args="-I$(cygpath -w $(pwd)/winfix) -I$(cygpath -w $MINGWPREFIX/include/mman-win32) -I$(cygpath -w $MINGWPREFIX/win32ports/include) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
  ## fix slash/backslash path issue when calling Python from Ninja
  #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
  ## fix missing strptime (version >= 3.340.0)
