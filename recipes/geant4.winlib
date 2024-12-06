@@ -19,8 +19,10 @@ export TYPE=library
 #export VERSIONDATE=20231208
 #export VERSION=11.2.1
 #export VERSIONDATE=20240216
-export VERSION=11.2.2
-export VERSIONDATE=20240622
+#export VERSION=11.2.2
+#export VERSIONDATE=20240622
+export VERSION=11.3.0
+export VERSIONDATE=20241206
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,zlib,xerces,clhep,qt
 export OPTIONALDEPENDENCIES=
@@ -60,10 +62,53 @@ patch -ulbf source/run/src/G4WorkerThread.cc << EOF
 +  G4NativeThread t = (G4NativeThread)pthread_self();
  #  else
 EOF
+# fix source/global/management/src/G4Timer.cc (version >= 11.3.0)
+patch -ulbf source/global/management/src/G4Timer.cc << EOF
+@@ -43,3 +43,3 @@
+
+-#ifdef WIN32
++#ifdef _WIN32
+ #  include <sys/types.h>
+@@ -48,2 +48,5 @@
+ // extract milliseconds time unit
++#ifdef CLOCKS_PER_SEC
++#define sysconf(_SC_CLK_TCK) CLOCKS_PER_SEC
++#else
+ G4int sysconf(G4int a)
+@@ -55,2 +58,3 @@
+ }
++#endif
+
+EOF
+# fix source/global/management/src/G4SliceTimer.cc (version >= 11.3.0)
+patch -ulbf source/global/management/src/G4SliceTimer.cc << EOF
+@@ -32,2 +32,5 @@
+ #include "G4ios.hh"
++#ifdef _WIN32
++#define sysconf(_SC_CLK_TCK) CLOCKS_PER_SEC
++#endif
+
+EOF
+# fix source/processes/electromagnetic/dna/management/src/G4MemStat.cc (version >= 11.3.0)patch -ulbf source/processes/electromagnetic/dna/management/src/G4MemStat.cc << EOF
+@@ -39,2 +39,12 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++#define _SC_PAGE_SIZE -1
++static inline DWORD sysconf (int conf_item)
++{
++  SYSTEM_INFO sysinfo;
++  GetSystemInfo(&sysinfo);
++  return sysinfo.dwPageSize;
++}
++#endif
+
+EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
  #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGEANT4_INSTALL_DATA:BOOL=ON -DGEANT4_USE_QT:BOOL=ON -DGEANT4_USE_SYSTEM_ZLIB:BOOL=ON -DGEANT4_USE_SYSTEM_CLHEP:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_win &&
- PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC_LIBS:BOOL=ON -DGEANT4_INSTALL_DATA:BOOL=ON -DGEANT4_USE_QT:BOOL=ON -DGEANT4_USE_GDML:BOOL=ON -DGEANT4_USE_SYSTEM_ZLIB:BOOL=ON -DGEANT4_USE_SYSTEM_CLHEP:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_win &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC_LIBS:BOOL=ON -DGEANT4_INSTALL_DATA:BOOL=ON -DGEANT4_USE_QT:BOOL=ON -DGEANT4_USE_GDML:BOOL=ON -DGEANT4_USE_SYSTEM_ZLIB:BOOL=ON -DGEANT4_USE_SYSTEM_CLHEP:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_win &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC_LIBS:BOOL=ON -DGEANT4_INSTALL_DATA:BOOL=ON -DGEANT4_USE_QT:BOOL=ON -DGEANT4_USE_GDML:BOOL=ON -DGEANT4_USE_SYSTEM_ZLIB:BOOL=ON -DGEANT4_USE_SYSTEM_CLHEP:BOOL=ON -DCMAKE_TLS_VERIFY:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-D_USE_MATH_DEFINES" -DCMAKE_SHARED_LINKER_FLAGS:STRING="-Wl,--allow-multiple-definition" -S. -Bbuild_win &&
  #-DGEANT4_USE_GDML:BOOL=ON 
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
