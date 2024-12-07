@@ -191,9 +191,23 @@ cd $BASENAME-$VERSION
 #sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
 # also allow building static library
 sed -i.bak -e "s/shared_\(library\)/\1/" gladeui/meson.build
+## skip building help (version >= 3.40.0)
+#sed -i.bak -e "s/^subdir('help')/#&/" meson.build
+## skip meson_post_install.py in meson.build (version >= 3.40.0)
+#patch -ulbf meson.build << EOF
+#@@ -212,2 +212,3 @@
+#
+#+if have_python
+# meson.add_install_script(
+#@@ -216,2 +217,3 @@
+# )
+#+endif
+#
+#EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
- PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgladeui=true -Dwebkit2gtk=disabled -Dgjs=disabled -Dintrospection=true -Dpython=disabled -Dman=false -Dgtk_doc=false . build_both &&
+ #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgladeui=true -Dwebkit2gtk=disabled -Dgjs=disabled -Dintrospection=true -Dpython=disabled -Dman=false -Dgtk_doc=false . build_both &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dgladeui=true -Dwebkit2gtk=disabled -Dgjs=disabled -Dintrospection=true -Dpython=disabled -Dman=false -Dgtk_doc=false -Dc_args="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" . build_both &&
  wl-showstatus build-install &&
  PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} GETTEXTDATADIR=$MINGWPREFIX/share/gettext ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
