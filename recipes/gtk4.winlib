@@ -265,6 +265,15 @@ patch -ulbf gtk/language-names.c << EOF
 +#endif
  #include <windows.h>
 EOF
+# fix missing SHOpenWithDialog in gtk/gtkshowwin32.c (version >= 4.16.7)
+patch -ulbf gtk/gtkshowwin32.c << EOF
+@@ -1 +1,5 @@
++#if !defined(NTDDI_VERSION) || NTDDI_VERSION < 0x06000000
++#undef NTDDI_VERSION
++#define NTDDI_VERSION 0x06000000
++#endif
+ /*
+EOF
 # fix detection of python3
 sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" subprojects/glib/meson.build
 mkdir -p build_both &&
@@ -274,7 +283,8 @@ mkdir -p build_both &&
  #PKG_CONFIG= PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwin32-backend=true -Dbroadway-backend=false -Dx11-backend=false -Dwayland-backend=false -Dmedia-ffmpeg=enabled -Dmedia-gstreamer=enabled -Dcloudproviders=disabled -Dprint-cups=disabled -Dcolord=disabled -Dintrospection=enabled -Dman-pages=false -Dgtk_doc=false -Dbuild-examples=false -Ddemos=false -Dbuild-tests=false -Dinstall-tests=false . build_both &&
  #PKG_CONFIG= PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwin32-backend=true -Dbroadway-backend=false -Dx11-backend=false -Dwayland-backend=false -Dmedia-ffmpeg=enabled -Dmedia-gstreamer=enabled -Dcloudproviders=disabled -Dprint-cups=disabled -Dcolord=disabled -Dintrospection=enabled -Dman-pages=false -Dgtk_doc=false -Dbuild-examples=false -Ddemos=false -Dbuild-tests=false . build_both &&
  #PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg4/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwin32-backend=true -Dbroadway-backend=false -Dx11-backend=false -Dwayland-backend=false -Dmedia-ffmpeg=enabled -Dmedia-gstreamer=enabled -Dcloudproviders=disabled -Dprint-cups=disabled -Dcolord=disabled -Dintrospection=enabled -Dman-pages=false -Dgtk_doc=false -Dbuild-examples=false -Ddemos=false -Dbuild-tests=false . build_both &&
- PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwin32-backend=true -Dbroadway-backend=false -Dx11-backend=false -Dwayland-backend=false -Dmedia-gstreamer=enabled -Dcloudproviders=disabled -Dprint-cups=disabled -Dcolord=disabled -Dintrospection=enabled -Dman-pages=false -Ddocumentation=false -Dbuild-examples=false -Dbuild-demos=false -Dbuild-tests=false -Dbuild-testsuite=false -Dc_args="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" . build_both &&
+ #PYTHONPATH=$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwin32-backend=true -Dbroadway-backend=false -Dx11-backend=false -Dwayland-backend=false -Dmedia-gstreamer=enabled -Dcloudproviders=disabled -Dprint-cups=disabled -Dcolord=disabled -Dintrospection=enabled -Dman-pages=false -Ddocumentation=false -Dbuild-examples=false -Dbuild-demos=false -Dbuild-tests=false -Dbuild-testsuite=false -Dc_args="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" . build_both &&
+ PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dwin32-backend=true -Dbroadway-backend=false -Dx11-backend=false -Dwayland-backend=false -Dmedia-gstreamer=enabled -Dcloudproviders=disabled -Dprint-cups=disabled -Dcolord=disabled -Dintrospection=enabled -Dman-pages=false -Ddocumentation=false -Dbuild-examples=false -Dbuild-demos=false -Dbuild-tests=false -Dbuild-testsuite=false -Dc_args="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" . build_both &&
  ## fix slash/backslash path issue when calling Python from Ninja (version <= 4.8.2)
  #sed -i.bak -e "/COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_both/build.ninja &&
  ## fix error calling gtk4-update-icon-cache in build-aux/meson/post-install.py (version <= 4.8.2)
@@ -284,6 +294,7 @@ mkdir -p build_both &&
  wl-showstatus build &&
  #PKG_CONFIG= PATH=$PYDIR:$PATH PYTHONPATH=$PWD/winfix:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both &&
  #PATH=$PYDIR:$PATH PYTHONPATH=$PWD/winfix:$MINGWPREFIX/lib${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both &&
+ #PATH=$PYDIR:$PATH PYTHONPATH=$PWD/winfix:$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both &&
  PATH=$PYDIR:$PATH PYTHONPATH=$PWD/winfix:$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} ninja -Cbuild_both &&
  wl-showstatus build-install &&
  mkdir -p $INSTALLPREFIX/share/icons/hicolor &&
