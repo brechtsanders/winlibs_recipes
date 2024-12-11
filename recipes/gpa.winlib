@@ -29,22 +29,43 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd gpa-gpa-$VERSION
+# fix missing inet_aton in src/settingsdlg.c (version >= 0.11.0)
+cp src/settingsdlg.c src/settingsdlg.c.bak &&
+echo "#define inet_aton(opt,bind) ((bind)->s_addr = inet_addr(opt))" > src/settingsdlg.c &&
+cat src/settingsdlg.c.bak >> src/settingsdlg.c
+# fix src/launch-gpa.c (version >= 0.11.0)
+patch -ulbf src/launch-gpa.c << EOF
+@@ -152,3 +152,3 @@
+     {
+-      printf (stdout, "%s %s ;%s\\n", me, PACKAGE_VERSION, pgm);
++      fprintf (stdout, "%s %s ;%s\\n", me, PACKAGE_VERSION, pgm);
+       fflush (stdout);
+EOF
+# fix undefined gpa_keytable_ensure in src/cm-piv.c (version >= 0.11.0)
+mv src/cm-piv.c src/cm-piv.c.bak &&
+echo '#include "keytable.h"' > src/cm-piv.c &&
+cat src/cm-piv.c.bak >> src/cm-piv.c
+# fix undefined gpgme_get_giochannel in src/gpacontext.c (version >= 0.11.0)
+#sed -i.bak -e "s/gpgme_get_giochannel/g_io_channel_win32_new_fd/" src/gpacontext.c
+sed -i.bak -e "s/gpgme_get_giochannel/g_io_channel_win32_new_socket/" src/gpacontext.c
 # fix missing gpadefs.h
 cp gpadefs.h.in gpadefs.h
-# don't abort when libassuan is a higher version configure.ac (version >= 0.11-base)
-patch -ulbf configure.ac << EOF
-@@ -443,3 +443,2 @@
- if test "\$have_libassuan" = "no"; then
--   die=yes
-    AC_MSG_NOTICE([[
-EOF
+## don't abort when libassuan is a higher version configure.ac (version = 0.11-base)
+#patch -ulbf configure.ac << EOF
+#@@ -443,3 +443,2 @@
+# if test "\$have_libassuan" = "no"; then
+#-   die=yes
+#    AC_MSG_NOTICE([[
+#EOF
 wl-showstatus configure &&
  mkdir -p m4 &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=incompatible-pointer-types"; fi)" &&
  wl-showstatus build-install &&
  #make install-strip &&
- PATH=$PYDIR:$PATH make install-strip &&
+ #PATH=$PYDIR:$PATH make install-strip &&
+ ( PATH=$PYDIR:$PATH make install-strip || PATH=$PYDIR:$PATH make install-strip LIBS="$(${PKG_CONFIG:-pkg-config} --libs gpgme zlib)" ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gpa-gpa-$VERSION
 ####TO DO: proper paths (relative if possible) in gpadefs.h
 
