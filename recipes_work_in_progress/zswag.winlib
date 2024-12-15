@@ -27,9 +27,55 @@ tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # allow building both static and shared libraries
 sed -i.bak -e "s/\(add_library([^ ]*\) \(STATIC\|SHARED\)/\1/" libs/httpcl/CMakeLists.txt libs/zswagcl/CMakeLists.txt
+# fix libs/httpcl/CMakeLists.txt (version >= 1.7.1)
+patch -ulbf libs/httpcl/CMakeLists.txt << EOF
+@@ -6,6 +6,8 @@
+ if(NOT TARGET spdlog)
+-  find_package(spdlog CONFIG REQUIRED)
++  find_package(PkgConfig)
++  pkg_check_modules(SPDLOG IMPORTED_TARGET REQUIRED spdlog)
++  add_library(spdlog::spdlog ALIAS PkgConfig::SPDLOG)
+ endif()
+
+-add_library(httpcl STATIC
++add_library(httpcl
+   include/httpcl/http-client.hpp
+EOF
+# fix CMakeLists.txt (version >= 1.7.1)
+# fix CMakeLists.txt (version >= 1.7.1)
+patch -ulbf CMakeLists.txt << EOF
+@@ -3,2 +3,3 @@
+ include(FetchContent)
++find_package(PkgConfig)
+
+@@ -55,3 +56,4 @@
+ if(NOT TARGET OpenSSL)
+-  find_package(OpenSSL CONFIG REQUIRED)
++  pkg_check_modules(OPENSSL-LIBSSL IMPORTED_TARGET REQUIRED libssl)
++  add_library(OpenSSL::SSL ALIAS PkgConfig::OPENSSL-LIBSSL)
+ endif()
+@@ -59,3 +61,4 @@
+ if(ZSWAG_KEYCHAIN_SUPPORT)
+-  find_package(keychain CONFIG REQUIRED)
++  add_library(keychain::keychain SHARED IMPORTED)
++  set_target_properties(keychain::keychain PROPERTIES IMPORTED_IMPLIB "-lkeychain")
+ endif()
+@@ -116,3 +119,4 @@
+   if (NOT TARGET ZLIB::ZLIB)
+-    find_package(ZLIB CONFIG REQUIRED)
++    pkg_check_modules(ZLIB IMPORTED_TARGET REQUIRED zlib)
++    add_library(ZLIB::ZLIB ALIAS PkgConfig::ZLIB)
+   endif ()
+@@ -132,3 +136,4 @@
+ if(ZSWAG_BUILD_WHEELS AND NOT TARGET pybind11::pybind11)
+-  find_package(pybind11 REQUIRED)
++  pkg_check_modules(PYBIND11 IMPORTED_TARGET REQUIRED pybind11)
++  add_library(pybind11::pybind11 ALIAS PkgConfig::PYBIND11)
+ endif()
+EOF
 
 #grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
-mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DZSWAG_KEYCHAIN_SUPPORT:BOOL=OFF -DZSWAG_BUILD_WHEELS:BOOL=OFF -DZSWAG_WITH_CONAN:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DZSWAG_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DZSWAG_KEYCHAIN_SUPPORT:BOOL=ON -DZSWAG_BUILD_WHEELS:BOOL=OFF -DZSWAG_WITH_CONAN:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DZSWAG_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_test -LH && echo OK; rm -rf build_test
 
 #export BUILDDEPENDENCIES=cmake
 #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
@@ -61,13 +107,12 @@ mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DZSWAG_KEYCHAIN_SUPPORT:BOO
 # ninja -Cbuild_win install/strip &&
 #    echo OK
 
-#export BUILDDEPENDENCIES=cmake,ninja
 #mkdir -p build_static build_shared &&
 # wl-showstatus configure-static &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DZSWAG_KEYCHAIN_SUPPORT:BOOL=ON -DZSWAG_BUILD_WHEELS:BOOL=OFF -DZSWAG_WITH_CONAN:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DZSWAG_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_static &&
 # #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
 # wl-showstatus configure-shared &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DZSWAG_KEYCHAIN_SUPPORT:BOOL=ON -DZSWAG_BUILD_WHEELS:BOOL=OFF -DZSWAG_WITH_CONAN:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DZSWAG_ENABLE_TESTING:BOOL=OFF -S. -Bbuild_shared &&
 # ## fix execution of Python scripts
 # #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
 # ## fix missing link libraries
@@ -89,7 +134,6 @@ mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DZSWAG_KEYCHAIN_SUPPORT:BOO
 # #cmake.exe --build build_shared --target "install/strip" &&
 # ninja -Cbuild_shared install/strip &&
 #    echo OK
-
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
