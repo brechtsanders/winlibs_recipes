@@ -32,6 +32,45 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix src/utils/find_msvc.c (version >= 0.6.5)
+patch -ulbf src/utils/find_msvc.c << EOF
+@@ -21,3 +21,7 @@
+        {
++#ifdef __MINGW32__
++               return out;
++#else
+                error_exit("Failed to find windows kit root.");
++#endif
+        }
+EOF
+# fix src/compiler/linker.c (version >= 0.6.5)
+patch -ulbf src/compiler/linker.c << EOF
+@@ -134,2 +134,3 @@
+        {
++#ifndef __MINGW32__
+                WindowsSDK *windows_sdk = windows_get_sdk();
+@@ -142,2 +143,3 @@
+                add_concat_quote_arg("/LIBPATH:", windows_sdk->vs_library_path);
++#endif
+        }
+@@ -466,2 +468,12 @@
+                {
++#ifdef __MINGW32__
++                       if (str_has_suffix(lib, ".dll.a") || str_has_suffix(lib, ".a"))
++                       {
++                               add_plain_arg(lib);
++                       }
++                       else
++                       {
++                               add_concat_quote_arg("/implib:", lib);
++                       }
++#else
+                        if (str_has_suffix(lib, ".lib"))
+@@ -474,2 +486,3 @@
+                        }
++#endif
+                }
+EOF
 # fix src/compiler/target.c (version >= 0.6.5)
 patch -ulbf src/compiler/target.c << EOF
 @@ -1823,3 +1823,5 @@
@@ -42,6 +81,7 @@ patch -ulbf src/compiler/target.c << EOF
                 INITIALIZE_TARGET(WebAssembly);
 EOF
 # support shared LLVM libraries
+####Bug reported: https://github.com/c3lang/c3c/pull/1682
 sed -i.bak -e "s/\(liblld[^ .]*\)\.a/\1.dll.a &/g" CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
