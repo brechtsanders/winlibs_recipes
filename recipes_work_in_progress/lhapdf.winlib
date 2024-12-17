@@ -5,8 +5,10 @@ export BASENAME=lhapdf
 export DESCRIPTION="LHAPDF is the standard tool for evaluating parton distribution functions (PDFs) in high-energy physics. PDFs encode the flavour and momentum structure of composite particles, such as protons, pions and nuclei; most cross-section calculations are based on parton-level matrix-elements which must be connected to the real interacting particles, hence PDFs are an essential ingredient of phenomenological and experimental studies at hadron and heavy-ion colliders (e.g. LHC, HERA, Tevatron, EIC, FCC) and in cosmic-ray physics."
 export CATEGORY=science
 export TYPE=library
-export VERSION=6.5.4
-export VERSIONDATE=20231218
+#export VERSION=6.5.4
+#export VERSIONDATE=20231218
+export VERSION=6.5.5
+export VERSIONDATE=20241217
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -23,16 +25,23 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/*LHAPDF-$VERSION.tar.gz
 cd LHAPDF-$VERSION
+# fix undefined setenv() in src/Paths.cc (version >= 6.5.5)
+patch -ulbf src/Paths.cc << EOF
+@@ -37,3 +37,8 @@
+   void setPaths(const string& pathstr) {
++#ifdef _WIN32
++    string envset = "LHAPDF_DATA_PATH=" + pathstr;
++    putenv(envset.c_str());
++#else
+     setenv("LHAPDF_DATA_PATH", pathstr.c_str(), 1);
++#endif
+   }
+EOF
 
   ./configure --help 2> /dev/null
   cat meson_options.txt 2> /dev/null
   head COPYING* LICENSE* LICENCE* COPYRIGHT*
   ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake xmake.lua Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
-
-wl-showstatus build &&
- make &&
- #make CC=${CC:-gcc} CXX=${CXX:-g++} LD=${LD:-ld} AR=${AR:-ar} &&
-    echo OK
 
 #GCCFLAG_ASNEEDED=$(echo "int main () { return 0; }"|gcc -xc - -Wl,--as-needed &>/dev/null && echo "-Wl,--as-needed")
 #GCCFLAG_ASNEEDED=$(if gcc --help -v 2>/dev/null | grep -q " --as-needed"; then echo "-Wl,--as-needed"; fi)
