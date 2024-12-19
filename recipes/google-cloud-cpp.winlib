@@ -123,6 +123,8 @@ export VERSIONDATE=20240202
 #export VERSIONDATE=20241109
 #export VERSION=2.32.0
 #export VERSIONDATE=20241206
+#export VERSION=2.33.0
+#export VERSIONDATE=20241219
 ####google/cloud/internal/sha256_hash.cc:33:14: error: 'BCRYPT_SHA256_ALG_HANDLE' was not declared in this scope
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,openssl,c-ares,protobuf,crc32c,nlohmann-json,abseil,grpc,libcurl,re2
@@ -163,12 +165,14 @@ cd $BASENAME-$VERSION
 #
 #   Request request_;
 #EOF
-# avoid undefined BCryptHash by using openssl (version >= 2.31.0)
-sed -i.bak -e "s/^#ifdef _WIN32$/#if 0/" google/cloud/internal/sha256_hash.cc google/cloud/internal/sha256_hmac.cc google/cloud/storage/internal/md5hash.cc
-mv google/cloud/internal/win32/sign_using_sha256.cc google/cloud/internal/win32/sign_using_sha256.cc.bak &&
-cp -f google/cloud/internal/openssl/sign_using_sha256.cc google/cloud/internal/win32/sign_using_sha256.cc
-mv google/cloud/storage/internal/win32/hash_function_impl.cc google/cloud/storage/internal/win32/hash_function_impl.cc.bak &&
-cp -f google/cloud/storage/internal/openssl/hash_function_impl.cc google/cloud/storage/internal/win32/hash_function_impl.cc
+## avoid undefined BCryptHash by using openssl (version >= 2.31.0 <= 2.32.0)
+#sed -i.bak -e "s/^#ifdef _WIN32$/#if 0/" google/cloud/internal/sha256_hash.cc google/cloud/internal/sha256_hmac.cc google/cloud/storage/internal/md5hash.cc
+#mv google/cloud/internal/win32/sign_using_sha256.cc google/cloud/internal/win32/sign_using_sha256.cc.bak &&
+#cp -f google/cloud/internal/openssl/sign_using_sha256.cc google/cloud/internal/win32/sign_using_sha256.cc
+#mv google/cloud/storage/internal/win32/hash_function_impl.cc google/cloud/storage/internal/win32/hash_function_impl.cc.bak &&
+#cp -f google/cloud/storage/internal/openssl/hash_function_impl.cc google/cloud/storage/internal/win32/hash_function_impl.cc
+## use OpenSSL instead of native Windows hashing functions (version >= 2.33.0)
+#sed -i.bak -e "s/#ifdef _WIN32/#if 0/" google/cloud/internal/sha256_hash.cc google/cloud/internal/sha256_hmac.cc google/cloud/internal/win32/* google/cloud/internal/openssl/* google/cloud/storage/internal/win32/hash_function_impl.cc google/cloud/storage/internal/md5hash.cc
 # don't abort on warnings (version >= 2.0.0)
 sed -i.bak -e "s/^include(EnableWerror)/#&/" external/googleapis/CMakeLists.txt
 mkdir -p build_static build_shared &&
@@ -178,15 +182,17 @@ mkdir -p build_static build_shared &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;pubsub;spanner;storage" -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DCMAKE_TLS_VERIFY:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;pubsub;spanner;storage" -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive -D_WIN32_WINNT=0x0A00" -S. -Bbuild_static &&
  #-DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;logging;pubsub;spanner;storage"
- # don't force older C++ standard and don't treat warnings as errors
- sed -i.bak -e "s/-std=gnu++11//; s/-Werror//" build_static/build.ninja &&
+ ## don't force older C++ standard and don't treat warnings as errors
+ #sed -i.bak -e "s/-std=gnu++11//; s/-Werror//" build_static/build.ninja &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;pubsub;spanner;storage" -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;pubsub;spanner;storage" -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DCMAKE_TLS_VERIFY:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DGOOGLE_CLOUD_CPP_ENABLE:STRING="bigtable;bigquery;iam;pubsub;spanner;storage" -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE:BOOL=OFF -DGOOGLE_CLOUD_CPP_ENABLE_GENERATOR:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive -D_WIN32_WINNT=0x0A00" -S. -Bbuild_shared &&
- # don't force older C++ standard and don't treat warnings as errors
- sed -i.bak -e "s/-std=gnu++11//; s/-Werror//" build_shared/build.ninja &&
+ ## don't force older C++ standard and don't treat warnings as errors
+ #sed -i.bak -e "s/-std=gnu++11//; s/-Werror//" build_shared/build.ninja &&
+ ## fix missing link libraries (version >= 2.33.0)
+ #sed -i.bak2 -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lcrypto/" build_shared/build.ninja &&
  wl-showstatus build &&
  ( ninja -Cbuild_static || (
   # fix already defined OPTIONAL
