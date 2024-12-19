@@ -1,0 +1,66 @@
+export NAME="wasp"
+export STATUS=
+export URL=https://github.com/WebAssembly/wasp
+export BASENAME=wasp
+export DESCRIPTION="Wasp is a C++ library designed to make it easy to work with WebAssembly modules. Unlike tools like wabt, it is designed to be used as a library."
+export CATEGORY=development
+export TYPE=library
+export VERSION=0.0.4
+export VERSIONDATE=20241219
+wl-showstatus --package-version
+export DEPENDENCIES=abseil
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/WebAssembly/wasp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/WebAssembly/wasp/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+touch third_party/abseil/CMakeLists.txt
+# fix CMakeLists.txt (version >= 0.0.4)
+patch -ulbf CMakeLists.txt << EOF
+@@ -36,2 +36,3 @@
+
++find_package(absl REQUIRED)
+ add_subdirectory(src/base)
+@@ -50,2 +51 @@
+ endif ()
+-find_package(absl REQUIRED)
+EOF
+# fix src/base/CMakeLists.txt (version >= 0.0.4)
+patch -ulbf src/base/CMakeLists.txt << EOF
+@@ -80,3 +80,3 @@
+   absl::base
+-  absl::container
++  absl::container_common
+   absl::hash
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TOOLS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TOOLS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-static &&
+ ninja -Cbuild_static &&
+ wl-showstatus build-shared &&
+ ninja -Cbuild_shared &&
+ #wl-showstatus build-install-static &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install-shared &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_{static,shared}/src/*/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/src/*/*.{dll,exe} $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
