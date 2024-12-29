@@ -177,17 +177,17 @@ patch -ulbf src/cat.c << EOF
 EOF
 # fix missing fpathconf (version >= 8.32)
 sed -i.bak -e "s/fpathconf (dir_fd, _PC_NAME_MAX)/255/; s/fpathconf (destdirfd, _PC_TIMESTAMP_RESOLUTION)/2000000000/; s/fpathconf (desc, _PC_ACL_ENABLED)/0/" $(grep -l fpathconf $(find -name '*.c'))
-# fix missing getpid/getppid/getuid/getgid lib/randread.c (version >= 8.32)
-patch -ulbf lib/randread.c << EOF
-@@ -177,2 +177,3 @@
-   ISAAC_SEED (struct timeval, gettimeofday (&v, NULL));
-+#ifndef _WIN32
-   ISAAC_SEED (pid_t, v = getpid ());
-@@ -181,2 +182,3 @@
-   ISAAC_SEED (uid_t, v = getgid ());
-+#endif
-
-EOF
+## fix missing getpid/getppid/getuid/getgid lib/randread.c (version >= 8.32)
+#patch -ulbf lib/randread.c << EOF
+#@@ -177,2 +177,3 @@
+#   ISAAC_SEED (struct timeval, gettimeofday (&v, NULL));
+#+#ifndef _WIN32
+#   ISAAC_SEED (pid_t, v = getpid ());
+#@@ -181,2 +182,3 @@
+#   ISAAC_SEED (uid_t, v = getgid ());
+#+#endif
+#
+#EOF
 # fix missing geteuid in lib/write-any-file.c (version >= 8.32)
 patch -ulbf lib/write-any-file.c << EOF
 @@ -41,3 +41,3 @@
@@ -351,6 +351,67 @@ patch -ulbf src/ls.c << EOF
          raise (SIGSTOP);
 +#endif
        j = interrupt_signal;
+EOF
+# fix undefined sprintf in lib/c-strtod.c (version >= 9.5)
+patch -ulbf lib/c-strtod.c << EOF
+@@ -26,2 +26,3 @@
+ #include <stdlib.h>
++#include <stdio.h>
+ #include <string.h>
+EOF
+# fix undefined fchown in lib/dirchownmod.c (version >= 9.5)
+patch -ulbf lib/dirchownmod.c << EOF
+@@ -93,2 +93,3 @@
+
++#ifndef _WIN32
+           if ((owner != (uid_t) -1 && owner != st.st_uid)
+@@ -110,2 +111,3 @@
+             }
++#endif
+
+EOF
+# fix lib/savewd.c (version >= 9.5)
+patch -ulbf lib/savewd.c << EOF
+@@ -69,2 +69,5 @@
+         {
++#ifdef _WIN32
++          wd->state = ERROR_STATE;
++#else
+           /* "Save" the initial working directory by forking a new
+@@ -80,2 +83,3 @@
+             }
++#endif
+         }
+@@ -203,2 +207,3 @@
+           _exit (status);
++#ifndef _WIN32
+         if (0 < child)
+@@ -213,2 +218,3 @@
+           }
++#endif
+       }
+EOF
+# fix lib/tzset.c (version >= 9.5)
+patch -ulbf lib/tzset.c << EOF
+@@ -67,3 +67,3 @@
+       if (env != NULL)
+-        for (char *s = env; *s != NULL; s++)
++        for (char *s = env[0]; s != NULL; s++)
+           if (s[0] == 'T' && s[1] == 'Z' && s[2] == '=')
+@@ -71,3 +71,3 @@
+       if (wenv != NULL)
+-        for (wchar_t *ws = wenv; *ws != NULL; ws++)
++        for (wchar_t *ws = wenv[0]; ws != NULL; ws++)
+           if (ws[0] == L'T' && ws[1] == L'Z' && ws[2] == L'=')
+EOF
+# fix src/copy.c (version >= 9.5)
+patch -ulbf src/copy.c << EOF
+@@ -3145,2 +3145,5 @@
+              symbolic link, if possible.  */
++#ifndef HAVE_LCHOWN
++#define HAVE_LCHOWN 0
++#endif
+           if (HAVE_LCHOWN
 EOF
 # fix configure
 patch -ulbf configure << EOF
