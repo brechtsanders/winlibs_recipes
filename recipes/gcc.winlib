@@ -2056,6 +2056,7 @@ echo -e "module conftest;\nint main()\n{ return 0; }\n" | gdc -xd - -o test.exe
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105506 (GCC12 first release (UCRT): fatal error: cannot execute 'cc1': CreateProcess: No such file or directory)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105858 (GCC12 first release (64-bit): build_mingw/x86_64-w64-mingw32/libstdc++-v3/include/ext/enc_filebuf.h:63:1: fatal error: cannot write PCH file: required memory segment unavailable)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108678 (Windows on ARM64 (target aarch64-w64-mingw32) support)
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=118238 (GCC15 LTO broken due to missing mkstemps and link)
 # -fstack-protector need -lssp_nonshared -lssp -> https://sourceware.org/legacy-ml/gdb-patches/2019-12/msg00795.html
 # --enable-offload-targets doesn't work when using ucrt
 
@@ -2167,6 +2168,58 @@ patch -ulbf gcc/rust/checks/errors/borrowck/rust-borrow-checker.cc << EOF
 +#elif defined(_WIN32)
    ret = _mkdir (dirname.c_str ());
 EOF
+# fix gcc/lto-wrapper.cc (version >= 15-20241222)
+patch -ulbf gcc/lto-wrapper.cc << EOF
+@@ -1872,2 +1872,3 @@
+
++#ifndef _WIN32
+       if (ltrans_cache_dir)
+@@ -1882,3 +1883,5 @@
+        }
+-      else if (save_temps)
++      else
++#endif
++      if (save_temps)
+        ltrans_output_file = concat (dumppfx, "ltrans.out", NULL);
+@@ -2044,2 +2047,3 @@
+
++#ifndef _WIN32
+       ltrans_file_cache ltrans_cache (ltrans_cache_dir, "ltrans", ".o",
+@@ -2160,2 +2164,3 @@
+        }
++#endif
+       if (parallel)
+@@ -2211,2 +2216,3 @@
+
++#ifndef _WIN32
+          if (!ltrans_cache)
+@@ -2214,4 +2220,6 @@
+              maybe_unlink (input_names[i]);
++#endif
+        }
+
++#ifndef _WIN32
+       if (ltrans_cache)
+@@ -2259,2 +2267,3 @@
+        }
++#endif
+
+@@ -2267,4 +2276,6 @@
+
++#ifndef _WIN32
+       if (ltrans_cache && !save_temps)
+        ltrans_cache.try_prune ();
++#endif
+
+EOF
+# fix gcc/lockfile.cc (version >= 15-20241222)
+patch -ulbf gcc/lockfile.cc << EOF
+@@ -21,2 +21,3 @@
+ #include "config.h"
++#undef HAVE_FCNTL_H
+ #include "system.h"
+EOF
 
 USERPROFILE=$PWD/prebuilt RUSTUP_TOOLCHAIN=$PWD/prebuilt/.rustup/toolchains/stable-x86_64-pc-windows-gnu PATH=$PATH:$PWD/prebuilt/.cargo/bin make -C build_mingw/libgrust AR="ar -cru"
 make -Cbuild_mingw/gcc -j1 LDFLAGS="-lws2_32"
+make -Cbuild_mingw CRAB1_LIBS="-ldl -lws2_32 -lntoskrnl -luserenv"
