@@ -35,7 +35,7 @@ wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=cmake,ninja
 export LICENSEFILE=README
 export LICENSETYPE=zlib
 export DOWNLOADURL="http://www.zlib.net/"
@@ -95,6 +95,8 @@ dlopen=''
 dlpreopen=''
 libdir='$INSTALLPREFIX/lib'
 EOF
+# set proper library name and make sure .dll file still ha sthe same name (version >= 1.3.1)
+sed -i.bak -e "s/^add_library(\([^ ]*\) SHARED.*$/&\nset_target_properties(\1 PROPERTIES PREFIX \"\" ARCHIVE_OUTPUT_NAME z RUNTIME_OUTPUT_NAME zlib1)/; s/^add_library(\([^ ]*\) STATIC.*$/&\nset_target_properties(\1 PROPERTIES PREFIX \"\" ARCHIVE_OUTPUT_NAME libz)/" CMakeLists.txt
 #wl-showstatus build &&
 # make -f win32/Makefile.gcc &&
 # #make -f win32/Makefile.gcc CC=clang RC=llvm-windres -j1 V=1 &&
@@ -107,7 +109,8 @@ EOF
 # cp zlib.h zconf.h $INSTALLPREFIX/include/ &&
 # sed -e "s?\@\(prefix\)\@?$INSTALLPREFIX?; s?\@\(exec_prefix\)\@?\${prefix}?; s?\@\(shared\)*libdir\@?\${exec_prefix}/lib?; s?\@includedir\@?\${prefix}/include?; s?\@VERSION\@?$VERSION?" zlib.pc.in > $INSTALLPREFIX/lib/pkgconfig/zlib.pc &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-wl-showstatus build &&
+if ! cmake --version &> /dev/null; then
+ wl-showstatus build &&
  mingw32-make -f win32/Makefile.gcc all CC=${CC:-gcc} RC=${RC:-windres} AR=${AR:-ar} SHARED_MODE=1 &&
  wl-showstatus build-install &&
  mingw32-make -f win32/Makefile.gcc install SHARED_MODE=1 INCLUDE_PATH=$INSTALLPREFIX/include LIBRARY_PATH=$INSTALLPREFIX/lib BINARY_PATH=$INSTALLPREFIX/bin &&
@@ -115,6 +118,20 @@ wl-showstatus build &&
  cp -u minigzip*.exe $INSTALLPREFIX/bin/ &&
  cp win32/zlib.def $INSTALLPREFIX/lib/ &&
  sed -e "s?\@\(prefix\)\@?$INSTALLPREFIX?; s?\@\(exec_prefix\)\@?\${prefix}?; s?\@\(shared\)*libdir\@?\${exec_prefix}/lib?; s?\@includedir\@?\${prefix}/include?; s?\@VERSION\@?$VERSION?" zlib.pc.in > $INSTALLPREFIX/lib/pkgconfig/zlib.pc &&
+ touch SUCCESS
+else
+ mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZLIB_BUILD_EXAMPLES:BOOL=ON -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ strip build_win/minigzip*.exe &&
+ cp -u build_win/minigzip*.exe $INSTALLPREFIX/bin/ &&
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ cp -u build_win/zlib.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
