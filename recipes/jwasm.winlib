@@ -39,8 +39,24 @@ mkdir -p $BASENAME-$VERSION
 #unzip -oq $TARBALLDIR/$BASENAME/JWasm$VERSION.zip -d$BASENAME-$VERSION
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix listing.c (version >= 2.13)
+patch -ulbf listing.c << EOF
+@@ -90,3 +90,3 @@
+     const short *capitems;
+-    void (*function)();
++    void (*function)(struct asym* sym, void* ptr, int n);
+ };
+EOF
+# fix redefinition of type bool in H/bool.h (version >= 2.13)
+if echo "#include <stdbool.h>" | ${CC:-gcc} -c -xc -; then
+ sed -i.bak -e "s/typedef unsigned char bool;/#include <stdbool.h>/" H/bool.h
+fi
 # fix to support building with clang
 sed -i.bak -e "s?gcc.exe?${CC:-gcc}?" GccWin.mak
+# ignore incompatible pointer type errors (version >= 2.13)
+if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then
+ sed -i.bak2 -e "s/\$(extra_c_flags)/& -Wno-incompatible-pointer-types/" GccWin.mak
+fi
 wl-showstatus build &&
  make -f GccWin.mak &&
  wl-showstatus build-install &&
