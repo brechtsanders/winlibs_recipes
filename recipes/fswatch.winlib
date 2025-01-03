@@ -272,8 +272,10 @@ export BASENAME=fswatch
 export DESCRIPTION="fswatch is a file change monitor that receives notifications when the contents of the specified files or directories are modified."
 export CATEGORY=system
 export TYPE=library
-export VERSION=1.17.1
-export VERSIONDATE=20220702
+#export VERSION=1.17.1
+#export VERSIONDATE=20220702
+export VERSION=1.18.0
+export VERSIONDATE=20250103
 wl-showstatus --package-version
 export DEPENDENCIES=gettext,pcre
 export OPTIONALDEPENDENCIES=
@@ -291,16 +293,38 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix missing S_ISLNK in libfswatch/src/libfswatch/c++/poll_monitor.cpp
+## fix missing S_ISLNK in libfswatch/src/libfswatch/c++/poll_monitor.cpp (version <= 1.17.1)
+#patch -ulbf libfswatch/src/libfswatch/c++/poll_monitor.cpp << EOF
+#@@ -123,2 +123,3 @@
+#
+#+#ifndef __MINGW32__
+#     if (follow_symlinks && S_ISLNK(fd_stat.st_mode))
+#@@ -131,2 +132,3 @@
+#     }
+#+#endif
+#
+#EOF
+# fix libfswatch/src/libfswatch/c++/poll_monitor.cpp (version >= 1.18.0)
 patch -ulbf libfswatch/src/libfswatch/c++/poll_monitor.cpp << EOF
-@@ -123,2 +123,3 @@
-
+@@ -127,2 +127,3 @@
+       // Check if the path is a symbolic link
 +#ifndef __MINGW32__
-     if (follow_symlinks && S_ISLNK(fd_stat.st_mode))
-@@ -131,2 +132,3 @@
-     }
+       if (follow_symlinks && std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
+@@ -133,4 +134,5 @@
+       }
 +#endif
 
+-      if (!accept_path(path)) return;
++      if (!accept_path(path.u8string())) return;
+
+@@ -139,5 +141,5 @@
+       struct stat fd_stat;
+-      if (!stat_path(path, fd_stat, follow_symlinks)) return;
++      if (!stat_path(path.u8string(), fd_stat, follow_symlinks)) return;
+
+-      if (!add_path(path, fd_stat, fn)) return;
++      if (!add_path(path.u8string(), fd_stat, fn)) return;
+       if (!recursive) return;
 EOF
 # fix fswatch/src/fswatch.cpp (version >= 1.17.1)
 patch -ulbf fswatch/src/fswatch.cpp << EOF

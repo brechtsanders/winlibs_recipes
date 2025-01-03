@@ -652,11 +652,24 @@ EOF
 ## fix missing dllexport/dllimport (version >= 17.2)
 #sed -i.bak -e "s/^extern/& PGDLLIMPORT/" src/include/common/scram-common.h src/include/port.h
 #echo -e '#if defined(_WIN32) && !defined(extern)\n#define extern extern PGDLLIMPORT\n#endif' >> src/include/c.h
+# avoid already defined constexpr in src/backend/optimizer/util/predtest.c (version >= 17.2)
+sed -i.bak -e "s/\bconstexpr\b/const_expr/g" src/backend/optimizer/util/predtest.c
+## if undefined _iswctype_l in src/include/port/win32_port.h (version >= 17.2)
+#sed -i.bak -e "1i #if !defined(__MSVCRT_VERSION__) || __MSVCRT_VERSION__ < 0x800\n#undef __MSVCRT_VERSION__\n#define __MSVCRT_VERSION__ 0x800\n#endif\n#include <ctype.h>" src/include/port/win32_port.h
 # don't abort with error: Non-clean source code directory detected
 sed -i.bak -e "s/error\((errmsg_nonclean_base\)/warning\1/" meson.build
+# fix detection of ossp-uuid in meson.build (version >= 17.2)
+patch -ulbf meson.build << EOF
+@@ -1438,3 +1438,3 @@
+     uuidfunc = 'uuid_export'
+-    uuidheader = 'uuid.h'
++    uuidheader = 'ossp/uuid.h'
+
+EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
- PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Duuid=ossp -Dssl=openssl -Drpath=false -Dsystemd=disabled -Dselinux=disabled -Dcassert=false -Dtap_tests=disabled -Dc_args="-I$MINGWPREFIX/include/ossp -Wno-int-conversion -Wno-implicit-function-declaration $(if ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-function-pointer-types"; fi)" -DPYTHON=$PYDIR/python.exe -DPERL=$PERLDIR/bin/perl.exe . build_both &&
+ #PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Duuid=ossp -Dssl=openssl -Drpath=false -Dsystemd=disabled -Dselinux=disabled -Dcassert=false -Dtap_tests=disabled -Dc_args="-I$MINGWPREFIX/include/ossp -Wno-int-conversion -Wno-implicit-function-declaration $(if ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-function-pointer-types"; fi)" -DPYTHON=$PYDIR/python.exe -DPERL=$PERLDIR/bin/perl.exe . build_both &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Duuid=ossp -Dssl=openssl -Drpath=false -Dsystemd=disabled -Dselinux=disabled -Dcassert=false -Dtap_tests=disabled -Dc_args="-I$MINGWPREFIX/include/ossp -Wno-int-conversion -Wno-implicit-function-declaration $(if ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-function-pointer-types"; fi)" -DPYTHON=$PYDIR/python.exe -DPERL=$PERLDIR/bin/perl.exe -Dc_args="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" . build_both &&
  # add linker flag
  sed -i.bak -e "s/^\s*LINK_ARGS\s*=.*\"-ladvapi32\"/& \"-Wl,--as-needed\" \"-lossp-uuid\"/" build_both/build.ninja &&
  wl-showstatus build-install &&
