@@ -16,12 +16,14 @@ export TYPE=library
 #export VERSIONDATE=20240107
 #export VERSION=1.7.2
 #export VERSIONDATE=20240204
-export VERSION=1.7.3
-export VERSIONDATE=20240302
+#export VERSION=1.7.3
+#export VERSIONDATE=20240302
 #export VERSION=1.8.0
 #export VERSIONDATE=20240422
 #export VERSION=1.9.0
 #export VERSIONDATE=20241007
+export VERSION=1.10
+export VERSIONDATE=20250105
 wl-showstatus --package-version
 export DEPENDENCIES=mbedtls
 export OPTIONALDEPENDENCIES=
@@ -38,6 +40,26 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix src/platform/windows/win_clock.c (version >= 1.10)
+####Bug reported here: https://github.com/nanomsg/nng/issues/2072
+patch -ulbf src/platform/windows/win_clock.c << EOF
+@@ -27,3 +27,7 @@
+        struct timespec ts;
++#if defined(__MINGW32__) && !defined(_UCRT)
++       if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
++#else
+        if (timespec_get(&ts, TIME_UTC) == TIME_UTC) {
++#endif
+                *seconds     = ts.tv_sec;
+EOF
+# fix src/platform/windows/CMakeLists.txt (version >= 1.10)
+patch -ulbf src/platform/windows/CMakeLists.txt << EOF
+@@ -18,3 +18,3 @@
+     if (NOT NNG_HAVE_CONDVAR OR NOT NNG_HAVE_SNPRINTF OR NOT NNG_HAVE_TIMESPEC_GET)
+-        message(FATAL_ERROR
++        message(WARNING
+                 "Modern Windows API support is missing. "
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DNNG_ENABLE_TLS:BOOL=ON -DNNG_TESTS:BOOL=OFF -S. -Bbuild_static &&
