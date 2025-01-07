@@ -7,12 +7,10 @@ export CATEGORY=system,compression,security,dataprocessing
 export TYPE=library
 #export VERSION=2.30.0
 #export VERSIONDATE=20230417
-export VERSION=2.31.0
-export VERSIONDATE=20240119
-#export VERSION=2.31.1
-#export VERSIONDATE=20250127
-####mem/mem_zero_detect_avx512.s:70: error: unknown preprocessor directive `%use'
-####Bug reported: https://github.com/intel/isa-l/issues/305
+#export VERSION=2.31.0
+#export VERSIONDATE=20240119
+export VERSION=2.31.1
+export VERSIONDATE=20250127
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -29,6 +27,20 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix configure.ac (version >= 2.31.1)
+####mem/mem_zero_detect_avx512.s:70: error: unknown preprocessor directive `%use'
+####Bug reported: https://github.com/intel/isa-l/issues/305
+patch -ulbf configure.ac << EOF
+@@ -249,7 +249,3 @@
+   if test x"\$arch" = x"mingw"; then
+-    AS=yasm
+-    as_feature_level=\$yasm_feature_level
+-    if test \$as_feature_level -lt 2 ; then
+-      AC_MSG_ERROR([Mingw build requires Yasm 1.2.0 or later.])
+-    fi
++    AS=nasm
+   fi
+EOF
 wl-showstatus preconfigure &&
  mkdir -p m4 &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
@@ -39,8 +51,10 @@ wl-showstatus preconfigure &&
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  wl-showstatus build-install &&
  #make install-strip &&
- ( make install-strip || make install-strip as_filter=tools/nasm-filter.sh ) &&
+ #( make install-strip || make install-strip as_filter=tools/nasm-filter.sh ) &&
+ ( make install-strip || make -j1 install-strip ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: 32-bit build fails
 
 
 
