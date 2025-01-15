@@ -1,0 +1,323 @@
+export NAME="GCC, the GNU Compiler Collection (version 13)"
+export STATUS=
+export URL=https://gcc.gnu.org/
+export BASENAME=gcc13
+export DESCRIPTION="The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, and Go, as well as libraries for these languages (libstdc++,...). GCC was originally written as the compiler for the GNU operating system. The GNU system was developed to be 100% free software, free in the sense that it respects the user's freedom."
+export CATEGORY=development
+export TYPE=application
+export VERSION=13.3.0
+export VERSIONDATE=20250115
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl,mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=binutils
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/releases/ gcc-"
+#export DOWNLOADURL="https://gcc.gnu.org/pub/gcc/snapshots/ gcc-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/releases/gcc-$VERSION/gcc-$VERSION.tar.xz
+#export DOWNLOADSOURCEURL=https://gcc.gnu.org/pub/gcc/snapshots/$VERSION/gcc-$VERSION.tar.xz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/gcc $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xJlh --force-local -f $TARBALLDIR/gcc/gcc-$VERSION.tar.xz
+cd gcc-$VERSION
+# set to 0 to build Dwarf2 (32-bit) or SEH (64-bit) C++ exception handling (or to 1 to use SJLJ)
+if [ "$USE_SJLJ" == "" ]; then
+ USE_SJLJ=0
+fi
+# set to 0 to use msvcrt or to 1 to use ucrt
+if [ "$USE_UCRT" == "" ]; then
+ USE_UCRT=0
+fi
+# set to 0 to use POSIX threads or to 1 to use MCF GThread library
+if [ "$USE_MCF" == "" ]; then
+ USE_MCF=0
+fi
+# set to 0 to use POSIX threads or to 1 to use Win32 thread library
+if [ "$USE_WIN32" == "" ]; then
+ USE_WIN32=0
+fi
+## fix undefined reference to __intrinsic_setjmpex in gcc/fortran/parse.c
+#sed -i.bak -e "s/^\(#include <setjmp\)\(\.h>\)/\1ex\2/" gcc/fortran/parse.c
+## fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+#sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/c/Make-lang.in gcc/cp/Make-lang.in
+## fix printf format issues with MinGW-w64 >= 8.0.0
+#####See also: https://sourceforge.net/p/mingw-w64/bugs/853/
+#####See also: https://github.com/msys2/MINGW-packages-dev/blob/master/mingw-w64-gcc-git/0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch
+#sed -i.bak -e "s/^\(\s*#\s*\)include <inttypes\.h>.*$/&\n\1ifdef __MINGW32__\n\1undef HAVE_INTTYPES_H\n\1endif/" libgomp/target.c libgomp/oacc-parallel.c
+## fix error: expected identifier before string constant in gcc/system.h
+#patch -ulbf gcc/system.h << EOF
+#@@ -774,3 +774,5 @@
+#                                         ATTRIBUTE_NORETURN ATTRIBUTE_COLD;
+#+#ifndef __cplusplus
+# #define abort() fancy_abort (__FILE__, __LINE__, __FUNCTION__)
+#+#endif
+#
+#EOF
+## fix issue when building for ucrt in libstdc++-v3/src/filesystem/ops.cc (version >= 11)
+#patch -ulbf libstdc++-v3/src/filesystem/ops.cc << EOF
+#@@ -977,3 +977,3 @@
+#   if (nofollow && is_symlink(st))
+#-    ec = std::make_error_code(std::errc::operation_not_supported);
+#+    ec = std::make_error_code(std::errc::function_not_supported);
+#   else if (posix::chmod(p.c_str(), static_cast<mode_t>(prms)))
+#EOF
+## avoid pthread issues in libphobos/libdruntime/gcc/gthread.d (version >= 11.5.0)
+#patch -ulbf libphobos/libdruntime/gcc/gthread.d << EOF
+#@@ -30,3 +30,3 @@
+#
+#-static if (GNU_Thread_Model == ThreadModel.Posix)
+#+static if (false)
+# {
+#@@ -41,3 +41,4 @@
+#     alias __gthread_once_t = pthread_once_t;
+#-    enum GTHREAD_ONCE_INIT = PTHREAD_ONCE_INIT;
+#+    //enum GTHREAD_ONCE_INIT = PTHREAD_ONCE_INIT;
+#+    enum GTHREAD_ONCE_INIT = 0;
+#
+#@@ -86,3 +87,3 @@
+# }
+#-else static if (GNU_Thread_Model == ThreadModel.Win32)
+#+else static if (GNU_Thread_Model == ThreadModel.Win32 || GNU_Thread_Model == ThreadModel.Posix)
+# {
+#EOF
+## show some more information if MapViewOfFileEx fails in gcc/config/i386/host-mingw32.cc (version >= 12.1.0)
+#patch -ulbf gcc/config/i386/host-mingw32.cc << EOF
+#@@ -191,3 +191,2 @@
+#     {
+#-      w32_error (__FUNCTION__, __FILE__, __LINE__, "MapViewOfFileEx");
+#       CloseHandle(mmap_handle);
+#EOF
+## fix precompiled header mapping issues in gcc/config/i386/host-mingw32.cc (version >= 12.2.0)
+##### see also: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105858
+##### see also: https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0010-Fix-using-large-PCH.patch
+##### see also: https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0021-PR14940-Allow-a-PCH-to-be-mapped-to-a-different-addr.patch
+#patch -ulbf gcc/config/i386/host-mingw32.cc << EOF
+#@@ -46,5 +46,2 @@
+#
+#-/* FIXME: Is this big enough?  */
+#-static const size_t pch_VA_max_size  = 128 * 1024 * 1024;
+#-
+# /* Granularity for reserving address space.  */
+#@@ -90,5 +87,2 @@
+#   void* res;
+#-  size = (size + va_granularity - 1) & ~(va_granularity - 1);
+#-  if (size > pch_VA_max_size)
+#-    return NULL;
+#
+#@@ -102,3 +96,3 @@
+#
+#-  res = VirtualAlloc (NULL, pch_VA_max_size,
+#+  res = VirtualAlloc (NULL, size,
+#                      MEM_RESERVE | MEM_TOP_DOWN,
+#@@ -143,3 +137,2 @@
+#   OSVERSIONINFO version_info;
+#-  int r;
+#
+#@@ -152,3 +145,3 @@
+#      this to work.  We can't change the offset. */
+#-  if ((offset & (va_granularity - 1)) != 0 || size > pch_VA_max_size)
+#+  if ((offset & (va_granularity - 1)) != 0)
+#     return -1;
+#@@ -177,21 +170,20 @@
+#
+#-  /* Retry five times, as here might occure a race with multiple gcc's
+#-     instances at same time.  */
+#-  for (r = 0; r < 5; r++)
+#-   {
+#-      mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
+#-                                  size, addr);
+#-      if (mmap_addr == addr)
+#-       break;
+#-      if (r != 4)
+#-        Sleep (500);
+#-   }
+#-
+#-  if (mmap_addr != addr)
+#+  /* Try mapping the file at \`addr\`.  */
+#+  mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
+#+                              size, addr);
+#+  if (mmap_addr == NULL)
+#     {
+#-      w32_error (__FUNCTION__, __FILE__, __LINE__, "MapViewOfFileEx");
+#-      CloseHandle(mmap_handle);
+#-      return  -1;
+#+      /* We could not map the file at its original address, so let the
+#+        system choose a different one. The PCH can be relocated later.  */
+#+      mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
+#+                                  size, NULL);
+#+      if (mmap_addr == NULL)
+#+       {
+#+         w32_error (__FUNCTION__, __FILE__, __LINE__, "MapViewOfFileEx");
+#+         CloseHandle(mmap_handle);
+#+         return  -1;
+#+       }
+#     }
+#
+#+  addr = mmap_addr;
+#   return 1;
+#EOF
+## fix gcc/config/i386/host-mingw32.cc (version >= 12.1.0)
+##### Bug reported: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105858
+##### See also: https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0021-PR14940-Allow-a-PCH-to-be-mapped-to-a-different-addr.patch
+#patch -ulbf gcc/config/i386/host-mingw32.cc << EOF
+#@@ -143,3 +143,2 @@
+#   OSVERSIONINFO version_info;
+#-  int r;
+#
+#@@ -177,19 +176,17 @@
+#
+#-  /* Retry five times, as here might occure a race with multiple gcc's
+#-     instances at same time.  */
+#-  for (r = 0; r < 5; r++)
+#-   {
+#-      mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
+#-                                  size, addr);
+#-      if (mmap_addr == addr)
+#-       break;
+#-      if (r != 4)
+#-        Sleep (500);
+#-   }
+#-
+#-  if (mmap_addr != addr)
+#+  /* Try mapping the file at \`addr\`.  */
+#+  mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
+#+                              size, addr);
+#+  if (mmap_addr == NULL)
+#     {
+#-      w32_error (__FUNCTION__, __FILE__, __LINE__, "MapViewOfFileEx");
+#-      CloseHandle(mmap_handle);
+#-      return  -1;
+#+      /* We could not map the file at its original address, so let the
+#+        system choose a different one. The PCH can be relocated later.  */
+#+      mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
+#+                                  size, NULL);
+#+      if (mmap_addr == NULL)
+#+       {
+#+         w32_error (__FUNCTION__, __FILE__, __LINE__, "MapViewOfFileEx");
+#+         CloseHandle(mmap_handle);
+#+         return  -1;
+#+       }
+#     }
+#EOF
+## fix missing mmap in gcc/gcc.cc (version >= 12.2.0)
+#patch -ulbf gcc/gcc.cc << EOF
+#@@ -45,2 +45,5 @@
+# #include "spellcheck.h"
+#+#ifdef HAVE_MMAP_FILE
+#+#include <sys/mman.h>
+#+#endif
+#
+#EOF
+## fix libiberty/vsnprintf.c (version >= 13.2.0)
+#patch -ulbf libiberty/vsnprintf.c << EOF
+#@@ -57,2 +57,3 @@
+#
+#+#define vsnprintf CUSTOM_vsnprintf
+# /* This implementation relies on a working vasprintf.  */
+#EOF
+## fix undefined index() in gcc/m2/gm2spec.cc and gcc/m2/mc-boot-ch/Glibc.c(version >= 13.1.0)
+#sed -i.bak -e "s/\bindex/strchr/" gcc/m2/gm2spec.cc gcc/m2/mc-boot-ch/Glibc.c gcc/m2/mc-boot-ch/Gdtoa.cc
+## fix gcc/m2/mc-boot-ch/GSelective.c (version >= 13.1.0)
+#patch -ulbf gcc/m2/mc-boot-ch/GSelective.c << EOF
+#@@ -28,2 +28,6 @@
+# #include "gm2-libs-host.h"
+#+#ifdef _WIN32
+#+#undef HAVE_SELECT
+#+typedef void fd_set;
+#+#endif
+#
+#EOF
+## fix gcc/m2/mc-boot-ch/GSysExceptions.c (version >= 13.1.0)
+#patch -ulbf gcc/m2/mc-boot-ch/GSysExceptions.c << EOF
+#@@ -25,2 +25,5 @@
+# #include "gm2-libs-host.h"
+#+#ifdef _WIN32
+#+#undef HAVE_SIGNAL_H
+#+#endif
+#
+#EOF
+## fix undefined std::mutex in gcc/jit/libgccjit.cc and gcc/jit/jit-playback.cc
+#sed -i.bak -e "1i #include <mutex>" gcc/jit/libgccjit.cc gcc/jit/jit-playback.cc
+# fix plugin install location in gcc/c/Make-lang.in and gcc/cp/Make-lang.in (version >= 9.2.0)
+sed -i.bak -e "s?\(\$(DESTDIR)\)/\(\$(plugin_resourcesdir)\)?\1\2?" gcc/cp/Make-lang.in
+# avoid looking for libiberty.a in pic subdirectory
+sed -i.bak -e "s?pic/\(libiberty\.a\)?\1?g" $(grep -l "pic/libiberty\.a" */Makefile.in)
+## fix location of /lib/cpp
+#sed -i.bak -e "s?/lib/cpp?$(which cpp.exe)?" $(find -name configure)
+## fix linker error: export ordinal too large (version >= 13)
+##sed -i.bak "s/--export-all-symbols/--discard-all/" gcc/configure
+##sed -i.bak "s/--export-all-symbols/--gc-keep-exported/" gcc/configure
+# fix linker error: export ordinal too large
+if ! ${CC:-gcc} --version|grep -q "^clang"; then
+ sed -i.bak "s/--export-all-symbols/--gc-keep-exported/" $(grep -l "\--export-all-symbols" $(find -name configure))
+fi
+# copy MinGW-w64 files
+mkdir -p build_mingw/mingw-w64/mingw/lib &&
+cp -rf $MINGWPREFIX/share/mingw-w64/include build_mingw/mingw-w64/mingw/ &&
+#cp -f $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/include/*.h build_mingw/mingw-w64/mingw/include &&
+( cp -rf $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/lib/* build_mingw/mingw-w64/mingw/lib/ &> /dev/null || cp -rf $MINGWPREFIX/share/mingw-w64/lib/* build_mingw/mingw-w64/mingw/lib/ ) &&
+mkdir -p build_mingw &&
+ wl-showstatus configure &&
+ cd build_mingw &&
+ PATH=$MINGWPREFIX/share/binutils/bin:$PATH ../configure --prefix=$INSTALLPREFIX/share/gcc13 --build=$BUILDPLATFORM --host=$RUNPLATFORM \
+  --with-pkgversion="MinGW-W64 $(echo $RUNPLATFORM | sed -e "s/-.*$//")$(if [ "0$USE_UCRT" -ne 0 ]; then echo -n "-ucrt"; else echo -n "-msvcrt"; fi)-posix-$(if [ "0$USE_SJLJ" -ne 0 ]; then echo "sjlj"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "dwarf"; else echo "seh"; fi; fi), built by Brecht Sanders" \
+  --with-tune=generic \
+  --enable-checking=release \
+  --enable-threads=$(if [ "0$USE_MCF" -ne 0 ]; then echo -n "mcf"; elif [ "0$USE_WIN32" -ne 0 ]; then echo -n "win32"; else echo -n "posix"; fi) \
+  $(if [ "0$USE_SJLJ" -ne 0 ]; then if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--without-dwarf2 "; fi; echo "--enable-sjlj-exceptions"; else if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--with-dwarf2 "; fi; echo "--disable-sjlj-exceptions"; fi) \
+  --disable-libunwind-exceptions \
+  --disable-serial-configure \
+  --disable-bootstrap \
+  --enable-host-shared \
+  --enable-plugin \
+  --disable-default-ssp \
+  --disable-rpath \
+  --disable-libstdcxx-debug \
+  --disable-version-specific-runtime-libs \
+  --with-stabs \
+  --disable-symvers \
+  --enable-languages=c,c++,fortran,lto,objc,obj-c++ \
+  --disable-{gold,nls,stage1-checking,win32-registry,multilib} \
+  --enable-{ld,libquadmath,libada,libssp,libstdcxx,lto,fully-dynamic-string,libgomp,graphite,mingw-wildcard,libstdcxx-time,libstdcxx-pch} \
+  --with-{mpc,mpfr,gmp,isl}=$MINGWPREFIX \
+  $(if ! ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "--enable-large-address-aware"; fi) \
+  --enable-install-libiberty \
+  --enable-__cxa_atexit \
+  --without-included-gettext \
+  --with-diagnostics-color=auto \
+  --enable-clocale=generic \
+  --with-libiconv \
+  --with-system-zlib --with-target-system-zlib=yes \
+  --with-build-sysroot=$PWD/mingw-w64 \
+  --enable-version-specific-runtime-libs \
+  CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -Wno-int-conversion" \
+  CXXFLAGS="-Wno-int-conversion" \
+  LDFLAGS="-L$MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/lib -L$MINGWPREFIX/share/mingw-w64/lib -pthread $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--dynamicbase &> /dev/null; then echo "-Wl,--dynamicbase"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--high-entropy-va &> /dev/null; then echo "-Wl,--high-entropy-va"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--nxcompat &> /dev/null; then echo "-Wl,--nxcompat"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--tsaware &> /dev/null; then echo "-Wl,--tsaware"; fi)" \
+  &&
+ cd .. &&
+ make -Cbuild_mingw configure-host &&
+ sed -i.bak -e "s?\$(DESTDIR)\(\$\$dest\)?\1?" build_mingw/gcc/Makefile &&
+ #sed -i.bak2 -e "s/\$(DESTDIR)\(\$(plugin_resourcesdir)\)/\1/" build_mingw/gcc/Makefile &&
+ wl-showstatus build &&
+ ( make -Cbuild_mingw || make -j1 -Cbuild_mingw ) &&
+ #XCFLAGS="-Wc,-pthread -Wno-error=format-extra-args" 
+ # fix missing cc1.exe.a / cc1plus.exe.a (version >= 11)
+ touch build_mingw/gcc/cc1.exe.a build_mingw/gcc/cc1plus.exe.a &&
+ wl-showstatus build-install &&
+ ( make -Cbuild_mingw install-strip || make -Cbuild_mingw install-strip LIBS="-lmman" ) &&
+ # remove .la files
+ rm -f $(find $INSTALLPREFIX -name '*.la') &&
+ # fix absolute path
+ sed -i -e "s?$INSTALLPREFIX/share/gcc?\$(realpath \$(dirname \$0)/../../../../..)?" $INSTALLPREFIX/share/gcc13/libexec/gcc/*/*/install-tools/mkheaders &&
+ sed -i -e "s?'$INSTALLPREFIX/share/gcc?os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..') + '?" $INSTALLPREFIX/share/gcc13/lib/gcc/*/*/libstdc++.dll.a-gdb.py &&
+ # remove dummy cc1.exe.a / cc1plus.exe.a (version >= 11)
+ for F in build_mingw/gcc/cc1.exe.a build_mingw/gcc/cc1plus.exe.a; do if [ ! -s $F ]; then echo rm -f $F; fi; done &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf gcc-$VERSION
+
+
+
