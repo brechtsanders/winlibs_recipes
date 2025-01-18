@@ -1,0 +1,311 @@
+export NAME="Monkey"
+export STATUS=
+export URL=http://monkey-project.com/
+export BASENAME=monkey
+export DESCRIPTION="Monkey is a lightweight and powerful web server and development stack for Linux & OSX. It has been designed to be very scalable with low memory and CPU consumption, the perfect solution for embedded devices. Made for ARM, x86 and x64."
+export CATEGORY=communication
+export TYPE=application
+#export VERSION=1.6.9
+#export VERSIONDATE=20220128
+#export VERSION=1.7.0
+#export VERSIONDATE=20230714
+#export VERSION=1.7.1
+#export VERSIONDATE=20230721
+#export VERSION=1.7.2
+#export VERSIONDATE=20230921
+#export VERSION=1.7.3
+#export VERSIONDATE=20240111
+#export VERSION=1.7.4
+#export VERSIONDATE=20240409
+#export VERSION=1.7.5
+#export VERSIONDATE=20240612
+#export VERSION=1.8.0
+#export VERSIONDATE=20240822
+#export VERSION=1.8.1
+#export VERSIONDATE=20241010
+export VERSION=1.8.2
+export VERSIONDATE=20250118
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/monkey/monkey/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://monkey-project.com/releases/$(echo $VERSION|sed -e "s/\([0-9]*\.[0-9]*\)\..*/\1/")/monkey-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/monkey/monkey/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/monkey-$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd monkey-$VERSION
+# fix mk_core/deps/libevent/evdns.c (version >= 1.7.5)
+patch -ulbf mk_core/deps/libevent/evdns.c << EOF
+@@ -3322,3 +3322,3 @@
+ #ifndef EVENT__HAVE_STRTOK_R
+-static char *
++char *
+ strtok_r(char *s, const char *delim, char **state) {
+EOF
+# fix plugins/mandril/mandril.c (version >= 1.8.0)
+patch -ulbf plugins/mandril/mandril.c << EOF
+@@ -21,2 +21,6 @@
+ /* Monkey API */
++#ifdef _WIN32
++#include <winsock2.h>
++inline int inet_aton (const char* cp, struct in_addr* addr) { return ((addr->s_addr = inet_addr(cp)) == INADDR_NONE ? 0 : 1); }
++#endif
+ #include <monkey/mk_api.h>
+@@ -25,2 +29,3 @@
+ /* system */
++#ifndef _WIN32
+ #include <sys/socket.h>
+@@ -28,2 +33,3 @@
+ #include <arpa/inet.h>
++#endif
+ #include <sys/stat.h>
+EOF
+# fix mk_core/mk_rconf.c (version >= 1.7.5)
+patch -ulbf mk_core/mk_rconf.c << EOF
+@@ -25,3 +25,3 @@
+ #include <sys/stat.h>
+-#ifndef _MSC_VER
++#ifndef _WIN32
+ #include <glob.h>
+EOF
+# fix include/monkey/mk_core/external/winpthreads.h (version >= 1.7.5)
+patch -ulbf include/monkey/mk_core/external/winpthreads.h << EOF
+@@ -103,3 +103,3 @@
+ /* Windows doesn't have this, so declare it ourselves. */
+-#if (_MSC_VER < 1900)
++#if (_MSC_VER < 1900 && !defined(__MINGW32__))
+ struct timespec
+EOF
+# fix include/monkey/mk_core/mk_string.h (version >= 1.7.5)
+patch -ulbf include/monkey/mk_core/mk_string.h << EOF
+@@ -28,3 +28,3 @@
+
+-#if defined(_WIN32) || defined(_WIN64)
++#if (defined(_WIN32) || defined(_WIN64)) && !defined(__MINGW32__)
+   #define snprintf _snprintf
+EOF
+# fix mk_core/mk_utils.c (version >= 1.7.5)
+patch -ulbf mk_core/mk_utils.c << EOF
+@@ -48,2 +48,3 @@
+   #endif
++#ifndef __MINGW32__
+     struct timezone {
+@@ -72,2 +73,3 @@
+     }
++#endif
+
+EOF
+# fix include/monkey/mk_scheduler.h (version >= 1.8.0)
+patch -ulbf include/monkey/mk_scheduler.h << EOF
+@@ -39,3 +39,3 @@
+
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW64_VERSION_MAJOR)
+     /* The pid field in the mk_sched_worker structure is ignored in platforms other than
+EOF
+# fix include/monkey/mk_config.h (version >= 1.8.0)
+patch -ulbf include/monkey/mk_config.h << EOF
+@@ -29,3 +29,5 @@
+ #ifdef _WIN32
++#ifndef __MINGW64_VERSION_MAJOR
+ typedef uint32_t mode_t;
++#endif
+ typedef uint32_t uid_t;
+EOF
+# fix undefined NAME_MAX in plugins/dirlisting/dirlisting.h (version >= 1.8.0)
+mv plugins/dirlisting/dirlisting.h plugins/dirlisting/dirlisting.h.bak &&
+echo "#define NAME_MAX 255" > plugins/dirlisting/dirlisting.h &&
+cat plugins/dirlisting/dirlisting.h.bak >> plugins/dirlisting/dirlisting.h
+# fix plugins/dirlisting/dirlisting.c (version >= 1.8.0)
+patch -ulbf plugins/dirlisting/dirlisting.c << EOF
+@@ -33,3 +33,3 @@
+ #include <time.h>
+-#include <dirent.h>
++#include "../../include/monkey/mk_core/external/dirent.h"
+ #include <sys/stat.h>
+EOF
+# fix plugins/dirlisting/dirlisting.c (version >= 1.8.0)
+patch -ulbf plugins/dirlisting/dirlisting.c << EOF
+@@ -33,3 +33,7 @@
+ #include <time.h>
++#ifdef _WIN32
++#include <windows.h>
++#else
+ #include <dirent.h>
++#endif
+ #include <sys/stat.h>
+@@ -95,3 +99,7 @@
+
++#ifdef _WIN32
++    if (type & FILE_ATTRIBUTE_DIRECTORY == 0) {
++#else
+     if (type != DT_DIR) {
++#endif
+         mk_dirhtml_human_readable_size(entry->size,
+@@ -115,3 +123,8 @@
+     struct mk_list *list;
++#ifdef _WIN32
++    WIN32_FIND_DATAA ent;
++    HANDLE dirhandle;
++#else
+     struct dirent *ent;
++#endif
+     struct mk_f_list *entry = 0;
+@@ -121,2 +134,19 @@
+
++#ifdef _WIN32
++    if ((dirhandle = FindFirstFileA(dir, &ent)) != INVALID_HANDLE_VALUE) {
++      do {
++        if ((ent.cFileName[0] == '.') && (strcmp(ent.cFileName, "..") != 0))
++            continue;
++
++        snprintf(full_path, PATH_MAX, "%s%s", path, ent.cFileName);
++        entry = mk_dirhtml_create_element(ent.cFileName,
++                                          ent.dwFileAttributes, full_path, list_len);
++        if (!entry) {
++            continue;
++        }
++
++        mk_list_add(&entry->_head, list);
++      } while (FindNextFileA(dirhandle, &ent));
++    }
++#else
+     while ((ent = readdir(dir)) != NULL) {
+@@ -140,2 +170,3 @@
+     }
++#endif
+
+@@ -555,3 +586,7 @@
+     /* %_target_title_% */
++#ifdef _WIN32
++    if (request->toc[i]->type & FILE_ATTRIBUTE_DIRECTORY != 0) {
++#else
+     if (request->toc[i]->type == DT_DIR) {
++#endif
+         sep = mk_dir_iov_slash;
+EOF
+# fix include/monkey/mk_thread_libco.h (version >= 1.8.0)
+sed -i.bak -e "s/^static \(MK_INLINE\)/\1/" include/monkey/mk_thread_libco.h include/monkey/mk_http_thread.h
+# fix mk_bin/monkey.c (version >= 1.8.0)
+patch -ulbf mk_bin/monkey.c << EOF
+@@ -292,2 +292,3 @@
+     /* Running Monkey as daemon */
++#ifndef _WIN32
+     if (server->is_daemon == MK_TRUE) {
+@@ -295,2 +296,3 @@
+     }
++#endif
+
+@@ -310,3 +312,5 @@
+     /* Register PID of Monkey */
++#ifndef _WIN32
+     mk_utils_register_pid(server->path_conf_pidfile);
++#endif
+
+@@ -322,2 +326,3 @@
+     /* Hang here, basically do nothing as threads are doing the job. */
++#ifndef _WIN32
+     sigset_t mask;
+@@ -325,2 +330,3 @@
+     sigsuspend(&mask);
++#endif
+
+EOF
+# fix mk_bin/mk_signals.c (version >= 1.8.0)
+patch -ulbf mk_bin/mk_signals.c << EOF
+@@ -26,3 +26,5 @@
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <sys/wait.h>
++#endif
+
+@@ -39,2 +41,3 @@
+ {
++#ifndef _WIN32
+     /* ignore future signals to properly handle the cleanup */
+@@ -49,2 +52,3 @@
+     mk_info("Exiting... >:(");
++#endif
+     _exit(EXIT_SUCCESS);
+@@ -52,2 +56,3 @@
+
++#ifndef _WIN32
+ static void mk_signal_handler(int signo, siginfo_t *si, void *context UNUSED_PARAM)
+@@ -85,2 +90,3 @@
+ }
++#endif
+
+@@ -88,2 +94,3 @@
+ {
++#ifndef _WIN32
+     struct sigaction act;
+@@ -102,2 +109,3 @@
+     mk_signal_context(context);
++#endif
+ }
+EOF
+# fix undefined realpath in mk_core/mk_rconf.c (version >= 1.8.0)
+mv mk_core/mk_rconf.c mk_core/mk_rconf.c.bak &&
+echo "#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" > mk_core/mk_rconf.c &&
+cat mk_core/mk_rconf.c.bak >> mk_core/mk_rconf.c
+# fix include/monkey/mk_core/external/dirent.h (version >= 1.8.1)
+patch -ulbf include/monkey/mk_core/external/dirent.h << EOF
+@@ -1 +1,5 @@
++#ifdef __MINGW32__
++#include <windows.h>
++#include <dirent.h>
++#else
+ /*
+@@ -1027 +1031,2 @@
+ #endif /*DIRENT_H*/
++#endif
+EOF
+# fix plugins/dirlisting/dirlisting.c (version >= 1.8.1)
+patch -ulbf plugins/dirlisting/dirlisting.c << EOF
+@@ -131,3 +131,3 @@
+ #ifdef _WIN32
+-    if ((dirhandle = FindFirstFileA(dir, &ent)) != INVALID_HANDLE_VALUE) {
++    if ((dirhandle = FindFirstFileA(path, &ent)) != INVALID_HANDLE_VALUE) {
+       do {
+EOF
+# fix mk_server/mk_header.c (version >= 1.8.1)
+patch -ulbf mk_server/mk_header.c << EOF
+@@ -447,3 +447,3 @@
+     iov = &header->headers_iov;
+-    iov->io          = (struct iovec *) &header->__iov_io;
++    iov->io          = (struct mk_iovec *) &header->__iov_io;
+     iov->buf_to_free = (void *) &header->__iov_buf;
+EOF
+# fix send/recv/setsockopt/getsockopt (version >= 1.8.1)
+sed -i.bak -e "s/\(\(send\|recv\)([^ ]*, \)\(&val, sizeof(\)/\1(void*)\3/" mk_server/mk_lib.c mk_server/mk_scheduler.c
+sed -i.bak -e "s/\(\(send\|recv\)([^ ]*, \)\(&val, sizeof(\)/\1(void*)\3/" mk_server/mk_server.c
+sed -i.bak -e "s/\(setsockopt([^,]*,[^,]*,[^,]*, \)\(&[^,]*, sizeof(\)/\1(void*)\2/" mk_server/mk_socket.c
+sed -i.bak -e "s/\(setsockopt([^,]*,[^,]*,[^,]*, \)\(&[^,]*, sizeof(\)/\1(void*)\2/" mk_server/mk_server.c
+sed -i.bak -e "s/\(getsockopt([^,]*,[^,]*,[^,]*, \)\(&[^,]*, \)/\1(void*)\2/" mk_server/mk_net.c
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMK_STATIC_LIB_MODE:BOOL=ON -DMK_MBEDTLS_SHARED:BOOL=OFF -DMK_PLUGIN_TLS:BOOL=OFF -DLIBEVENT_LIBRARIES:STRING= -DMK_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMK_STATIC_LIB_MODE:BOOL=OFF -DMK_MBEDTLS_SHARED:BOOL=ON -DMK_PLUGIN_TLS:BOOL=OFF -DLIBEVENT_LIBRARIES:STRING= -DMK_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ rm -f $INSTALLPREFIX/lib/libevent* &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf monkey-$VERSION
+
+
+
