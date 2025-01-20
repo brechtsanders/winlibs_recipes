@@ -15,8 +15,10 @@ export TYPE=library
 #export VERSIONDATE=20180414
 #export VERSION=5.2.1
 #export VERSIONDATE=20210828
-export VERSION=5.3.0
-export VERSIONDATE=20221221
+#export VERSION=5.3.0
+#export VERSIONDATE=20221221
+export VERSION=5.4.0
+export VERSIONDATE=20250120
 ####ITK build directory path length is too long (51 > 50).Please set the ITK build directory to a directory with a shorter path.
 wl-showstatus --package-version
 export DEPENDENCIES=
@@ -57,6 +59,14 @@ EOF
 mv Modules/Filtering/MathematicalMorphology/include/itkMathematicalMorphologyEnums.h Modules/Filtering/MathematicalMorphology/include/itkMathematicalMorphologyEnums.h.bak &&
 echo "#include <cstdint>" > Modules/Filtering/MathematicalMorphology/include/itkMathematicalMorphologyEnums.h &&
 cat Modules/Filtering/MathematicalMorphology/include/itkMathematicalMorphologyEnums.h.bak >> Modules/Filtering/MathematicalMorphology/include/itkMathematicalMorphologyEnums.h
+# fix Modules/ThirdParty/GDCM/src/gdcm/Utilities/gdcmext/mec_mr3_io.c (version >= 5.4.0)
+patch -ulbf Modules/ThirdParty/GDCM/src/gdcm/Utilities/gdcmext/mec_mr3_io.c << EOF
+@@ -140,3 +140,3 @@
+ static void *aligned_alloc_impl(size_t alignment, size_t size) {
+-#ifdef _MSC_VER
++#ifdef _WIN32
+   return _aligned_malloc(size, alignment);
+EOF
 #mkdir -p build_static build_shared &&
 # wl-showstatus configure &&
 # cd build_static &&
@@ -130,6 +140,8 @@ mkdir -p build_static build_shared &&
  #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DITK_BUILD_DEFAULT_MODULES:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DITK_WRAP_PYTHON:BOOL=ON -DITK_LEGACY_SILENT:BOOL=ON -DITK_SKIP_PATH_LENGTH_CHECKS:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython3_LIBRARIES:PATH=$(ls -1 $PYDIR/libs/libpython*.a|sort -V|tail -n1) -DPython3_INCLUDE_DIRS:PATH=$PYDIR/include -S. -Bbuild_shared &&
  cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DITK_BUILD_DEFAULT_MODULES:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DITK_WRAP_PYTHON:BOOL=OFF -DITK_LEGACY_SILENT:BOOL=ON -DITK_SKIP_PATH_LENGTH_CHECKS:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython3_LIBRARIES:PATH=$(ls -1 $PYDIR/*python*.dll|sort -V|head -n1) -DPython3_INCLUDE_DIRS:PATH=$PYDIR/include -S. -Bbuild_shared &&
  #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DITK_BUILD_DEFAULT_MODULES:BOOL=ON -DPYTHON_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DITK_WRAP_PYTHON:BOOL=ON -DITK_LEGACY_SILENT:BOOL=ON -DITK_SKIP_PATH_LENGTH_CHECKS:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DPython3_LIBRARIES:PATH=$(ls -1 $PYDIR/*python*.dll|sort -V|head -n1) -DPython3_INCLUDE_DIRS:PATH=$PYDIR/include -S. -Bbuild_shared &&
+ # add linker flags (version >= 5.4.0)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -liconv/" build_shared/build.ninja &&
  # fix empty define of _FILE_OFFSET_BITS
  sed -i.bak -e "s/^#define _FILE_OFFSET_BITS$/& 64/" build_shared/Modules/ThirdParty/TIFF/src/itktiff/itk_tif_config.h &&
  wl-showstatus build-install &&
@@ -142,3 +154,5 @@ mkdir -p build_static build_shared &&
 
 
 
+# fix undefined posix_memalign() in Modules/ThirdParty/GDCM/src/gdcm/Utilities/gdcmext/mec_mr3_io.c (version >= 5.4.0)
+sed -i.bak -e "1i #define posix_memalign(p, a, s) (*(p) = _aligned_malloc((s), (a)))" Modules/ThirdParty/GDCM/src/gdcm/Utilities/gdcmext/mec_mr3_io.c
