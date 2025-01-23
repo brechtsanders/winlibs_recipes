@@ -474,6 +474,8 @@ export VERSIONDATE=20241029
 #export VERSIONDATE=20241116
 #export VERSION=1.69.0
 #export VERSIONDATE=20241224
+#export VERSION=1.70.0
+#export VERSIONDATE=20250123
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,c-ares,openssl,protobuf,abseil,re2
 #export DEPENDENCIES=zlib,c-ares,openssl,protobuf,abseil,re2,opencensus-cpp
@@ -520,6 +522,23 @@ EOF
 #sed -i.bak -e "s?\(^#include \"\)\(upb/\)?\1third_party/upb/\2?" $(grep -l "^#include \"upb/" $(find -name '*.h' -or -name '*.c'))
 # fix missing folder (version >= 1.48.0)
 mkdir -p third_party/opencensus-proto/src
+# fix CMakeLists.txt (version >= 1.70.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -4631,3 +4631,12 @@
+
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++
++    PRIVATE
++      "GRPCXX_DLL_EXPORTS"
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++ PROPERTIES COMPILE_PDB_NAME "grpc++"
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF -DgRPC_BUILD_GRPC_CSHARP_PLUGIN:BOOL=OFF -DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN:BOOL=OFF -DgRPC_ZLIB_PROVIDER:STRING=package -DgRPC_CARES_PROVIDER:STRING=package -DgRPC_PROTOBUF_PROVIDER:STRING=package -DgRPC_GFLAGS_PROVIDER:STRING=package -DgRPC_SSL_PROVIDER:STRING=package -DgRPC_ABSL_PROVIDER:STRING=package -DgRPC_RE2_PROVIDER:STRING=package -DgRPC_BENCHMARK_PROVIDER:STRING=package -DgRPC_BUILD_TESTS:BOOL=OFF -DPACKAGE_VERSION:STRING=$VERSION -DCMAKE_C_FLAGS:STRING="-D_WIN32_WINNT=0x600 -I$PWD -I$PWD/include" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -D_WIN32_WINNT=0x600 -I$PWD -I$PWD/include" -S. -Bbuild_static &&
@@ -537,6 +556,7 @@ mkdir -p build_static build_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF -DgRPC_BUILD_GRPC_CSHARP_PLUGIN:BOOL=OFF -DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN:BOOL=OFF -DgRPC_ZLIB_PROVIDER:STRING=package -DgRPC_CARES_PROVIDER:STRING=package -DgRPC_PROTOBUF_PROVIDER:STRING=module -DPROTOBUF_ROOT_DIR:PATH=$MINGWPREFIX/include -DgRPC_GFLAGS_PROVIDER:STRING=package -DgRPC_SSL_PROVIDER:STRING=package -DgRPC_ABSL_PROVIDER:STRING=package -DgRPC_RE2_PROVIDER:STRING=package -DgRPC_BENCHMARK_PROVIDER:STRING=package -DgRPC_BUILD_TESTS:BOOL=OFF -DPACKAGE_VERSION:STRING=$VERSION -DCMAKE_C_FLAGS:STRING="-D_WIN32_WINNT=0x600 -I$PWD -I$PWD/include" -DCMAKE_CXX_FLAGS:STRING="-fpermissive -D_WIN32_WINNT=0x600 -I$PWD -I$PWD/include" -S. -Bbuild_shared &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lre2 -lws2_32/" build_shared/build.ninja &&
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lcrypto -lre2 -lws2_32/" build_shared/build.ninja &&
  # don't force older C++ standard (breaks linking against abseil)
  sed -i.bak2 -e "s/-std=c++[^ ]*//g" build_shared/build.ninja &&
  wl-showstatus build-install &&
@@ -547,3 +567,2969 @@ mkdir -p build_static build_shared &&
 
 
 
+# fix CMakeLists.txt (version >= 1.70.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -2106,3 +2106,10 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(gpr
++    PRIVATE
++      "GPR_DLL_EXPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(gpr PROPERTIES COMPILE_PDB_NAME "gpr"
+@@ -3050,3 +3057,11 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc
++    PRIVATE
++      "GRPC_DLL_EXPORTS"
++      "GPR_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc PROPERTIES COMPILE_PDB_NAME "grpc"
+@@ -3229,3 +3244,11 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc_test_util
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc_test_util PROPERTIES COMPILE_PDB_NAME "grpc_test_util"
+@@ -3295,3 +3318,11 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc_test_util_unsecure
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc_test_util_unsecure PROPERTIES COMPILE_PDB_NAME "grpc_test_util_unsecure"
+@@ -3750,3 +3781,11 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc_unsecure
++    PRIVATE
++      "GRPC_DLL_EXPORTS"
++      "GPR_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc_unsecure PROPERTIES COMPILE_PDB_NAME "grpc_unsecure"
+@@ -4525,3 +4564,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(benchmark_helpers
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(benchmark_helpers PROPERTIES COMPILE_PDB_NAME "benchmark_helpers"
+@@ -4631,3 +4679,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++
++    PRIVATE
++      "GRPCXX_DLL_EXPORTS"
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++ PROPERTIES COMPILE_PDB_NAME "grpc++"
+@@ -4913,3 +4970,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++_alts
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++_alts PROPERTIES COMPILE_PDB_NAME "grpc++_alts"
+@@ -4984,3 +5050,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++_error_details
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++_error_details PROPERTIES COMPILE_PDB_NAME "grpc++_error_details"
+@@ -5065,3 +5140,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++_reflection
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++_reflection PROPERTIES COMPILE_PDB_NAME "grpc++_reflection"
+@@ -5140,3 +5224,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++_test
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++_test PROPERTIES COMPILE_PDB_NAME "grpc++_test"
+@@ -5213,3 +5306,10 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++_test_config
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++_test_config PROPERTIES COMPILE_PDB_NAME "grpc++_test_config"
+@@ -5284,3 +5384,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++_test_util
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++_test_util PROPERTIES COMPILE_PDB_NAME "grpc++_test_util"
+@@ -5378,3 +5487,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc++_unsecure
++    PRIVATE
++      "GRPCXX_DLL_EXPORTS"
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc++_unsecure PROPERTIES COMPILE_PDB_NAME "grpc++_unsecure"
+@@ -5923,3 +6041,10 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpc_authorization_provider
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpc_authorization_provider PROPERTIES COMPILE_PDB_NAME "grpc_authorization_provider"
+@@ -6163,3 +6288,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpcpp_channelz
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpcpp_channelz PROPERTIES COMPILE_PDB_NAME "grpcpp_channelz"
+@@ -6241,3 +6375,12 @@
+ 
+-if(WIN32 AND MSVC)
++if(MINGW)
++  if(BUILD_SHARED_LIBS)
++    target_compile_definitions(grpcpp_otel_plugin
++    PRIVATE
++      "GPR_DLL_IMPORTS"
++      "GRPC_DLL_IMPORTS"
++      "GRPCXX_DLL_IMPORTS"
++    )
++  endif()
++elseif(WIN32 AND MSVC)
+   set_target_properties(grpcpp_otel_plugin PROPERTIES COMPILE_PDB_NAME "grpcpp_otel_plugin"
+@@ -6317,3 +6460,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -6354,3 +6497,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -6391,3 +6534,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -6437,3 +6580,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -6480,3 +6623,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -6528,3 +6671,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -6588,3 +6731,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -7148,3 +7291,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7203,3 +7346,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -7251,3 +7394,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7296,3 +7439,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7338,3 +7481,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7392,3 +7535,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -7438,3 +7581,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7481,3 +7624,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7524,3 +7667,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7568,3 +7711,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7611,3 +7754,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7654,3 +7797,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7697,3 +7840,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7748,3 +7891,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7791,3 +7934,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7834,3 +7977,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7876,3 +8019,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7921,3 +8064,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -7963,3 +8106,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8005,3 +8148,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8087,3 +8230,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8139,3 +8282,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8181,3 +8324,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8233,3 +8376,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8276,3 +8419,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8321,3 +8464,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8373,3 +8516,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8429,3 +8572,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8474,3 +8617,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8547,3 +8690,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8593,3 +8736,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8648,3 +8791,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -8704,3 +8847,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -8749,3 +8892,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8793,3 +8936,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8835,3 +8978,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8878,3 +9021,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -8921,3 +9064,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -8963,3 +9106,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9036,3 +9179,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9125,3 +9268,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9181,3 +9324,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9223,3 +9366,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9266,3 +9409,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9309,3 +9452,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -9383,3 +9526,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9472,3 +9615,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9524,3 +9667,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9597,3 +9740,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9651,3 +9794,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -9703,3 +9846,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -9751,3 +9894,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10028,3 +10171,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10116,3 +10259,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10192,3 +10335,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10268,3 +10411,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10344,3 +10487,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10392,3 +10535,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10467,3 +10610,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10540,3 +10683,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10620,3 +10763,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10696,3 +10839,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10840,3 +10983,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10882,3 +11025,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10924,3 +11067,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -10967,3 +11110,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -11016,3 +11159,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -11092,3 +11235,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11135,3 +11278,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11177,3 +11320,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11230,3 +11373,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11272,3 +11415,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11314,3 +11457,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11356,3 +11499,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11403,3 +11546,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11447,3 +11590,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11525,3 +11668,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11594,3 +11737,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -11664,3 +11807,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -11717,3 +11860,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11768,3 +11911,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11820,3 +11963,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11890,3 +12033,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -11981,3 +12124,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12031,3 +12174,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12080,3 +12223,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12134,3 +12277,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -12212,3 +12355,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12255,3 +12398,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12306,3 +12449,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -12350,3 +12493,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12430,3 +12573,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -12510,3 +12653,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12602,3 +12745,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -12647,3 +12790,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -12721,3 +12864,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12775,3 +12918,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12817,3 +12960,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12861,3 +13004,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -12915,3 +13058,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -12958,3 +13101,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13000,3 +13143,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13073,3 +13216,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13118,3 +13261,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13160,3 +13303,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13211,3 +13354,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -13264,3 +13407,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13308,3 +13451,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13351,3 +13494,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13402,3 +13545,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13475,3 +13618,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13553,3 +13696,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13596,3 +13739,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13639,3 +13782,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13713,3 +13856,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13788,3 +13931,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13833,3 +13976,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -13876,3 +14019,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -13949,3 +14092,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14027,3 +14170,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14070,3 +14213,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14113,3 +14256,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14186,3 +14329,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14231,3 +14374,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14273,3 +14416,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14315,3 +14458,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14357,3 +14500,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14401,3 +14544,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -14482,3 +14625,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14555,3 +14698,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14638,3 +14781,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14681,3 +14824,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14728,3 +14871,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14783,3 +14926,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14825,3 +14968,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14891,3 +15034,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14945,3 +15088,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -14996,3 +15139,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15047,3 +15190,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15089,3 +15232,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15133,3 +15276,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -15177,3 +15320,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -15252,3 +15395,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15317,3 +15460,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15369,3 +15512,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15414,3 +15557,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15455,3 +15598,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15497,3 +15640,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15540,3 +15683,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15592,3 +15735,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -15635,3 +15778,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15708,3 +15851,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15784,3 +15927,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15835,3 +15978,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15910,3 +16053,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -15988,3 +16131,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16063,3 +16206,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16141,3 +16284,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16191,3 +16334,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -16238,3 +16381,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16294,3 +16437,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16337,3 +16480,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16386,3 +16529,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16442,3 +16585,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -16491,3 +16634,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16540,3 +16683,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16619,3 +16762,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16662,3 +16805,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16705,3 +16848,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16748,3 +16891,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16791,3 +16934,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16864,3 +17007,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16910,3 +17053,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -16961,3 +17104,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17003,3 +17146,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17055,3 +17198,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17106,3 +17249,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17184,3 +17327,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17259,3 +17402,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17304,3 +17447,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17356,3 +17499,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17396,3 +17539,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17523,3 +17666,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17764,3 +17907,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17815,3 +17958,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17866,3 +18009,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17917,3 +18060,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -17968,3 +18111,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18021,3 +18164,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18103,3 +18246,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -18154,3 +18297,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18239,3 +18382,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -18293,3 +18436,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18336,3 +18479,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18379,3 +18522,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18421,3 +18564,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18465,3 +18608,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -18510,3 +18653,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18554,3 +18697,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18638,3 +18781,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18712,3 +18855,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18766,3 +18909,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18808,3 +18951,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18859,3 +19002,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18910,3 +19053,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -18961,3 +19104,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19034,3 +19177,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19091,3 +19234,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19142,3 +19285,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19196,3 +19339,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19238,3 +19381,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19311,3 +19454,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19356,3 +19499,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19401,3 +19544,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -19448,3 +19591,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -19529,3 +19672,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19637,3 +19780,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19680,3 +19823,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19724,3 +19867,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19789,3 +19932,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -19842,3 +19985,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19884,3 +20027,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19933,3 +20076,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -19980,3 +20123,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20050,3 +20193,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20115,3 +20258,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20169,3 +20312,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20209,3 +20352,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20282,3 +20425,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20329,3 +20472,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -20377,3 +20520,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20425,3 +20568,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20469,3 +20612,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20511,3 +20654,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20562,3 +20705,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20613,3 +20756,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20686,3 +20829,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20732,3 +20875,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20805,3 +20948,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20857,3 +21000,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20908,3 +21051,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20951,3 +21094,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -20995,3 +21138,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21046,3 +21189,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -21090,3 +21233,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21132,3 +21275,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21183,3 +21326,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21226,3 +21369,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -21272,3 +21415,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21380,3 +21523,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21429,3 +21572,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21512,3 +21655,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21585,3 +21728,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21661,3 +21804,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21737,3 +21880,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21813,3 +21956,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21859,3 +22002,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -21902,3 +22045,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -21977,3 +22120,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22029,3 +22172,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22071,3 +22214,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22122,3 +22265,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22165,3 +22308,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22207,3 +22350,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22313,3 +22456,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22392,3 +22535,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22442,3 +22585,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22490,3 +22633,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -22564,3 +22707,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22672,3 +22815,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22748,3 +22891,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22794,3 +22937,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22868,3 +23011,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22911,3 +23054,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -22952,3 +23095,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23001,3 +23144,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23054,3 +23197,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -23122,3 +23265,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23166,3 +23309,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23209,3 +23352,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23322,3 +23465,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23369,3 +23512,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23411,3 +23554,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23459,3 +23602,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23534,3 +23677,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23577,3 +23720,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -23620,3 +23763,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23675,3 +23818,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23717,3 +23860,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23790,3 +23933,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23835,3 +23978,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23898,3 +24041,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -23952,3 +24095,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24004,3 +24147,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24046,3 +24189,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24097,3 +24240,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24170,3 +24313,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24224,3 +24367,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24297,3 +24440,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24342,3 +24485,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24384,3 +24527,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24458,3 +24601,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -24506,3 +24649,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -24550,3 +24693,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -24597,3 +24740,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -24648,3 +24791,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -24703,3 +24846,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -25284,3 +25427,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25330,3 +25473,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25372,3 +25515,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25414,3 +25557,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25457,3 +25600,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25507,3 +25650,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25554,3 +25697,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25596,3 +25739,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25639,3 +25782,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25720,3 +25863,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25764,3 +25907,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25839,3 +25982,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25925,3 +26068,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -25997,3 +26140,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26036,3 +26179,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26078,3 +26221,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26192,3 +26335,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26235,3 +26378,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26286,3 +26429,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26329,3 +26472,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26371,3 +26514,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26444,3 +26587,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26490,3 +26633,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -26581,3 +26724,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26664,3 +26807,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26740,3 +26883,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26795,3 +26938,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -26848,3 +26991,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -26901,3 +27044,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -26954,3 +27097,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27029,3 +27172,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27103,3 +27246,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27148,3 +27291,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27221,3 +27364,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27297,3 +27440,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27373,3 +27516,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27449,3 +27592,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27525,3 +27668,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27601,3 +27744,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27677,3 +27820,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27753,3 +27896,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27807,3 +27950,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -27882,3 +28025,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -27958,3 +28101,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28034,3 +28177,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28110,3 +28253,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28186,3 +28329,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28262,3 +28405,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28338,3 +28481,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28414,3 +28557,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28490,3 +28633,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28566,3 +28709,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28642,3 +28785,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28718,3 +28861,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28794,3 +28937,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28870,3 +29013,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28946,3 +29089,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -28991,3 +29134,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29064,3 +29207,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29140,3 +29283,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29216,3 +29359,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29292,3 +29435,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29337,3 +29480,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29410,3 +29553,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29486,3 +29629,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29562,3 +29705,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29638,3 +29781,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29714,3 +29857,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29790,3 +29933,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29866,3 +30009,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -29949,3 +30092,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30037,3 +30180,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30081,3 +30224,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30129,3 +30272,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30172,3 +30315,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30215,3 +30358,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30267,3 +30410,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30318,3 +30461,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30363,3 +30506,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30407,3 +30550,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30486,3 +30629,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30572,3 +30715,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -30659,3 +30802,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -30715,3 +30858,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -30759,3 +30902,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30801,3 +30944,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30843,3 +30986,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30885,3 +31028,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -30960,3 +31103,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31034,3 +31177,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31113,3 +31256,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31158,3 +31301,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31242,3 +31385,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -31289,3 +31432,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -31363,3 +31506,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31408,3 +31551,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31487,3 +31630,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31530,3 +31673,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31581,3 +31724,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31654,3 +31797,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31730,3 +31873,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31811,3 +31954,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31885,3 +32028,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -31961,3 +32104,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32008,3 +32151,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32081,3 +32224,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32126,3 +32269,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32167,3 +32310,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32214,3 +32357,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32258,3 +32401,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32300,3 +32443,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32342,3 +32485,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32394,3 +32537,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -32469,3 +32612,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32513,3 +32656,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -32558,3 +32701,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -32602,3 +32745,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -32645,3 +32788,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32688,3 +32831,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32730,3 +32873,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32781,3 +32924,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32823,3 +32966,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32865,3 +33008,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32907,3 +33050,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -32949,3 +33092,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33022,3 +33165,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33104,3 +33247,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -33158,3 +33301,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33200,3 +33343,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33244,3 +33387,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33286,3 +33429,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33328,3 +33471,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33371,3 +33514,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33422,3 +33565,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33510,3 +33653,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -33554,3 +33697,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -33608,3 +33751,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -33661,3 +33804,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -33704,3 +33847,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33791,3 +33934,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33866,3 +34009,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33915,3 +34058,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -33961,3 +34104,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34013,3 +34156,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34067,3 +34210,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34124,3 +34267,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34176,3 +34319,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34218,3 +34361,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34261,3 +34404,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34329,3 +34472,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -34374,3 +34517,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34417,3 +34560,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34494,3 +34637,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34558,3 +34701,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34603,3 +34746,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34647,3 +34790,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34690,3 +34833,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34733,3 +34876,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34775,3 +34918,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34819,3 +34962,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34863,3 +35006,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -34943,3 +35086,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -34994,3 +35137,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -35038,3 +35181,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -35083,3 +35226,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35156,3 +35299,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35210,3 +35353,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35252,3 +35395,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35294,3 +35437,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35339,3 +35482,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35416,3 +35559,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35491,3 +35634,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35543,3 +35686,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35586,3 +35729,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35630,3 +35773,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35673,3 +35816,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -35747,3 +35890,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35792,3 +35935,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35834,3 +35977,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35879,3 +36022,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35924,3 +36067,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -35969,3 +36112,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36085,3 +36228,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36127,3 +36270,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36203,3 +36346,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36245,3 +36388,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36287,3 +36430,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36336,3 +36479,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36384,3 +36527,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -36428,3 +36571,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36477,3 +36620,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36522,3 +36665,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -36567,3 +36710,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36611,3 +36754,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -36656,3 +36799,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -36730,3 +36873,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36806,3 +36949,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36853,3 +36996,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -36943,3 +37086,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -37333,3 +37476,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -37378,3 +37521,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -37420,3 +37563,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -37991,3 +38134,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -38520,3 +38663,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -39026,3 +39169,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -39558,3 +39701,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -39907,3 +40050,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -40435,3 +40578,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -40512,3 +40655,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -40564,3 +40707,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -41181,3 +41324,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -41707,3 +41850,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -42017,3 +42160,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -42544,3 +42687,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -43078,3 +43221,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -43608,3 +43751,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -44139,3 +44282,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -44608,3 +44751,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -44990,3 +45133,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -45488,3 +45631,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -45789,3 +45932,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -46322,3 +46465,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -46856,3 +46999,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -46900,3 +47043,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -46948,3 +47091,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -47482,3 +47625,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -48013,3 +48156,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -48548,3 +48691,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -48945,3 +49088,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -49480,3 +49623,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -50031,3 +50174,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+@@ -50604,3 +50747,3 @@
+ )
+-if(WIN32 AND MSVC)
++if(WIN32)
+   if(BUILD_SHARED_LIBS)
+@@ -51141,3 +51284,3 @@
+   )
+-  if(WIN32 AND MSVC)
++  if(WIN32)
+     if(BUILD_SHARED_LIBS)
+EOF
