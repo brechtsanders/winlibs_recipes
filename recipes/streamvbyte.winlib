@@ -1,4 +1,4 @@
-export NAME="streamvbyte"
+export NAME="StreamVByte"
 export STATUS=
 export URL=https://github.com/fast-pack/streamvbyte
 export BASENAME=streamvbyte
@@ -23,6 +23,48 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing streamvbyte.pc
+cat > streamvbyte.pc << EOF
+prefix=$INSTALLPREFIX
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: streamvbyte
+Description: Fast integer compression in C using the StreamVByte codec
+Version: $VERSION
+Libs: -L\${libdir} -lstreamvbyte
+Cflags: -I\${includedir}
+EOF
+# also create .cmake files
+cat > streamvbyteConfig.cmake.in << EOF
+@PACKAGE_INIT@
+#SET(STREAMVBYTE_INCLUDE_DIR "@PACKAGE_STREAMVBYTE_INCLUDE_DIR@")
+INCLUDE(FindPkgConfig)
+PKG_SEARCH_MODULE(streamvbyte streamvbyte)
+EOF
+cat >> CMakeLists.txt << EOF
+SET(STREAMVBYTE_INCLUDE_DIR include)
+INCLUDE(CMakePackageConfigHelpers)
+CONFIGURE_PACKAGE_CONFIG_FILE(
+  "\${CMAKE_CURRENT_SOURCE_DIR}/streamvbyteConfig.cmake.in"
+  "\${CMAKE_CURRENT_BINARY_DIR}/streamvbyteConfig.cmake"
+  INSTALL_DESTINATION "lib/cmake" # location relative to the install root the configured file will end up in
+  PATH_VARS STREAMVBYTE_INCLUDE_DIR # allow us to use @PACKAGE_STREAMVBYTE_INCLUDE_DIR@ to refer to <install_prefix>/include in Config.cmake.in
+  NO_SET_AND_CHECK_MACRO
+  NO_CHECK_REQUIRED_COMPONENTS_MACRO
+)
+WRITE_BASIC_PACKAGE_VERSION_FILE(
+  "streamvbyteConfigVersion.cmake"
+  VERSION "\${STREAMVBYTE_LIB_VERSION}" 
+  COMPATIBILITY AnyNewerVersion
+)
+INSTALL(
+  FILES
+    "\${CMAKE_CURRENT_BINARY_DIR}/streamvbyteConfig.cmake"
+    "\${CMAKE_CURRENT_BINARY_DIR}/streamvbyteConfigVersion.cmake"
+  DESTINATION "lib/cmake"
+)
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure-static &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSTREAMVBYTE_ENABLE_EXAMPLES:BOOL=OFF -DSTREAMVBYTE_ENABLE_TESTS:BOOL=OFF -S. -Bbuild_static &&
@@ -32,6 +74,8 @@ mkdir -p build_static build_shared &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install-shared &&
  ninja -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+ cp -f streamvbyte.pc $INSTALLPREFIX/lib/pkgconfig/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: add configure_package_config_file to CMakeLists.txt
 
