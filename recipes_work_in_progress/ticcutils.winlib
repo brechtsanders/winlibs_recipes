@@ -71,6 +71,143 @@ patch -ulbf src/Timer.cxx << EOF
 +#endif
 
 EOF
+# fix conversion from filesystem::path to std::string in src/FileUtils.cxx (version >= 0.36)
+patch -ulbf src/FileUtils.cxx << EOF
+@@ -92,3 +92,3 @@
+ 	 && ec.value() != 0 ){
+-      throw runtime_error( "create_dir(" + string(p) + ") failed: "
++      throw runtime_error( "create_dir(" + p.string() + ") failed: "
+ 			   + ec.message() + " (" + to_string( ec.value())
+@@ -163,4 +163,4 @@
+ 	if ( ext.empty() ||
+-	     TiCC::match_back( p, ext ) ){
+-	  result.push_back( p );
++	     TiCC::match_back( p.string(), ext ) ){
++	  result.push_back( p.string() );
+ 	}
+@@ -172,4 +172,4 @@
+ 	if ( ext.empty() ||
+-	     TiCC::match_back( p, ext ) ){
+-	  result.push_back( p );
++	     TiCC::match_back( p.string(), ext ) ){
++	  result.push_back( p.string() );
+ 	}
+@@ -221,3 +221,3 @@
+       for ( const auto& entry : filesystem::recursive_directory_iterator(dir_path) ){
+-	string p = entry.path();
++	string p = entry.path().string();
+ 	if ( regex_search( p, match ) ){
+@@ -229,3 +229,3 @@
+       for ( const auto& entry : filesystem::directory_iterator(dir_path) ){
+-	string p = entry.path();
++	string p = entry.path().string();
+ 	if ( regex_search( p, match ) ){
+EOF
+# fix src/SocketBasics.cxx (version >= 0.36)
+patch -ulbf src/SocketBasics.cxx << EOF
+@@ -26,2 +26,6 @@
+ 
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#endif
+ #include "ticcutils/SocketBasics.h"
+@@ -33,2 +37,3 @@
+ #include <cerrno>
++#ifndef _WIN32
+ #include <fcntl.h>
+@@ -38,2 +43,3 @@
+ #include <sys/socket.h>
++#endif
+ #include <unistd.h>
+@@ -276,2 +282,12 @@
+     */
++#ifdef _WIN32
++    unsigned long flags = 0;
++    if ( ioctlsocket(sock, FIONBIO, &flags) != 0) {
++      mess = "ioctlsocket failed";
++#ifdef DEBUG
++    cerr << "ioctlsocket: " << mess << endl;
++#endif
++      return false;
++    }
++#else
+     int opts = fcntl( sock, F_GETFL );
+@@ -300,2 +316,3 @@
+     }
++#endif
+     nonBlocking = false;
+@@ -312,2 +329,12 @@
+     */
++#ifdef _WIN32
++    unsigned long flags = 1;
++    if ( ioctlsocket(sock, FIONBIO, &flags) != 0) {
++      mess = "ioctlsocket failed";
++#ifdef DEBUG
++    cerr << "ioctlsocket: " << mess << endl;
++#endif
++      return false;
++    }
++#else
+     int opts = fcntl( sock, F_GETFL );
+@@ -336,2 +363,3 @@
+     }
++#endif
+     nonBlocking = true;
+@@ -510,3 +538,3 @@
+     if (host != NULL) {
+-      return static_cast<struct in_addr *>(*host->h_addr_list);
++      return reinterpret_cast<struct in_addr *>(*host->h_addr_list);
+     }
+@@ -535,3 +563,3 @@
+     struct sockaddr_in address;
+-    memset( static_cast<char *>(&address), 0, sizeof(address));
++    memset( reinterpret_cast<char *>(&address), 0, sizeof(address));
+     address.sin_family = AF_INET;
+@@ -546,3 +574,3 @@
+       setsockopt( sock, SOL_SOCKET, SO_REUSEADDR,
+-		  static_cast<void *>(&val), sizeof(val) );
++		  reinterpret_cast<void *>(&val), sizeof(val) );
+       val = 1;
+@@ -551,6 +579,6 @@
+       int connected = ::connect( sock,
+-				 static_cast<struct sockaddr *>(&address),
++				 reinterpret_cast<struct sockaddr *>(&address),
+ 				 sizeof(address));
+       if (connected < 0) {
+-	mess = string( "ClientSocket connect: ") + host + ":" + portNum +
++	mess = string( "ClientSocket connect: ") + hostString + ":" + portString +
+ 	  " failed (" + strerror( errno ) + ")";
+@@ -581,3 +609,3 @@
+       struct sockaddr_in serv_addr;
+-      memset( static_cast<char *>(&serv_addr), 0, sizeof(serv_addr));
++      memset( reinterpret_cast<char *>(&serv_addr), 0, sizeof(serv_addr));
+       serv_addr.sin_family = AF_INET;
+@@ -587,3 +615,3 @@
+       if ( bind( sock,
+-		 static_cast<struct sockaddr *>(&serv_addr),
++		 reinterpret_cast<struct sockaddr *>(&serv_addr),
+ 		 sizeof(serv_addr) ) < 0 ){
+@@ -596,3 +624,3 @@
+ 
+-  bool ServerSocket::accept( ServerSocket& newSocket ){
++  bool ServerSocket::accept( ClientSocket& newSocket ){
+     /// accept a connection on a socket
+@@ -606,3 +634,3 @@
+     int newsock = ::accept( sock,
+-			    static_cast<struct sockaddr *>(&cli_addr),
++			    reinterpret_cast<struct sockaddr *>(&cli_addr),
+ 			    &clilen );
+@@ -622,6 +650,6 @@
+       if ( getpeername( newsock,
+-			static_cast<struct sockaddr *>(&rem),
++			reinterpret_cast<struct sockaddr *>(&rem),
+ 			&remlen ) >= 0 ){
+ 	struct hostent *host
+-	  = gethostbyaddr( static_cast<char *>(&rem.sin_addr),
++	  = gethostbyaddr( reinterpret_cast<char *>(&rem.sin_addr),
+ 			   sizeof rem.sin_addr,
+EOF
 wl-showstatus configure &&
  #mkdir -p m4 &&
  #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
