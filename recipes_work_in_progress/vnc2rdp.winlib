@@ -1,0 +1,106 @@
+export NAME="vnc2rdp"
+export STATUS=
+export URL=http://leeyiw.github.io/vnc2rdp/
+export BASENAME=vnc2rdp
+export DESCRIPTION="vnc2rdp is a proxy for RDP client connect to VNC server."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=0.2.0
+export VERSIONDATE=20250128
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/leeyiw/vnc2rdp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/leeyiw/vnc2rdp/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix session.h
+patch -ulbf session.h << EOF
+@@ -21,3 +21,7 @@
+
++#ifdef _WIN32
++#include <ws2tcpip.h>
++#else
+ #include <netinet/in.h>
++#endif
+
+EOF
+# fix session.c
+patch -ulbf session.c << EOF
+@@ -20,3 +20,7 @@
+ #include <string.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/epoll.h>
++#endif
+ #include <unistd.h>
+EOF
+# fix tpkt.c
+patch -ulbf tpkt.c << EOF
+@@ -18,4 +18,10 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <netinet/in.h>
+ #include <netinet/tcp.h>
++#include <sys/socket.h>
++#endif
+ #include <stddef.h>
+@@ -24,3 +30,2 @@
+ #include <sys/types.h>
+-#include <sys/socket.h>
+ #include <unistd.h>
+@@ -45,3 +50,3 @@
+        optval = 1;
+-       if (setsockopt(t->fd, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval))
++       if (setsockopt(t->fd, IPPROTO_TCP, TCP_NODELAY, (const char *)&optval, sizeof(optval))
+                == -1) {
+EOF
+# fix vnc.c
+patch -ulbf vnc.c << EOF
+@@ -20,3 +20,7 @@
+ #include <string.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
++#endif
+ #include <unistd.h>
+EOF
+# fix vnc2rdp.c
+patch -ulbf vnc2rdp.c << EOF
+@@ -18,3 +18,7 @@
+
++#ifdef _WIN32
++#include <ws2tcpip.h>
++#else
+ #include <arpa/inet.h>
++#endif
+ #include <getopt.h>
+@@ -32,2 +36,3 @@
+
++#undef ERROR
+ #define ERROR(...) \\
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
