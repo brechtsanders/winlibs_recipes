@@ -104,13 +104,10 @@ export VERSIONDATE=20240813
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libpng,libbz2
 export OPTIONALDEPENDENCIES=harfbuzz,brotli
-export BUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
 export OPTIONALBUILDDEPENDENCIES=
 #export OPTIONALBUILDDEPENDENCIES=docwriter
-#export BUILDDEPENDENCIES=cmake,ninja
-#export OPTIONALBUILDDEPENDENCIES=
-#export BUILDDEPENDENCIES=meson,ninja
-#export OPTIONALBUILDDEPENDENCIES=
 #export LICENSEFILE=docs/GPL.TXT
 export LICENSEFILE=docs/GPLv2.TXT
 export LICENSETYPE="GPLv2/BSD-like"
@@ -138,51 +135,68 @@ patch -ulbf builds/unix/freetype2.in << EOF
 +includedir=\${prefix}/include
 
 EOF
-# force configure parameters
-sed -i.bak -e "s?\(configure \)\$(value CFG)?\1 --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM?" builds/unix/detect.mk
-#rm config.mk
-#cp $INSTALLPREFIX/bin/libfreetype-6.dll $INSTALLPREFIX/bin/freetype6.dll
-# allow building shared libraries when using clang
-if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
- sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" $(find -name configure)
-fi
-wl-showstatus configure &&
- #./autogen.sh &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
- # fix detection of shared libraries
- #sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" builds/unix/libtool &&
- sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" $(find -name libtool) &&
- wl-showstatus build &&
- # fix undefined off_t
- mv builds/unix/unix-cc.mk builds/unix/unix-cc.mk.bak &&
- sed -e "s/ -pedantic -ansi//" builds/unix/unix-cc.mk.bak > builds/unix/unix-cc.mk &&
- #mv builds/compiler/gcc.mk builds/compiler/gcc.mk.bak &&
- #sed -e "s/-ansi -pedantic//" builds/compiler/gcc.mk.bak > builds/compiler/gcc.mk &&
- #( make || make -j1 ) &&
- ( make || make -j1 || (
-  # fix invalid exports (version >= 2.6.3)
-  mv objs/ftexport.sym objs/ftexport.sym.bak &&
-  grep -v "FT_GetFilePath_From_Mac_ATS_Name\|FT_GetFile_From_Mac_ATS_Name\|FT_GetFile_From_Mac_Name\|FT_New_Face_From_FOND\|FT_New_Face_From_FSRef\|FT_New_Face_From_FSSpec" objs/ftexport.sym.bak > objs/ftexport.sym &&
-  make
- )) &&
- wl-showstatus install &&
- mkdir -p $INSTALLPREFIX/bin &&
- make install &&
- ## fix include path so config/ftconfig.h can be found (version >= 2.4.12 <= 2.5.0)
- ##sed -i -e "s?\(Cflags:.*\)\(-I[^ ]*/freetype2\)?\1\2 \2/freetype?" $INSTALLPREFIX/lib/pkgconfig/freetype2.pc &&
- #mkdir -p $INSTALLPREFIX/include/freetype2/config &&
- #echo '#include "../freetype/config/ftheader.h"' > $INSTALLPREFIX/include/freetype2/config/ftheader.h &&
- # fix issue with backslashes when building fontconfig in freetype2.pc (version >= 2.12.0)
- sed -i -e "s?-L$INSTALLPREFIX/lib?-L\${libdir}?g" $INSTALLPREFIX/lib/pkgconfig/freetype2.pc &&
- # fix missing freetype-config (version >= 2.9.1)
- ( ls -1 $INSTALLPREFIX/bin/freetype-config &> /dev/null || cp -f builds/unix/freetype-config $INSTALLPREFIX/bin/ ) &&
- # fix absolute paths in freetype-config
- sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/freetype-config &&
+## force configure parameters
+#sed -i.bak -e "s?\(configure \)\$(value CFG)?\1 --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM?" builds/unix/detect.mk
+##rm config.mk
+##cp $INSTALLPREFIX/bin/libfreetype-6.dll $INSTALLPREFIX/bin/freetype6.dll
+## allow building shared libraries when using clang
+#if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+# sed -i.bak -e "s/\$LD --help 2>&1 | \$GREP 'auto-import'/true/" $(find -name configure)
+#fi
+#wl-showstatus configure &&
+# #./autogen.sh &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined" &&
+# # fix detection of shared libraries
+# #sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" builds/unix/libtool &&
+# sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" $(find -name libtool) &&
+# wl-showstatus build &&
+# # fix undefined off_t
+# mv builds/unix/unix-cc.mk builds/unix/unix-cc.mk.bak &&
+# sed -e "s/ -pedantic -ansi//" builds/unix/unix-cc.mk.bak > builds/unix/unix-cc.mk &&
+# #mv builds/compiler/gcc.mk builds/compiler/gcc.mk.bak &&
+# #sed -e "s/-ansi -pedantic//" builds/compiler/gcc.mk.bak > builds/compiler/gcc.mk &&
+# #( make || make -j1 ) &&
+# ( make || make -j1 || (
+#  # fix invalid exports (version >= 2.6.3)
+#  mv objs/ftexport.sym objs/ftexport.sym.bak &&
+#  grep -v "FT_GetFilePath_From_Mac_ATS_Name\|FT_GetFile_From_Mac_ATS_Name\|FT_GetFile_From_Mac_Name\|FT_New_Face_From_FOND\|FT_New_Face_From_FSRef\|FT_New_Face_From_FSSpec" objs/ftexport.sym.bak > objs/ftexport.sym &&
+#  make
+# )) &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# make install &&
+# ## fix include path so config/ftconfig.h can be found (version >= 2.4.12 <= 2.5.0)
+# ##sed -i -e "s?\(Cflags:.*\)\(-I[^ ]*/freetype2\)?\1\2 \2/freetype?" $INSTALLPREFIX/lib/pkgconfig/freetype2.pc &&
+# #mkdir -p $INSTALLPREFIX/include/freetype2/config &&
+# #echo '#include "../freetype/config/ftheader.h"' > $INSTALLPREFIX/include/freetype2/config/ftheader.h &&
+# # fix issue with backslashes when building fontconfig in freetype2.pc (version >= 2.12.0)
+# sed -i -e "s?-L$INSTALLPREFIX/lib?-L\${libdir}?g" $INSTALLPREFIX/lib/pkgconfig/freetype2.pc &&
+# # fix missing freetype-config (version >= 2.9.1)
+# ( ls -1 $INSTALLPREFIX/bin/freetype-config &> /dev/null || cp -f builds/unix/freetype-config $INSTALLPREFIX/bin/ ) &&
+# # fix absolute paths in freetype-config
+# sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/freetype-config &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dc_args="['-I$(cygpath -m $MINGWPREFIX/include/harfbuzz)','-I$(cygpath -m $MINGWPREFIX/include/mman-win32)']" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dharfbuzz=disabled -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dtests=disabled -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dharfbuzz=disabled -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dharfbuzz=enabled -Dbrotli=enabled -Dmmap=enabled -Dtests=disabled -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ #-Dharfbuzz=enabled 
+ echo "#undef FT_CONFIG_OPTION_USE_HARFBUZZ" >> build_both/ftoption.h &&
+ # fix invalid -R linker flag
+ sed -i.bak -e "s/\"-R/\"-L/" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
+ # manually copy ftlogging.h
+ cp -u include/freetype/ftlogging.h $INSTALLPREFIX/include/freetype2/freetype/ &&
+ # manually generate freetype-config
+ ( ls -1 $INSTALLPREFIX/bin/freetype-config &>/dev/null || sed -e "s?%PKG_CONFIG%?\${PKG_CONFIG:-pkg-config}?; s?%prefix%?\$(dirname \$(dirname \$0))?; s?%exec_prefix%?\$prefix?; s?%\(include\|lib\)dir%?\$prefix/\1?; s?%ft_version%?$(sed -ne "s/^Version: //p" build_both/meson-private/freetype2.pc)?; s?%LIBSSTATIC_CONFIG%?-L\$libdir $(PKG_CONFIG_PATH=$PWD/build_both/meson-private ${PKG_CONFIG:-pkg-config} --static --libs-only-l freetype2)?" builds/unix/freetype-config.in > $INSTALLPREFIX/bin/freetype-config ) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
 
 
 
+#export BUILDDEPENDENCIES=cmake,ninja
 ### fix CMakeLists.txt for building DLL
 ##patch -ulbf CMakeLists.txt << EOF
 ##--- CMakeLists.txt  2015-10-04 06:55:55.000000000 +0200
@@ -204,23 +218,6 @@ wl-showstatus configure &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
 ####TO DO: also install freetype-config
 ####grep % builds/unix/freetype-config.in
-
-
-
-#mkdir -p build_both &&
-# wl-showstatus configure &&
-# #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dc_args="['-I$(cygpath -m $MINGWPREFIX/include/harfbuzz)','-I$(cygpath -m $MINGWPREFIX/include/mman-win32)']" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
-# PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dharfbuzz=disabled -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dtests=disabled -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
-# #-Dharfbuzz=enabled 
-# echo "#undef FT_CONFIG_OPTION_USE_HARFBUZZ" >> build_both/ftoption.h &&
-# # fix invalid -R linker flag
-# sed -i.bak -e "s/\"-R/\"-L/" build_both/build.ninja &&
-# wl-showstatus build-install &&
-# PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib ninja -Cbuild_both install &&
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
-####TO DO: also install freetype-config
-####grep % builds/unix/freetype-config.in
-#sed -e "s?%PKG_CONFIG%?\${PKG_CONFIG:-pkg-config}?; s?%prefix%?\$(dirname \$(dirname \$0))? s?%exec_prefix%?\$prefix?; s?%\(include\|lib\)dir%?\$prefix/\1?; s?%ft_version%?$(sed -ne "s/^Version: //p" build_both/meson-private/freetype2.pc)?" builds/unix/freetype-config.in > freetype-config
 
 
 
