@@ -29,14 +29,16 @@ export TYPE=library
 #export VERSIONDATE=20221128
 #export VERSION=5.7.0
 #export VERSIONDATE=20240303
-export VERSION=5.8.0
-export VERSIONDATE=20250128
+#export VERSION=5.8.0
+#export VERSIONDATE=20250128
+export VERSION=5.8.1
+export VERSIONDATE=20250129
 ####src/open_filename.c:(.text+0x36): undefined reference to `_ftelli64'
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=cmake,ninja
 export LICENSEFILE=license.txt
 export LICENSETYPE=
 export DOWNLOADURL="http://www.wavpack.com/downloads.html wavpack- .zip"
@@ -122,10 +124,25 @@ EOF
 # {
 #EOF
 ##make LIBS="-Wl,--as-needed -lmsvcr80"
-wl-showstatus configure &&
+if ! cmake --version &> /dev/null; then
+ wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared CFLAGS="-DWIN32" &&
  wl-showstatus build-install &&
  make install-strip &&
+ touch SUCCESS
+else
+ mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
