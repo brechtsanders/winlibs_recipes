@@ -43,10 +43,12 @@ export BASENAME=slog
 export DESCRIPTION="Slog is simple and thread safe logging library for C/C++."
 export CATEGORY=
 export TYPE=library
-export VERSION=1.8.22
-export VERSIONDATE=20201214
+#export VERSION=1.8.22
+#export VERSIONDATE=20201214
 #export VERSION=1.8.42
 #export VERSIONDATE=20250124
+export VERSION=1.8.47
+export VERSIONDATE=20250129
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -56,36 +58,49 @@ export LICENSEFILE=LICENSE
 export LICENSETYPE=MIT
 export DOWNLOADURL="https://github.com/kala13x/slog/releases/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/kala13x/slog/archive/$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=https://github.com/kala13x/slog/archive/refs/tags/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/kala13x/slog/archive/$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/kala13x/slog/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
-#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix src/slog.c (version >= 1.8.22)
-patch -ulbf src/slog.c << EOF
-@@ -24,2 +24,5 @@
-
-+#if defined(_WIN32)
-+#define _POSIX_THREAD_SAFE_FUNCTIONS
-+#endif
- #include <stdio.h>
-@@ -35,3 +38,3 @@
-
--#ifndef DARWIN
-+#if !defined(DARWIN) && !defined(_WIN32)
- #include <syscall.h>
-@@ -169,3 +172,3 @@
- {
--#ifdef DARWIN
-+#if !defined(DARWIN) || defined(_WIN32)
-     return (uint32_t)pthread_self();
-EOF
+## fix src/slog.c (version = 1.8.22)
+#patch -ulbf src/slog.c << EOF
+#@@ -24,2 +24,5 @@
+#
+#+#if defined(_WIN32)
+#+#define _POSIX_THREAD_SAFE_FUNCTIONS
+#+#endif
+# #include <stdio.h>
+#@@ -35,3 +38,3 @@
+#
+#-#ifndef DARWIN
+#+#if !defined(DARWIN) && !defined(_WIN32)
+# #include <syscall.h>
+#@@ -169,3 +172,3 @@
+# {
+#-#ifdef DARWIN
+#+#if !defined(DARWIN) || defined(_WIN32)
+#     return (uint32_t)pthread_self();
+#EOF
 # fix to also build shared library
 sed -i.bak -e "s/\(add_library\s*(\s*[^ ]* \)STATIC/\1/" CMakeLists.txt
+# fix CMakeLists.txt (version >= 1.8.47)
+patch -ulbf CMakeLists.txt << EOF
+@@ -6,3 +6,3 @@
+
+-IF (WIN32)
++IF (MSVC)
+ set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} /Od /W3")
+@@ -12,3 +12,3 @@
+
+-add_library(slog STATIC src/slog.c src/slog.h)
++add_library(slog  src/slog.c src/slog.h)
+ add_executable(slog-sample example/example.c)
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
