@@ -1,0 +1,84 @@
+export NAME="Veyon"
+export STATUS=
+export URL=https://veyon.io/
+export BASENAME=veyon
+export DESCRIPTION="Veyon is a free and open source software for monitoring and controlling computers across multiple platforms. Veyon supports you in teaching in digital learning environments, performing virtual trainings or giving remote support."
+export CATEGORY=
+export TYPE=application
+#export VERSION=4.7.3
+#export VERSIONDATE=20220612
+#export VERSION=4.7.4
+#export VERSIONDATE=20220730
+#export VERSION=4.7.5
+#export VERSIONDATE=20230124
+#export VERSION=4.8.0
+#export VERSIONDATE=20230421
+#export VERSION=4.8.1
+#export VERSIONDATE=20230705
+#export VERSION=4.8.2
+#export VERSIONDATE=20230814
+#export VERSION=4.8.3
+#export VERSIONDATE=20240221
+#export DEPENDENCIES=qt,libjpeg,zlib,openssl,openpam,lzo,qca2,cyrus-sasl
+##export DEPENDENCIES=qt6,libjpeg,zlib,openssl,openpam,lzo,qca2,cyrus-sasl
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#export VERSION=4.9.0
+#export VERSIONDATE=20240906
+#export VERSION=4.9.1
+#export VERSIONDATE=20241128
+export VERSION=4.9.2
+export VERSIONDATE=20250130
+wl-showstatus --package-version
+export DEPENDENCIES=qt6,libjpeg,zlib,openssl,openpam,lzo,qca2,cyrus-sasl,libvncserver
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/veyon/veyon/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/veyon/veyon/releases/download/v$VERSION/veyon-$VERSION-src.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/veyon-$VERSION-src.tar.bz2
+cd $BASENAME-$VERSION
+# fix invalid use of lm.h (version >= 4.8.3)
+sed -i.orig -e "s/#include <lm\.h>/#include <lmaccess.h>\n#include <lmerr.h>\n#include <lmsname.h>\n#include <lmcons.h>\n#include <lmapibuf.h>\n#include <lmstats.h>/" $(grep -l "#include <lm\.h>" 3rdparty/ultravnc/addon/ms-logon/authSSP/*.h)
+# fix undefined AF_INET6 in plugins/platform/windows/WtsSessionManager.cpp (verion >= 4.9.2)
+sed -i.bak -e "1i #include <ws2tcpip.h>" plugins/platform/windows/WtsSessionManager.cpp
+# fix undefined GWL_USERDATA/DWL_MSGRESULT/GWL_HINSTANCE/GWL_WNDPROC (verion >= 4.9.2)
+sed -i.bak -e "s/\([DG]WL\)_\(USERDATA\|HINSTANCE\|WNDPROC\|MSGRESULT\)/\1P_\2/g" 3rdparty/ultravnc/common/win32_helpers.cpp 3rdparty/ultravnc/common/win32_helpers.h 3rdparty/ultravnc/winvnc/winvnc/vncdesktopsink.cpp
+# fix 3rdparty/ultravnc/winvnc/winvnc/vncdesktop.cpp (version >= 4.9.2)
+patch -ulbf 3rdparty/ultravnc/winvnc/winvnc/vncdesktop.cpp << EOF
+@@ -258,3 +258,3 @@
+                                        SendMessage(hWnd, LVM_GETITEMRECT, j, (LPARAM)ptritemrect);
+-#ifdef _X64
++#if defined(_X64) || defined(_WIN64)
+                                        SIZE_T copied = 0;
+EOF
+# fix 3rdparty/ultravnc/winvnc/winvnc/vncEncodeUltra2.cpp (version >= 4.9.2)
+sed -i.bak -e "1i #include <stdlib.h>\n#include <stdio.h>\n#include <../share/libjpeg-turbo/include/jpeglib.h>" 3rdparty/ultravnc/winvnc/winvnc/vncEncodeUltra2.cpp
+# don't abort on warnings
+sed -i.bak -e "s/-Wall;-Werror//" cmake/modules/SetDefaultTargetProperties.cmake
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_QT6:BOOL=OFF -DWITH_TRANSLATIONS:BOOL=OFF -DWITH_PCH:BOOL=OFF -S. -Bbuild_win &&
+ PKG_CONFIG_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} \
+ CPATH=$MINGWPREFIX/share/libjpeg-turbo/include${CPATH:+:$CPATH} \
+ LIBRARY_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib${LIBRARY_PATH:+:$LIBRARY_PATH} \
+ PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_QT6:BOOL=ON -DWITH_TRANSLATIONS:BOOL=OFF -DWITH_PCH:BOOL=OFF -DCMAKE_MODULE_PATH:PATH="$MINGWPREFIX/share/libjpeg-turbo/lib/cmake/libjpeg-turbo" -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/share/libjpeg-turbo/include" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/share/libjpeg-turbo/include" -S. -Bbuild_win &&
+ sed -i.bak -e "s/-E create_symlink/-E copy/g" build_win/build.ninja &&
+ #wl-showstatus build &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: link with libjpeg-turbo
+####PATH=$MINGWPREFIX/lib/veyon:$MINGWPREFIX/qt6/bin:$PATH $MINGWPREFIX/bin/veyon-worker.exe
+
+
+
