@@ -26,8 +26,10 @@ export TYPE=application
 #export OPTIONALBUILDDEPENDENCIES=
 #export VERSION=4.9.0
 #export VERSIONDATE=20240906
-export VERSION=4.9.1
-export VERSIONDATE=20241128
+#export VERSION=4.9.1
+#export VERSIONDATE=20241128
+export VERSION=4.9.2
+export VERSIONDATE=20250130
 wl-showstatus --package-version
 export DEPENDENCIES=qt6,libjpeg,zlib,openssl,openpam,lzo,qca2,cyrus-sasl
 export OPTIONALDEPENDENCIES=
@@ -46,12 +48,24 @@ tar xj --force-local -f $TARBALLDIR/$BASENAME/veyon-$VERSION-src.tar.bz2
 cd $BASENAME-$VERSION
 # fix invalid use of lm.h (version >= 4.8.3)
 sed -i.orig -e "s/#include <lm\.h>/#include <lmaccess.h>\n#include <lmerr.h>\n#include <lmsname.h>\n#include <lmcons.h>\n#include <lmapibuf.h>\n#include <lmstats.h>/" $(grep -l "#include <lm\.h>" 3rdparty/ultravnc/addon/ms-logon/authSSP/*.h)
+# fix undefined AF_INET6 in plugins/platform/windows/WtsSessionManager.cpp (verion >= 4.9.2)
+sed -i.bak -e "1i #include <ws2tcpip.h>" plugins/platform/windows/WtsSessionManager.cpp
+# fix undefined GWL_USERDATA/DWL_MSGRESULT/GWL_HINSTANCE/GWL_WNDPROC (verion >= 4.9.2)
+sed -i.bak -e "s/\([DG]WL\)_\(USERDATA\|HINSTANCE\|WNDPROC\|MSGRESULT\)/\1P_\2/g" 3rdparty/ultravnc/common/win32_helpers.cpp 3rdparty/ultravnc/common/win32_helpers.h 3rdparty/ultravnc/winvnc/winvnc/vncdesktopsink.cpp
+# fix 3rdparty/ultravnc/winvnc/winvnc/vncdesktop.cpp (version >= 4.9.2)
+patch -ulbf 3rdparty/ultravnc/winvnc/winvnc/vncdesktop.cpp << EOF
+@@ -258,3 +258,3 @@
+                                        SendMessage(hWnd, LVM_GETITEMRECT, j, (LPARAM)ptritemrect);
+-#ifdef _X64
++#if defined(_X64) || defined(_WIN64)
+                                        SIZE_T copied = 0;
+EOF
 # don't abort on warnings
 sed -i.bak -e "s/-Wall;-Werror//" cmake/modules/SetDefaultTargetProperties.cmake
 mkdir -p build_win &&
  wl-showstatus configure &&
- PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_QT6:BOOL=OFF -DWITH_TRANSLATIONS:BOOL=OFF -DWITH_PCH:BOOL=OFF -S. -Bbuild_win &&
- #PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_QT6:BOOL=ON -DWITH_TRANSLATIONS:BOOL=OFF -DWITH_PCH:BOOL=OFF -S. -Bbuild_win &&
+ #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_QT6:BOOL=OFF -DWITH_TRANSLATIONS:BOOL=OFF -DWITH_PCH:BOOL=OFF -S. -Bbuild_win &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWITH_QT6:BOOL=ON -DWITH_TRANSLATIONS:BOOL=OFF -DWITH_PCH:BOOL=OFF -S. -Bbuild_win &&
  sed -i.bak -e "s/-E create_symlink/-E copy/g" build_win/build.ninja &&
  #wl-showstatus build &&
  #ninja -Cbuild_win &&
