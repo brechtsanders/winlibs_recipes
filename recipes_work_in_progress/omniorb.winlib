@@ -27,7 +27,7 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/omniORB-$VERSION.tar.bz2
-cd $BASENAME-$VERSION
+cd omniORB-$VERSION
 # fix missing size_t in include/omniORB4/CORBA_sysdep.h
 mv include/omniORB4/CORBA_sysdep.h include/omniORB4/CORBA_sysdep.h.bak &&
 echo "#include <stddef.h>" > include/omniORB4/CORBA_sysdep.h &&
@@ -65,6 +65,10 @@ patch -ulbf src/tool/omniidl/cxx/idlsysdep.h << EOF
 +#if defined(__WIN32__) && !defined(__MINGW32__)
  // declspec is a define in windef.h under MINGW
 EOF
+# fix src/lib/omnithread/posix.cc (version >= 4.3.2)
+#sed -i.bak -e "1i #include <pthread.h>" src/lib/omnithread/posix.cc
+mv src/lib/omnithread/posix.cc src/lib/omnithread/posix.cc.bak
+cp -f src/lib/omnithread/nt.cc src/lib/omnithread/posix.cc
 wl-showstatus configure &&
  # mkdir -p m4 &&
  # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
@@ -80,20 +84,21 @@ wl-showstatus configure &&
  #PYTHON=$PYDIR/python.exe 
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$PYDIR/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl PYTHON=$PYDIR/python.exe LDFLAGS="-Wl,--as-needed -L$PWD/pylibs -lpython" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-openssl PYTHON=$PYDIR/python.exe CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" LDFLAGS="-Wl,--as-needed -L$PWD/pylibs -lpython" &&
  #--disable-ipv6
  #--disable-alloca
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  #wl-showstatus build &&
  #make &&
+ #make extralibs="-L$PWD/pylibs -lpython" SHAREDLIB_SUFFIX=dll &&
  wl-showstatus build-install &&
  make -Csrc/tool/omkdepend Win32Platform=1 LIBS="-ladvapi32" &&
  cp -f src/tool/omkdepend/omkdepend.exe bin/ &&
  make -Csrc/tool/omniidl/cxx/cccp Win32Platform=1 &&
- make install Win32Platform=1 MinGW32Build=1 PYVERSION= omnicpp=$PWD/src/tool/omniidl/cxx/cccp/omnicpp.exe &&
+ make install Win32Platform=1 MinGW32Build=1 PYVERSION= extralibs="-L$PWD/pylibs -lpython" omnicpp=$PWD/src/tool/omniidl/cxx/cccp/omnicpp.exe &&
     echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf omniORB-$VERSION
 
 
 

@@ -43,7 +43,7 @@ export VERSION=4.0.27-1
 export VERSIONDATE=20250205
 ####/lib/libtrace.h:61:65: error: size of unnamed array is negative
 wl-showstatus --package-version
-export DEPENDENCIES=libwandio,mman-win32,openssl,
+export DEPENDENCIES=libwandio,mman-win32,openssl
 export OPTIONALDEPENDENCIES=libpcap
 export BUILDDEPENDENCIES=doxygen
 export OPTIONALBUILDDEPENDENCIES=
@@ -64,9 +64,11 @@ wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix missing files
-mkdir -p winfix/sys winfix/arpa
+mkdir -p winfix/sys winfix/arpa winfix/netinet winfix/net
 echo "#include <winsock2.h>" > winfix/sys/socket.h
 echo "#include <winsock2.h>" > winfix/arpa/inet.h
+echo "#include <ws2tcpip.h>" > winfix/netinet/in.h
+touch winfix/net/if.h
 ## fix missing uint64_t in lib/libtrace.h
 #mv lib/libtrace.h.in lib/libtrace.h.in.bak &&
 #echo "#include <stdint.h>" > lib/libtrace.h.in &&
@@ -103,6 +105,38 @@ patch -ulbf lib/libtrace.h.in << EOF
 -#ifdef WIN32
 +#ifdef _WIN32
  #pragma pack(pop)
+EOF
+# fix lib/libtrace.h (version >= 4.0.27-1)
+sed -i.bak -e "1i #include <pthread.h>\n#include <stdint.h>" lib/libtrace.h
+# avoid failing assertion in lib/libtrace.h (version >= 4.0.27-1)
+sed -i.bak2 -e "s/^\(#define ct_assert(e)\).*$/\1/" lib/libtrace.h
+# fix lib/libtrace.h (version >= 4.0.27-1)
+patch -ulbf lib/libtrace.h << EOF
+@@ -91,2 +91,5 @@
+ /* Make up for a lack of stdbool.h */
++#  if $(if echo "#include <stdbool.h>" | ${CC:-gcc} -c -o /dev/null -xc &> /dev/null -; then echo 1; else echo 0; fi)
++#    include <stdbool.h>
++#  else
+ #    define bool signed char
+@@ -94,2 +97,3 @@
+ #    define true 1
++#  endif
+ #    if !defined(ssize_t)
+EOF
+# fix lib/trace.c (version >= 4.0.27-1)
+patch -ulbf lib/trace.c << EOF
+@@ -136,4 +136,3 @@
+     struct timeval tv;
+-    gettimeofday(&tv, NULL);
+-    srand(tv.tv_sec);
++    srand(time(NULL));
+
+@@ -150,3 +149,5 @@
+ #endif
++#ifdef HAVE_BPF
+         bpf_constructor();
++#endif
+         pcapfile_constructor();
 EOF
 wl-showstatus preconfigure &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
