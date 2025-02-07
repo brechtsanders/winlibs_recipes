@@ -7,8 +7,10 @@ export CATEGORY=communication
 export TYPE=application
 #export VERSION=1.0.3
 #export VERSIONDATE=20230413
-export VERSION=1.0.4
-export VERSIONDATE=20240227
+#export VERSION=1.0.4
+#export VERSIONDATE=20240227
+export VERSION=1.0.5
+export VERSIONDATE=20250207
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -39,7 +41,36 @@ patch -ulbf server.h << EOF
 +#endif
 
 EOF
-# fix sockssrv.c (version >= 1.0.3)
+## fix sockssrv.c (version >= 1.0.3 <= 1.0.4)
+#patch -ulbf sockssrv.c << EOF
+#@@ -31,4 +31,10 @@
+# #include <signal.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#define poll WSAPoll
+#+#define dprintf(fd, ...) fprintf(stderr, __VA_ARGS__)
+#+#else
+# #include <poll.h>
+# #include <arpa/inet.h>
+#+#endif
+# #include <errno.h>
+#@@ -405,2 +411,8 @@
+#        unsigned port = 1080;
+#+#ifdef _WIN32
+#+        static WSADATA wsaData;
+#+        if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
+#+                fprintf(stderr, "Attempting to initialize Winsock failed\\n");
+#+        atexit((void(*)())WSACleanup);
+#+#endif
+#        while((ch = getopt(argc, argv, ":1b:i:p:u:P:")) != -1) {
+#@@ -442,3 +454,5 @@
+#        }
+#+#ifdef SIGPIPE
+#        signal(SIGPIPE, SIG_IGN);
+#+#endif
+#        struct server s;
+#EOF
+# fix sockssrv.c (version >= 1.0.5)
 patch -ulbf sockssrv.c << EOF
 @@ -31,4 +31,10 @@
  #include <signal.h>
@@ -52,16 +83,16 @@ patch -ulbf sockssrv.c << EOF
  #include <arpa/inet.h>
 +#endif
  #include <errno.h>
-@@ -405,2 +411,8 @@
+@@ -415,2 +421,8 @@
         unsigned port = 1080;
 +#ifdef _WIN32
 +        static WSADATA wsaData;
 +        if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
-+                fprintf(stderr, "Attempting to initialize Winsock failed\\n");
++                fprintf(stderr, "Attempting to initialize Winsock failed\\\\n");
 +        atexit((void(*)())WSACleanup);
 +#endif
-        while((ch = getopt(argc, argv, ":1b:i:p:u:P:")) != -1) {
-@@ -442,3 +454,5 @@
+        while((ch = getopt(argc, argv, ":1qb:i:p:u:P:w:")) != -1) {
+@@ -470,3 +482,5 @@
         }
 +#ifdef SIGPIPE
         signal(SIGPIPE, SIG_IGN);
