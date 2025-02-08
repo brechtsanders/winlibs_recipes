@@ -1,0 +1,105 @@
+export NAME="libzhuyin"
+export STATUS=
+export URL=https://github.com/libzhuyin/libzhuyin
+export BASENAME=libzhuyin
+export DESCRIPTION="Library to deal with zhuyin"
+export CATEGORY=internationalization
+export TYPE=library
+export VERSION=1.1.1
+export VERSIONDATE=20210820
+wl-showstatus --package-version
+export DEPENDENCIES=glib2
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/libzhuyin/libzhuyin/releases"
+export DOWNLOADURL="https://github.com/libzhuyin/libzhuyin/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/libzhuyin/libzhuyin/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing getline()
+for F in $(grep -lw getline $(find -name '*.cpp')); do
+mv $F $F.bak
+cat > $F << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat $F.bak >> $F
+done
+# fix redefinition of ERROR_ALREADY_EXISTS in src/include/novel_types.h (version >= 1.1.1)
+patch -ulbf src/include/novel_types.h << EOF
+@@ -87,2 +87,4 @@
+     ERROR_INTEGER_OVERFLOW,      /* integer is overflowed */
++#undef ERROR_ALREADY_EXISTS
++#define ERROR_ALREADY_EXISTS LIBPINYIN_ERROR_ALREADY_EXISTS
+     ERROR_ALREADY_EXISTS,        /* the sub phrase already exists. */
+EOF
+# skip building tests and data
+sed -i.bak "s/ \(tests\|data\) / /g" Makefile.am
+wl-showstatus configure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX/share/libzhuyin --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-D_NO_SYS_GUID_OPERATOR_EQ_" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ # fix missing fsync()
+ echo "#define fsync(fd) _commit(fd)" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build with data folder (currently: Segmentation fault): make -Cdata
+####NOTE: now part of libpinyin => moved to different folder
+
+
+

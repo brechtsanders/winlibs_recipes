@@ -1,0 +1,236 @@
+export NAME="libpinyin"
+export STATUS=
+#export URL=http://sourceforge.net/projects/libpinyin/
+export URL=https://github.com/epico/libpinyin
+export BASENAME=libpinyin
+export DESCRIPTION="Library to deal with pinyin"
+export CATEGORY=internationalization
+export TYPE=library
+#export VERSION=1.2.0
+#export VERSIONDATE=20151010
+#export VERSION=1.2.1
+#export VERSIONDATE=20151128
+#export VERSION=1.2.91
+#export VERSIONDATE=20151010
+####src/storage/chewing_key.h:76:20: error: previous declaration 'bool operator==(ChewingKey, ChewingKey)' here
+#export VERSION=1.3.0
+#export VERSIONDATE=20151204
+#export VERSION=1.5.91
+#export VERSIONDATE=20160718
+#export VERSION=1.5.92
+#export VERSIONDATE=20160802
+#export VERSION=1.6.0
+#export VERSIONDATE=20160907
+#export DEPENDENCIES=
+#export VERSION=1.6.91
+#export VERSIONDATE=20161101
+#export VERSION=1.7.0
+#export VERSIONDATE=20161130
+#export VERSION=1.9.91
+#export VERSIONDATE=20170214
+#export VERSION=1.9.92
+#export VERSIONDATE=20170307
+#export VERSION=2.0.0
+#export VERSIONDATE=20170420
+#export VERSION=2.0.91
+#export VERSIONDATE=20170608
+#export VERSION=2.0.92
+#export VERSIONDATE=20170710
+#export VERSION=2.1.91
+#export VERSIONDATE=20180125
+#export VERSION=2.1.0
+#export VERSIONDATE=20170824
+#export VERSION=2.2.0
+#export VERSIONDATE=20180417
+#export VERSION=2.2.1
+#export VERSIONDATE=20181009
+#export VERSION=2.2.2
+#export VERSIONDATE=20190121
+#export VERSION=2.3.0
+#export VERSIONDATE=20190318
+#export VERSION=2.4.91
+#export VERSIONDATE=20200826
+#export VERSION=2.4.92
+#export VERSIONDATE=20201022
+#export VERSION=2.6.0
+#export VERSIONDATE=20201215
+#export VERSION=2.6.1
+#export VERSIONDATE=20210915
+#export VERSION=2.6.2
+#export VERSIONDATE=20220413
+#export VERSION=2.7.91
+#export VERSIONDATE=20221019
+#export VERSION=2.7.92
+#export VERSIONDATE=20221019
+#export VERSION=2.8.0
+#export VERSIONDATE=20230104
+#export VERSION=2.8.1
+#export VERSIONDATE=20230116
+#export VERSION=2.9.91
+#export VERSIONDATE=20240813
+#export VERSION=2.9.92
+#export VERSIONDATE=20241021
+#export VERSION=2.9.93
+#export VERSIONDATE=20241217
+export VERSION=2.10.0
+export VERSIONDATE=20250208
+####Segmentation fault ../utils/storage/import_interpolation --table-dir ../data < ../data/interpolation2.text
+wl-showstatus --package-version
+export DEPENDENCIES=bdb
+#export DEPENDENCIES=kyotocabinet
+export OPTIONALDEPENDENCIES=
+#export OPTIONALDEPENDENCIES=libzhuyin
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake
+#export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+#export DOWNLOADURL="http://sourceforge.net/projects/libpinyin/files/libpinyin/"
+export DOWNLOADURL="https://github.com/epico/libpinyin/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://downloads.sourceforge.net/project/libpinyin/libpinyin/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/libpinyin/libpinyin/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/epico/libpinyin/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix GUID issues
+for F in */*.cpp */*/*.cpp; do
+ mv $F $F.bak
+ echo "#include <guiddef.h>" > $F
+ if grep -q getline $F.bak; then
+cat >> $F << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#define GETLINE_BUFLEN 128
+size_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  size_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+ fi
+ cat $F.bak >> $F
+done
+# fix redefinition of ERROR_ALREADY_EXISTS in src/include/novel_types.h (version >= 2.10.0)
+patch -ulbf src/include/novel_types.h << EOF
+@@ -86,2 +86,4 @@
+     ERROR_INTEGER_OVERFLOW,      /* integer is overflowed */
++#undef ERROR_ALREADY_EXISTS
++#define ERROR_ALREADY_EXISTS LIBPINYIN_ERROR_ALREADY_EXISTS
+     ERROR_ALREADY_EXISTS,        /* the sub phrase already exists. */
+EOF
+# fix missing fsync() in src/include/memory_chunk.h (version >= 2.10.0)
+patch -ulbf src/include/memory_chunk.h << EOF
+@@ -549,3 +549,7 @@
+
++#ifdef _WIN32
++        _commit(fd);
++#else
+         fsync(fd);
++#endif
+         close(fd);
+EOF
+# skip building tests and data
+sed -i.bak "s/ \(tests\|data\) / /g" Makefile.am
+wl-showstatus preconfigure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-dbm=BerkeleyDB --enable-libzhuyin &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-dbm=BerkeleyDB CFLAGS="-O0 -g" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-dbm=KyotoCabinet --enable-libzhuyin LDFLAGS="-Wl,--as-needed -lz -lregex" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix missing fsync()
+ #echo "#define fsync(fd) _commit(fd)" >> config.h &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build with data folder (currently: Segmentation fault): make -Cdata
+
+
+
+## fix missing fsync in src/include/memory_chunk.h (version >= 2.1.0)
+#mv src/include/memory_chunk.h src/include/memory_chunk.h.bak &&
+#echo "#define fsync(fd) _commit(fd)" > src/include/memory_chunk.h &&
+#cat src/include/memory_chunk.h.bak >> src/include/memory_chunk.h
+## fix src/CMakeLists.txt (version >= 2.1.0)
+#patch -ulbf src/CMakeLists.txt << EOF
+#@@ -34,6 +34,8 @@
+# install(
+#     TARGETS
+#         libpinyin
+#+    ARCHIVE DESTINATION
+#+        \${DIR_LIBRARY}
+#     LIBRARY DESTINATION
+#         \${DIR_LIBRARY}
+# )
+#EOF
+## skip building tests (version >= 2.9.93)
+#sed -i.bak -e "s/[^ ]*tests/#&/" CMakeLists.txt
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+# # fix Windows path issues in build files
+# ####src/lookup/CMakeFiles/lookup.dir/build.make:144: *** target pattern contains no '%'.  Stop.
+# mkdir -p $INSTALLPREFIX &&
+# for F in $(grep -lF "/$(cygpath -m $INSTALLPREFIX)" $(find -name '*.make')); do
+#  mv $F $F.bak &&
+#  sed -e "s?/$(cygpath -m $INSTALLPREFIX)?$INSTALLPREFIX?g" $F.bak > $F
+# done &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DINCLUDE_INSTALL_DIR:PATH=$INSTALLPREFIX/include -DCMAKE_INSTALL_LIBDIR:PATH=$INSTALLPREFIX/lib -DSHARE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share -S. -Bbuild_win &&
+# wl-showstatus build &&
+# ninja -Cbuild_win &&
+# wl-showstatus build-install &&
+# make -Cbuild_win install/strip &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
