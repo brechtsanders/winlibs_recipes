@@ -408,8 +408,10 @@ export TYPE=library
 #export VERSIONDATE=20250122
 #export VERSION=6999
 #export VERSIONDATE=20250205
-export VERSION=7003
-export VERSIONDATE=20250207
+#export VERSION=7003
+#export VERSIONDATE=20250207
+export VERSION=7017
+export VERSIONDATE=20250214
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -533,3 +535,43 @@ EOF
 PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe gni-to-cmake.py BUILD.gn CMakeLists.txt
 
 
+
+# fix missing files
+touch src/commit.h
+#cat > src/common/ANGLEShaderProgramVersion.h << EOF
+##ifndef ANGLE_VERSION_STRING
+##define ANGLE_VERSION_STRING "$VERSION"
+##define ANGLE_PROGRAM_VERSION $(echo $VERSION|sed -e "s/\..*$//")
+##define ANGLE_REVISION 0
+##endif
+#EOF
+echo "#include \"angle_version.h\"" > src/common/ANGLEShaderProgramVersion.h
+cat > src/common/angle_commit.h << EOF
+#ifndef ANGLE_COMMIT_POSITION
+#define ANGLE_COMMIT_POSITION 0
+#define ANGLE_COMMIT_HASH ""
+#define ANGLE_COMMIT_HASH_SIZE 0
+#define ANGLE_PROGRAM_VERSION "$VERSION"
+#define ANGLE_PROGRAM_VERSION_HASH_SIZE 0
+#endif
+EOF
+# also allow building shared libANGLE
+sed -i.bak -e "s/\(add_library(libANGLE\) STATIC/\1/" CMakeLists.txt
+
+#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
+#mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+mkdir -p build_win &&
+ wl-showstatus preconfigure &&
+ $PYDIR/python.exe src/program_serialize_data_version.py angle/ANGLEShaderProgramVersion.h &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release USE_D3D9:BOOL=ON -DUSE_VULKAN:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$PWD/src/common/base -I$MINGWPREFIX/include/libdl-win32" -S. -Bbuild_win &&
+ #-DD3D11_LIB:STRING="-ld3d11" -DDXGUID_LIB:STRING="-ldxguid"
+ #wl-showstatus build &&
+ #cmake.exe --build build_win &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
