@@ -605,10 +605,10 @@ export TYPE=library
 #export VERSIONDATE=20231224
 #export VERSION=1.85.0
 #export VERSIONDATE=20240416
-export VERSION=1.86.0
-export VERSIONDATE=20240815
-#export VERSION=1.87.0
-#export VERSIONDATE=20241212
+#export VERSION=1.86.0
+#export VERSIONDATE=20240815
+export VERSION=1.87.0
+export VERSIONDATE=20241212
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libbz2,xz,zstd,icu,libiconv,expat,pcre
 export OPTIONALDEPENDENCIES=libbacktrace
@@ -683,8 +683,15 @@ cat libs/process/src/windows/default_launcher.cpp.bak >> libs/process/src/window
 mv libs/process/src/environment.cpp libs/process/src/environment.cpp.bak &&
 echo -e '#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600\n#define _WIN32_WINNT 0x0600\n#endif' > libs/process/src/environment.cpp &&
 cat libs/process/src/environment.cpp.bak >> libs/process/src/environment.cpp
-## fix libs/stacktrace/src/from_exception.cpp (version >= 1.87.0)
+# fix missing dlfcn.h in libs/stacktrace/src/from_exception.cpp (version >= 1.87.0)
 #sed -i.bak -e "s/_MSC_VER/_WIN32/" libs/stacktrace/src/from_exception.cpp
+patch -ulbf libs/stacktrace/src/from_exception.cpp << EOF
+@@ -160,3 +160,3 @@
+ #include <exception>
+-#include <dlfcn.h>
++#include <libdl-win32/dlfcn.h>
+
+EOF
 ## fix missing libs/CMakeLists.txt
 #ls -1 libs/CMakeLists.txt &> /dev/null || ls -1 libs/*/CMakeLists.txt|sed -e "s?libs/\(.*\)/CMakeLists\.txt?ADD_SUBDIRECTORY(\1)?" > libs/CMakeLists.txt
 # avoid missing Boost::mpi target (version >= 1.85.0)
@@ -706,7 +713,8 @@ mkdir -p build_static build_shared &&
  PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBOOST_RUNTIME_LINK:STRING=shared -DBOOST_INSTALL_LAYOUT:STRING=tagged -DBOOST_THREAD_THREADAPI:STRING=win32 -DBOOST_CONTEXT_IMPLEMENTATION:STRING=$(if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then echo "winfib"; else echo "fcontext"; fi) -DBOOST_CONTEXT_ABI:STRING=ms -DBOOST_CONTEXT_BINARY_FORMAT:STRING=pe -DBOOST_FIBER_NUMA_TARGET_OS:STRING=windows -DBOOST_ENABLE_MPI:BOOL=OFF -DBOOST_IOSTREAMS_ENABLE_ZLIB:BOOL=ON -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARY:PATH=$MINGWPREFIX/lib/libz.dll.a -DBOOST_IOSTREAMS_ENABLE_BZIP2:BOOL=ON -DBZIP2_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBZIP2_LIBRARIES:PATH=$MINGWPREFIX/lib/libbz2.dll.a -DBOOST_IOSTREAMS_ENABLE_LZMA:BOOL=ON -DLIBLZMA_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DLIBLZMA_LIBRARY:PATH=$MINGWPREFIX/lib/liblzma.dll.a -DBOOST_IOSTREAMS_ENABLE_ZSTD:BOOL=OFF -DBOOST_ENABLE_PYTHON:BOOL=ON -DBOOST_URL_BUILD_EXAMPLES:BOOL=OFF -DBOOST_URL_BUILD_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  #PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBOOST_RUNTIME_LINK:STRING=shared -DBOOST_INSTALL_LAYOUT:STRING=tagged -DBOOST_THREAD_THREADAPI:STRING=win32 -DBOOST_CONTEXT_IMPLEMENTATION:STRING=$(if ( echo $RUNPLATFORM | grep -q "^aarch64" ); then echo "winfib"; else echo "fcontext"; fi) -DBOOST_CONTEXT_ABI:STRING=ms -DBOOST_CONTEXT_BINARY_FORMAT:STRING=pe -DBOOST_FIBER_NUMA_TARGET_OS:STRING=windows -DBOOST_ENABLE_MPI:BOOL=OFF -DBOOST_IOSTREAMS_ENABLE_ZLIB:BOOL=ON -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARY:PATH=$MINGWPREFIX/lib/libz.dll.a -DBOOST_IOSTREAMS_ENABLE_BZIP2:BOOL=ON -DBZIP2_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBZIP2_LIBRARIES:PATH=$MINGWPREFIX/lib/libbz2.dll.a -DBOOST_IOSTREAMS_ENABLE_LZMA:BOOL=ON -DLIBLZMA_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DLIBLZMA_LIBRARY:PATH=$MINGWPREFIX/lib/liblzma.dll.a -DBOOST_IOSTREAMS_ENABLE_ZSTD:BOOL=OFF -DOPENSSL_ROOT_DIR:PATH=$MINGWPREFIX -DBOOST_ENABLE_PYTHON:BOOL=ON -DBOOST_URL_BUILD_EXAMPLES:BOOL=OFF -DBOOST_URL_BUILD_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  # fix missing link libraries
- sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ldl -lws2_32/" build_shared/build.ninja &&
  # fix issue finding libbz2 library (version >= 1.85.0)
  sed -i.bak2 -e "s? BZip2::BZip2-NOTFOUND ? -lbz2.dll ?; s? BZip2\$:\$:BZip2-NOTFOUND ? $(cygpath -m $MINGWPREFIX/lib/libbz2.dll.a|sed -e "s/\:/\$&/g") ?" build_shared/build.ninja &&
  wl-showstatus build-install &&
