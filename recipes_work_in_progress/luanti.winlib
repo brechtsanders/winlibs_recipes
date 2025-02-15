@@ -1,0 +1,49 @@
+export NAME="Luanti"
+export STATUS=
+export URL=https://www.luanti.org/
+export BASENAME=luanti
+export DESCRIPTION="Luanti (formerly Minetest) is an open source voxel game-creation platform with easy modding and game creation"
+export CATEGORY=games
+export TYPE=library,application
+export VERSION=5.11.0
+export VERSIONDATE=20250215
+wl-showstatus --package-version
+export DEPENDENCIES=pthreads,zlib,libcurl,freetype2,gettext,lua,luajit,postgresql,leveldb,hiredis,gmp,libogg,libvorbis,irrlichtmt,openal
+export OPTIONALDEPENDENCIES=leveldb,libspatialindex
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=COPYING
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/minetest/minetest/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/luanti-org/luanti/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix zlib linkage in src/serialization.cpp
+#mv src/serialization.cpp src/serialization.cpp.bak &&
+#echo "#define WIN32_NO_ZLIB_WINAPI" > src/serialization.cpp &&
+#cat src/serialization.cpp.bak >> src/serialization.cpp
+## fix missing std::shared_ptr in src/clientiface.h (version >= 5.3.0)
+#mv src/clientiface.h src/clientiface.h.bak &&
+#echo "#include <bits/shared_ptr.h>" > src/clientiface.h &&
+#cat src/clientiface.h.bak >> src/clientiface.h
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -GNinja -Wno-dev -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/games/luanti -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_CLIENT:BOOL=TRUE -DBUILD_SERVER:BOOL=FALSE -DENABLE_GETTEXT:BOOL=OFF -DENABLE_CURSES:BOOL=OFF -DZLIB_DLL:FILEPATH=$MINGWPREFIX/bin/zlib1.dll -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARIES:FILEPATH=-lz -DFREETYPE_LIBRARY:FILEPATH=-lfreetype -DOGG_DLL:FILEPATH=$(ls -1 $MINGWPREFIX/bin/libogg-*.dll|tail -n1) -DVORBISFILE_DLL:FILEPATH=$(ls -1 $MINGWPREFIX/bin/libvorbisfile-*.dll|tail -n1) -DOPENAL_DLL:FILEPATH=$MINGWPREFIX/bin/OpenAL32.dll -DENABLE_SYSTEM_GMP:BOOL=ON -DBUILD_UNITTESTS:BOOL=OFF -S. -Bbuild_win &&
+ #sed -i.bak -e "s/-Wl,-Bstatic//g" build_win/build.ninja &&
+ #sed -i.bak2 -e "s?-isystem [^ ]*/include ?$(${PKG_CONFIG:-pkg-config} --cflags-only-I luajit|sed -e "s/-I/-isystem /g") &?" build_win/build.ninja &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ # remove external DLLs
+ rm -f $INSTALLPREFIX/games/luanti/bin/*.dll &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####$MINGWPREFIX/games/luanti/bin/luanti.exe
+
+
+
