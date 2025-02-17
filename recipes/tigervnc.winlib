@@ -21,12 +21,15 @@ export TYPE=library
 #export VERSIONDATE=20230306
 #export VERSION=1.14.0
 #export VERSIONDATE=20240724
-export VERSION=1.14.1
-export VERSIONDATE=20241025
+#export VERSION=1.14.1
+#export VERSIONDATE=20241025
+export VERSION=1.15.0
+export VERSIONDATE=20250217
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libjpeg,libiconv,gettext,gnutls,fltk
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+#export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENCE.TXT
 export LICENSETYPE=GPL
@@ -39,13 +42,32 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-wl-showstatus configure &&
- #C_INCLUDE_PATH=$MINGWPREFIX/share/libjpeg-turbo/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} LIBRARY_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib${LIBRARY_PATH:+:$LIBRARY_PATH} LD_RUN_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib:$LD_RUN_PATH cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=OFF . &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=OFF . &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON . &&
- #echo "-Wl,--as-needed -Wl,-Bstatic -lidn2 -lunistring -lwinpthread" >> win/vncconfig/CMakeFiles/vncconfig.dir/linklibs.rsp &&
+# fix vncviewer/DesktopWindow.cxx (version >= 1.14.1)
+patch -ulbf vncviewer/DesktopWindow.cxx << EOF
+@@ -214,3 +214,3 @@
+   // See STR #2083 and STR #2178
+-#ifndef __APPLE__
++#if !defined(__APPLE__) && !defined(_WIN32)
+   if (maximize) {
+EOF
+## fix CMakeLists.txt (version >= 1.15.0)
+#sed -i.bak -e "s/FATAL_ERROR\(.*Incompatible version of FLTK\)/WARNING\1/" CMakeLists.txt
+#wl-showstatus configure &&
+# #C_INCLUDE_PATH=$MINGWPREFIX/share/libjpeg-turbo/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} LIBRARY_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib${LIBRARY_PATH:+:$LIBRARY_PATH} LD_RUN_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib:$LD_RUN_PATH cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=OFF . &&
+# cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=OFF . &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON . &&
+# #echo "-Wl,--as-needed -Wl,-Bstatic -lidn2 -lunistring -lwinpthread" >> win/vncconfig/CMakeFiles/vncconfig.dir/linklibs.rsp &&
+# wl-showstatus build-install &&
+# make install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #C_INCLUDE_PATH=$MINGWPREFIX/share/libjpeg-turbo/include${C_INCLUDE_PATH:+:$C_INCLUDE_PATH} LIBRARY_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib${LIBRARY_PATH:+:$LIBRARY_PATH} LD_RUN_PATH=$MINGWPREFIX/share/libjpeg-turbo/lib:$LD_RUN_PATH cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=OFF -S. -Bbuild_win &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/TigerVNC -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=OFF -S. -Bbuild_win &&
+ # add linker flag (version >= 1.14.1)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lgdiplus/" build_win/build.ninja &&
  wl-showstatus build-install &&
- make install/strip &&
+ ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####Note: remote support connection can be establised like this:
 ####  On the site giving support:
