@@ -1,0 +1,48 @@
+export NAME="RadixDB"
+export STATUS=
+export URL=https://github.com/balena/radixdb
+export BASENAME=radixdb
+export DESCRIPTION="Static Radix Tree (Patricia trie) implementation in C - RadixDB is a key-value static (read-only) database that provides fast lookups and "longest matching" operation."
+export CATEGORY=development,dataprocessing
+export TYPE=library
+export VERSION=0.27
+export VERSIONDATE=20250217
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/balena/radixdb/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/balena/radixdb/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix radixdb_util.c (version >= 0.27)
+patch -ulbf radixdb_util.c << EOF
+@@ -69,3 +69,3 @@
+   CloseHandle(hMapping);
+-  if (!mem) {
++  if (!db->mem) {
+     fprintf(stderr, "MapViewOfFile error\\n");
+EOF
+wl-showstatus build &&
+ make staticlib CC=${CC:-gcc} LD=${CC:-gcc} AR=${AR:-ar} RANLIB=${RANLIB:-ranlib} &&
+ # manually build shared library
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libradixdb.a | sed -n -e "s/^_\{0,1\}\([^ ]*\) T .*$/\1/p" ) > radixdb.def &&
+ ${CC:-gcc} -shared -s -mwindows -def radixdb.def -o radixdb.dll libradixdb.a -Wl,--out-implib,libradixdb.dll.a &&
+ make USELIB=libradixdb.dll.a CC=${CC:-gcc} LD=${CC:-gcc} AR=${AR:-ar} RANLIB=${RANLIB:-ranlib} LDFLAGS="-s" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
