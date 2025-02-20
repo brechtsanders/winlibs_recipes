@@ -276,7 +276,8 @@ export VERSIONDATE=20250220
 wl-showstatus --package-version
 export DEPENDENCIES=qt,snowball
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.txt
 export LICENSETYPE=GPL
@@ -310,31 +311,36 @@ patch -ulbf src/3rdparty/dxflib/src/dl_dxf.h << EOF
 +#endif
 
 EOF
-wl-showstatus configure &&
- #$MINGWPREFIX/qt/bin/qmake.exe -makefile qcad.pro &&
- $MINGWPREFIX/qt/bin/qmake.exe -makefile qcad.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
- #$MINGWPREFIX/qt/bin/qmake.exe -r CONFIG+=ractivated &&
- #sed -i.bak -e "s?^LIBS\s*=.*?& -Wl,--as-needed -lrpcrt4 -L$(pwd)/release -lzlib?" src/entity/Makefile.Release &&
- # fix zlib linking issues
- mkdir -p release &&
- pexports $MINGWPREFIX/bin/zlib1.dll | sed -e "s/^[a-z][^ ]*$/z_& = &/" > release/libzlib.def &&
- dlltool -D $MINGWPREFIX/bin/zlib1.dll -d release/libzlib.def -l release/libzlib.a &&
- wl-showstatus build &&
- #( make CXX="${CXX:-g++} -fpermissive" || ( cp -u release/libstemmer.a release/stemmer.lib && make CXX="${CXX:-g++} -fpermissive" )) &&
- (
-  make CXX="${CXX:-g++} -fpermissive" || 
-  # fix building src/entity
-  ( sed -i.bak -e "s?-luser32\s*\$?& -L../../release -Wl,--as-needed -lzlib -lrpcrt4?" src/entity/Makefile.Release && make CXX="${CXX:-g++} -fpermissive" ) || 
-  ( cp -u release/libstemmer.a release/stemmer.lib && make CXX="${CXX:-g++} -fpermissive" )
- ) &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-#sed -e "s/^\(\s\s*\)\(.*\)$/\1z_\2 = \2/" $C/lib/zlib.def > zlib.def
-#dlltool -d zlib.def -l release/libzlib.a
+# fix src/io/dxf/RDxfImporter.cpp (version >= 3.32.2.0)
+patch -ulbf src/io/dxf/RDxfImporter.cpp << EOF
+@@ -124,3 +124,3 @@
 
-
-
-#export BUILDDEPENDENCIES=cmake,ninja
+-#ifdef Q_OS_WIN
++#if defined(Q_OS_WIN) && !defined(__MINGW32__)
+     wchar_t* winfn = new wchar_t[2000];
+EOF
+#wl-showstatus configure &&
+# #$MINGWPREFIX/qt/bin/qmake.exe -makefile qcad.pro &&
+# $MINGWPREFIX/qt/bin/qmake.exe -makefile qcad.pro -spec $MINGWPREFIX/qt/mkspecs/win32-g++ &&
+# #$MINGWPREFIX/qt6/bin/qmake.exe -makefile qcad.pro -spec $MINGWPREFIX/qt6/mkspecs/win32-g++ &&
+# #$MINGWPREFIX/qt/bin/qmake.exe -r CONFIG+=ractivated &&
+# #sed -i.bak -e "s?^LIBS\s*=.*?& -Wl,--as-needed -lrpcrt4 -L$(pwd)/release -lzlib?" src/entity/Makefile.Release &&
+# # fix zlib linking issues
+# mkdir -p release &&
+# pexports $MINGWPREFIX/bin/zlib1.dll | sed -e "s/^[a-z][^ ]*$/z_& = &/" > release/libzlib.def &&
+# dlltool -D $MINGWPREFIX/bin/zlib1.dll -d release/libzlib.def -l release/libzlib.a &&
+# wl-showstatus build &&
+# #( make CXX="${CXX:-g++} -fpermissive" || ( cp -u release/libstemmer.a release/stemmer.lib && make CXX="${CXX:-g++} -fpermissive" )) &&
+# (
+#  make CXX="${CXX:-g++} -fpermissive" || 
+#  # fix building src/entity
+#  ( sed -i.bak -e "s?-luser32\s*\$?& -L../../release -Wl,--as-needed -lzlib -lrpcrt4?" src/entity/Makefile.Release && make CXX="${CXX:-g++} -fpermissive" ) || 
+#  ( cp -u release/libstemmer.a release/stemmer.lib && make CXX="${CXX:-g++} -fpermissive" )
+# ) &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+##sed -e "s/^\(\s\s*\)\(.*\)$/\1z_\2 = \2/" $C/lib/zlib.def > zlib.def
+##dlltool -d zlib.def -l release/libzlib.a
 mkdir -p build_win &&
  wl-showstatus configure &&
  PATH=$PATH:$MINGWPREFIX/qt6/bin cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
@@ -342,10 +348,15 @@ mkdir -p build_win &&
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lrpcrt4/" build_win/build.ninja &&
  wl-showstatus build &&
  ninja -Cbuild_win &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_win install/strip &&
  wl-showstatus build-install &&
- ninja -Cbuild_win install/strip &&
+ mkdir -p $INSTALLPREFIX/share/QCAD &&
+ cp -f release/*.exe build_win/release/*.dll $INSTALLPREFIX/share/QCAD/ &&
+ cp -rf build_win/plugins $INSTALLPREFIX/share/QCAD/ &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####PATH=$PATH:$MINGWPREFIX/qt6/bin $INSTALLPREFIX/share/QCAD/qcad
 
 
 
