@@ -275,13 +275,15 @@ export TYPE=library
 #export VERSIONDATE=20230210
 #export VERSION=1.5.5
 #export VERSIONDATE=20230405
-export VERSION=1.5.6
-export VERSIONDATE=20240327
+#export VERSION=1.5.6
+#export VERSIONDATE=20240327
+export VERSION=1.5.7
+export VERSIONDATE=20250220
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,xz,liblz4
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=cmake,ninja
 export LICENSEFILE=LICENSE
 export LICENSETYPE=BSD
 export DOWNLOADURL="https://github.com/facebook/zstd/releases/"
@@ -298,7 +300,10 @@ sed -i.bak -e "s/ifneq (,\$(filter \(\$(shell uname)\|\$(UNAME)\),Linux /&$(unam
 sed -i.bak2 -e "s/ln -sf/#&/" lib/Makefile
 sed -i.bak2 -e "s/ln -sf/cp -f/" programs/Makefile
 #sed -i.bak3 -e "s/\$(CC) .*\$(LDLIBS) -o .*$/& -lsynchronization/" programs/Makefile
-wl-showstatus build-install &&
+# also allow building tools in build/cmake/programs/CMakeLists.txt (version >= 1.5.7)
+sed -i.bak -e "s/if (UNIX/& OR MINGW/; s/create_symlink \([^ .]*\) \(zstdcat\|unzstd\|zstdmt\)/copy \1.exe \2.exe/; s/create_symlink/copy/; s/\(install(FILES.*\(zstdcat\|unzstd\|zstdmt\)\) /\1.exe /" build/cmake/programs/CMakeLists.txt
+if ! [ -f build/cmake/CMakeLists.txt ] || ! cmake --version &> /dev/null || ! ninja --version &> /dev/null; then
+ wl-showstatus build-install &&
  #make install CC=${CC:-gcc} TARGET_SYSTEM=Windows prefix=$INSTALLPREFIX &&
  #( make install CC=${CC:-gcc} TARGET_SYSTEM=Windows prefix=$INSTALLPREFIX || make install CC="${CC:-gcc} -D_WIN32_WINNT=0x0600" TARGET_SYSTEM=Windows prefix=$INSTALLPREFIX ) &&
  ( make lib-mt install prefix=$INSTALLPREFIX TARGET_SYSTEM=Windows CC=${CC:-gcc} HASH_DIR=conf_myhash || make lib-mt install prefix=$INSTALLPREFIX TARGET_SYSTEM=Windows CC="${CC:-gcc} -D_WIN32_WINNT=0x0600" HASH_DIR=conf_myhash ) &&
@@ -311,11 +316,24 @@ wl-showstatus build-install &&
  cp -u programs/zstd-frugal.exe $INSTALLPREFIX/bin/ &&
  mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
  strip $INSTALLPREFIX/bin/*.{dll,exe} &&
- cp -u $INSTALLPREFIX/lib/pkgconfig/libzstd.pc $INSTALLPREFIX/lib/pkgconfig/zstd.pc &&
  # manually provide zstdConfig.cmake (version >= 1.5.2)
  mkdir -p $INSTALLPREFIX/cmake &&
- echo -e "INCLUDE(FindPkgConfig)\nPKG_SEARCH_MODULE(libzstd REQUIRED zstd IMPORTED_TARGET GLOBAL)\nADD_LIBRARY(ZSTD::ZSTD ALIAS PkgConfig::libzstd)" > $INSTALLPREFIX/cmake/zstdConfig.cmake &&
+ echo -e "INCLUDE(FindPkgConfig)\nPKG_SEARCH_MODULE(libzstd REQUIRED zstd IMPORTED_TARGET GLOBAL)\nADD_LIBRARY(ZSTD::ZSTD ALIAS PkgConfig::libzstd)" > $INSTALLPREFIX/lib/cmake/zstdConfig.cmake &&
  #echo "SET(PACKAGE_VERSION \"$VERSION\")" > $INSTALLPREFIX/cmake/zstdConfigVersion.cmake &&
+ touch SUCCESS
+else
+ mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DZSTD_BUILD_STATIC:BOOL=ON -DZSTD_BUILD_SHARED:BOOL=ON -DZSTD_LEGACY_SUPPORT:BOOL=ON -DZSTD_ZLIB_SUPPORT:BOOL=ON -DZSTD_LZ4_SUPPORT:BOOL=ON -DZSTD_LZMA_SUPPORT:BOOL=ON -DZSTD_BUILD_CONTRIB:BOOL=ON -DZSTD_BUILD_PROGRAMS:BOOL=ON -DZSTD_PROGRAMS_LINK_SHARED:BOOL=ON -DZSTD_BUILD_TESTS:BOOL=ON -Sbuild/cmake -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ strip build_win/programs/zstd-frugal.exe &&
+ cp -u build_win/programs/zstd-frugal.exe $INSTALLPREFIX/bin/ &&
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
+ # also create zstd.pc for better compatibility
+ cp -u $INSTALLPREFIX/lib/pkgconfig/libzstd.pc $INSTALLPREFIX/lib/pkgconfig/zstd.pc &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: fix missing share/man/man1/zstdmt.1
 
