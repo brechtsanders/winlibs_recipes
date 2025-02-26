@@ -1,0 +1,64 @@
+export NAME="libtnc"
+export STATUS=
+#export URL=https://libtnc.sourceforge.io/
+export URL=https://sourceforge.net/projects/libtnc/
+export BASENAME=libtnc
+export DESCRIPTION="OS independent implementation of the Trusted Network Connect (TNC) specification from Trusted Computing Group (TCG). Functions for loading and communicating with TNC plugins, sample IMC and IMV plugins, TNCCS-XML support on Windows, Linux, Mac, *BSD"
+export CATEGORY=security
+export TYPE=library
+export VERSION=1.25
+export VERSIONDATE=20250226
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://sourceforge.net/projects/libtnc/files/libtnc/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/libtnc/libtnc/$VERSION/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix src/libtnc/libtnctncc.c
+#sed -i.bak -e "1i #include <stddef.h>\n#include \"base64.h\"\n#include \"mutex.h\"" src/libtnc/libtnctncc.c
+## fix ./src/libtnc/tncifimc.h
+#patch -ulbf ./src/libtnc/tncifimc.h << EOF
+#@@ -183,2 +183,3 @@
+#
+#+TNC_Result libtnc_tncc_BindFunction(TNC_IMCID imcID, char *functionName, void **pOutfunctionPointer);
+# TNC_Result TNC_TNCC_BindFunction(
+#EOF
+## fix src/libtnc/tncifimv.h
+#patch -ulbf src/libtnc/tncifimv.h << EOF
+#@@ -253,2 +253,3 @@
+#
+#+TNC_Result libtnc_tncs_BindFunction(TNC_IMVID imcID, char *functionName, void **pOutfunctionPointer);
+# TNC_Result TNC_TNCS_BindFunction(
+#EOF
+## fix src/libtnc/libtncarray.h
+#patch -ulbf src/libtnc/libtncarray.h << EOF
+#@@ -41,2 +41,3 @@
+# extern TNC_UInt32 libtnc_array_resize(libtnc_array* array, TNC_UInt32 size);
+#+extern TNC_UInt32 libtnc_array_size(libtnc_array* array);
+#
+#EOF
+#wl-showstatus preconfigure &&
+# autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-DWIN32 $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: also build shared library
+
+
+
