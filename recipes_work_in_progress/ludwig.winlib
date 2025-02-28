@@ -49,9 +49,31 @@ wl-showstatus extract
 #cd ludwig-release-$VERSION
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd ludwig-ludwig-$VERSION
-cp config/unix-gcc-default.mk config.mk &&
-wl-showstatus build &&
- make CC=${CC:-gcc} &&
+# fix undefined posix_memalign() in src/memory.c (version >= 0.23.0)
+sed -i.bak -e "1i #define posix_memalign(p, a, s) ((*(p) = _aligned_malloc((s), (a))) != NULL ? 0 : -1)" src/memory.c
+# fix undefined strndup() in src/runtime.c (version >= 0.23.0)
+mv src/runtime.c src/runtime.c.bak
+cat > src/runtime.c << EOF
+#include <malloc.h>
+#include <string.h>
+static inline char* strndup (const char* s, size_t n)
+{
+  char* result;
+  size_t len = strlen(s);
+  if (len > n)
+    len = n;
+  result = (char*)malloc(len + 1);
+  if (!result)
+    return 0;
+  result[len] = 0;
+  return (char*)memcpy(result, s, len);
+}
+EOF
+cat src/runtime.c.bak >> src/runtime.c
+wl-showstatus configure &&
+ cp -f config/unix-gcc-default.mk config.mk &&
+ wl-showstatus build &&
+ make CC=${CC:-gcc} MPI_LIB="-lHYPRE" &&
     echo OK
 # #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ludwig-release-$VERSION
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf ludwig-ludwig-$VERSION
