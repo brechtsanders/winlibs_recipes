@@ -450,13 +450,17 @@ export TYPE=library
 #export VERSIONDATE=20250123
 #export VERSION=5.3.105
 #export VERSIONDATE=20250212
-export VERSION=5.3.106
-export VERSIONDATE=20250305
-#export VERSION=5.4.0
-#export VERSIONDATE=20250311
-wl-showstatus --package-version
-export DEPENDENCIES=bcunit,polarssl
+#export VERSION=5.3.106
+#export VERSIONDATE=20250305
+##export DEPENDENCIES=bcunit,polarssl
 #export DEPENDENCIES=bcunit,mbedtls
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+export VERSION=5.4.0
+export VERSIONDATE=20250311
+wl-showstatus --package-version
+export DEPENDENCIES=bcunit,openssl
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -625,6 +629,30 @@ EOF
 mv src/crypto/mbedtls.cc src/crypto/mbedtls.cc.bak &&
 echo "#include <mbedtls/threading.h>" > src/crypto/mbedtls.cc
 sed -e "s?^#define BCTBX_USE_MBEDTLS_PSA?//&?" src/crypto/mbedtls.cc.bak >> src/crypto/mbedtls.cc
+# fix src/crypto/openssl.c (version >= 5.4.0)
+patch -ulbf src/crypto/openssl.c << EOF
+@@ -36,2 +36,7 @@
+ #include <string.h>
++#ifdef _WIN32
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#endif
+
+@@ -278,2 +283,8 @@
+        while ((entry = readdir(directory)) != NULL) {
++#ifdef _WIN32
++                char file_path[PATH_MAX];
++                struct stat file_stat;
++                snprintf(file_path, sizeof(file_path), "%s/%s", path, entry->d_name);
++                if (stat(file_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) { // Only process regular files
++#else
+                if (entry->d_type == DT_REG) { // Only process regular files
+@@ -281,2 +292,3 @@
+                        snprintf(file_path, sizeof(file_path), "%s/%s", path, entry->d_name);
++#endif
+                        int32_t ret;
+EOF
 ## don't abort on warnings
 #sed -i.bak -e "s/-Wall//" CMakeLists.txt
 #mkdir -p build_static build_shared &&
@@ -680,10 +708,11 @@ sed -i.bak -e "s/WIN32/MSVC/" cmake/FindMbedTLS.cmake
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_MBEDTLS=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC -fpermissive" -S. -Bbuild_static &&
- #-DENABLE_POLARSSL=OFF -DENABLE_MBEDTLS=ON 
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_MBEDTLS:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC -fpermissive" -S. -Bbuild_static &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_OPENSSL:BOOL=ON -DENABLE_MBEDTLS:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DBCTBX_STATIC" -DCMAKE_CXX_FLAGS:STRING="-DBCTBX_STATIC -fpermissive" -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_MBEDTLS=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -S. -Bbuild_shared -DCMAKE_CXX_FLAGS:STRING="-fpermissive" &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_MBEDTLS:BOOL=ON -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -S. -Bbuild_shared -DCMAKE_CXX_FLAGS:STRING="-fpermissive" &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_OPENSSL:BOOL=ON -DENABLE_MBEDTLS:BOOL=OFF -DENABLE_STRICT:BOOL=OFF -DENABLE_TESTS_COMPONENT:BOOL=ON -DENABLE_UNIT_TESTS:BOOL=OFF -S. -Bbuild_shared -DCMAKE_CXX_FLAGS:STRING="-fpermissive" &&
  ## fix missing link libraries
  #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ldbghelp/" build_shared/build.ninja &&
  wl-showstatus build-install &&
