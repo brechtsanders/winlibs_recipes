@@ -17,8 +17,10 @@ export TYPE=library
 #export VERSIONDATE=20230206
 #export VERSION=7.0.4
 #export VERSIONDATE=20230816
-export VERSION=7.0.5
-export VERSIONDATE=20240813
+#export VERSION=7.0.5
+#export VERSIONDATE=20240813
+export VERSION=7.0.7
+export VERSIONDATE=20250312
 ####MPI required to compile PT-Scotch
 wl-showstatus --package-version
 export DEPENDENCIES=openmpi
@@ -37,6 +39,23 @@ wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/scotch-v$VERSION.tar.bz2
 cd $BASENAME-v$VERSION
+# fix src/libscotch/library.h (version >= 7.0.7)
+patch -ulbf src/libscotch/library.h << EOF
+@@ -67,2 +67,4 @@
+
++#include <stdio.h>
++
+ /*
+@@ -236,4 +238,6 @@
+ void                        SCOTCH_errorProg    (const char * const);
+-void                        SCOTCH_errorPrint   (const char * const, ...);
+-void                        SCOTCH_errorPrintW  (const char * const, ...);
++#define SCOTCH_errorPrint(...) fprintf(stderr, __VA_ARGS__)
++#define SCOTCH_errorPrintW(...) fprintf(stderr, __VA_ARGS__)
++//void                        SCOTCH_errorPrint   (const char * const, ...);
++//void                        SCOTCH_errorPrintW  (const char * const, ...);
+
+EOF
 #wl-showstatus configure &&
 # cp -f src/Make.inc/Makefile.inc.i686_pc_mingw32 src/Makefile.inc &&
 # wl-showstatus build &&
@@ -46,10 +65,12 @@ cd $BASENAME-v$VERSION
 ## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-v$VERSION
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMPI_THREAD_MULTIPLE:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMPI_THREAD_MULTIPLE:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_PTSCOTCH=OFF -S. -Bbuild_static &&
  #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMPI_THREAD_MULTIPLE:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMPI_THREAD_MULTIPLE:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PTSCOTCH=OFF -S. -Bbuild_shared &&
  ## fix execution of Python scripts
  #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
  ## fix missing link libraries
