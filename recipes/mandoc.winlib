@@ -1,0 +1,405 @@
+export NAME="mandoc"
+export STATUS=
+export URL=https://mandoc.bsd.lv/
+export BASENAME=mandoc
+export DESCRIPTION="mandoc is a suite of tools compiling mdoc, the roff macro language of choice for BSD manual pages, and man, the predominant historical language for UNIX manuals. It is small, ISO C, ISC-licensed, and quite fast. The main component of the toolset is the mandoc utility program, based on the libmandoc validating compiler, to format output for UTF-8 and ASCII UNIX terminals, HTML 5, PostScript, and PDF."
+export CATEGORY=fileformat
+export TYPE=library
+#export VERSION=1.14.5
+#export VERSIONDATE=20210311
+export VERSION=1.14.6
+export VERSIONDATE=20210924
+####FATAL: no endian conversion functions found
+wl-showstatus --package-version
+#export DEPENDENCIES=mman-win32,sys_wait_h
+export DEPENDENCIES=mman-win32,sys_wait_h,unixem
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://mandoc.bsd.lv/snapshots/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://mandoc.bsd.lv/snapshots/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix compat_mkdtemp.c (version >= 1.14.5)
+patch -ulbf compat_mkdtemp.c << EOF
+@@ -49,3 +49,7 @@
+                }
++#ifdef _WIN32
++               if (mkdir(path) == 0)
++#else
+                if (mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR) == 0)
++#endif
+                        return path;
+EOF
+# fix compat_fts.h (version >= 1.14.5)
+patch -ulbf compat_fts.h << EOF
+@@ -68,3 +68,5 @@
+        dev_t fts_dev;                  /* device */
++#ifndef _WIN32
+        nlink_t fts_nlink;              /* link count */
++#endif
+
+EOF
+## fix mandocdb.c (version >= 1.14.5)
+#patch -ulbf mandocdb.c << EOF
+#@@ -798,2 +798,3 @@
+#         */
+#+#ifndef _WIN32
+#        if (-1 == lstat(file, &st)) {
+#@@ -803,2 +804,5 @@
+#        } else if (0 == ((S_IFREG | S_IFLNK) & st.st_mode)) {
+#+#else
+#+       if (0 == ((S_IFREG) & st.st_mode)) {
+#+#endif
+#                exitcode = (int)MANDOCLEVEL_BADARG;
+#EOF
+# fix mandocdb.c (version >= 1.14.6)
+patch -ulbf mandocdb.c << EOF
+@@ -806,3 +806,7 @@
+         */
++#ifndef _WIN32
+        if (lstat(infile, &st) == -1) {
++#else
++       if (stat(infile, &st) == -1) {
++#endif
+                exitcode = (int)MANDOCLEVEL_BADARG;
+@@ -810,2 +814,3 @@
+                return;
++#ifdef S_ISLNK
+        } else if (S_ISREG(st.st_mode) == 0 && S_ISLNK(st.st_mode) == 0) {
+@@ -814,2 +819,3 @@
+                return;
++#endif
+        }
+EOF
+## fix main.c (version >= 1.14.5)
+#patch -ulbf main.c << EOF
+#@@ -21,3 +21,5 @@
+# #include <sys/types.h>
+#+#ifndef _WIN32
+# #include <sys/ioctl.h>
+#+#endif
+# #include <sys/param.h> /* MACHINE */
+#@@ -32,3 +34,5 @@
+# #include <fcntl.h>
+#+#ifndef _WIN32
+# #include <glob.h>
+#+#endif
+# #if HAVE_SANDBOX_INIT
+#@@ -41,3 +45,5 @@
+# #include <string.h>
+#+#ifndef _WIN32
+# #include <termios.h>
+#+#endif
+# #include <time.h>
+#EOF
+# fix main.c (version >= 1.14.6)
+patch -ulbf main.c << EOF
+@@ -23,3 +23,5 @@
+ #include <sys/types.h>
++#ifndef _WIN32
+ #include <sys/ioctl.h>
++#endif
+ #include <sys/param.h> /* MACHINE */
+@@ -35,3 +37,5 @@
+ #include <fcntl.h>
++#ifndef _WIN32
+ #include <glob.h>
++#endif
+ #include <limits.h>
+@@ -45,3 +49,5 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <termios.h>
++#endif
+ #include <time.h>
+@@ -127,3 +133,5 @@
+        struct outstate  outst;         /* Output state. */
++#ifndef _WIN32
+        struct winsize   ws;            /* Result of ioctl(TIOCGWINSZ). */
++#endif
+        struct mansearch search;        /* Search options. */
+@@ -382,2 +390,3 @@
+
++#ifndef _WIN32
+        if (outst.use_pager &&
+@@ -391,2 +400,3 @@
+        }
++#endif
+
+EOF
+## fix term_tag.c (version >= 1.14.6)
+#patch -ulbf term_tag.c << EOF
+#@@ -52,3 +52,5 @@
+# {
+#+#ifndef _WIN32
+#        struct sigaction         sa;
+#+#endif
+#        int                      ofd;   /* In /tmp/, dup(2)ed to stdout. */
+#@@ -62,2 +64,3 @@
+#
+#+#ifndef _WIN32
+#        memset(&sa, 0, sizeof(sa));
+#@@ -77,2 +80,3 @@
+#        sigaction(SIGTTOU, &sa, NULL);
+#+#endif
+#
+#@@ -196,2 +200,3 @@
+#
+#+#ifndef _WIN32
+#        if (tag_files.tcpgid != -1) {
+#@@ -203,2 +208,3 @@
+#        }
+#+#endif
+#        if (strncmp(tag_files.ofn, "/tmp/man.", 9) == 0) {
+#@@ -216,2 +222,3 @@
+# {
+#+#ifndef _WIN32
+#        struct sigaction         sa;
+#@@ -226,2 +233,3 @@
+#        _exit(1);
+#+#endif
+# }
+#EOF
+# fix term_tag.c (version >= 1.14.6)
+patch -ulbf term_tag.c << EOF
+@@ -37,5 +37,7 @@
+ #include "term_tag.h"
+
++#ifdef SIGHUP
+ static void tag_signal(int) __attribute__((__noreturn__));
++#endif
+
+ static struct tag_files tag_files;
+@@ -51,5 +53,7 @@
+     const char *tagfilename)
+ {
++#ifdef SIGHUP
+        struct sigaction         sa;
++#endif
+        int                      ofd;   /* In /tmp/, dup(2)ed to stdout. */
+        int                      tfd;
+@@ -61,4 +65,5 @@
+        /* Clean up when dying from a signal. */
+
++#ifdef SIGHUP
+        memset(&sa, 0, sizeof(sa));
+        sigfillset(&sa.sa_mask);
+@@ -76,4 +81,5 @@
+        sa.sa_handler = SIG_IGN;
+        sigaction(SIGTTOU, &sa, NULL);
++#endif
+
+        /* Save the original standard output for use by the pager. */
+@@ -212,4 +218,5 @@
+ }
+
++#ifdef SIGHUP
+ static void
+ tag_signal(int signum)
+@@ -226,2 +233,3 @@
+        _exit(1);
+ }
++#endif
+EOF
+# fix mansearch.c (version >= 1.14.6)
+patch -ulbf mansearch.c << EOF
+@@ -28,3 +28,5 @@
+ #include <fcntl.h>
++#ifndef _WIN32
+ #include <glob.h>
++#endif
+ #include <limits.h>
+EOF
+## fix configure (version = 1.14.5)
+#patch -ulbf configure << EOF
+#@@ -43,3 +43,3 @@
+#
+#-CC=\`printf "all:\\\\n\\\\t@echo \\\\\\\$(CC)\\\\n" | env -i make -sf -\`
+#+CC=${CC:-gcc}
+# CFLAGS=
+#@@ -326,3 +326,3 @@
+#        echo "FATAL: no endian conversion functions found" 1>&3
+#-       exit 1
+#+       #exit 1
+# fi
+#EOF
+# fix configure (version >= 1.14.6)
+patch -ulbf configure << EOF
+@@ -410,3 +410,2 @@
+        echo "FATAL: no endian conversion functions found" 1>&3
+-       FATAL=1
+ fi
+@@ -415,3 +414,2 @@
+        echo "FATAL: nanosleep: no" 1>&3
+-       FATAL=1
+ fi
+EOF
+# fix compat_fts.c (version >= 1.14.6)
+patch -ulbf compat_fts.c << EOF
+@@ -513,3 +513,7 @@
+
++#ifdef _WIN32
++       if (stat(p->fts_accpath, sbp)) {
++#else
+        if (lstat(p->fts_accpath, sbp)) {
++#endif
+                p->fts_errno = errno;
+@@ -529,3 +533,5 @@
+                ino = p->fts_ino = sbp->st_ino;
++#ifndef _WIN32
+                p->fts_nlink = sbp->st_nlink;
++#endif
+
+@@ -548,4 +554,6 @@
+        }
++#ifndef _WIN32
+        if (S_ISLNK(sbp->st_mode))
+                return (FTS_SL);
++#endif
+        if (S_ISREG(sbp->st_mode))
+EOF
+# fix term_tag.c (version >= 1.14.6)
+patch -ulbf term_tag.c << EOF
+@@ -202,2 +202,3 @@
+
++#ifndef _WIN32
+        if (tag_files.tcpgid != -1) {
+@@ -209,2 +210,3 @@
+        }
++#endif
+        if (strncmp(tag_files.ofn, "/tmp/man.", 9) == 0) {
+EOF
+# fix undefined realpath and S_ISLNK in mandocdb.c (version >= 1.14.6)
+patch -ulbf mandocdb.c << EOF
+@@ -49,2 +49,8 @@
+ #include <unistd.h>
++#include <getopt.h>
++/*
++#ifdef _WIN32
++#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
++#endif
++*/
+
+@@ -853,4 +859,6 @@
+        do {
++#ifndef _WIN32
+                if (S_ISLNK(st.st_mode) == 0)
+                        break;
++#endif
+
+EOF
+# fix undefined realpath in manpath.c (version >= 1.14.6)
+sed -i.bak -e "1i #define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" manpath.c
+# fix main.c (version >= 1.14.6)
+patch -ulbf main.c << EOF
+@@ -54,2 +54,4 @@
+ #include <unistd.h>
++#include <getopt.h>
++#include <glob.h>
+
+@@ -117,3 +119,7 @@
+ static void              process_onefile(struct mparse *, struct manpage *,
++#ifdef _WIN32
++                               const char*, struct outstate *, struct manconf *);
++#else
+                                int, struct outstate *, struct manconf *);
++#endif
+ static void              run_pager(struct outstate *, char *);
+@@ -154,3 +160,7 @@
+        int              prio, best_prio;
++#ifdef _WIN32
++       char             startdir[PATH_MAX];
++#else
+        int              startdir;
++#endif
+        int              c;
+@@ -626,3 +636,8 @@
+         */
++#ifdef _WIN32
++       startdir[0] = 0;
++       getcwd(startdir, PATH_MAX);
++#else
+        startdir = open(".", O_RDONLY | O_DIRECTORY);
++#endif
+        for (i = 0; i < ressz; i++) {
+@@ -632,2 +647,7 @@
+        }
++#ifdef _WIN32
++       if (startdir[0] != 0) {
++               chdir(startdir);
++       }
++#else
+        if (startdir != -1) {
+@@ -636,2 +656,3 @@
+        }
++#endif
+        if (conf.output.tag != NULL && conf.output.tag_found == 0) {
+@@ -878,3 +899,7 @@
+ static void
++#ifdef _WIN32
++process_onefile(struct mparse *mp, struct manpage *resp, const char* startdir,
++#else
+ process_onefile(struct mparse *mp, struct manpage *resp, int startdir,
++#endif
+     struct outstate *outst, struct manconf *conf)
+@@ -890,4 +915,9 @@
+                (void)chdir(conf->manpath.paths[resp->ipath]);
++#ifdef _WIN32
++       else if (startdir && startdir[0] != 0)
++               chdir(startdir);
++#else
+        else if (startdir != -1)
+                (void)fchdir(startdir);
++#endif
+
+@@ -1232,2 +1262,3 @@
+ {
++#ifndef _WIN32
+        int      signum, status;
+@@ -1281,2 +1312,3 @@
+        }
++#endif
+ }
+@@ -1353,2 +1385,6 @@
+
++#ifdef _WIN32
++       mandoc_msg(MANDOCERR_FORK, 0, 0, "Unable to run pager: fork() not supported on Windows");
++       exit(mandoc_msg_getrc());
++#else
+        switch (pager_pid = fork()) {
+@@ -1384,2 +1420,3 @@
+        _exit(mandoc_msg_getrc());
++#endif
+ }
+EOF
+# avoid conflict with install
+mv -f INSTALL INSTALL.txt
+# fix Makefile
+sed -i.bak -e "s/\(\$(CC).*\)\( \$(LDFLAGS)\)\( .*\)$/\1\3\2/" Makefile
+sed -i.bak -e "s/^BINM_PAGER=$/&\"less.exe\"/; s/^HAVE_LESS_T=$/&1/" configure
+wl-showstatus configure &&
+ # if a black screen appears press q
+ #./configure &&
+ ./configure CFLAGS="-DOSNAME=\\\"Windows\\\" -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/unixemulation -I$MINGWPREFIX/win32ports/include" LDFLAGS="-Wl,--as-needed -lmman -lunixem" &&
+ sed -i.bak "1i #include <winsock2.h>" config.h &&
+ sed -i.bak2 "s?^#define PATH_MAX?//&?" config.h &&
+ # fix install location
+ sed -i.bak -e "s?/usr/local/?\$(PREFIX)/?" Makefile.local &&
+ echo "#include <getopt.h>" >> config.h &&
+ wl-showstatus build-install &&
+ make install PREFIX=$INSTALLPREFIX/share/mandoc CC=${CC:-gcc} CFLAGS="-DOSNAME=\\\"Windows\\\" -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/unixemulation -I$MINGWPREFIX/win32ports/include" LDFLAGS="-s -Wl,--as-needed -lmman -lunixem -lpcreposix -lws2_32" &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####$MINGWPREFIX/share/mandoc/bin/man.exe $MINGWPREFIX/share/mandoc/man/man1/man.1
+####$MINGWPREFIX/share/mandoc/bin/mandoc.exe $MINGWPREFIX/share/mandoc/man/man1/mandoc.1 | less
+####See also: https://embedeo.org/ws/doc/man_windows/
+
+
+
