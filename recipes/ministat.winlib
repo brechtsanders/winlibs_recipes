@@ -1,0 +1,70 @@
+export NAME="ministat"
+export STATUS=
+export URL=https://github.com/codemac/ministat
+export BASENAME=ministat
+export DESCRIPTION="A small tool to do the statistics legwork on benchmarks etc. "
+export CATEGORY=math
+export TYPE=application
+export VERSION=master
+export VERSIONDATE=20160211
+wl-showstatus --package-version
+export DEPENDENCIES=sys_queue_h
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=beer-ware
+#export DOWNLOADURL="https://github.com/codemac/ministat/releases "
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/codemac/ministat/archive/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#mv $TARBALLDIR/$BASENAME/$VERSION.tar.gz $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+wl-wait4deps
+wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# extract license
+sed "/\*\//q" ministat.c > LICENSE
+# fix ministat.c (version >= master)
+patch -ulbf ministat.c << EOF
+@@ -16,3 +16,8 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <windows.h>
++#define err(retcode, ...) { fprintf(stderr, __VA_ARGS__); _exit(retcode); }
++#else
+ #include <sys/ioctl.h>
++#endif
+ #include <sys/queue.h>
+@@ -555,3 +560,7 @@
+        if (isatty(STDOUT_FILENO)) {
++#ifdef _WIN32
++               CONSOLE_SCREEN_BUFFER_INFO coninfo;
++#else
+                struct winsize wsz;
++#endif
+
+@@ -559,5 +568,10 @@
+                        termwidth = atoi(p);
++#ifdef _WIN32
++               else if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &coninfo) != 0 && coninfo.dwSize.X > 2)
++                       termwidth = coninfo.dwSize.X - 2;
++#else
+                else if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) != -1 &&
+-                        wsz.ws_col > 0)
++                        wsz.ws_col > 2)
+                        termwidth = wsz.ws_col - 2;
++#endif
+        }
+EOF
+# fix Makefile
+sed -i.bak -e "s/gcc\b\(.*\)$/\$(CC)\1 \$(CFLAGS) \$(LDFLAGS)/" Makefile
+wl-showstatus build-install &&
+ make install CC=${CC:-gcc} CFLAGS="-I$MINGWPREFIX/win32ports/include" LDFLAGS="-s" PREFIX=$INSTALLPREFIX &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

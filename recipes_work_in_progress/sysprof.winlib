@@ -49,6 +49,69 @@ patch -ulbf src/libsysprof-capture/sysprof-capture-writer.c << EOF
 +# include <portable_endian.h>
  #else
 EOF
+# fix src/libsysprof-capture/sysprof-macros-internal.h (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-macros-internal.h << EOF
+@@ -66,2 +66,4 @@
+ # include <architecture/byte_order.h>
++#elifdef _WIN32
++# include <portable_endian.h>
+ #else
+@@ -97 +99,6 @@
+ #endif
++#ifdef __MINGW32__
++#define bswap_16(x) __builtin_bswap16(x)
++#define bswap_32(x) __builtin_bswap32(x)
++#define bswap_64(x) __builtin_bswap64(x)
++#endif
+EOF
+# fix src/libsysprof-capture/sysprof-capture-writer.c (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-capture-writer.c << EOF
+@@ -61,2 +61,4 @@
+ # include <machine/endian.h>
++#elifdef _WIN32
++# include <portable_endian.h>
+ #else
+@@ -509,3 +511,3 @@
+   time (&now);
+-  if (strftime (now_str, sizeof (now_str), "%FT%TZ", gmtime (&now)) == 0)
++  if (strftime (now_str, sizeof (now_str), "%Y-%m-%dT%H:%M:%SZ", gmtime (&now)) == 0)
+     {
+EOF
+# fix src/libsysprof-capture/sysprof-collector.c (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-collector.c << EOF
+@@ -61,3 +61,5 @@
+ #include <fcntl.h>
++#ifndef _WIN32
+ #include <poll.h>
++#endif
+ #include <pthread.h>
+EOF
+# fix src/libsysprof-capture/sysprof-capture-util-private.h (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-capture-util-private.h << EOF
+@@ -66,2 +66,3 @@
+ #include <unistd.h>
++#include <stdint.h>
+
+EOF
+# fix src/libsysprof-capture/sysprof-platform.c (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-platform.c << EOF
+@@ -60,3 +60,5 @@
+ #include <stdlib.h>
++#ifndef _WIN32
+ #include <sys/syscall.h>
++#endif
+ #include <unistd.h>
+@@ -131,2 +133,3 @@
+
++#ifndef _WIN32
+ #ifdef __APPLE__
+@@ -138,2 +141,5 @@
+   fd = TEMP_FAILURE_RETRY (mkostemp (template, flags));
++#else
++  fd = TEMP_FAILURE_RETRY (mkstemp (template));
++#endif
+   if (fd < 0)
+EOF
 
 #export DEPENDENCIES=portableendian
 #sed -i.bak -e "s/\(<\)\(endian\.h>\)/\1portable_\2/" src/libsysprof-capture/sysprof-macros-internal.h src/libsysprof-capture/sysprof-capture-types.h src/libsysprof-capture/sysprof-capture-writer.c
@@ -63,7 +126,7 @@ EOF
 #sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
 mkdir -p build_both &&
  wl-showstatus configure &&
- PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibsysprof=false -Dsysprofd=none -Dgtk=false -Dpolkit-agent=disabled -Dtools=false -Dhelp=false -Dexamples=false -Dtests=false -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibsysprof=false -Dsysprofd=none -Dgtk=false -Dpolkit-agent=disabled -Dtools=false -Ddebuginfod=disabled -Dhelp=false -Dexamples=false -Dtests=false -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
  ## fix slash/backslash path issue when calling Python from Ninja
  #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
  ## fix Python path issues in meson_exe
