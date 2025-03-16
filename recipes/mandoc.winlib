@@ -4,7 +4,7 @@ export URL=https://mandoc.bsd.lv/
 export BASENAME=mandoc
 export DESCRIPTION="mandoc is a suite of tools compiling mdoc, the roff macro language of choice for BSD manual pages, and man, the predominant historical language for UNIX manuals. It is small, ISO C, ISC-licensed, and quite fast. The main component of the toolset is the mandoc utility program, based on the libmandoc validating compiler, to format output for UTF-8 and ASCII UNIX terminals, HTML 5, PostScript, and PDF."
 export CATEGORY=fileformat
-export TYPE=library
+export TYPE=application,library
 #export VERSION=1.14.5
 #export VERSIONDATE=20210311
 export VERSION=1.14.6
@@ -393,15 +393,33 @@ wl-showstatus configure &&
  sed -i.bak "1i #include <winsock2.h>" config.h &&
  sed -i.bak2 "s?^#define PATH_MAX?//&?" config.h &&
  echo "#include <getopt.h>" >> config.h &&
- #echo -e "#undef HAVE_DIRENT_NAMLEN\n#define HAVE_DIRENT_NAMLEN 0" >> config.h &&
+ echo -e "#undef HAVE_DIRENT_NAMLEN\n#define HAVE_DIRENT_NAMLEN 0" >> config.h &&
  # fix install location
  sed -i.bak -e "s?/usr/local/?\$(PREFIX)/?" Makefile.local &&
+ wl-showstatus build &&
+ # build static library
+ make libmandoc.a CC=${CC:-gcc} CFLAGS="-DOSNAME=\\\"Windows\\\" -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/unixemulation -I$MINGWPREFIX/win32ports/include" LDFLAGS="-s -Wl,--as-needed -lmman -lunixem -lpcreposix -lws2_32" &&
+ # manually build static library
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libmandoc.a | sed -n -e "s/^_\{0,1\}\([^ ]*\) T .*$/\1/p; s/^_\{0,1\}\([^ _][^ ]*\) D .*$/\1 DATA/p" ) > mandoc.def &&
+ ${CC:-gcc} -shared -s -mwindows -def mandoc.def -o mandoc.dll libmandoc.a -Wl,--out-implib,libmandoc.dll.a -Wl,--as-needed -lz -lmman -lunixem -lpcreposix -lws2_32 &&
+ # build the rest against shared library
+ mv -f libmandoc.a libmandoc_static.a &&
+ mv -f libmandoc.dll.a libmandoc.a &&
+ make CC=${CC:-gcc} CFLAGS="-DOSNAME=\\\"Windows\\\" -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/unixemulation -I$MINGWPREFIX/win32ports/include" LDFLAGS="-s -Wl,--as-needed -lmman -lunixem -lpcreposix -lws2_32" &&
+ mv -f libmandoc.a libmandoc.dll.a &&
+ mv -f libmandoc_static.a libmandoc.a &&
  wl-showstatus build-install &&
  make install PREFIX=$INSTALLPREFIX/share/mandoc CC=${CC:-gcc} CFLAGS="-DOSNAME=\\\"Windows\\\" -I$MINGWPREFIX/include/mman-win32 -I$MINGWPREFIX/include/unixemulation -I$MINGWPREFIX/win32ports/include" LDFLAGS="-s -Wl,--as-needed -lmman -lunixem -lpcreposix -lws2_32" &&
+ # manually copy library
+ mkdir -p $INSTALLPREFIX/share/mandoc/lib &&
+ cp -f *.a $INSTALLPREFIX/share/mandoc/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/share/mandoc/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####$MINGWPREFIX/share/mandoc/bin/man.exe $MINGWPREFIX/share/mandoc/man/man1/man.1
 ####$MINGWPREFIX/share/mandoc/bin/mandoc.exe $MINGWPREFIX/share/mandoc/man/man1/mandoc.1 | less
 ####See also: https://embedeo.org/ws/doc/man_windows/
+####Note: conflicting files (with other packages like man and groff) => moved to different location
+####TO DO: avoid /tmp and use relative location for /etc        
 
 
 
