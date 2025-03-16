@@ -5,10 +5,12 @@ export BASENAME=sysprof
 export DESCRIPTION="Sysprof is a sampling profiler that uses a kernel module to generate stacktraces which are then interpreted by the userspace program \"sysprof\"."
 export CATEGORY=development
 export TYPE=library
-export VERSION=47.2
-export VERSIONDATE=20241204
+#export VERSION=47.2
+#export VERSIONDATE=20241204
+export VERSION=48.0
+export VERSIONDATE=20250316
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=portableendian,mman-win32
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=meson,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -23,6 +25,30 @@ wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
+# fix src/libsysprof-capture/sysprof-macros-internal.h (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-macros-internal.h << EOF
+@@ -66,2 +66,4 @@
+ # include <architecture/byte_order.h>
++#elifdef _WIN32
++# include <portable_endian.h>
+ #else
+EOF
+# fix src/libsysprof-capture/sysprof-capture-types.h (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-capture-types.h << EOF
+@@ -61,2 +61,4 @@
+ # include <machine/endian.h>
++#elifdef _WIN32
++# include <portable_endian.h>
+ #else
+EOF
+# fix src/libsysprof-capture/sysprof-capture-writer.c (version >= 48.0)
+patch -ulbf src/libsysprof-capture/sysprof-capture-writer.c << EOF
+@@ -61,2 +61,4 @@
+ # include <machine/endian.h>
++#elifdef _WIN32
++# include <portable_endian.h>
+ #else
+EOF
 
 #export DEPENDENCIES=portableendian
 #sed -i.bak -e "s/\(<\)\(endian\.h>\)/\1portable_\2/" src/libsysprof-capture/sysprof-macros-internal.h src/libsysprof-capture/sysprof-capture-types.h src/libsysprof-capture/sysprof-capture-writer.c
@@ -37,7 +63,7 @@ cd $BASENAME-$VERSION
 #sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
 mkdir -p build_both &&
  wl-showstatus configure &&
- PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibsysprof=false -Dsysprofd=none -Dgtk=false -Dpolkit-agent=disabled -Dtools=false -Dhelp=false -Dexamples=false -Dtests=false . build_both &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibsysprof=false -Dsysprofd=none -Dgtk=false -Dpolkit-agent=disabled -Dtools=false -Dhelp=false -Dexamples=false -Dtests=false -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" . build_both &&
  ## fix slash/backslash path issue when calling Python from Ninja
  #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
  ## fix Python path issues in meson_exe
