@@ -7,8 +7,10 @@ export CATEGORY=security
 export TYPE=library
 #export VERSION=master
 #export VERSIONDATE=20210714
-export VERSION=0.1
-export VERSIONDATE=20231015
+#export VERSION=0.1
+#export VERSIONDATE=20231015
+export VERSION=0.2
+export VERSIONDATE=20250322
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -28,6 +30,80 @@ wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing strndup in cli/commands.c (version >= 0.2)
+mv cli/commands.c cli/commands.c.bak
+cat >> cli/commands.c << EOF
+#include <malloc.h>
+#include <string.h>
+#define strndup MY_strndup
+inline char* strndup (const char* s, size_t n)
+{
+  char* result;
+  size_t len = strlen(s);
+  if (len > n)
+    len = n;
+  result = (char*)malloc(len + 1);
+  if (!result)
+    return 0;
+  result[len] = 0;
+  return (char*)memcpy(result, s, len);
+}
+EOF
+cat cli/commands.c.bak >> cli/commands.c
+# fix missing stpcpy in login/crypto.c (version >= 0.2)
+mv login/crypto.c login/crypto.c.bak
+cat >> login/crypto.c << EOF
+#include <malloc.h>
+#include <string.h>
+#define stpcpy MY_stpcpy
+inline char* stpcpy (char *dest, const char *src)
+{
+  register char *d = dest;
+  register const char *s = src;
+  do
+    *d++ = *s;
+  while (*s++);
+  return (d - 1);
+}
+EOF
+cat login/crypto.c.bak >> login/crypto.c
+
+# fix login/login.c (version >= 0.2)
+patch -ulbf login/login.c << EOF
+@@ -20,3 +20,8 @@
+ #include <limits.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <netdb.h>
++#endif
+ #include <openssl/crypto.h>
+@@ -28,5 +33,11 @@
+ #include <string.h>
++#ifndef _WIN32
+ #include <sys/socket.h>
++#endif
+ #include <sys/types.h>
++#ifdef _WIN32
++#define syslog(...)
++#else
+ #include <syslog.h>
++#endif
+ #include <time.h>
+EOF
+# fix login/main.c (version >= 0.2)
+patch -ulbf login/main.c << EOF
+@@ -15,3 +15,8 @@
+ #include <stdlib.h>
++#ifdef _WIN32
++#define openlog(...)
++#define syslog(...)
++#else
+ #include <syslog.h>
++#endif
+ #include <unistd.h>
+EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dtests=disabled . build_both &&
