@@ -1,0 +1,83 @@
+export NAME="tuisic"
+export STATUS=
+export URL=https://github.com/Dark-Kernel/tuisic
+export BASENAME=tuisic
+export DESCRIPTION="A simple TUI online music stream app written in c++ with easy vim keybinds."
+export CATEGORY=audio
+export TYPE=application
+export VERSION=stable
+export VERSIONDATE=20250330
+wl-showstatus --package-version
+export DEPENDENCIES=ftxui,mpv,fmt,libcurl,ffmpeg6,cava,fftw
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/Dark-Kernel/tuisic/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Dark-Kernel/tuisic/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/visualizer.hpp
+patch -ulbf src/visualizer.hpp << EOF
+@@ -2,3 +2,3 @@
+
+-#include "../cava/cavacore.h"
++#include <cavacore.h>
+ #include <memory>
+EOF
+# fix CMakeLists.txt
+patch -ulbf CMakeLists.txt << EOF
+@@ -13,20 +13,6 @@
+
+-# Cava core
+-add_library(cavacore STATIC
+-    \${CMAKE_CURRENT_SOURCE_DIR}/cava/cavacore.c
+-)
+-set_target_properties(cavacore PROPERTIES
+-    C_STANDARD 11
+-    C_STANDARD_REQUIRED ON
+-)
+ # Link against FFTW3
+-find_package(FFTW3 REQUIRED)
+-target_include_directories(cavacore PUBLIC
+-    \${CMAKE_CURRENT_SOURCE_DIR}/cava
+-    \${FFTW3_INCLUDE_DIRS}
+-)
+-target_link_libraries(cavacore PUBLIC
+-    \${FFTW3_LIBRARIES}
+-    m  # Math library
+-)
++include(FindPkgConfig)
++#find_package(FFTW3 REQUIRED)
++pkg_search_module(FFTW3 REQUIRED fftw3)
+
+@@ -43,3 +29,2 @@
+     \${MPV_INCLUDE_DIRS}
+-    \${CMAKE_CURRENT_SOURCE_DIR}/cava
+ )
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ PKG_CONFIG_PATH=$MINGWPREFIX/ffmpeg6/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=OFF -DFTXUI_ENABLE_INSTALL:BOOL=OFF -DFTXUI_BUILD_DOCS:BOOL=OFF -DFTXUI_BUILD_EXAMPLES:BOOL=OFF -DFTXUI_BUILD_TESTS:BOOL=OFF -S. -Bbuild_win &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
+ strip build_win/*.exe &&
+ #wl-showstatus build-install &&
+ #ninja -Cbuild_win install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -rf build_win/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####PATH=$MINGWPREFIX/ffmpeg6/bin:$PATH tuisic.exe
+
+
+
+mkdir -p tuisic &&
+ PATH=$MINGWPREFIX/ffmpeg6/bin:$PATH copypedeps -r $MINGWPREFIX/bin/tuisic.exe tuisic/ &&
+    echo OK

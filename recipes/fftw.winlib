@@ -116,3 +116,38 @@ mkdir -p build_single build_longdouble build_quad build_standard &&
 
 
 
+## fix kernel/kalloc.c (version >= 3.3.10)
+#patch -ulbf kernel/kalloc.c << EOF
+#@@ -105,3 +105,3 @@
+#
+#-#  elif defined(_MSC_VER)
+#+#  elif defined(_WIN32)
+#      /* MS Visual C++ 6.0 with a "Processor Pack" supports SIMD
+#EOF
+## fix api/api.h (version >= 3.3.10)
+#patch -ulbf api/api.h << EOF
+#@@ -27,2 +27,5 @@
+# #endif
+#+#if !defined(COMPILING_FFTW) && (defined(fftw3_EXPORTS) || defined(fftw3_threads_EXPORTS) || defined(fftw3_omp_EXPORTS) || defined(fftw3f_EXPORTS) || defined(fftw3f_threads_EXPORTS) || defined(fftw3f_omp_EXPORTS) || defined(fftw3l_EXPORTS) || defined(fftw3l_threads_EXPORTS) || defined(fftw3l_omp_EXPORTS) || defined(fftw3q_EXPORTS) || defined(fftw3q_threads_EXPORTS) || defined(fftw3q_omp_EXPORTS))
+#+#  define COMPILING_FFTW
+#+#endif
+#
+#EOF
+#
+##if ! cmake --version &> /dev/null || ! ninja --version &> /dev/null; then
+#
+#for P in STANDARD FLOAT LONG_DOUBLE QUAD_PRECISION; do
+# mkdir -p build_static_$P build_shared_$P &&
+# wl-showstatus configure-static-$(echo $P|tr '[:upper:]' '[:lower:]') &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_$P:BOOL=ON -DENABLE_THREADS:BOOL=ON -DENABLE_OPENMP:BOOL=ON $(if echo $RUNPLATFORM | grep -qv "^aarch64"; then echo "-DENABLE_SSE:BOOL=ON -DENABLE_SSE2:BOOL=ON -DENABLE_AVX:BOOL=ON -DENABLE_AVX2:BOOL=ON"; fi) -DLIBM_LIBRARY:FILEPATH=" " -DBUILD_TESTS:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static_$P &&
+# wl-showstatus configure-shared-$(echo $P|tr '[:upper:]' '[:lower:]') &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_$P:BOOL=ON -DENABLE_THREADS:BOOL=ON -DENABLE_OPENMP:BOOL=ON $(if echo $RUNPLATFORM | grep -qv "^aarch64"; then echo "-DENABLE_SSE:BOOL=ON -DENABLE_SSE2:BOOL=ON -DENABLE_AVX:BOOL=ON -DENABLE_AVX2:BOOL=ON"; fi) -DLIBM_LIBRARY:FILEPATH=" " -DBUILD_TESTS:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared_$P &&
+# #-DCMAKE_C_FLAGS:STRING="-DCOMPILING_FFTW" 
+# wl-showstatus build-install-static-$(echo $P|tr '[:upper:]' '[:lower:]') &&
+# ninja -Cbuild_static_$P install/strip &&
+# wl-showstatus build-install-shared-$(echo $P|tr '[:upper:]' '[:lower:]') &&
+# ninja -Cbuild_shared_$P install/strip &&
+# touch SUCCESS_$P
+#done &&
+# ls -l SUCCESS_*
+#    echo OK
