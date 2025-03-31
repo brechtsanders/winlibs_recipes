@@ -1,0 +1,79 @@
+export NAME="Fintamath"
+export STATUS=
+export URL=https://github.com/fintarin/Fintamath
+export BASENAME=fintamath
+export DESCRIPTION="Fintamath is a C++ library for symbolic mathematics, supporting both the input of expressions in mathematical format and the use of functions from the library. It is fully featured performing operations on mathematical expressions (polynomials, powers, logarithms, trigonometry, etc.) and solving equations. Using arbitrary precision integers, exact fractions and floating point numbers, Fintamath yields highly accurate numerical results. The library is extensively tested and has 100% line coverage."
+export CATEGORY=math
+export TYPE=library
+export VERSION=0.9.0
+export VERSIONDATE=20250331
+wl-showstatus --package-version
+export DEPENDENCIES=boost,mpfr
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/fintarin/Fintamath/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/fintarin/Fintamath/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd Fintamath-$VERSION
+# fix CMakeLists.txt (version >= 0.9.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -20,3 +20,6 @@
+
+-find_package(MPFR REQUIRED)
++find_package(boost_multiprecision REQUIRED)
++find_package(boost_math REQUIRED)
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(MPFR REQUIRED mpfr)
+
+EOF
+# fix thirdparty/CMakeLists.txt (version >= 0.9.0)
+patch -ulbf thirdparty/CMakeLists.txt << EOF
+@@ -1,14 +1 @@
+-set(CMAKE_MODULE_PATH
+-    \${CMAKE_MODULE_PATH} \${CMAKE_CURRENT_SOURCE_DIR}/mpfr-gmp-prebuilt
+-    PARENT_SCOPE)
+-
+-add_subdirectory(boost-multiprecision)
+-get_target_property(BOOST_MULTIPRECISION_INCLUDE_DIR boost_multiprecision INTERFACE_INCLUDE_DIRECTORIES)
+-target_include_directories(boost_multiprecision SYSTEM INTERFACE \${BOOST_MULTIPRECISION_INCLUDE_DIR})
+-mark_as_advanced(BOOST_MULTIPRECISION_INCLUDE_DIR)
+-
+-add_subdirectory(boost-math)
+-get_target_property(BOOST_MATH_INCLUDE_DIR boost_math INTERFACE_INCLUDE_DIRECTORIES)
+-target_include_directories(boost_math SYSTEM INTERFACE \${BOOST_MATH_INCLUDE_DIR})
+-mark_as_advanced(BOOST_MATH_INCLUDE_DIR)
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -Dfintamath_build_shared:BOOL=OFF -Dfintamath_build_tests:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -Dfintamath_build_shared:BOOL=ON -Dfintamath_build_tests:BOOL=OFF -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lgmp/" build_shared/build.ninja &&
+ wl-showstatus build-static &&
+ ninja -Cbuild_static &&
+ wl-showstatus build-shared &&
+ ninja -Cbuild_shared &&
+ strip build_shared/bin/*.dll &&
+ #wl-showstatus build-install-static &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install-shared &&
+ #ninja -Cbuild_shared install/strip &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_{static,shared}/lib/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_shared/bin/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Fintamath-$VERSION
+
+
+
