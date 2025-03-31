@@ -37,21 +37,94 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
-# fix missing lchown/getegid in src/util.c
-mv src/util.c src/util.c.bak
-cat > src/util.c << EOF
-#include <pthread.h>
-#define lchown(toname,uid,gid) 0
-#define getegid() 0
-EOF
-cat src/util.c.bak >> src/util.c
+## fix missing lchown/getegid in src/util.c
+#mv src/util.c src/util.c.bak
+#cat > src/util.c << EOF
+##include <pthread.h>
+##define lchown(toname,uid,gid) 0
+##define getegid() 0
+#EOF
+#cat src/util.c.bak >> src/util.c
 ## fix cdecl in lib/msvc-inval.c (version <= 2.7.1)
 #sed -i.bak -e "s/cdecl/__cdecl/g" lib/msvc-inval.c
+# fix src/util.c (version >= 2.8)
+patch -ulbf src/util.c << EOF
+@@ -318,2 +318,3 @@
+     }
++#ifndef _WIN32
+   if (attr & FA_IDS)
+@@ -369,2 +370,3 @@
+     }
++#endif
+ }
+@@ -1230,3 +1232,5 @@
+     {
++#ifdef SIGHUP
+       SIGHUP,
++#endif
+       SIGINT,
+@@ -1248,3 +1252,5 @@
+   /* System V fork+wait does not work if SIGCHLD is ignored.  */
++#ifdef SIGCHLD
+   signal (SIGCHLD, SIG_DFL);
++#endif
+
+EOF
+# fix lib/backupfile.c (version >= 2.8)
+patch -ulbf lib/backupfile.c << EOF
+@@ -217,3 +217,3 @@
+   if (dirp)
+-    rewinddir (dirp);
++    rewinddir ((void*)dirp);
+   else
+EOF
+# fix src/pch.c (version >= 2.8)
+patch -ulbf src/pch.c << EOF
+@@ -354,3 +354,5 @@
+       although POSIX does not require it; check here to be sure.  */
++#ifdef S_IFLNK
+    static_assert (S_IFLNK);
++#endif
+    static_assert (S_IFREG);
+EOF
+# fix src/safe.c (version >= 2.8)
+patch -ulbf src/safe.c << EOF
+@@ -23,3 +23,5 @@
+ #include <sys/stat.h>
++#ifndef _WIN32
+ #include <sys/resource.h>
++#endif
+ #include <sys/time.h>
+@@ -75,4 +77,8 @@
+ static Hash_table *cached_dirfds;
++#ifdef _WIN32
++static size_t min_cached_fds = 8;
++#else
+ static rlim_t min_cached_fds = 8;
+ static rlim_t max_cached_fds;
++#endif
+ static LIST_HEAD (lru_list);
+@@ -105,2 +111,3 @@
+ {
++#ifndef _WIN32
+   struct rlimit nofile;
+@@ -116,2 +123,3 @@
+     max_cached_fds = min_cached_fds;
++#endif
+
+@@ -162,2 +170,3 @@
+
++#ifndef _WIN32
+   if (max_cached_fds != RLIM_INFINITY)
+@@ -182,2 +191,3 @@
+     }
++#endif
+
+EOF
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-xattr &&
  wl-showstatus build-install &&
  make install-strip &&
-    echo OK
  make check &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION
