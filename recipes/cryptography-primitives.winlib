@@ -14,7 +14,7 @@ export VERSIONDATE=20250226
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake,ninja
+export BUILDDEPENDENCIES=cmake,ninja,nasm
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=Apache
@@ -90,6 +90,16 @@ sed -i.bak -e "s/\(lib\|bin\)32/\1/" sources/cmake/ippcp-gen-pkg-config.cmake so
 cp -u sources/cmake/windows/GNU8.2.0.cmake sources/cmake/windows/GNU.cmake
 cp -u sources/ippcp/crypto_mb/src/cmake/linux/GNU.cmake sources/ippcp/crypto_mb/src/cmake/windows/GNU.cmake
 #sed -i.bak -e "s?/Od??" sources/ippcp/crypto_mb/src/CMakeLists.txt
+# fix sources/ippcp/crypto_mb/src/CMakeLists.txt (version >= 1.1.0)
+patch -ulbf sources/ippcp/crypto_mb/src/CMakeLists.txt << EOF
+@@ -93,3 +93,3 @@
+
+-if("\${OS_STRING}" STREQUAL "windows")
++if("\${OS_STRING}" STREQUAL "windows" AND NOT MINGW)
+     set_source_files_properties(\${CPU_FEATURES_FILE} PROPERTIES  COMPILE_FLAGS  "\${CMAKE_C_FLAGS_SECURITY} /Od")
+EOF
+# avoid -z linker flags in sources/ippcp/crypto_mb/src/cmake/windows/GNU.cmake (version >= 1.1.0)
+sed -i.bak -e "s/-Wl,-z,[^ \"]*//g" sources/ippcp/crypto_mb/src/cmake/windows/GNU.cmake
 # fix missing file
 ####Bug reported: https://github.com/intel/cryptography-primitives/issues/94
 cp -f sources/cmake/linux/GNU8.2.0.cmake sources/cmake/windows/GNU8.2.0.cmake &&
@@ -101,13 +111,7 @@ set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} -DIPP_W32DLL")
 EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DARCH:STRING=$(if ( echo $RUNPLATFORM | grep -q "^i.86" ); then echo "ia32"; else echo "intel64"; fi) -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_EXAMPLES:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -S. -Bbuild_win &&
- #sed -i.bak -e "s?/MT /O3 /DNDEBUG?-O3 -pthread?; s?/Qfnalign:?-falign-functions=?; s?/Qalign-loops:?-falign-loops=?; s?-ffreestanding?& -fno-asynchronous-unwind-tables?; s?-wd10120??; s?-QxCORE-AVX512 -Qopt-zmm-usage:high?-march=skylake-avx512?; s?-Werror?& -Wno-error=stringop-overflow?" build_win/build.ninja &&
- ##sed -i.bak2 -e "s?\(/GS\|/W3\|/WX\|/Qcf-protection:full\|/Qfreestanding\)??g; s?/Qstd=\(c99\)?-std=\1?" build_win/build.ninja &&
- ## avoid -z linker flags (version >= 2021.8)
- #sed -i.bak3 -e "s/-Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack//" build_win/build.ninja &&
- ## add linker flags
- #sed -i.bak4 -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lssp/" build_win/build.ninja &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DARCH:STRING=$(if ( echo $RUNPLATFORM | grep -q "^i.86" ); then echo "ia32"; else echo "intel64"; fi) -DPython_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DBUILD_EXAMPLES:BOOL=OFF -DCMAKE_ASM_NASM_COMPILER:FILEPATH=$(which nasm.exe) -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -S. -Bbuild_win &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  cp -u build_win/.build/RELEASE/lib/*.dll.a $INSTALLPREFIX/lib/ &&
@@ -115,8 +119,7 @@ mkdir -p build_win &&
  mv -f $INSTALLPREFIX/lib/intel64/*.dll $INSTALLPREFIX/bin/ &&
  mv -f $INSTALLPREFIX/lib/intel64/*.a $INSTALLPREFIX/lib/ &&
  rmdir $INSTALLPREFIX/lib/intel64 &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: build fails on Windows 32-bit
 
 
