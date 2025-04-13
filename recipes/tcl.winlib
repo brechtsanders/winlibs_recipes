@@ -150,28 +150,52 @@ cp -f $MINGWPREFIX/bin/zlib1.dll .
 #sed -e "s/^\(TCL_EXE\s*=\s\)tclsh/\1\$(TCLSH)/" Makefile.in.bak > Makefile.in
 # fix zlib link issue
 sed -i.bak -e "s?\$(shell \$(CYGPATH) '\@ZLIB_LIBS@')?-lz?" Makefile.in
-wl-showstatus configure &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads --enable-shared &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads --enable-shared $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo --enable-64bit; fi) &&
- wl-showstatus build-install &&
- ( make -j1 install || make -j1 TCL_EXE=$(pwd)/tclsh86.exe install ) &&
- # remove zlib1.dll
- ( rm $INSTALLPREFIX/bin/zlib1.dll || true ) &&
- cp -f $INSTALLPREFIX/bin/tclsh$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\).*/\1\2/").exe $INSTALLPREFIX/bin/tclsh.exe &&
+#wl-showstatus configure &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads --enable-shared &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threads --enable-shared $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo --enable-64bit; fi) &&
+# wl-showstatus build-install &&
+# ( make -j1 install || make -j1 TCL_EXE=$(pwd)/tclsh86.exe install ) &&
+# # remove zlib1.dll
+# ( rm $INSTALLPREFIX/bin/zlib1.dll || true ) &&
+# cp -f $INSTALLPREFIX/bin/tclsh$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\).*/\1\2/").exe $INSTALLPREFIX/bin/tclsh.exe &&
+# strip $INSTALLPREFIX/bin/*.dll $INSTALLPREFIX/bin/*.exe &&
+# # fix and install tclConfig.sh
+# #sed -e "s?$INSTALLPREFIX?'\"\$MINGWPREFIX\"'?g" tclConfig.sh > $INSTALLPREFIX/bin/tclConfig.sh &&
+# #sed -e "s?$INSTALLPREFIX?'\"\$(realpath \$(dirname \$0)/..)\"'?g" tclConfig.sh > $INSTALLPREFIX/bin/tclConfig.sh &&
+# sed -e "s?$INSTALLPREFIX?'\"\$(realpath \$(dirname \$(if [ \"\${BASH_ARGV[0]}\" == \"\" ]; then echo \$0; else echo \${BASH_ARGV[0]}; fi))/..)\"'?g" tclConfig.sh > $INSTALLPREFIX/bin/tclConfig.sh &&
+# # manually install private header
+# mkdir -p $INSTALLPREFIX/include/tcl-private/generic &&
+# cp ../generic/tclInt.h $INSTALLPREFIX/include/tcl-private/generic/ &&
+# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION &&
+# ## wait with clean up so tk can be built
+# #( sleep 1200 || true ) &&
+# #cd ../.. && rm -rf $BASENAME$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && rm -rf $BASENAME$VERSION
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cd build_static && 
+ ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-shared --disable-symbols --enable-threads --enable-zipfs --with-encoding $(if ( echo $RUNPLATFORM | grep -q "^[^-]*64" ); then echo --enable-64bit; fi) &&
+ cd .. &&
+ wl-showstatus configure-shared &&
+ cd build_shared &&
+ ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --disable-symbols --enable-threads --enable-zipfs --with-encoding $(if ( echo $RUNPLATFORM | grep -q "^[^-]*64" ); then echo --enable-64bit; fi) &&
+ cd .. &&
+ wl-showstatus build-install-static &&
+ make -Cbuild_static install &&
+ wl-showstatus build-install-shared &&
+ make -Cbuild_shared install &&
+ # strip binaries
  strip $INSTALLPREFIX/bin/*.dll $INSTALLPREFIX/bin/*.exe &&
+ # remove conflicting library files
+ ( rm $INSTALLPREFIX/bin/zlib1.dll $INSTALLPREFIX/lib/libz.dll.a $INSTALLPREFIX/bin/libtommath.dll $INSTALLPREFIX/lib/libtommath.dll.a || true ) &&
+ # copy unversioned tclsh.exe
+ cp -f $INSTALLPREFIX/bin/tclsh$(echo $VERSION|sed -e "s/^\([0-9]*\)\.\([0-9]*\).*/\1\2/").exe $INSTALLPREFIX/bin/tclsh.exe &&
  # fix and install tclConfig.sh
- #sed -e "s?$INSTALLPREFIX?'\"\$MINGWPREFIX\"'?g" tclConfig.sh > $INSTALLPREFIX/bin/tclConfig.sh &&
- #sed -e "s?$INSTALLPREFIX?'\"\$(realpath \$(dirname \$0)/..)\"'?g" tclConfig.sh > $INSTALLPREFIX/bin/tclConfig.sh &&
- sed -e "s?$INSTALLPREFIX?'\"\$(realpath \$(dirname \$(if [ \"\${BASH_ARGV[0]}\" == \"\" ]; then echo \$0; else echo \${BASH_ARGV[0]}; fi))/..)\"'?g" tclConfig.sh > $INSTALLPREFIX/bin/tclConfig.sh &&
+ sed -e "s?$INSTALLPREFIX?'\"\$(realpath \$(dirname \$(if [ \"\${BASH_ARGV[0]}\" == \"\" ]; then echo \$0; else echo \${BASH_ARGV[0]}; fi))/..)\"'?g" build_shared/tclConfig.sh > $INSTALLPREFIX/bin/tclConfig.sh &&
  # manually install private header
  mkdir -p $INSTALLPREFIX/include/tcl-private/generic &&
  cp ../generic/tclInt.h $INSTALLPREFIX/include/tcl-private/generic/ &&
- #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION &&
- ## wait with clean up so tk can be built
- #( sleep 1200 || true ) &&
- #cd ../.. && rm -rf $BASENAME$VERSION
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && rm -rf $BASENAME$VERSION
-####TO DO: also build static library
 
 
 
