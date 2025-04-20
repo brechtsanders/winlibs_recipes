@@ -4,7 +4,7 @@ export URL=https://github.com/arminbiere/cadical
 export BASENAME=cadical
 export DESCRIPTION="CaDiCaL Simplified Satisfiability Solver"
 export CATEGORY=math
-export TYPE=library
+export TYPE=application,library
 #export VERSION=2.0.0
 #export VERSIONDATE=20240714
 #export VERSION=2.1.0
@@ -69,15 +69,32 @@ patch -ulbf src/mobical.cpp << EOF
 +#endif
  
 EOF
+# fix makefile.in (version >= 2.1.3)
+patch -ulbf makefile.in << EOF
+@@ -57,7 +57,8 @@
+
+-mobical: mobical.o libcadical.a makefile \$(LIBS)
+-       \$(COMPILE) -o \$@ \$< -L. -lcadical
++mobical: mobical.o libcadical.a makefile
++$(echo -e '\t')\$(COMPILE) -o \$@ \$< -L. -lcadical \$(LIBS)
+
+ libcadical.a: \$(OBJ_SOLVER) \$(OBJ_CONTRIB) makefile
+-       ar rc \$@ \$(OBJ_SOLVER) \$(OBJ_CONTRIB)
++$(echo -e '\t')\$(AR) rc \$@ \$(OBJ_SOLVER) \$(OBJ_CONTRIB)
++$(echo -e '\t')\$(CXX) -shared -s -mwindows -o libcadical.dll -Wl,--out-implib,libcadical.dll.a \$(OBJ_SOLVER) \$(OBJ_CONTRIB) \$(LIBS)
+
+EOF
 wl-showstatus configure &&
  ./configure CXX=${CXX:-g++} CXXFLAGS="-I$MINGWPREFIX/include/mman-win32" &&
- #-static
  wl-showstatus build &&
- make &&
- #make LIBS="$MINGWPREFIX/lib/libmman.a" &&
- #make CC=${CC:-gcc} CXX=${CXX:-g++} LD=${LD:-ld} AR=${AR:-ar} &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cadical-rel-$VERSION
+ make AR=${AR:-ar} LIBS="-s -lmman" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/cadical $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ #cp -f src/ccadical.h src/cadical.hpp $INSTALLPREFIX/include/cadical/ &&
+ cp -f src/*.h* $INSTALLPREFIX/include/cadical/ &&
+ cp -f build/*.a $INSTALLPREFIX/lib/ &&
+ cp -f build/*.{dll,exe} $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cadical-rel-$VERSION
 
 
 
