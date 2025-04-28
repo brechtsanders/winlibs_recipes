@@ -34,8 +34,10 @@ export TYPE=library
 #export OPTIONALDEPENDENCIES=
 #export BUILDDEPENDENCIES=cmake
 #export OPTIONALBUILDDEPENDENCIES=
-export VERSION=3.7.0
-export VERSIONDATE=20240125
+#export VERSION=3.7.0
+#export VERSIONDATE=20240125
+export VERSION=4.0.0
+export VERSIONDATE=20250428
 wl-showstatus --package-version
 export DEPENDENCIES=libdl,mman-win32
 export OPTIONALDEPENDENCIES=
@@ -56,9 +58,25 @@ cd $BASENAME-$VERSION
 sed -i.bak -e "s?^typedef unsigned long size_t;?#include <io.h>    //&?" $(grep -l "^typedef unsigned long size_t;" $(find -name '*.h'))
 # fix redefinitions in src/interface/header/_OMPI/run_mpi.h (version >= 3.7.0)
 sed -i.bak -e "s/^#define\s*\([^\s]*\)\s\{1,\}[0-9]\{1,\}\s*\(\/\*.*\*\/\s*\)$/#ifndef \1\n&\n#endif/" src/interface/header/_OMPI/run_mpi.h src/interface/header/_OMPI/app_mpi.h
+# fix CMakeLists.txt (version >= 4.0.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -133,3 +133,7 @@
+ if(BASHPATH STREQUAL "BASHPATH-NOTFOUND")
++  if(MINGW)
++    set(BASHPATH "bash.exe")
++  else()
+     message(FATAL_ERROR "Bash shell not found. It is required for running Wi4MPI.")
++  endif()
+ endif()
+@@ -168,3 +172,3 @@
+   execute_process(
+-      COMMAND python3 \${CMAKE_SOURCE_DIR}/src/generator/generator.py
++      COMMAND python \${CMAKE_SOURCE_DIR}/src/generator/generator.py
+                 --interface_header_dir="\${dir_gen_interface}"
+EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_FLAGS:STRING="-I$(cygpath -m $MINGWPREFIX/include/libdl-win32) -I$(cygpath -m $MINGWPREFIX/include/mman-win32)" -S. -Bbuild_win &&
+ PATH=$PYDIR:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DWI4MPI_GENERATOR:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$(cygpath -m $MINGWPREFIX/include/libdl-win32) -I$(cygpath -m $MINGWPREFIX/include/mman-win32)" -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
  # add linker flags
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -ldl -lmman/" build_win/build.ninja &&
  wl-showstatus build-install &&
