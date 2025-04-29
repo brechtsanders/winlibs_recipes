@@ -247,8 +247,10 @@ export TYPE=application
 #export VERSIONDATE=20241217
 #export VERSION=4.4.0
 #export VERSIONDATE=20250318
-export VERSION=4.4.1
-export VERSIONDATE=20250415
+#export VERSION=4.4.1
+#export VERSIONDATE=20250415
+export VERSION=4.4.2
+export VERSIONDATE=20250429
 ####Compiler is unsupported
 wl-showstatus --package-version
 export DEPENDENCIES=
@@ -308,18 +310,42 @@ EOF
 #+    message(WARNING "Compiler is unsupported, MSVC 2019 16.9.16 or newer is required for building blender.")
 #   endif()
 #EOF
-# fix build_files/cmake/platform/platform_win32.cmake (version >= 3.6.3)
-patch -ulbf build_files/cmake/platform/platform_win32.cmake << EOF
-@@ -8,3 +8,3 @@
- if(NOT MSVC)
--  message(FATAL_ERROR "Compiler is unsupported")
-+  message(WARNING "Compiler is unsupported")
- endif()
-@@ -43,3 +43,3 @@
-     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.28.29921) # MSVC 2019 16.9.16
--      message(FATAL_ERROR "Compiler is unsupported, MSVC 2019 16.9.16 or newer is required for building blender.")
-+      message(WARNING "Compiler is unsupported, MSVC 2019 16.9.16 or newer is required for building blender.")
-     endif()
+## fix build_files/cmake/platform/platform_win32.cmake (version >= 3.6.3)
+#patch -ulbf build_files/cmake/platform/platform_win32.cmake << EOF
+#@@ -8,3 +8,3 @@
+# if(NOT MSVC)
+#-  message(FATAL_ERROR "Compiler is unsupported")
+#+  message(WARNING "Compiler is unsupported")
+# endif()
+#@@ -43,3 +43,3 @@
+#     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.28.29921) # MSVC 2019 16.9.16
+#-      message(FATAL_ERROR "Compiler is unsupported, MSVC 2019 16.9.16 or newer is required for building blender.")
+#+      message(WARNING "Compiler is unsupported, MSVC 2019 16.9.16 or newer is required for building blender.")
+#     endif()
+#EOF
+# fix CMakeLists.txt (version >= 4.4.2)
+patch -ulbf CMakeLists.txt << EOF
+@@ -1519,3 +1519,3 @@
+
+-if(UNIX AND NOT APPLE)
++if((UNIX OR MINGW) AND NOT APPLE)
+   include(platform_unix)
+EOF
+# fix build_files/cmake/macros.cmake (version >= 4.4.2)
+patch -ulbf build_files/cmake/macros.cmake << EOF
+@@ -1304,3 +1304,3 @@
+   # when \$_dependency is disabled, forces \$_setting = \$_val
+-  if(NOT \${\${_dependency}} AND \${\${_setting}})
++  if(NOT "\${\${_dependency}}" AND "\${\${_setting}}")
+     if(WITH_STRICT_BUILD_OPTIONS)
+EOF
+# fix build_files/cmake/platform/platform_unix.cmake (version >= 4.4.2)
+patch -ulbf build_files/cmake/platform/platform_unix.cmake << EOF
+@@ -113,3 +113,3 @@
+ macro(find_package_wrapper)
+-  if(WITH_STATIC_LIBS)
++  if(WITH_STATIC_LIBS AND NOT MINGW)
+     find_package_static(\${ARGV})
 EOF
 ## avoid MSVC stuff
 #cp -f build_files/cmake/platform/platform_unix.cmake build_files/cmake/platform/platform_win32.cmake
@@ -330,7 +356,7 @@ wl-showstatus configure &&
  cp -f $PYDIR/include/Python.h build_win/dummylib/python/include/python3.5/ &&
  #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBDIR:PATH=$MINGWPREFIX/lib -DWITH_RAYOPTIMIZATION:BOOL=OFF -DWITH_PYTHON_INSTALL:BOOL=OFF -DWITH_PYTHON_INSTALL_NUMPY:BOOL=OFF -DWITH_PYTHON_MODULE:BOOL=OFF -DPYTHON_INCLUDE_DIR:PATH=$PYDIR/include -S. -Bbuild_win &&
  #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBDIR:PATH=$(pwd)/dummylib -DWITH_RAYOPTIMIZATION:BOOL=OFF -DWITH_PYTHON_INSTALL:BOOL=OFF -DWITH_PYTHON_INSTALL_NUMPY:BOOL=OFF -DWITH_PYTHON_MODULE:BOOL=OFF -DPYTHON_INCLUDE_DIR:PATH=$PYDIR/include -S. -Bbuild_win &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBDIR:PATH=$(pwd)/dummylib -DWITH_RAYOPTIMIZATION:BOOL=OFF -DWITH_PYTHON_INSTALL:BOOL=OFF -DWITH_DRACO:BOOL=OFF -DWITH_PYTHON_INSTALL_NUMPY:BOOL=OFF -DWITH_PYTHON_MODULE:BOOL=OFF -DWITH_PYTHON_NUMPY:BOOL=OFF -DPYTHON_INCLUDE_DIR:PATH=$PYDIR/include -S. -Bbuild_win &&
+ cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBDIR:PATH=$(pwd)/dummylib -DWITH_RAYOPTIMIZATION:BOOL=OFF -DWITH_PYTHON_INSTALL:BOOL=OFF -DWITH_DRACO:BOOL=OFF -DWITH_PYTHON_INSTALL_NUMPY:BOOL=OFF -DWITH_PYTHON_MODULE:BOOL=OFF -DWITH_PYTHON_NUMPY:BOOL=OFF -DWITH_LIBS_PRECOMPILED:BOOL=ON -DWITH_INSTALL_PORTABLE:BOOL=ON -DWITH_CPU_CHECK=ON -DPYTHON_INCLUDE_DIR:PATH=$PYDIR/include -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZSTD_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DJPEG_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DEpoxy_INCLUDE_DIR:PATH=$MINGWPREFIX/include -S. -Bbuild_win &&
  wl-showstatus build-install &&
  make -Cbuild_win install/strip &&
     echo OK
