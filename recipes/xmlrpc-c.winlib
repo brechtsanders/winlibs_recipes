@@ -128,6 +128,17 @@ wl-wait4deps
 wl-showstatus extract
 unzip -oq $TARBALLDIR/$BASENAME/$VERSION-cmake.zip
 cd xmlrpc-c-$VERSION-cmake
+# fix redefined bool/true/false in lib/util/include/bool.h (version >= 1.33.14)
+patch -ulbf lib/util/include/bool.h << EOF
+@@ -11,2 +11,3 @@
+ #define __bool_true_false_are_defined
++#if !(defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L)
+ typedef enum {
+@@ -16,2 +17,3 @@
+ #endif
++#endif
+ #endif
+EOF
 # manually generate xmlrpc-c-config
 cat > xmlrpc-c-config << EOF
 #!/bin/sh
@@ -145,7 +156,7 @@ mkdir -p build_win &&
  wl-showstatus configure &&
  #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"; fi)" -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"; fi)" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
  # fix link issue
  #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lws2_32/" build_win/build.ninja &&
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32 -lcurl/" build_win/build.ninja &&
