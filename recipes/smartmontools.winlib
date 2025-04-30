@@ -41,15 +41,15 @@ export TYPE=application
 #export VERSIONDATE=20201231
 #export VERSION=7.3
 #export VERSIONDATE=20220301
-export VERSION=7.4
-export VERSIONDATE=20230801
+#export VERSION=7.4
+#export VERSIONDATE=20230801
 ####os_win32/daemon_win32.cpp:1014:7: error: 'SERVICE_DELAYED_AUTO_START_INFO' was not declared in this scope
-#export VERSION=7.5
-#export VERSIONDATE=20250430
+export VERSION=7.5
+export VERSIONDATE=20250430
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=zip
+export BUILDDEPENDENCIES=zip,dos2unix,groff
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL2
@@ -113,41 +113,40 @@ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libgcc" LIBS="-lpcreposix" &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" LIBS="-lpcreposix" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-static-libstdc++" LIBS="-Wl,--as-needed -lpcreposix -lssp" &&
- (
-patch -ulbf Makefile << EOF
---- Makefile  Thu Dec 10 14:27:10 2009
-+++ Makefile  Thu Dec 10 14:39:16 2009
-@@ -1694,14 +1694,3 @@
--# The script below changes the word at offset 220 (Subsystem) from 3
--# (Console) to 2 (GUI) in a copy of smartctl.exe.
--# This will be changed when a tool (like 'editbin') is available in
--# the Cygwin distribution
--smartctl-nc.exe: smartctl.exe
--       @rm -f \$@
--       cp -p smartctl.exe \$@.tmp
--       @if test \`od -A n -j 220 -N 2 -d \$@.tmp\` -eq 3; then :; \\
--         else echo "invalid EXE header"; exit 1; fi
--       @echo "editbin /subsystem:windows \$@.tmp"
--       @echo -ne '\\002' | dd bs=1 seek=220 count=1 conv=notrunc of=\$@.tmp 2>/dev/null
--       @if test \`od -A n -j 220 -N 2 -d \$@.tmp\` -eq 2; then :; \\
--         else echo "EXE patch failed"; exit 1; fi
--       mv -f \$@.tmp \$@
-+smartctl-nc\$(EXEEXT): \$(smartctl_OBJECTS) \$(smartctl_DEPENDENCIES) 
-+`printf "\\t"`@rm -f smartctl\$(EXEEXT)
-+`printf "\\t"`\$(CXXLINK) -mwindows \$(smartctl_OBJECTS) \$(smartctl_LDADD) \$(LIBS)
-EOF
- ) &&
+# (
+#patch -ulbf Makefile << EOF
+#--- Makefile  Thu Dec 10 14:27:10 2009
+#+++ Makefile  Thu Dec 10 14:39:16 2009
+#@@ -1694,14 +1694,3 @@
+#-# The script below changes the word at offset 220 (Subsystem) from 3
+#-# (Console) to 2 (GUI) in a copy of smartctl.exe.
+#-# This will be changed when a tool (like 'editbin') is available in
+#-# the Cygwin distribution
+#-smartctl-nc.exe: smartctl.exe
+#-       @rm -f \$@
+#-       cp -p smartctl.exe \$@.tmp
+#-       @if test \`od -A n -j 220 -N 2 -d \$@.tmp\` -eq 3; then :; \\
+#-         else echo "invalid EXE header"; exit 1; fi
+#-       @echo "editbin /subsystem:windows \$@.tmp"
+#-       @echo -ne '\\002' | dd bs=1 seek=220 count=1 conv=notrunc of=\$@.tmp 2>/dev/null
+#-       @if test \`od -A n -j 220 -N 2 -d \$@.tmp\` -eq 2; then :; \\
+#-         else echo "EXE patch failed"; exit 1; fi
+#-       mv -f \$@.tmp \$@
+#+smartctl-nc\$(EXEEXT): \$(smartctl_OBJECTS) \$(smartctl_DEPENDENCIES) 
+#+`printf "\\t"`@rm -f smartctl\$(EXEEXT)
+#+`printf "\\t"`\$(CXXLINK) -mwindows \$(smartctl_OBJECTS) \$(smartctl_LDADD) \$(LIBS)
+#EOF
+# ) &&
  # avoid sha1sum and sha256sum
- mv Makefile Makefile.bak &&
- sed -e "s/sha1sum\|sha256sum/echo UNAVAILABLE/g" Makefile.bak > Makefile &&
+ sed -i.bak2 -e "s/sha1sum\|sha256sum/echo UNAVAILABLE/g" Makefile &&
  # fix groff hanging on input
- mv Makefile Makefile.bak2 &&
- sed -e "s/\(MAN2[A-Z]* *= *\)\(groff.*\)/\1\2 </" Makefile.bak2 > Makefile &&
+ sed -i.bak3 -e "s/\(MAN2[A-Z]* *= *\)\(groff.*\)/\1\2 </" Makefile &&
  # fix missing folder (version = 5.41)
  #mkdir -p smartmontools-5.41.win32/doc &&
  #make install-strip &&
  #( make -j1 dist-win32 || make -j1 dist-win32 UNIX2DOS="unix2dos -ascii" || make -j1 dist-win32 UNIX2DOS="cat" ) &&
- ( make -j1 dist-win32 MAN2HTML=true || make -j1 dist-win32 UNIX2DOS="unix2dos -ascii" MAN2HTML=true || make -j1 dist-win32 UNIX2DOS="cat" MAN2HTML=true || make -j1 MAN2PDF= ) &&
+ #( make -j1 dist-win32 MAN2HTML=true || make -j1 dist-win32 UNIX2DOS="unix2dos -ascii" MAN2HTML=true || make -j1 dist-win32 UNIX2DOS="cat" MAN2HTML=true || make -j1 MAN2PDF= ) &&
+ ( make dist-win32 || make dist-win32 UNIX2DOS="unix2dos -ascii" MAN2HTML="groff -man -Thtml" MAN2PDF="groff -man -Tpdf" || make -j1 dist-win32 UNIX2DOS="unix2dos -ascii" MAN2HTML="groff -man -Thtml" MAN2PDF="groff -man -Tpdf" ) &&
  ( smartmontools-$VERSION.win*/bin/smartctl.exe -i -lscttempsts sda -d ata || true ) &&
  mkdir -p $INSTALLPREFIX/ &&
  rm -rf smartmontools-$VERSION.win*/doc &&
