@@ -35,10 +35,12 @@ export TYPE=application
 #export VERSIONDATE=20240130
 #export VERSION=2024.6
 #export VERSIONDATE=20240710
-export VERSION=2024.7
-export VERSIONDATE=20240714
+#export VERSION=2024.7
+#export VERSIONDATE=20240714
+export VERSION=2025.1
+export VERSIONDATE=20250505
 wl-showstatus --package-version
-export DEPENDENCIES=lua,mosquitto,sqlite3,openssl,pthreads,libusb,jsoncpp,minizip,fmt,cereal
+export DEPENDENCIES=lua,mosquitto,sqlite3,openssl,pthreads,libusb,jsoncpp,minizip,fmt,cereal,jwtpp
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake
 export OPTIONALBUILDDEPENDENCIES=
@@ -53,6 +55,14 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix redefinition of gettimeofday in main/Helper.h (version >= 2025.1)
+patch -ulbf main/Helper.h << EOF
+@@ -131,3 +131,3 @@
+
+-#if defined WIN32
++#if defined WIN32 && !defined __MINGW32__
+        int gettimeofday(timeval * tp, void * tzp);
+EOF
 # fix missing -lrt in CMakeLists.txt
 sed -i.bak -e "s/\b-lrt\b//" CMakeLists.txt
 # fix invalid -rdynamic in CMakeLists.txt
@@ -64,7 +74,7 @@ sed -i.bak2 -e "s/-rdynamic//" CMakeLists.txt
 #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
 mkdir -p build_win &&
  wl-showstatus configure &&
- PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGIT_SUBMODULE:BOOL=OFF -DWITH_LIBUSB:BOOL=ON -DLIBUSB_INCLUDE_DIR:PATH=$MINGWPREFIX/include/libusb-1.0 -DLIBUSB_LIBRARIES:PATH=$MINGWPREFIX/lib -DMQTT_LIBRARIES:PATH=$MINGWPREFIX/lib -DUSE_OPENSSL_STATIC:BOOL=OFF -DUSE_STATIC_BOOST:BOOL=OFF -DUSE_STATIC_OPENZWAVE:BOOL=OFF -DUSE_BUILTIN_JSONCPP:BOOL=OFF -DUSE_BUILTIN_MINIZIP:BOOL=OFF -DUSE_BUILTIN_LUA:BOOL=OFF -DUSE_BUILTIN_MQTT:BOOL=OFF -DUSE_BUILTIN_SQLITE:BOOL=OFF -DUSE_BUILTIN_LIBFMT:BOOL=OFF -DUSE_PYTHON:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DWIN32" -S. -Bbuild_win &&
+ PKG_CONFIG= cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DGIT_SUBMODULE:BOOL=OFF -DWITH_LIBUSB:BOOL=ON -DLIBUSB_INCLUDE_DIR:PATH=$MINGWPREFIX/include/libusb-1.0 -DLIBUSB_LIBRARIES:PATH=$MINGWPREFIX/lib -DMQTT_LIBRARIES:PATH=$MINGWPREFIX/lib -DUSE_OPENSSL_STATIC:BOOL=OFF -DUSE_STATIC_BOOST:BOOL=OFF -DUSE_STATIC_OPENZWAVE:BOOL=OFF -DUSE_BUILTIN_JSONCPP:BOOL=OFF -DUSE_BUILTIN_MINIZIP:BOOL=OFF -DUSE_BUILTIN_LUA:BOOL=OFF -DUSE_BUILTIN_MQTT:BOOL=OFF -DUSE_BUILTIN_SQLITE:BOOL=OFF -DUSE_BUILTIN_LIBFMT:BOOL=OFF -DUSE_BUILTIN_JWTCPP:BOOL=OFF -DUSE_PYTHON:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DWIN32 -fpermissive" -S. -Bbuild_win &&
  wl-showstatus build-install &&
  make -Cbuild_win install/strip &&
     echo OK
