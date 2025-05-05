@@ -10,7 +10,7 @@ export VERSIONDATE=20130513
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libbz2,libpng,pthreads,fftw
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE.txt
 export LICENSETYPE="Simple Library Usage License"
@@ -22,18 +22,28 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/teem-$VERSION-src.tar.gz
 cd teem-$VERSION-src
+# fix CMakeLists.txt (version >= 1.11.0)
+patch -ulbf CMakeLists.txt << EOF
+@@ -416,2 +416,3 @@
+ INSTALL(TARGETS teem
++  EXPORT TeemLibrary
+   RUNTIME DESTINATION bin
+@@ -450,3 +451,3 @@
+ INCLUDE(CMakeExportBuildSettings)
+-EXPORT_LIBRARY_DEPENDENCIES(\${Teem_BINARY_DIR}/TeemLibraryDepends.cmake)
++install(EXPORT TeemLibrary DESTINATION \${Teem_BINARY_DIR} FILE TeemLibraryDepends.cmake)
+ CMAKE_EXPORT_BUILD_SETTINGS(\${Teem_BINARY_DIR}/TeemBuildSettings.cmake)
+EOF
 #####explicitely specify bz2 library to avoid dependancy on libbz2.so.1.0.6 instead of libbz2.dll
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DTeem_FFTW3:BOOL=ON -DBZ2_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBZ2_LIBRARY:PATH=-lbz2 -S. -Bbuild_static &&
- #-DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DTeem_FFTW3:BOOL=ON -DBZ2_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBZ2_LIBRARY:PATH=-lbz2 -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DTeem_FFTW3:BOOL=ON -DBZ2_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBZ2_LIBRARY:PATH=-lbz2 -S. -Bbuild_shared &&
- #-DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DTeem_FFTW3:BOOL=ON -DBZ2_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBZ2_LIBRARY:PATH=-lbz2 -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
  wl-showstatus build-install &&
- make -Cbuild_static install/strip &&
+ ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
- make -Cbuild_shared install/strip &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf teem-$VERSION-src
 ####To do: build stripped
 
