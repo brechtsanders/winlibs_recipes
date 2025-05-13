@@ -54,7 +54,7 @@ export VERSIONDATE=20241125
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake,yasm
+export BUILDDEPENDENCIES=cmake,ninja,yasm
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
@@ -68,13 +68,15 @@ wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/x265_$VERSION.tar.gz
 cd x265_$VERSION
 #cd x265_v$VERSION
+# fix invalid cmake_policy in source/CMakeLists.txt (version >= 4.1)
+sed -i.bak -e "s/^\(\s*\)\(cmake_policy\)/\1#\2/" source/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DNASM_EXECUTABLE:FILEPATH=$(which yasm.exe) -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -Ssource -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_SHARED:BOOL=ON -DNASM_EXECUTABLE:FILEPATH=$(which yasm.exe) -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -Ssource -Bbuild_win &&
  ## fix missing GetNumaProcessorNode
- #echo "#define _WIN32_WINNT_WIN7 0x0601" >> x265_config.h &&
+ #echo "#define _WIN32_WINNT_WIN7 0x0601" >> build_win/x265_config.h &&
  wl-showstatus build-install &&
- make -Cbuild_win install/strip &&
+ ninja -Cbuild_win install/strip &&
  # manually generate libx265.dll.a
  dlltool -D$INSTALLPREFIX/bin/libx265.dll -d build_win/x265.def -l $INSTALLPREFIX/lib/libx265.dll.a &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf x265_$VERSION
