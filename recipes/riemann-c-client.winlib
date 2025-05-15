@@ -1,6 +1,7 @@
 export NAME="riemann-c-client"
 export STATUS=
-export URL=https://github.com/algernon/riemann-c-client
+#export URL=https://github.com/algernon/riemann-c-client
+export URL=https://github.com/dhilst/riemann-c-client
 export BASENAME=riemann-c-client
 export DESCRIPTION="A C client library for the Riemann monitoring system."
 export CATEGORY=
@@ -28,6 +29,8 @@ export TYPE=library
 #export VERSIONDATE=20220326
 export VERSION=2.0.1
 export VERSIONDATE=20220612
+#export VERSION=4.4.0
+#export VERSIONDATE=20250515
 wl-showstatus --package-version
 export DEPENDENCIES=protobuf,protobuf-c,json,gettext,gnutls
 export OPTIONALDEPENDENCIES=
@@ -35,24 +38,28 @@ export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=LGPL
-export DOWNLOADURL="https://github.com/algernon/riemann-c-client/releases"
+#export DOWNLOADURL="https://github.com/algernon/riemann-c-client/releases"
+export DOWNLOADURL="https://github.com/dhilst/riemann-c-client/tags"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/algernon/riemann-c-client/releases/download/$BASENAME-$VERSION/$BASENAME-$VERSION.tar.xz
 export DOWNLOADSOURCEURL=https://github.com/algernon/riemann-c-client/archive/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/dhilst/riemann-c-client/archive/refs/tags/$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 #tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
-#cd $BASENAME-$VERSION
 cd riemann-c-client-riemann-c-client-$VERSION
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
 # fix missing files
 mkdir -p winfix/sys winfix/netinet winfix/arpa
 echo "#include <winsock2.h>" > winfix/sys/socket.h
 echo "#include <ws2tcpip.h>" >> winfix/sys/socket.h
 echo "#include <winsock2.h>" > winfix/netdb.h
-touch winfix/netinet/in.h winfix/arpa/inet.h
+echo "#include <winsock2.h>" > winfix/netinet/in.h
+touch winfix/arpa/inet.h
 # fix already defined stdin in in src/cmd-send.c (version >= 1.10.4)
 patch -ulbf src/cmd-send.c << EOF
 @@ -140,3 +140,3 @@
@@ -71,12 +78,21 @@ patch -ulbf src/cmd-send.c << EOF
 +  if (use_stdin)
      {
 EOF
+## fix configure.ac (version >= 4.4.0)
+#patch -ulbf configure.ac << EOF
+#@@ -8,3 +8,3 @@
+# # Automake init
+#-AM_INIT_AUTOMAKE
+#+AM_INIT_AUTOMAKE($BASENAME,$VERSION)
+# m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+#EOF
 ## fix invalid --c_out=
 #sed -i.bak -e "s/protoc-c \(.*\)-I[^ ]*/protoc-gen-c.exe \1/; s/--c_out=/--cpp_out=/g" Makefile
 # fix protoc-c issue
 sed -i.bak -e "s/protoc-c/protoc/" Makefile.am
-wl-showstatus configure &&
+wl-showstatus preconfigure &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tls=gnutls CFLAGS="-I$(pwd)/winfix" LDFLAGS="-Wl,--as-needed -lws2_32" &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-tls=gnutls CFLAGS="-I$PWD/winfix $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"; fi)" LDFLAGS="-Wl,--as-needed -lws2_32" &&
@@ -86,8 +102,8 @@ wl-showstatus configure &&
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  wl-showstatus build-install &&
  make install-strip &&
- #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf riemann-c-client-riemann-c-client-$VERSION
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####See also: http://riemann.io/clients.html
 ####See also: https://github.com/gkos/riemann-c-client
 
