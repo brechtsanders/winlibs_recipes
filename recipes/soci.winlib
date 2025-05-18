@@ -49,6 +49,31 @@ wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix src/core/backend-loader.cpp (version >= 4.1.2)
+patch -ulbf src/core/backend-loader.cpp << EOF
+@@ -27,2 +27,11 @@
+
++static HMODULE modulehandle = NULL;
++
++BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID /*lpvReserved*/)
++{
++  if (fdwReason == DLL_PROCESS_ATTACH)
++    modulehandle = hinstDLL;
++  return TRUE;
++}
++
+ namespace
+@@ -48,4 +57,2 @@
+
+-extern "C" IMAGE_DOS_HEADER __ImageBase;
+-
+ std::string get_this_dynlib_path()
+@@ -55,3 +62,3 @@
+     char buf[MAX_PATH];
+-    if ( ::GetModuleFileNameA(reinterpret_cast<HINSTANCE>(&__ImageBase), buf, MAX_PATH) )
++    if ( modulehandle && ::GetModuleFileNameA(modulehandle, buf, MAX_PATH) )
+     {
+EOF
 #mkdir -p build_win &&
 # wl-showstatus configure &&
 # #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DSOCI_STATIC:BOOL=OFF -S. -Bbuild_win &&
