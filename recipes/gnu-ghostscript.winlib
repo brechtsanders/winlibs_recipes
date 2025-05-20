@@ -24,7 +24,7 @@ export VERSIONDATE=20161107
 wl-showstatus --package-version
 #export DEPENDENCIES=libjpeg,zlib,libpng,libtiff,pthreads,cairo,fontconfig,libpaper,lcms1,libidn
 export DEPENDENCIES=libjpeg,zlib,libpng,libtiff,pthreads,cairo,fontconfig,libpaper,lcms1,libidn,jbig2dec
-export OPTIONALDEPENDENCIES=
+export OPTIONALDEPENDENCIES=sjpeg
 export BUILDDEPENDENCIES=pexports
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
@@ -80,13 +80,23 @@ patch -ulbf base/gp_psync.c << EOF
 +#endif
  }
 EOF
-# fix missing mswin_popen (version >= 8.71.1)
+## fix missing mswin_popen (version >= 8.71.1)
+#patch -ulbf base/pipe_.h << EOF
+#--- base/pipe_.h  2010-07-11 00:02:22 +0200
+#+++ base/pipe_.h  2010-09-09 10:36:42 +0200
+#@@ -22 +22 @@
+#-#ifdef __WIN32__
+#+#if defined(__WIN32__) && !defined(__MINGW32__)
+#EOF
+# fix base/pipe_.h (version >= 9.14.1)
 patch -ulbf base/pipe_.h << EOF
---- base/pipe_.h  2010-07-11 00:02:22 +0200
-+++ base/pipe_.h  2010-09-09 10:36:42 +0200
-@@ -22 +22 @@
--#ifdef __WIN32__
-+#if defined(__WIN32__) && !defined(__MINGW32__)
+@@ -23,3 +23,5 @@
+
+-#if defined(__WIN32__)
++#ifdef __MINGW32__
++#include <stdio.h>
++#elif defined(__WIN32__) && !(defined(__MINGW32__) && __MINGW32__ == 1)
+ /*
 EOF
 # fix base/gp_unifs.c
 mv base/gp_unifs.c base/gp_unifs.c.bak
@@ -150,6 +160,95 @@ EOF
 mv base/fapi_ft.c base/fapi_ft.c.bak &&
 echo "#define FT_CALLBACK_DEF(...) __VA_ARGS__" > base/fapi_ft.c &&
 cat base/fapi_ft.c.bak >> base/fapi_ft.c
+# fix already defined bool/true/false in base/stdpre.h (version >= 9.14.1)
+patch -ulbf base/stdpre.h << EOF
+@@ -290,3 +290,5 @@
+ #ifndef __cplusplus
+-#ifdef __BEOS__
++#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
++#include <stdbool.h>
++#elif defined(__BEOS__)
+ typedef unsigned char bool;
+EOF
+# fix base/pipe_.h (version >= 9.14.1)
+patch -ulbf base/pipe_.h << EOF
+@@ -23,3 +23,3 @@
+
+-#if defined(__WIN32__) && !(defined(__MINGW32__) && __MINGW32__ == 1)
++#if defined(__WIN32__)
+ /*
+EOF
+# fix base/gsfcmap.c (version >= 9.14.1)
+patch -ulbf base/gsfcmap.c << EOF
+@@ -221,3 +221,3 @@
+  */
+-int
++bool
+ gs_cmap_is_identity(const gs_cmap_t *pcmap, int font_index_only)
+EOF
+# fix base/gximag3x.c (version >= 9.14.1)
+patch -ulbf base/gximag3x.c << EOF
+@@ -119,3 +119,3 @@
+ } image3x_channel_values_t;
+-static int check_image3x_mask(const gs_image3x_t *pim,
++static bool check_image3x_mask(const gs_image3x_t *pim,
+                                const gs_image3x_mask_t *pimm,
+EOF
+# fix psi/zcontrol.c (version >= 9.14.1)
+patch -ulbf psi/zcontrol.c << EOF
+@@ -28,3 +28,3 @@
+ /* Forward references */
+-static int check_for_exec(const_os_ptr);
++static bool check_for_exec(const_os_ptr);
+ static int no_cleanup(i_ctx_t *);
+EOF
+# fix base/gsovrc.c (version >= 9.14.1)
+patch -ulbf base/gsovrc.c << EOF
+@@ -285,3 +285,3 @@
+  */
+-int
++bool
+ gs_is_overprint_compositor(const gs_composite_t * pct)
+EOF
+# fix base/gsstate.h (version >= 9.14.1)
+patch -ulbf base/gsstate.h << EOF
+@@ -59,4 +59,4 @@
+
+-int gs_currentblackptcomp(const gs_state *);
+-int gs_setblackptcomp(gs_state *, int);
++bool gs_currentblackptcomp(const gs_state *);
++int gs_setblackptcomp(gs_state *, bool);
+
+EOF
+# avoid using already installed sjpeg.h (version >= 9.14.1)
+patch -ulbf psi/zfdcte.c << EOF
+@@ -28,3 +28,3 @@
+ #include "sdct.h"
+-#include "sjpeg.h"
++#include "../base/sjpeg.h"
+ #include "ifilter.h"
+EOF
+patch -ulbf psi/zfdctd.c << EOF
+@@ -25,3 +25,3 @@
+ #include "sdct.h"
+-#include "sjpeg.h"
++#include "../base/sjpeg.h"
+ #include "ialloc.h"
+EOF
+patch -ulbf devices/vector/gdevpsdu.c << EOF
+@@ -27,3 +27,3 @@
+ #include "sdct.h"
+-#include "sjpeg.h"
++#include "../../base/sjpeg.h"
+ #include "spprint.h"
+EOF
+patch -ulbf devices/gdevjpeg.c << EOF
+@@ -22,3 +22,3 @@
+ #include "sdct.h"
+-#include "sjpeg.h"
++#include "../base/sjpeg.h"
+
+EOF
 # fix for MSYS2
 mv configure configure.bak
 sed -e "s/\(MINGW\*)\)/MSYS*|\1/" configure.bak > configure

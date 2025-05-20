@@ -51,10 +51,43 @@ patch -ulbf src/yajl_tree.c << EOF
 +#if (defined(_WIN32) || defined(WIN32)) && defined(_MSC_VER)
  #define snprintf sprintf_s
 EOF
+# fix missing include files (version >= 2.1.0)
+mkdir -p fix/yajl
+cp -u src/api/*.h fix/yajl/
 # fix to avoid invalid compiler/linker switches
 sed -i.bak -e "s/(WIN32)/(WIN32NOMINGW)/" CMakeLists.txt
 # fix static library name (version >= 2.1.0)
 echo "set_target_properties(yajl_s PROPERTIES OUTPUT_NAME yajl)" >> src/CMakeLists.txt
+## skip building example in CMakeLists.txt (version >= 2.1.0)
+#sed -i.bak2 -i "s/^ADD_SUBDIRECTORY(example)/#&/" CMakeLists.txt
+# fix src/CMakeLists.txt (version >= 2.1.0)
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -69,3 +69,3 @@
+
+-  EXEC_PROGRAM(\${CMAKE_COMMAND} ARGS -E copy_if_different \${header} \${incDir})
++  #EXEC_PROGRAM(\${CMAKE_COMMAND} ARGS -E copy_if_different \${header} \${incDir})
+
+EOF
+# fix reformatter/CMakeLists.txt (version >= 2.1.0)
+patch -ulbf reformatter/CMakeLists.txt << EOF
+@@ -37,6 +37,3 @@
+ # copy the binary into the output directory
+-GET_TARGET_PROPERTY(binPath json_reformat LOCATION)
+
+-ADD_CUSTOM_COMMAND(TARGET json_reformat POST_BUILD
+-    COMMAND \${CMAKE_COMMAND} -E copy_if_different \${binPath} \${binDir})
+
+EOF
+# fix verify/CMakeLists.txt (version >= 2.1.0)
+patch -ulbf verify/CMakeLists.txt << EOF
+@@ -31,6 +31,3 @@
+ # copy in the binary
+-GET_TARGET_PROPERTY(binPath json_verify LOCATION)
+
+-ADD_CUSTOM_COMMAND(TARGET json_verify POST_BUILD
+-    COMMAND \${CMAKE_COMMAND} -E copy_if_different \${binPath} \${binDir})
+
+EOF
 #wl-showstatus configure &&
 # cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -S. -Bbuild_win &&
 # wl-showstatus install &&
@@ -68,7 +101,7 @@ echo "set_target_properties(yajl_s PROPERTIES OUTPUT_NAME yajl)" >> src/CMakeLis
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf yajl-$VERSION
 wl-showstatus configure &&
  #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -S. -Bbuild_win &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -DCMAKE_C_FLAGS:STRING="-I$PWD/fix" -S. -Bbuild_win &&
  wl-showstatus install &&
  #make -Cbuild_win install &&
  ninja -Cbuild_win install/strip &&
