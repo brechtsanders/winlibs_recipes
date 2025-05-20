@@ -20,15 +20,13 @@ export TYPE=library
 ####64-bit: libmp3lame/vbrquantize.c:122:1: error: multiple storage classes in declaration specifiers
 #export VERSION=3.99.4
 #export VERSIONDATE=20120126
-export VERSION=3.99.5
-export VERSIONDATE=20120229
-#export VERSION=3.100
-#export VERSIONDATE=20171014
-####Cannot export lame_init_old: symbol not defined
-####frontend/parse.c:74:10: fatal error: langinfo.h: No such file or directory
+#export VERSION=3.99.5
+#export VERSIONDATE=20120229
+export VERSION=3.100
+export VERSIONDATE=20171014
 wl-showstatus --package-version
 #export DEPENDENCIES=pdcurses
-export DEPENDENCIES=ncurses
+export DEPENDENCIES=libiconv,ncurses
 export OPTIONALDEPENDENCIES=libffm
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -55,9 +53,20 @@ sed -e "s/FORCEINLINE static//" libmp3lame/vbrquantize.c.bak > libmp3lame/vbrqua
 ## fix missing lame_init_old in include/lame.h (version >= 3.100)
 #mv include/lame.h include/lame.h.bak &&
 #sed -e "s/\(#define DEPRECATED_OR_OBSOLETE_CODE_REMOVED \)1/\10/" include/lame.h.bak > include/lame.h
-## fix missing lame_init_old in include/libmp3lame.sym (version >= 3.100)
-#mv include/libmp3lame.sym include/libmp3lame.sym.bak &&
-#grep -v lame_init_old include/libmp3lame.sym.bak > include/libmp3lame.sym
+# fix missing lame_init_old in include/libmp3lame.sym (version >= 3.100)
+sed -i.bak -e "s/^lame_init_old$//" include/libmp3lame.sym
+# fix missing langinfo.h in frontend/parse.c (version >= 3.100)
+patch -ulbf frontend/parse.c << EOF
+@@ -73,4 +73,8 @@
+ #include <locale.h>
++#ifdef WIN32
++#define nl_langinfo(codeset) "UTF-8"
++#else
+ #include <langinfo.h>
+ #endif
++#endif
+
+EOF
 # fix detection of socket()
 #sed -i.bak -e "s/-lsocket/-lws2_32/" configure
 sed -i.bak -e "s/-lsocket/-lws2_32/; s/char socket ();/#include <winsock2.h>/; s/return socket ();/return (\&socket != NULL ? 0 : 1);/" configure
