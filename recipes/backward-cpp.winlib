@@ -1,0 +1,72 @@
+export NAME="Backward-cpp"
+export STATUS=
+export URL=https://github.com/bombela/backward-cpp
+export BASENAME=backward-cpp
+export DESCRIPTION="Backward is a beautiful stack trace pretty printer for C++."
+export CATEGORY=
+export TYPE=library
+export VERSION=1.6
+export VERSIONDATE=20250601
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/bombela/backward-cpp/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/bombela/backward-cpp/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+patch -ulbf backward.hpp << EOF
+@@ -33,3 +33,3 @@
+ #else
+-#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1800)
++#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1800) || defined(__MINGW32__)
+ #define BACKWARD_CXX11
+@@ -37,3 +37,3 @@
+ #define BACKWARD_ATLEAST_CXX98
+-#if __cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
++#if __cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L) || defined(__MINGW32__)
+ #define BACKWARD_ATLEAST_CXX17
+@@ -340,3 +340,7 @@
+ #include <basetsd.h>
++#ifdef __MINGW32__
++#include <io.h>
++#else
+ typedef SSIZE_T ssize_t;
++#endif
+
+@@ -4306,3 +4310,5 @@
+     signal(SIGABRT, signal_handler);
++#ifndef __MINGW32__
+     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
++#endif
+
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBACKWARD_SHARED:BOOL=OFF -DBACKWARD_TESTS:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lpsapi/" build_static/build.ninja &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBACKWARD_SHARED:BOOL=OFF -DBACKWARD_TESTS:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lpsapi/" build_shared/build.ninja &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ strip build_shared/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_static/*.a build_shared/*.a $INSTALLPREFIX/lib/ &&
+ cp -u build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
