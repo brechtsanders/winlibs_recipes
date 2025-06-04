@@ -12,7 +12,7 @@ export TYPE=application
 export VERSION=0.11.0
 export VERSIONDATE=20241210
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,libiconv,libassuan,gpgme,libgpg-error
+export DEPENDENCIES=zlib,libiconv,libassuan,gpgme,libgpg-error,libiconv,gettext,glib2,gdk-pixbuf,gtk3
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -20,14 +20,17 @@ export LICENSEFILE=COPYING
 export LICENSETYPE=GPL
 #export DOWNLOADURL="https://github.com/gpg/gpa/releases"
 export DOWNLOADURL="https://github.com/gpg/gpa/tags"
+#export DOWNLOADURL="https://www.gnupg.org/ftp/gcrypt/gpa/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/gpg/gpa/archive/$BASENAME-$VERSION.tar.gz
 export DOWNLOADSOURCEURL=https://github.com/gpg/gpa/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://www.gnupg.org/ftp/gcrypt/gpa/$BASENAME-$VERSION.tar.bz2
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd gpa-gpa-$VERSION
 # fix missing inet_aton in src/settingsdlg.c (version >= 0.11.0)
 cp src/settingsdlg.c src/settingsdlg.c.bak &&
@@ -50,6 +53,19 @@ cat src/cm-piv.c.bak >> src/cm-piv.c
 sed -i.bak -e "s/gpgme_get_giochannel/g_io_channel_win32_new_socket/" src/gpacontext.c
 # fix missing gpadefs.h
 cp gpadefs.h.in gpadefs.h
+# fix src/gpacontext.h (version >= 0.11.0)
+sed -i.bak -e "1i #ifndef __GPGMEPP_GPGMEFW_H__\ntypedef struct _gpgme_trust_item *gpgme_trust_item_t;\n#endif" src/gpacontext.h
+# fix src/gpacontext.c (version >= 0.11.0)
+patch -ulbf src/gpacontext.c << EOF
+@@ -498,2 +498,3 @@
+       break;
++#ifdef GPGME_EVENT_NEXT_TRUSTITEM
+     case GPGME_EVENT_NEXT_TRUSTITEM:
+@@ -502,2 +503,3 @@
+       break;
++#endif
+     default:
+EOF
 ## don't abort when libassuan is a higher version configure.ac (version = 0.11-base)
 #patch -ulbf configure.ac << EOF
 #@@ -443,3 +443,2 @@
@@ -61,7 +77,7 @@ wl-showstatus configure &&
  mkdir -p m4 &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=incompatible-pointer-types"; fi)" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=incompatible-pointer-types"; fi)" LDFLAGS="-Wl,--as-needed -lgpgme -lz" &&
  wl-showstatus build-install &&
  #make install-strip &&
  #PATH=$PYDIR:$PATH make install-strip &&
