@@ -28,6 +28,11 @@ export TYPE=library
 #export VERSIONDATE=20220525
 #export VERSION=1.4.1
 #export VERSIONDATE=20230704
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+##export BUILDDEPENDENCIES=pexports
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
 export VERSION=1.4.2
 export VERSIONDATE=20250305
 wl-showstatus --package-version
@@ -36,7 +41,7 @@ export OPTIONALDEPENDENCIES=
 #export BUILDDEPENDENCIES=pexports
 #export OPTIONALBUILDDEPENDENCIES=
 export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=cmake,ninja
 export LICENSEFILE=COPYING
 export LICENSETYPE=LGPL
 #export DOWNLOADURL="http://code.google.com/p/dlfcn-win32/downloads/list dlfcn-win32-r"
@@ -98,7 +103,16 @@ dlopen=''
 dlpreopen=''
 libdir='$INSTALLPREFIX/lib'
 EOF
-wl-showstatus configure &&
+# fix CMakeLists.txt (version >= 1.4.2)
+sed -i.bak -e "s/\(include\)\()\)/\1\/libdl-win32\2/" src/CMakeLists.txt
+patch -ulbf CMakeLists.txt << EOF
+@@ -16,2 +16,3 @@
+ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY \${CMAKE_BINARY_DIR}/lib)
++set(CMAKE_INCLUDE_OUTPUT_DIRECTORY \${CMAKE_BINARY_DIR}/include/libdl-win32)
+ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY \${CMAKE_BINARY_DIR}/bin)
+EOF
+if ! cmake --version &> /dev/null || ! ninja --version &> /dev/null; then
+ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --libdir=$INSTALLPREFIX/lib --incdir=$INSTALLPREFIX/include --enable-shared --enable-static && 
  #./configure --prefix=$INSTALLPREFIX --libdir=$INSTALLPREFIX/lib --incdir=$INSTALLPREFIX/include --enable-shared --enable-static --enable-stripping --disable-msvc --disable-wine && 
  ./configure --prefix=$INSTALLPREFIX --cc=${CC:-gcc} --libdir=$INSTALLPREFIX/lib --incdir=$INSTALLPREFIX/include/libdl-win32 --enable-shared --enable-static --enable-stripping --disable-wine && 
@@ -113,21 +127,23 @@ wl-showstatus configure &&
  #mkdir -p $INSTALLPREFIX/cmake &&
  #sed -e "s?@PACKAGE_INIT@??; s?set_and_check?set?; s?@PACKAGE_INCLUDE_INSTALL_DIR@?\${CMAKE_CURRENT_LIST_DIR}/../include?" dlfcn-win32-config.cmake.in > $INSTALLPREFIX/cmake/dlfcn-win32-config.cmake &&
  #touch $INSTALLPREFIX/cmake/dlfcn-win32-targets.cmake &&
+ touch SUCCESS
+else
+ mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf dlfcn-win32-$VERSION
 ####CFLAGS="-I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl" 
 ####TO DO: use separate (include) folder so software that does not need libdl will default to using Windows methods
 
 
 
-#export BUILDDEPENDENCIES=cmake,ninja
-#export OPTIONALBUILDDEPENDENCIES=
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_static install/strip &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_shared install/strip &&
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf dlfcn-win32-$VERSION

@@ -1,0 +1,48 @@
+export NAME="DLPack"
+export STATUS=
+export URL=https://github.com/dmlc/dlpack
+export BASENAME=dlpack
+export DESCRIPTION="DLPack is an open in-memory tensor structure for sharing tensors among frameworks."
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=1.1
+export VERSIONDATE=20250627
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/dmlc/dlpack/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/dmlc/dlpack/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined posix_memalign in contrib/dlpack/dlpackcpp.h (version >= 1.1)
+patch -ulf contrib/dlpack/dlpackcpp.h << EOF
+@@ -49,4 +49,9 @@
+                                  static_cast<int64_t>(1), std::multiplies<int64_t>());
++#ifdef _WIN32
++    void* ret = (handle_.data = _aligned_malloc(sz, 256));
++    if (ret == NULL) throw std::bad_alloc();
++#else
+     int ret = posix_memalign(&handle_.data, 256, sz);
+     if (ret != 0) throw std::bad_alloc();
++#endif
+     handle_.shape = &shape_[0];
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_DOCS:BOOL=OFF -DBUILD_MOCK:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ cp -u contrib/dlpack/dlpackcpp.h $INSTALLPREFIX/include/dlpack/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
