@@ -1,0 +1,91 @@
+export NAME="libgrapheme"
+export STATUS=
+export URL=https://libs.suckless.org/libgrapheme/
+export BASENAME=libgrapheme
+export DESCRIPTION="libgrapheme is an extremely simple freestanding C99 library providing utilities for properly handling strings according to the latest Unicode standard 15.0.0."
+export CATEGORY=internationalization
+export TYPE=library
+export VERSION=2.0.2
+export VERSIONDATE=20250708
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=ISC
+export DOWNLOADURL="https://github.com/FRIGN/libgrapheme/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/FRIGN/libgrapheme/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing getline in gen/util.c (version >= 2.0.2)
+mv gen/util.c gen/util.c.bak
+cat > gen/util.c << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define GETLINE_BUFLEN 128
+static ssize_t getline(char** lineptr, size_t* n, FILE* stream)
+{
+  char* bufptr;
+  char* p;
+  ssize_t size;
+  int c;
+  if (!lineptr || !n || !stream)
+    return -1;
+  bufptr = *lineptr;
+  size = *n;
+  c = fgetc(stream);
+  if (c == EOF)
+    return -1;
+  if (!bufptr) {
+    if ((bufptr = (char*)malloc(GETLINE_BUFLEN)) == NULL)
+      return -1;
+    size = GETLINE_BUFLEN;
+  }
+  p = bufptr;
+  while (c != EOF) {
+    if ((p - bufptr) > (size - 1)) {
+      size = size + GETLINE_BUFLEN;
+      if ((bufptr = (char*)realloc(bufptr, size)) == NULL)
+        return -1;
+    }
+    *p++ = c;
+    if (c == '\n') {
+      break;
+    }
+    c = fgetc(stream);
+  }
+  *p++ = 0;
+  *lineptr = bufptr;
+  *n = size;
+  return p - bufptr - 1;
+}
+EOF
+cat gen/util.c.bak >> gen/util.c
+# fix configure (version >= 2.0.2)
+patch -ulbf configure << EOF
+@@ -32,2 +32,8 @@
+                ;;
++       MINGW*)
++               replace_line 'SOFLAGS'   '  '  ' -shared -s -mwindows -o libgrapheme-\$(VERSION_MAJOR).dll -Wl,--out-implib,libgrapheme-\$(VERSION_MAJOR).dll'
++               replace_line 'SONAME'    '   ' 'libgrapheme-\$(VERSION_MAJOR).dll'
++               replace_line 'SOSYMLINK' ''    'false'
++               replace_line 'LDCONFIG'  ''    ''
++               ;;
+        *)
+EOF
+wl-showstatus configure &&
+ ./configure &&
+ wl-showstatus build &&
+ make CC=${CC:-gcc} AR=${AR:-ar} RANLIB=${RANLIB:-ranlib} &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
