@@ -20,7 +20,8 @@ export VERSIONDATE=20160824
 wl-showstatus --package-version
 export DEPENDENCIES=boost,gdal
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake
+#export BUILDDEPENDENCIES=cmake
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 #export LICENSEFILE=COPYING
 #export LICENSETYPE=BSD
@@ -55,12 +56,19 @@ tar xj --force-local -f $TARBALLDIR/$BASENAME/libLAS-$VERSION.tar.bz2
 cd libLAS-$VERSION
 # fix missing boost/detail/endian.hpp
 sed -i.bak -e "s?boost/detail/endian.hpp?boost/endian.hpp?" include/liblas/detail/binary.hpp
-wl-showstatus configure &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX . &&
- cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DBoost_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBoost_LIBRARY_DIRS:PATH=$MINGWPREFIX/lib . &&
+# fix undefined _1 in src/header.cpp and src/c_api.cpp (version >= 1.8.1)
+sed -i.bak -e "s/\b_1/std::placeholders::&/" src/header.cpp src/c_api.cpp
+# fix detections in CMakeLists.txt (version >= 1.8.1)
+sed -i.bak -e "s/\(find_package(Boost\) [0-9.]*/\1/; s/cmake_policy/#&/" CMakeLists.txt
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -S. -Bbuild_win &&
+ #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DBoost_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBoost_LIBRARY_DIRS:PATH=$MINGWPREFIX/lib -S. -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DBoost_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DBoost_LIBRARY_DIRS:PATH=$MINGWPREFIX/lib -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
  #-DWITH_GDAL:BOOL=TRUE -DWITH_GEOTIFF:BOOL=ON -DWITH_LASZIP:BOOL=ON -DWITH_PKGCONFIG:BOOL=ON
  wl-showstatus build-install &&
- make -j1 install/strip &&
+ #make -Cbuild_win -j1 install/strip &&
+ ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libLAS-src-$VERSION
 
 
