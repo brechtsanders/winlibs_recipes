@@ -34,8 +34,10 @@ export TYPE=application
 #export VERSIONDATE=20240424
 #export VERSION=1.21
 #export VERSIONDATE=20250108
-export VERSION=1.21.1
-export VERSIONDATE=20250325
+#export VERSION=1.21.1
+#export VERSIONDATE=20250325
+export VERSION=1.22
+export VERSIONDATE=20250722
 wl-showstatus --package-version
 export DEPENDENCIES=pcre
 export OPTIONALDEPENDENCIES=
@@ -114,29 +116,49 @@ cd $BASENAME-$VERSION
 #   }
 #
 #EOF
-# fix signal.c (version >= 1.20)
+## fix signal.c (version >= 1.20 <= 1.21.1)
+#patch -ulbf signal.c << EOF
+#@@ -26,5 +26,9 @@
+# #include <string.h>
+#+#ifndef _WIN32
+# #include <termios.h>
+#+#endif
+# #include <unistd.h>
+#+#ifndef _WIN32
+# #include <sys/ioctl.h>
+#+#endif
+#
+#@@ -61,2 +65,3 @@
+#
+#+#ifndef _WIN32
+# static void sighup_handler( int signum )
+#@@ -156,2 +161,6 @@
+#
+#+#else
+#+void enable_interrupts( void ) {}
+#+void disable_interrupts( void ) {}
+#+#endif
+# void set_window_lines( const int lines ) { window_lines_ = lines; }
+#EOF
+# fix signal.c (version >= 1.22)
 patch -ulbf signal.c << EOF
-@@ -26,5 +26,9 @@
- #include <string.h>
-+#ifndef _WIN32
- #include <termios.h>
-+#endif
+@@ -26,3 +26,5 @@
  #include <unistd.h>
 +#ifndef _WIN32
  #include <sys/ioctl.h>
 +#endif
 
-@@ -61,2 +65,3 @@
+@@ -61,2 +63,3 @@
 
 +#ifndef _WIN32
  static void sighup_handler( int signum )
-@@ -156,2 +161,6 @@
+@@ -156,2 +159,6 @@
 
 +#else
 +void enable_interrupts( void ) {}
 +void disable_interrupts( void ) {}
 +#endif
- void set_window_lines( const int lines ) { window_lines_ = lines; }
+ void set_window_lines( const int lines ) { user_lines = lines; }
 EOF
 ## fix buffer.c (version <= 1.19)
 #patch -ulbf buffer.c << EOF
@@ -168,17 +190,17 @@ patch -ulbf buffer.c << EOF
 +#endif
    }
 EOF
-# fix io.c (version >= 1.20)
-patch -ulbf io.c << EOF
-@@ -335,3 +335,7 @@
-             { free( partial ); errno = ENOTDIR; return false; } }
-+#ifdef _WIN32
-+      else if( mkdir( partial ) != 0 && errno != EEXIST )
-+#else
-       else if( mkdir( partial, mode ) != 0 && errno != EEXIST )
-+#endif
-         { free( partial ); return false; }
-EOF
+## fix io.c (version >= 1.20 <= 1.21.1)
+#patch -ulbf io.c << EOF
+#@@ -335,3 +335,7 @@
+#             { free( partial ); errno = ENOTDIR; return false; } }
+#+#ifdef _WIN32
+#+      else if( mkdir( partial ) != 0 && errno != EEXIST )
+#+#else
+#       else if( mkdir( partial, mode ) != 0 && errno != EEXIST )
+#+#endif
+#         { free( partial ); return false; }
+#EOF
 # fix main_loop.c (version >= 1.20)
 patch -ulbf main_loop.c << EOF
 @@ -755,3 +755,5 @@
