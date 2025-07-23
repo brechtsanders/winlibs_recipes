@@ -5,10 +5,17 @@ export BASENAME=vectorscan
 export DESCRIPTION="A fork of Intel's Hyperscan, modified to run on more platforms."
 export CATEGORY=dataprocessing
 export TYPE=library
-export VERSION=5.4.11
-export VERSIONDATE=20250331
+#export VERSION=5.4.11
+#export VERSIONDATE=20250331
+#export DEPENDENCIES=sqlite3
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+##export OPTIONALBUILDDEPENDENCIES=sphinx
+export VERSION=5.4.12
+export VERSIONDATE=20250723
 wl-showstatus --package-version
-export DEPENDENCIES=sqlite3
+export DEPENDENCIES=sqlite3,mman-win32
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -24,15 +31,29 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd vectorscan-vectorscan-$VERSION
+# fix src/fdr/fdr_engine_description.cpp (version >= 5.4.12)
+patch -ulbf src/fdr/fdr_engine_description.cpp << EOF
+@@ -73,3 +73,3 @@
+             // least minlen 3
+-            desiredStride = std::min(min_len - 1, 2UL);
++            desiredStride = std::min((unsigned long)min_len - 1, 2UL);
+         }
+EOF
 # fix missing symbol export
 echo "hs_compile_lit_multi" >> hs.def
 # don't build benchmark if not requested
 sed -i.bak -e "1i IF (NOT BUILD_BENCHMARKS)\nRETURN()\nENDIF()" tools/hsbench/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/vectorscan -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/vectorscan -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFAT_RUNTIME:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/vectorscan -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFAT_RUNTIME:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_static &&
+ # fix missing link libraries (version >= 5.4.12)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lmman/" build_static/build.ninja &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/vectorscan -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/vectorscan -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFAT_RUNTIME:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/vectorscan -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFAT_RUNTIME:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_shared &&
+ # fix missing link libraries (version >= 5.4.12)
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lmman/" build_shared/build.ninja &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
