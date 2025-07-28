@@ -22,6 +22,38 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix termcap.c (version >= 1.3.1)
+patch -ulbf termcap.c << EOF
+@@ -128,3 +128,3 @@
+
+-static char *tgetst1 ();
++static char *tgetst1 (char *ptr, char **area);
+
+@@ -319,3 +319,3 @@
+      int nlines;
+-     register int (*outfun) ();
++     register int (*outfun) (char);
+ {
+@@ -391,6 +391,6 @@
+
+-static int scan_file ();
+-static char *gobble_line ();
+-static int compare_contin ();
+-static int name_match ();
++static int scan_file (char *str, int fd, register struct termcap_buffer *bufp);
++static char *gobble_line (int fd, register struct termcap_buffer *bufp, char *append_end);
++static int compare_contin (register char *str1, register char *str2);
++static int name_match (char *line, char *name);
+
+EOF
+# fix tparam.c (version >= 1.3.1)
+patch -ulbf tparam.c << EOF
+@@ -90,3 +90,3 @@
+
+-static char *tparam1 ();
++static char *tparam1 (char *string, char *outstring, int len, char *up, char *left, register int *argp);
+
+EOF
 #cat > config.h << EOF
 ##include <unistd.h>
 ##include <fcntl.h>
@@ -37,7 +69,8 @@ wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-install-termcap &&
  wl-showstatus build-install &&
  #make install &&
- make install CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" &&
+ #make install CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" &&
+ make install CFLAGS="-DSTDC_HEADERS $(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" &&
  # manually install shared library
  mkdir -p $INSTALLPREFIX/bin &&
  #echo "EXPORTS" > termcap.def &&
