@@ -329,6 +329,8 @@ export TYPE=application
 #export VERSIONDATE=20250609
 export VERSION=2.40.2
 export VERSIONDATE=20250713
+#export VERSION=2.40.3
+#export VERSIONDATE=20250730
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,tbb,mimalloc,zlib,zstd,libdl
 export OPTIONALDEPENDENCIES=
@@ -348,6 +350,14 @@ tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
 # fix already defined exception_info in common/main.cc (version >= 1.10.0)
 sed -i.bak -e "s/\bexception_info\b/exceptioninfo/g" common/main.cc
+# fix undefined _TEB in third-party/mimalloc/src/prim/windows/prim.c (version >= 2.40.3)
+patch -ulbf third-party/mimalloc/src/prim/windows/prim.c << EOF
+@@ -850,3 +850,3 @@
+     // see: <https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/pebteb/teb/index.htm>
+-    _TEB* const teb = NtCurrentTeb();
++    struct _TEB* const teb = NtCurrentTeb();
+     void* const pool_data = *((void**)((uint8_t*)teb + (MI_SIZE_BITS == 32 ? 0x0F90 : 0x1778)));
+EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DMI_BUILD_SHARED:BOOL=ON -DMOLD_USE_SYSTEM_TBB:BOOL=ON -DTBB_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$PWD/elf -fpermissive" -S. -Bbuild_win &&
