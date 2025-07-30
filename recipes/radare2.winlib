@@ -42,8 +42,10 @@ export TYPE=application
 #export VERSIONDATE=20240809
 #export VERSION=5.9.6
 #export VERSIONDATE=20241013
-export VERSION=5.9.8
-export VERSIONDATE=20241119
+#export VERSION=5.9.8
+#export VERSIONDATE=20241119
+export VERSION=6.0.0
+export VERSIONDATE=20250730
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libzip,liblz4,xxhash,file,capstone,libuv
 export OPTIONALDEPENDENCIES=
@@ -100,6 +102,17 @@ cat libr/util/sandbox.c.bak >> libr/util/sandbox.c
 # fix undefined HAVE_FORK (version >= 5.9.6)
 sed -i.bak -e "s/^#if HAVE_FORK/#ifndef HAVE_FORK\n#defined HAVE_FORK 0\n#endif\n&/" $(grep -l "#if HAVE_FORK" $(find -name '*.h' -or -name '*.c'))
 #sed -i.bak2 -e "1i #ifdef R2__WINDOWS__\n#undef\n#endif\n#define R2__WINDOWS__ 1\n#include \"../include/r_util/r_w32.h\"" $(grep -l "r_w32_" $(find -name '*.c'))
+# fix missing core in libr/core/rtr.c (version >= 6.0.0)
+patch -ulbf libr/core/rtr.c << EOF
+@@ -1237,5 +1238,5 @@
+
+-       r_cons_sleep_end (core->cons, context->bed);
++       r_cons_sleep_end (client_context->core->cons, context->bed);
+        client_context->res = r_core_cmd_str (client_context->core, (const char *)client_context->buf);
+-       context->bed = r_cons_sleep_begin (core->cons);
++       context->bed = r_cons_sleep_begin (client_context->core->cons);
+
+EOF
 # avoid bad definition of R2_BIRTH in libr/include/r_version.h.in (version >= 5.9.4)                            
 patch -ulbf libr/include/r_version.h.in << EOF                                  
 @@ -11,3 +11,3 @@                                                               
@@ -153,6 +166,14 @@ sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')
 #sed -i.bak2 -e "s?^subdir('shlr/zip')?#&?" meson.build
 # fix libr/syscall/meson.build (version >= 5.9.6)
 sed -i.bak -e "s/^subdir('d')/#subdir('d')/" libr/syscall/meson.build
+# fix missing powershell in meson.build (version >= 6.0.0)
+patch -ulbf meson.build << EOF
+@@ -519,3 +519,3 @@
+
+-if host_machine.system() == 'windows'
++if host_machine.system() == 'MSVC_windows'
+ copyinout = [
+EOF
 mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dcli=enabled -Dlocal=true -Dwant_capstone=true -Duse_sys_capstone=true -Duse_capstone_version=v4 -Duse_sys_magic=true -Duse_sys_zip=true -Duse_sys_zlib=true -Duse_sys_lz4=true -Duse_sys_xxhash=true -Duse_ssl=true -Duse_sys_openssl=true -Duse_libuv=true -Duse_fork=false -Ddebugger=false -Dwant_ptrace_wrap=false -Denable_r2r=false -Denable_tests=false . build_both &&
