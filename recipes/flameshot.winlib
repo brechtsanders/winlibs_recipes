@@ -1,0 +1,101 @@
+export NAME="Flameshot"
+export STATUS=
+export URL=https://flameshot.org/
+export BASENAME=flameshot
+export DESCRIPTION="Powerful, yet simple to use open-source screenshot software."
+export CATEGORY=graphics
+export TYPE=application
+#export VERSION=12.0.0
+#export VERSIONDATE=20220626
+#export VERSION=12.1.0
+#export VERSIONDATE=20220704
+export VERSION=13.0.0
+export VERSIONDATE=20250804
+wl-showstatus --package-version
+export DEPENDENCIES=qt
+#export DEPENDENCIES=qt,qtcolorwidgets
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/flameshot-org/flameshot/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/flameshot-org/flameshot/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing main() in src/windows-cli.cpp (version >= 13.0.0)
+cat >> src/windows-cli.cpp << EOF
+std::wstring joinArgsToWide(int argc, char* argv[])
+{
+    std::wstring result;
+    for (int i = 1; i < argc; ++i) {
+        if (i > 1) {
+            result += L" ";
+        }
+        int widesize = MultiByteToWideChar(CP_UTF8, 0, argv[i], strlen(argv[i]), NULL, 0);
+        std::wstring widearg(widesize, 0);
+        MultiByteToWideChar(CP_UTF8, 0, argv[i], strlen(argv[i]), &widearg[0], widesize);
+        result += widearg;
+    }
+    return result;
+}
+
+int main(int argc, char* argv[])
+{
+    // if no args, do not wait for stdout
+    if (argc == 1) {
+        std::cout << "Starting flameshot in daemon mode" << std::endl;
+        CallFlameshot(L"", false);
+    } else {
+        std::wstring argString = joinArgsToWide(argc, argv);
+        CallFlameshot(argString, true);
+    }
+    std::cout.flush();
+    return 0;
+}
+EOF
+# fix data/flameshot.rc (version >= 12.0.0)
+patch -ulbf data/flameshot.rc << EOF
+@@ -33,3 +33,3 @@
+             VALUE "FileDescription",  "Flameshot"
+-            VALUE "FileVersion",      VER_FILEVERSION_STR
++            VALUE "FileVersion",      "$VERSION"
+             VALUE "InternalName",     "flameshot"
+@@ -38,3 +38,3 @@
+             VALUE "ProductName",      "Flameshot"
+-            VALUE "ProductVersion",   VER_PRODUCTVERSION_STR
++            VALUE "ProductVersion",   "$VERSION"
+         END
+EOF
+# fix src/CMakeLists.txt (version >= 13.0.0)
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -82,3 +82,7 @@
+     set_target_properties(flameshot-cli PROPERTIES OUTPUT_NAME "flameshot-cli")
++  if (MSVC)
+     target_link_options(flameshot-cli PRIVATE /SUBSYSTEM:CONSOLE)
++  else ()
++    target_link_options(flameshot-cli PRIVATE -mconsole)
++  endif ()
+     set_property(TARGET flameshot PROPERTY WIN32_EXECUTABLE true)
+@@ -394,3 +398,3 @@
+ # windeployqt
+-if (WIN32)
++if (MSVC)
+     # Add CMAKE_PREFIX_PATH to search paths
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #-DQTCOLORWIDGETS_DESIGNER_PLUGIN:BOOL=OFF 
+ #-DCACHE_OPTION:STRING= 
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
