@@ -34,6 +34,14 @@ sed -i.bak2 -e "s/\(H5Oget_info([^,]*,\)/\1H5O_INFO_ALL,/" $(grep -l "H5Oget_inf
 sed -i.bak -e "s/^#error/#warning/" src/hdfi/_MEDfileCreate.c src/hdfi/_MEDfileOpen.c src/hdfi/_MEDmemFileOpen.c src/ci/MEDfileCompatibility.c
 # fix undefined time in src/*/ci/MEDunvCr.c (version >= 4.1.0)
 sed -i.bak -e "1i #include <time.h>" src/*/ci/MEDunvCr.c
+# fix include/med_hdfi.h (version >= 4.1.0)
+patch -ulbf include/med_hdfi.h << EOF
+@@ -411,3 +411,3 @@
+ extern MEDC_EXPORT
+-med_err _MEDiterate(const med_idt fid, herr_t (*func)(), void * itdatas );
++med_err _MEDiterate(const med_idt fid, herr_t (*func)(med_idt id, const char* lname, const H5L_info_t* linfo, void* data), void * itdatas );
+
+EOF
 # fix src/hdfi/_MEDiterate.c (version >= 4.1.0)
 patch -ulbf src/hdfi/_MEDiterate.c << EOF
 @@ -27,3 +27,3 @@
@@ -42,14 +50,13 @@ patch -ulbf src/hdfi/_MEDiterate.c << EOF
 +_MEDiterate(const med_idt fid,  herr_t (*func)(med_idt id, const char* lname, const H5L_info_t* linfo, void* data), void * itdatas )
  {
 EOF
-# fix include/med_hdfi.h (version >= 4.1.0)
-patch -ulbf include/med_hdfi.h << EOF
-@@ -411,3 +411,3 @@
- extern MEDC_EXPORT
--med_err _MEDiterate(const med_idt fid, herr_t (*func)(), void * itdatas );
-+med_err _MEDiterate(const med_idt fid, herr_t (*func)(med_idt id, const char* lname, const
-H5L_info_t* linfo, void* data), void * itdatas );
-
+# fix src/hdfi/_MEDvisit.c (version >= 4.1.0)
+patch -ulbf src/hdfi/_MEDvisit.c << EOF
+@@ -28,3 +28,3 @@
+ _MEDvisit(const med_idt fid, const char * const srcpath, const char * const dstpath,
+-         herr_t (*func)() )
++         medvisitorfunc func )
+ {
 EOF
 # fix detection of newer HDF5 in config/cmake_files/medMacros.cmake (version >= 4.1.0)
 patch -ulbf config/cmake_files/medMacros.cmake << EOF
@@ -64,10 +71,10 @@ sed -i.bak -e "1i #include <io.h>" src/ci/MEDfileExist.c src/misc/_MEDaccess.c
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_STATIC_LIBS:BOOL=ON -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_STATIC_LIBS:BOOL=ON -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_SHARED_LIBS:BOOL=OFF -DMEDFILE_BUILD_STATIC_LIBS:BOOL=ON -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"; fi)" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_STATIC_LIBS:BOOL=OFF -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_STATIC_LIBS:BOOL=OFF -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi)" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_SHARED_LIBS:BOOL=ON -DMEDFILE_BUILD_STATIC_LIBS:BOOL=OFF -DMEDFILE_BUILD_PYTHON:BOOL=OFF -DMEDFILE_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wint-conversion" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=int-conversion"; fi) $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"; fi)" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
  wl-showstatus build-install &&
  ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
