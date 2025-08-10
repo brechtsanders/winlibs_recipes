@@ -1557,7 +1557,7 @@ export BASENAME=winlibs-$(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "gcc-"; fi)$(i
 #export DEPENDENCIES=gcc,gdb,mingw-w64,binutils,make,pexports,dos2unix
 #export DEPENDENCIES=gcc,mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm,lld,clang,compiler-rt,lldb,libunwind,clang-tools-extra"; fi)
 #export DEPENDENCIES=gcc,mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm,lld,clang,compiler-rt,lldb,libunwind,clang-tools-extra"; fi)$(if [ "0$WITH_GCC_OFFLOAD" -ne 0 ]; then echo -n ",gcc-offload-nvptx,nvptx-gcc"; fi)
-export DEPENDENCIES=$(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "gcc$GCC_SPECIFIC_VERSION,"; fi)mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_CMAKE" -ne 0 ]; then echo -n ",cmake"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm-project,lldb-mi"; fi)$(if [ "0$WITH_GCC_OFFLOAD" -ne 0 ]; then echo -n ",gcc-offload-nvptx,nvptx-gcc"; fi)$(if [ "0$WITH_NINJA" -ne 0 ]; then echo -n ",ninja"; fi)$(if [ "0$WITH_DOXYGEN" -ne 0 ]; then echo -n ",doxygen"; fi)$(if [ "0$WITH_EXTRA_TOOLS" -ne 0 ]; then echo -n ",pedeps,ctags,cppcheck,premake5,ntldd"; fi)
+export DEPENDENCIES=$(if [ "0$WITH_GCC" -ne 0 ]; then echo -n "gcc$GCC_SPECIFIC_VERSION,"; fi)mingw-w64,binutils,make,pexports,dos2unix$(if [ "0$WITH_GDB" -ne 0 ]; then echo -n ",gdb"; fi)$(if [ "0$WITH_ASM" -ne 0 ]; then echo -n ",yasm,nasm,jwasm"; fi)$(if [ "0$WITH_CCACHE" -ne 0 ]; then echo -n ",ccache"; fi)$(if [ "0$WITH_CMAKE" -ne 0 ]; then echo -n ",cmake"; fi)$(if [ "0$WITH_LLVM" -ne 0 ]; then echo -n ",llvm-project,lldb-mi"; fi)$(if [ "0$WITH_GCC_OFFLOAD" -ne 0 ]; then echo -n ",gcc-offload-nvptx,nvptx-gcc"; fi)$(if [ "0$WITH_NINJA" -ne 0 ]; then echo -n ",ninja"; fi)$(if [ "0$WITH_DOXYGEN" -ne 0 ]; then echo -n ",doxygen"; fi)$(if [ "0$WITH_EXTRA_TOOLS" -ne 0 ]; then echo -n ",pedeps,ctags,cppcheck,premake5,ntldd,pkgconf"; fi)
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=pedeps
 export OPTIONALBUILDDEPENDENCIES=
@@ -1648,6 +1648,7 @@ cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF
 - Cppcheck $($MINGWPREFIX/bin/cppcheck.exe --version|head -n1|sed -e "s/^.* \([0-9][0-9.]*\)$/\1/")
 - Premake $($MINGWPREFIX/bin/premake5 --version|head -n1|sed -e "s/^.* //")
 - ntldd $($MINGWPREFIX/bin/ntldd.exe --version|head -n1|sed -e "s/^.* //")
+- pkgconf $($MINGWPREFIX/share/pkgconf/bin/pkgconf.exe --version)
 EOF
 fi &&
 cat >> $INSTALLPREFIX/$ROOTFOLDER/version_info << EOF &&
@@ -1662,7 +1663,7 @@ EOF
 $MINGWPREFIX/bin/unix2dos.exe < $INSTALLPREFIX/$ROOTFOLDER/version_info > $INSTALLPREFIX/$ROOTFOLDER/version_info.txt &&
 rm -f $INSTALLPREFIX/$ROOTFOLDER/version_info &&
 echo [Create mingwvars.bat] &&
-cat > $INSTALLPREFIX/$ROOTFOLDER/mingwvars << EOF &&
+cat | $MINGWPREFIX/bin/unix2dos.exe > $INSTALLPREFIX/$ROOTFOLDER/mingwvars.bat << EOF &&
 @ECHO OFF
 ECHO Setting up environment for using MinGW-w64 with GCC from %~dp0
 SET PATH=%~dp0bin;%PATH%
@@ -1682,8 +1683,6 @@ REM To enable ccache remove REM from the next lines
 REM SET CC=%~dp0bin/ccache.exe %CC%
 REM SET CXX=%~dp0bin/ccache.exe %CXX%
 EOF
-$MINGWPREFIX/bin/unix2dos.exe < $INSTALLPREFIX/$ROOTFOLDER/mingwvars > $INSTALLPREFIX/$ROOTFOLDER/mingwvars.bat &&
-rm -f $INSTALLPREFIX/$ROOTFOLDER/mingwvars &&
 echo [Copying binutils] &&
 cp -r -i $MINGWPREFIX/share/binutils/* $INSTALLPREFIX/$ROOTFOLDER/ &&
 #cp -r -i $MINGWPREFIX/share/binutils/{include,lib,bin,share,$RUNPLATFORM} $INSTALLPREFIX/$ROOTFOLDER/ &&
@@ -1821,6 +1820,8 @@ if [ "0$WITH_EXTRA_TOOLS" -ne 0 ]; then
  copypedeps -r -n $MINGWPREFIX/bin/premake5.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null &&
  echo [Copying ntldd] &&
  copypedeps -r -n $MINGWPREFIX/bin/ntldd.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null
+ echo [Copying pkgconf] &&
+ copypedeps -r -n $MINGWPREFIX/share/pkgconf/bin/*.exe $INSTALLPREFIX/$ROOTFOLDER/bin/ &>/dev/null
 fi &&
 echo [Creating archives] &&
 pushd $INSTALLPREFIX &> /dev/null &&
