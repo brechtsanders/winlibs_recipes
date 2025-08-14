@@ -52,10 +52,12 @@ export TYPE=application
 #export VERSIONDATE=20250417
 #export VERSION=25.04.1
 #export VERSIONDATE=20250508
-export VERSION=25.04.2
-export VERSIONDATE=20250605
+#export VERSION=25.04.2
+#export VERSIONDATE=20250605
 #export VERSION=25.07.80
 #export VERSIONDATE=20250712
+export VERSION=25.08.0
+export VERSIONDATE=20250814
 wl-showstatus --package-version
 #export DEPENDENCIES=freerdp,libvncserver,gettext,qt,libkf5config,libkf5kcmutils,libkf5dnssd,libkf5notifications,libkf5bookmarks,libkf5iconthemes,libkf5xmlgui,libkf5completion,libkf5wallet,libkf5widgetsaddons,libkf5windowsystem,libkf5notifyconfig,libkf5i18n
 export DEPENDENCIES=freerdp,libvncserver,gettext,qt,libkf6config,libkf6kcmutils,libkf6dnssd,libkf6notifications,libkf6bookmarks,libkf6iconthemes,libkf6xmlgui,libkf6completion,libkf6wallet,libkf6widgetsaddons,libkf6windowsystem,libkf6notifyconfig,libkf6i18n,libkf6kstatusnotifieritem,plasma-activities
@@ -232,6 +234,55 @@ patch -ulbf rdp/rdpsession.cpp << EOF
 +        fprintf(stderr, "WSAStartup failed with %s [%d]", gai_strerrorA(rc), rc);
          return false;
 EOF
+# fix core/sshtunnelthread.cpp (version >= 25.08.0)
+patch -ulbf core/sshtunnelthread.cpp << EOF
+@@ -12,2 +12,6 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <arpa/inet.h>
+@@ -16,2 +20,3 @@
+ #include <sys/socket.h>
++#endif
+
+@@ -127,3 +132,7 @@
+
++#ifdef _WIN32
++    const int server_sock = socket(AF_INET, SOCK_STREAM, 0);
++#else
+     const int server_sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
++#endif
+     if (server_sock == -1) {
+@@ -132,2 +141,6 @@
+     }
++#ifdef _WIN32
++    u_long nonblockingmode = 1;
++    ioctlsocket(server_sock, FIONBIO, &nonblockingmode);
++#endif
+
+@@ -136,4 +149,8 @@
+     // so that we can bind more than once in case more than one tunnel is used
++#ifdef _WIN32
++    BOOL sockopt = TRUE;
++#else
+     int sockopt = 1;
+-    setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt));
++#endif
++    setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt));
+
+@@ -194,4 +211,9 @@
+
++#ifdef _WIN32
++        u_long nonblockingmode = 1;
++        ioctlsocket(client_sock, FIONBIO, &nonblockingmode);
++#else
+         int sock_flags = fcntl(client_sock, F_GETFL, 0);
+         fcntl(client_sock, F_SETFL, sock_flags | O_NONBLOCK);
++#endif
+     }
+EOF
 # ignore version when detecting FreeRDP
 sed -i.bak -e "s/\(find_package(\)\(FreeRDP\|FreeRDP-Client\|WinPR\) [0-9]*\.[0-9.]*\()\)/\1\2\3/" CMakeLists.txt
 # also allow building static library
@@ -239,6 +290,8 @@ sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" core/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
  PATH=$PATH:$MINGWPREFIX/qt6/bin cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dbuild_win_LIBS:BOOL=ON -DBUILD_WITH_QT6:BOOL=ON -DWITH_RDP:BOOL=ON -DWITH_VNC:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_win/build.ninja &&
  wl-showstatus build-install &&
  PATH=$PATH:$MINGWPREFIX/qt6/bin ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf krdc-v$VERSION
