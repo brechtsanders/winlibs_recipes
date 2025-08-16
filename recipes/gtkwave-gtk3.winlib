@@ -37,8 +37,10 @@ export TYPE=application
 #export VERSIONDATE=20250422
 #export VERSION=3.3.123
 #export VERSIONDATE=20250505
-export VERSION=3.3.124
-export VERSIONDATE=20250512
+#export VERSION=3.3.124
+#export VERSIONDATE=20250512
+export VERSION=3.3.125
+export VERSIONDATE=20250816
 wl-showstatus --package-version
 export DEPENDENCIES=gtk3,tcl,tk,libbz2
 export OPTIONALDEPENDENCIES=
@@ -55,6 +57,29 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix missing strndup in src/helpers/vcd2fst.c (version >= 3.3.125)
+mv src/helpers/vcd2fst.c src/helpers/vcd2fst.c.bak
+cat > src/helpers/vcd2fst.c << EOF
+#include <malloc.h>
+#include <string.h>
+char* strndup (const char *str, size_t maxlen)
+{
+  int l = strnlen(str, maxlen);
+  char* s = (char*)malloc(l + 1);
+  memcpy(s, str, l);
+  s[l] = 0;
+  return s;
+}
+EOF
+cat src/helpers/vcd2fst.c.bak >> src/helpers/vcd2fst.c
+# fix src/gnu-getopt.h (version >= 3.3.125)
+patch -ulbf src/gnu-getopt.h << EOF
+@@ -136,3 +136,3 @@
+ #if (defined __STDC__ && __STDC__) || defined __cplusplus
+-# ifdef __GNU_LIBRARY__
++# if defined(__GNU_LIBRARY__) || defined(__MINGW32__)
+ /* Many other libraries have conflicting prototypes for getopt, with
+EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-gtk3 --enable-struct-pack --disable-mime-update --with-tcl=$MINGWPREFIX/bin --with-tk=$MINGWPREFIX/bin &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-gtk3 --enable-struct-pack --disable-mime-update --with-tcl=$MINGWPREFIX/bin --with-tk=$MINGWPREFIX/bin CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" &&
