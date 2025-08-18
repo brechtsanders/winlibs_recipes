@@ -312,12 +312,12 @@ export TYPE=library,application
 #export VERSIONDATE=20241202
 #export VERSION=6.8.2
 #export VERSIONDATE=20250131
-export VERSION=6.8.3
-export VERSIONDATE=20250327
+#export VERSION=6.8.3
+#export VERSIONDATE=20250327
 #export VERSION=6.9.0
 #export VERSIONDATE=20250401
-#export VERSION=6.9.1
-#export VERSIONDATE=20250206
+export VERSION=6.9.1
+export VERSIONDATE=20250206
 wl-showstatus --package-version
 export DEPENDENCIES=sqlite3,mariadb-client,postgresql,freetds,firebird,zlib,zstd,brotli,libpng,libjpeg,libtiff,libmng,libwebp,openssl,pcre2,glib2,icu,dbus,jasper,freetype2,harfbuzz,assimp,doubleconversion,xmlstar,libb2,gstreamer,gst-plugins-base,egl,abseil,protobuf,md4c,hunspell,ffmpeg5
 export OPTIONALDEPENDENCIES=grpc,libproxy,xcb,open62541,tslib,libva,qtquicktimeline
@@ -579,6 +579,22 @@ patch -ulbf qtgrpc/src/tools/qtgrpcgen/qgrpcgenerator.cpp << EOF
 +    const std::string basename = utils::extractFileBasename(std::string{file->name()}) +
          GrpcTemplates::GrpcClientFileSuffix() + CommonTemplates::ProtoFileSuffix();
 EOF
+# fix qt3d/src/3rdparty/assimp/src/code/Common/DefaultIOStream.cpp and qtquick3d/src/3rdparty/assimp/src/code/Common/DefaultIOStream.cpp (version >= 6.9.1)
+####undefined reference to `__imp__fstat32'
+patch -ulbf qt3d/src/3rdparty/assimp/src/code/Common/DefaultIOStream.cpp << EOF
+@@ -151,3 +151,3 @@
+         // https://www.securecoding.cert.org/confluence/display/seccode/FIO19-C.+Do+not+use+fseek()+and+ftell()+to+compute+the+size+of+a+regular+file
+-#if defined _WIN32 && (!defined __GNUC__ || !defined __CLANG__ && __MSVCRT_VERSION__ >= 0x0601)
++#if defined _WIN32 && (defined __MINGW32__ || !defined __GNUC__ || !defined __CLANG__ && __MSVCRT_VERSION__ >= 0x0601)
+         struct __stat64 fileStat;
+EOF
+patch -ulbf qtquick3d/src/3rdparty/assimp/src/code/Common/DefaultIOStream.cpp << EOF
+@@ -151,3 +151,3 @@
+         // https://www.securecoding.cert.org/confluence/display/seccode/FIO19-C.+Do+not+use+fseek()+and+ftell()+to+compute+the+size+of+a+regular+file
+-#if defined _WIN32 && (!defined __GNUC__ || !defined __CLANG__ && __MSVCRT_VERSION__ >= 0x0601)
++#if defined _WIN32 && (defined __MINGW32__ || !defined __GNUC__ || !defined __CLANG__ && __MSVCRT_VERSION__ >= 0x0601)
+         struct __stat64 fileStat;
+EOF
 ## avoid assimp detection issues (version >= 6.2.2)
 #####qt3d/config.tests/assimp/CMakeLists.txt: IMPORTED_IMPLIB not set for imported target "assimp::assimp".
 #mv qt3d/config.tests/assimp/CMakeLists.txt qt3d/config.tests/assimp/CMakeLists.txt.bak &&
@@ -600,14 +616,14 @@ patch -ulbf qtdeclarative/tools/CMakeLists.txt << EOF
 +    if(TARGET Qt::Quick AND TARGET Qt::Svg AND BUILD_SHARED_LIBS)
          add_subdirectory(svgtoqml)
 EOF
-## fix detection of assimp in qt3d/cmake/FindWrapQt3DAssimp.cmake (version >= 6.9.1)
-#patch -ulbf qt3d/cmake/FindWrapQt3DAssimp.cmake << EOF
-#@@ -10,3 +10,3 @@
-#
-#-find_package(assimp \${WrapQt3DAssimp_FIND_VERSION} CONFIG QUIET)
-#+find_package(assimp $(ls -1d $MINGWPREFIX/lib/cmake/assimp-*|sort -V|tail -n1|sed -e "s/^.*-\([0-9.]*\)/\1/") CONFIG QUIET)
-# if (assimp_FOUND AND TARGET assimp::assimp)
-#EOF
+# fix detection of assimp in qt3d/cmake/FindWrapQt3DAssimp.cmake (version >= 6.9.1)
+patch -ulbf qt3d/cmake/FindWrapQt3DAssimp.cmake << EOF
+@@ -10,3 +10,3 @@
+
+-find_package(assimp \${WrapQt3DAssimp_FIND_VERSION} CONFIG QUIET)
++find_package(assimp $(ls -1d $MINGWPREFIX/lib/cmake/assimp-*|sort -V|tail -n1|sed -e "s/^.*-\([0-9.]*\)/\1/") CONFIG QUIET)
+ if (assimp_FOUND AND TARGET assimp::assimp)
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  # disable QML to avoid error: Filename longer than 260 characters
