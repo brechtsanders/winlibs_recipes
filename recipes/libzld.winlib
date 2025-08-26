@@ -1,14 +1,171 @@
+#export NAME="libzld"
+#export STATUS=
+#export URL=https://github.com/memnoth/libzld
+#export BASENAME=libzld
+#export DESCRIPTION="Lightweight LLDP Protocol Library"
+#export CATEGORY=network
+#export TYPE=library
+##export VERSION=master
+##export VERSIONDATE=20211005
+#export VERSION=0.1-alpha
+#export VERSIONDATE=20211005
+#wl-showstatus --package-version
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=Apache
+#export DOWNLOADURL="https://github.com/memnoth/libzld/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/memnoth/libzld/archive/refs/heads/$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/memnoth/libzld/archive/refs/tags/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix src/include/zl-tlv-common.h
+#patch -ulbf src/include/zl-tlv-common.h << EOF
+#@@ -21,3 +21,7 @@
+# #include <stdint.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <arpa/inet.h>
+#+#endif
+#
+#EOF
+## fix src/zl-tlv-dot1ab.c
+#patch -ulbf src/zl-tlv-dot1ab.c << EOF
+#@@ -18,3 +18,7 @@
+# #include <string.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <arpa/inet.h>
+#+#endif
+#
+#EOF
+## fix tools/send.c
+#patch -ulbf tools/send.c << EOF
+#@@ -22,2 +22,14 @@
+# #include <sys/types.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#include <stdint.h>
+#+#define AF_PACKET 17
+#+#define SOCK_PACKET 10
+#+#define ETH_ALEN 6
+#+struct ethhdr {
+#+  uint8_t h_dest[ETH_ALEN];
+#+  uint8_t h_source[ETH_ALEN];
+#+  uint16_t h_proto;
+#+} __attribute__((packed));
+#+#else
+# #include <sys/socket.h>
+#@@ -25,2 +37,3 @@
+# #include <linux/if_ether.h>
+#+#endif
+#
+#EOF
+## fix src/zl-tlv-core.c (version >= 0.1-alpha)
+#patch -ulbf src/zl-tlv-core.c << EOF
+#@@ -18,3 +18,5 @@
+# #include <string.h>
+#+#ifndef _WIN32
+# #include <arpa/inet.h>
+#+#endif
+#
+#EOF
+### fix src/Makefile
+##patch -ulbf src/Makefile << EOF
+##@@ -3,3 +3,3 @@
+## LDFLAGS = -shared
+##-TARGET_LIB = libzld.so
+##+TARGET_LIB = libzld.dll
+##
+##@@ -13,3 +13,4 @@
+## \$(TARGET_LIB): \$(OBJS)
+##-       \$(CC) \${LDFLAGS} -o \$@ \$^
+##+$(echo -e '\t')\$(CC) \${LDFLAGS} -o \$@ \$^ -s -mwindows -Wl,--out-implib,\$@.a -lws2_32
+##+$(echo -e '\t')ar cr libzld.a \$^
+##
+##EOF
+## fix src/Makefile (version >= 0.1-alpha)
+#patch -ulbf src/Makefile << EOF
+#@@ -3,3 +3,5 @@
+# LDFLAGS = -shared
+#-TARGET_LIB = libzlldp.so
+#+LIBS = -lws2_32
+#+TARGET_LIB = libzlldp.dll
+#+TARGET_STATIC_LIB = libzlldp.a
+#
+#@@ -10,6 +12,9 @@
+# .PHONY: all
+#-all: \${TARGET_LIB}
+#+all: \${TARGET_LIB} \$(TARGET_STATIC_LIB)
+#
+# \$(TARGET_LIB): \$(OBJS)
+#-       \$(CC) \${LDFLAGS} -o \$@ \$^
+#+$(echo -e '\t')\$(CC) \${LDFLAGS} -s -mwindows -Wl,--out-implib,\$@.a -o \$@ \$^ \$(LIBS)
+#+
+#+\$(TARGET_STATIC_LIB): \$(OBJS)
+#+$(echo -e '\t')\$(AR) cr \$@ \$^
+#
+#EOF
+### fix tools/Makefile
+##patch -ulbf tools/Makefile << EOF
+##@@ -7,3 +7,3 @@
+##
+##-TARGET = send
+##+TARGET = libzld-send.exe
+##
+##@@ -13,3 +13,3 @@
+## \$(TARGET): \$(OBJS)
+##-       \$(CC) \${LDFLAGS} -o \$@ \$^
+##+$(echo -e '\t')\$(CC) -o \$@ \$^ \${LDFLAGS} -s -lws2_32
+##
+##EOF
+## fix tools/Makefile (version >= 0.1-alpha)
+#patch -ulbf tools/Makefile << EOF
+#@@ -2,3 +2,3 @@
+# CFLAGS += -g
+#-LDFLAGS = -L../src -lzlldp
+#+LDFLAGS = -L../src -lzlldp -lws2_32
+#
+#@@ -13,3 +13,3 @@
+# \$(TARGET): \$(OBJS)
+#-       \$(CC) \${LDFLAGS} -o \$@ \$^
+#+$(echo -e '\t')\$(CC) -o \$@ \$^ \${LDFLAGS}
+#
+#EOF
+## avoid -fPIC (useless on Windows and not supported by clang) in src/Makefile
+#sed -i.bak -e "s/-fPIC//" src/Makefile
+#wl-showstatus build &&
+# #make CC=${CC:-gcc} AR=${AR:-ar} &&
+# make -Csrc CC=${CC:-gcc} AR=${AR:-ar} &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# cp -f src/include/*.h $INSTALLPREFIX/include/ &&
+# cp -f src/*.a $INSTALLPREFIX/lib/ &&
+# cp -f src/*.dll $INSTALLPREFIX/bin/ &&
+# #cp -f tools/*.exe $INSTALLPREFIX/bin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
 export NAME="libzld"
 export STATUS=
-export URL=https://github.com/memnoth/libzld
+export URL=https://github.com/lsahn-gh/libzld
 export BASENAME=libzld
 export DESCRIPTION="Lightweight LLDP Protocol Library"
 export CATEGORY=network
 export TYPE=library
-#export VERSION=master
-#export VERSIONDATE=20211005
-export VERSION=0.1-alpha
-export VERSIONDATE=20211005
+export VERSION=1.0.0
+export VERSIONDATE=20250826
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -18,18 +175,16 @@ export LICENSEFILE=LICENSE
 export LICENSETYPE=Apache
 export DOWNLOADURL="https://github.com/memnoth/libzld/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/memnoth/libzld/archive/refs/heads/$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://github.com/memnoth/libzld/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/lsahn-gh/libzld/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix src/include/zl-tlv-common.h
-patch -ulbf src/include/zl-tlv-common.h << EOF
-@@ -21,3 +21,7 @@
+# fix src/include/zl-tlv-header.h (version >= 1.0.0)
+patch -ulbf src/include/zl-tlv-header.h << EOF
+@@ -27,3 +27,7 @@
  #include <stdint.h>
 +#ifdef _WIN32
 +#include <winsock2.h>
@@ -38,9 +193,9 @@ patch -ulbf src/include/zl-tlv-common.h << EOF
 +#endif
 
 EOF
-# fix src/zl-tlv-dot1ab.c
+# fix src/zl-tlv-dot1ab.c (version >= 1.0.0)
 patch -ulbf src/zl-tlv-dot1ab.c << EOF
-@@ -18,3 +18,7 @@
+@@ -23,3 +23,7 @@
  #include <string.h>
 +#ifdef _WIN32
 +#include <winsock2.h>
@@ -49,110 +204,14 @@ patch -ulbf src/zl-tlv-dot1ab.c << EOF
 +#endif
 
 EOF
-# fix tools/send.c
-patch -ulbf tools/send.c << EOF
-@@ -22,2 +22,14 @@
- #include <sys/types.h>
-+#ifdef _WIN32
-+#include <winsock2.h>
-+#include <stdint.h>
-+#define AF_PACKET 17
-+#define SOCK_PACKET 10
-+#define ETH_ALEN 6
-+struct ethhdr {
-+  uint8_t h_dest[ETH_ALEN];
-+  uint8_t h_source[ETH_ALEN];
-+  uint16_t h_proto;
-+} __attribute__((packed));
-+#else
- #include <sys/socket.h>
-@@ -25,2 +37,3 @@
- #include <linux/if_ether.h>
-+#endif
-
-EOF
-# fix src/zl-tlv-core.c (version >= 0.1-alpha)
-patch -ulbf src/zl-tlv-core.c << EOF
-@@ -18,3 +18,5 @@
- #include <string.h>
-+#ifndef _WIN32
- #include <arpa/inet.h>
-+#endif
-
-EOF
-## fix src/Makefile
-#patch -ulbf src/Makefile << EOF
-#@@ -3,3 +3,3 @@
-# LDFLAGS = -shared
-#-TARGET_LIB = libzld.so
-#+TARGET_LIB = libzld.dll
-#
-#@@ -13,3 +13,4 @@
-# \$(TARGET_LIB): \$(OBJS)
-#-       \$(CC) \${LDFLAGS} -o \$@ \$^
-#+$(echo -e '\t')\$(CC) \${LDFLAGS} -o \$@ \$^ -s -mwindows -Wl,--out-implib,\$@.a -lws2_32
-#+$(echo -e '\t')ar cr libzld.a \$^
-#
-#EOF
-# fix src/Makefile (version >= 0.1-alpha)
-patch -ulbf src/Makefile << EOF
-@@ -3,3 +3,5 @@
- LDFLAGS = -shared
--TARGET_LIB = libzlldp.so
-+LIBS = -lws2_32
-+TARGET_LIB = libzlldp.dll
-+TARGET_STATIC_LIB = libzlldp.a
-
-@@ -10,6 +12,9 @@
- .PHONY: all
--all: \${TARGET_LIB}
-+all: \${TARGET_LIB} \$(TARGET_STATIC_LIB)
-
- \$(TARGET_LIB): \$(OBJS)
--       \$(CC) \${LDFLAGS} -o \$@ \$^
-+$(echo -e '\t')\$(CC) \${LDFLAGS} -s -mwindows -Wl,--out-implib,\$@.a -o \$@ \$^ \$(LIBS)
-+
-+\$(TARGET_STATIC_LIB): \$(OBJS)
-+$(echo -e '\t')\$(AR) cr \$@ \$^
-
-EOF
-## fix tools/Makefile
-#patch -ulbf tools/Makefile << EOF
-#@@ -7,3 +7,3 @@
-#
-#-TARGET = send
-#+TARGET = libzld-send.exe
-#
-#@@ -13,3 +13,3 @@
-# \$(TARGET): \$(OBJS)
-#-       \$(CC) \${LDFLAGS} -o \$@ \$^
-#+$(echo -e '\t')\$(CC) -o \$@ \$^ \${LDFLAGS} -s -lws2_32
-#
-#EOF
-# fix tools/Makefile (version >= 0.1-alpha)
-patch -ulbf tools/Makefile << EOF
-@@ -2,3 +2,3 @@
- CFLAGS += -g
--LDFLAGS = -L../src -lzlldp
-+LDFLAGS = -L../src -lzlldp -lws2_32
-
-@@ -13,3 +13,3 @@
- \$(TARGET): \$(OBJS)
--       \$(CC) \${LDFLAGS} -o \$@ \$^
-+$(echo -e '\t')\$(CC) -o \$@ \$^ \${LDFLAGS}
-
-EOF
-# avoid -fPIC (useless on Windows and not supported by clang) in src/Makefile
-sed -i.bak -e "s/-fPIC//" src/Makefile
-wl-showstatus build &&
- #make CC=${CC:-gcc} AR=${AR:-ar} &&
- make -Csrc CC=${CC:-gcc} AR=${AR:-ar} &&
- wl-showstatus install &&
- mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
- cp -f src/include/*.h $INSTALLPREFIX/include/ &&
- cp -f src/*.a $INSTALLPREFIX/lib/ &&
- cp -f src/*.dll $INSTALLPREFIX/bin/ &&
- #cp -f tools/*.exe $INSTALLPREFIX/bin/ &&
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --disable-tests LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
