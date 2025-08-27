@@ -210,6 +210,7 @@ mkdir -p build_win &&
  ../configure --prefix=$(cygpath -m $INSTALLPREFIX/share/python) --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-optimizations --enable-loadable-sqlite-extensions --disable-ipv6 --with-system-expat --with-system-ffi --with-system-libmpdec --without-ensurepip --without-c-locale-coercion --enable-loadable-sqlite-extensions --with-ssl-default-suites=openssl CFLAGS="-D_POSIX -Wno-implicit-function-declaration -Wno-incompatible-pointer-types" &&
  #--with-tzpath=$MINGWPREFIX/share/zoneinfo
  cd .. &&
+ #echo "#undef HAVE_DLOPEN" >> build_win/pyconfig.h &&
  wl-showstatus build &&
  #make -Cbuild_win CC="${CC:-gcc} -I$(pwd)/PC" BASEMODLIBS="-Wl,--as-needed -lshlwapi -lversion -lws2_32 -lmincore -Wl,--allow-multiple-definition" &&
  #make -Cbuild_win &&
@@ -228,6 +229,36 @@ mkdir -p build_win &&
  #find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####echo -e "import sys\nprint('Home: ', sys.prefix)\nprint('Path: ', sys.path)" | $MINGWPREFIX/share/python/bin/python.exe
+
+
+
+# fix Python/initconfig.c (version >= 3.12.11)
+patch -ulbf Python/initconfig.c << EOF
+@@ -2561,3 +2561,3 @@
+
+-#ifdef MS_WINDOWS
++#if defined(MS_WINDOWS) || defined(__MINGW32__)
+ #  define WCSTOK wcstok_s
+EOF
+# fix Python/sysmodule.c (version >= 3.12.11)
+patch -ulbf Python/sysmodule.c << EOF
+@@ -2394,3 +2394,6 @@
+     // Use nofollow flag to prevent symlink attacks.
+-    int flags = O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW;
++    int flags = O_WRONLY | O_CREAT | O_APPEND;
++#ifdef O_NOFOLLOW
++    flags |= O_NOFOLLOW;
++#endif
+ #ifdef O_CLOEXEC
+EOF
+# fix Include/pythread.h (version >= 3.12.11)
+patch -ulbf Include/pythread.h << EOF
+@@ -22,3 +22,3 @@
+
+-#if (defined(__APPLE__) || defined(__linux__) || defined(_WIN32) \\
++#if (defined(__APPLE__) || defined(__linux__) \\
+      || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) \\
+EOF
 
 
 
