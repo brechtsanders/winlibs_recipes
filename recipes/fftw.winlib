@@ -38,7 +38,7 @@ wl-showstatus --package-version
 export DEPENDENCIES=pthreads
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=cmake,ninja
 export LICENSEFILE=COPYING
 export LICENSETYPE=
 export DOWNLOADURL="http://www.fftw.org/download.html"
@@ -62,7 +62,8 @@ if ${CC:-gcc} --version|grep -q "^clang"; then
 fi
 # don't detect pthreads library (version >= 3.6.10)
 sed -i.bak2 -e "s/\(acx_pthread_ok=\)no/\1yes/" configure
-mkdir -p build_single build_longdouble build_quad build_standard &&
+if ! cmake --version &> /dev/null || ! ninja --version &> /dev/null; then
+ mkdir -p build_single build_longdouble build_quad build_standard &&
  wl-showstatus configure single &&
  cd build_single &&
  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-shared --enable-static --with-our-malloc16 --enable-threads --with-combined-threads --enable-portable-binary --enable-sse2 LDFLAGS="-Wl,--enable-auto-import" &&
@@ -107,12 +108,49 @@ mkdir -p build_single build_longdouble build_quad build_standard &&
  #make -Cbuild_quad install-strip &&
  wl-showstatus build-install standard &&
  make -Cbuild_standard install-strip &&
+ touch SUCCESS
+else
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
  # fix absolute link in .cmake file(s)
  #sed -i -e "s?$(echo $INSTALLPREFIX|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $INSTALLPREFIX/lib/cmake/fftw3/*Config.cmake &&
  sed -i -e "s?$INSTALLPREFIX\|$(cygpath -m $INSTALLPREFIX)?\${CMAKE_CURRENT_LIST_FILE}/../../../..?g" $INSTALLPREFIX/lib/cmake/fftw3/*Config.cmake &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 # see also: http://www.fftw.org/install/windows.html
 # removed quad-precision because of dependancy on $MINGWDIR/bin/libquadmath-0.dll
+
+
+
+mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_test -LH && echo OK; rm -rf build_test
+
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_FLOAT:BOOL=ON -DENABLE_LONG_DOUBLE:BOOL=ON -DENABLE_QUAD_PRECISION:BOOL=ON -DENABLE_OPENMP:BOOL=ON -DENABLE_THREADS:BOOL=OFF -DWITH_COMBINED_THREADS:BOOL=OFF -DDISABLE_FORTRAN:BOOL=$(if ${F77:-gfortran} --version &> /dev/null; then echo "OFF"; else echo "ON"; fi) -DBUILD_TESTS:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
+ #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_FLOAT:BOOL=ON -DENABLE_LONG_DOUBLE:BOOL=ON -DENABLE_QUAD_PRECISION:BOOL=ON -DENABLE_OPENMP:BOOL=ON -DENABLE_THREADS:BOOL=OFF -DWITH_COMBINED_THREADS:BOOL=OFF -DDISABLE_FORTRAN:BOOL=$(if ${F77:-gfortran} --version &> /dev/null; then echo "OFF"; else echo "ON"; fi) -DBUILD_TESTS:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+ ## fix missing link libraries
+ #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
+ #wl-showstatus build-static &&
+ #cmake.exe --build build_static &&
+ #ninja -Cbuild_static &&
+ #wl-showstatus build-shared &&
+ #cmake.exe --build build_shared &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-install-static &&
+ #cmake.exe --install build_static --strip &&
+ #cmake.exe --build build_static --target "install/strip" &&
+ #cmake.exe --build build_static --target "library/install/strip" &&
+ ninja -Cbuild_static install/strip &&
+ #ninja -Cbuild_static library/install/strip &&
+ wl-showstatus build-install-shared &&
+ #cmake.exe --install build_shared --strip &&
+ #cmake.exe --build build_shared --target "install/strip" &&
+ ninja -Cbuild_shared install/strip &&
+    echo OK
 
 
 
