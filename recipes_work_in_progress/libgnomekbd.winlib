@@ -23,6 +23,18 @@ wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
+## fix missing gdk/gdkx.h
+#sed -i.bak -e "s?gdk/gdkx\.h?gdk/gdk.h?" $(grep -l gdkx.h $(find -name '*.c'))
+mkdir -p winfix/gdk
+cat > winfix/gdk/gdkx.h << EOF
+#include <gdk/gdk.h>
+#ifndef GDK_DISPLAY_XDISPLAY
+#define GDK_DISPLAY_XDISPLAY(...) NULL
+#endif
+#ifndef GDK_WINDOW_XID
+#define GDK_WINDOW_XID(...) -1
+#endif
+EOF
 
 #export BUILDDEPENDENCIES=meson,ninja
 #-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS -Dcpp_link_args=$LDFLAGS
@@ -35,7 +47,7 @@ cd $BASENAME-$VERSION
 #sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
 mkdir -p build_both &&
  wl-showstatus configure &&
- PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dtests=false . build_both &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dtests=false -Dc_args="-I$PWD/winfix" . build_both &&
  ## fix slash/backslash path issue when calling Python from Ninja
  #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
  ## fix Python path issues in meson_exe
