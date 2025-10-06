@@ -24,6 +24,52 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix lib/type1/arith.h (version >= 5.1.2)
+patch -ulbf lib/type1/arith.h << EOF
+@@ -32,7 +32,18 @@
+
+-void DLmult(),DLdiv(),DLadd(),DLsub();
++/*SHARED*/
++
++typedef struct {
++       LONG high;
++       ULONG low;
++} doublelong;
+
+-fractpel FPmult();
+-fractpel FPdiv();
+-fractpel FPstarslash();
++/*END SHARED*/
++void DLmult(register doublelong *product, register ULONG u, register ULONG v);
++void DLdiv(doublelong *quotient, ULONG divisor);
++void DLadd(doublelong *u, doublelong *v);
++void DLsub(doublelong *u, doublelong *v);
++
++fractpel FPmult(register fractpel u, register fractpel v);
++fractpel FPdiv(register fractpel dividend, register fractpel divisor);
++fractpel FPstarslash(register fractpel a, register fractpel b, register fractpel c);
+
+@@ -45,10 +56,2 @@
+
+-/*END SHARED*/
+-/*SHARED*/
+-
+-typedef struct {
+-       LONG high;
+-       ULONG low;
+-} doublelong;
+-
+ /*END SHARED*/
+EOF
+# fix lib/type1/objects.h (version >= 5.1.2)
+patch -ulbf lib/type1/objects.h << EOF
+@@ -66,3 +66,3 @@
+
+-void t1_abort();              /* crash; software logic error                  */
++void t1_abort(const char* line, int no);    /* crash; software logic error    */
+ struct xobject *t1_Allocate();    /* allocate memory                          */
+EOF
+# skip building doc
 cat > doc/Makefile.in << EOF
 all:
 install:
@@ -37,6 +83,7 @@ wl-showstatus configure &&
  wl-showstatus build-install &&
  make install && 
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####See also patches at: https://gitweb.gentoo.org/repo/gentoo.git/tree/media-libs/t1lib/files
 
 
 
