@@ -230,14 +230,14 @@ export CATEGORY=audio,hardware
 export TYPE=library
 #export VERSION=1.23.1
 #export VERSIONDATE=20230412
-export VERSION=1.24.0
-export VERSIONDATE=20241116
+#export VERSION=1.24.0
+#export VERSIONDATE=20241116
 #export VERSION=1.24.1
 #export VERSIONDATE=20241128
 #export VERSION=1.24.2
 #export VERSIONDATE=20250111
-#export VERSION=1.24.3
-#export VERSIONDATE=20250330
+export VERSION=1.24.3
+export VERSIONDATE=20250330
 wl-showstatus --package-version
 export DEPENDENCIES=libsoundio,portaudio,pulseaudio,pffft
 export OPTIONALDEPENDENCIES=qt,sdl2,jack,libmysofa
@@ -253,12 +253,54 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd openal-soft*$VERSION
-# fix alc/effects/convolution.cpp (version >= 1.24.0)
+## fix alc/effects/convolution.cpp (version >= 1.24.0)
+#patch -ulbf alc/effects/convolution.cpp << EOF
+#@@ -229,3 +229,3 @@
+#
+#-    PFFFTSetup mFft{};
+#+    PFFFT_Setup *mFft{};
+#     alignas(16) std::array<float,ConvolveUpdateSize> mFftBuffer{};
+#@@ -290,3 +290,3 @@
+#     if(!mFft)
+#-        mFft = PFFFTSetup{ConvolveUpdateSize, PFFFT_REAL};
+#+        mFft = pffft_new_setup(ConvolveUpdateSize, PFFFT_REAL);
+#
+#@@ -420,3 +420,3 @@
+#              */
+#-            mFft.zreorder(ffttmp.data(), al::to_address(filteriter), PFFFT_BACKWARD);
+#+            pffft_zreorder(mFft, ffttmp.data(), al::to_address(filteriter), PFFFT_BACKWARD);
+#             filteriter += ConvolveUpdateSize;
+#@@ -669,3 +669,3 @@
+#          */
+#-        mFft.transform(mInput.data(), &mComplexData[curseg*ConvolveUpdateSize],
+#+        pffft_transform(mFft, mInput.data(), &mComplexData[curseg*ConvolveUpdateSize],
+#             mFftWorkBuffer.data(), PFFFT_FORWARD);
+#@@ -682,4 +682,4 @@
+#             {
+#-                mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
+#-                    mFftBuffer.data());
+#+                pffft_zconvolve_accumulate(mFft, al::to_address(input), al::to_address(filter),
+#+                    mFftBuffer.data(), 1);
+#                 input += ConvolveUpdateSize;
+#@@ -690,4 +690,4 @@
+#             {
+#-                mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
+#-                    mFftBuffer.data());
+#+                pffft_zconvolve_accumulate(mFft, al::to_address(input), al::to_address(filter),
+#+                    mFftBuffer.data(), 1);
+#                 input += ConvolveUpdateSize;
+#@@ -701,3 +701,3 @@
+#              */
+#-            mFft.transform(mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#+            pffft_transform(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#                 PFFFT_BACKWARD);
+#EOF
+# fix alc/effects/convolution.cpp (version >= 1.24.3)
 patch -ulbf alc/effects/convolution.cpp << EOF
 @@ -229,3 +229,3 @@
 
--    PFFFTSetup mFft{};
-+    PFFFT_Setup *mFft{};
+-    PFFFTSetup mFft;
++    PFFFT_Setup* mFft;
      alignas(16) std::array<float,ConvolveUpdateSize> mFftBuffer{};
 @@ -290,3 +290,3 @@
      if(!mFft)
@@ -361,6 +403,21 @@ patch -ulbf core/uhjfilter.cpp << EOF
 +        pffft_transform(Filter.mFft, mFftBuffer.data(), mFftBuffer.data(), mWorkData.data(),
              PFFFT_BACKWARD);
 EOF
+# fix alc/backends/pulseaudio.cpp (version >= 1.24.3)
+patch -ulbf alc/backends/pulseaudio.cpp << EOF
+@@ -63,3 +63,3 @@
+
+-#if HAVE_DYNLOAD
++#if defined(HAVE_DYNLOAD) && HAVE_DYNLOAD
+ #define PULSE_FUNCS(MAGIC)                                                    \\
+@@ -1449,3 +1449,3 @@
+ {
+-#if HAVE_DYNLOAD
++#if defined(HAVE_DYNLOAD) && HAVE_DYNLOAD
+     if(!pulse_handle)
+EOF
+# fix #if HAVE_DYNLOAD (version >= 1.24.3)
+sed -i.bak -e "s/\(#if\) \(HAVE_DYNLOAD\)/\1 defined(\2) \&\& \2/" $(grep -l "#if HAVE_DYNLOAD" $(find -name '*.cpp' -or -name '*.h'))
 # for portability set library name to openal instead of OpenAL32 (version >= 1.23.1)
 patch -ulbf CMakeLists.txt << EOF
 @@ -1294,3 +1294,3 @@
@@ -374,10 +431,14 @@ mkdir -p build_static build_shared &&
  PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBTYPE:STRING=STATIC -DBUILD_SHARED_LIBS:BOOL=OFF -DALSOFT_BACKEND_WINMM:BOOL=ON -DALSOFT_REQUIRE_WINMM:BOOL=ON -DALSOFT_REQUIRE_WASAPI:BOOL=ON -DALSOFT_BACKEND_PORTAUDIO:BOOL=ON -DALSOFT_BACKEND_PULSEAUDIO:BOOL=ON -DALSOFT_BACKEND_DSOUND:BOOL=OFF -DALSOFT_REQUIRE_DSOUND:BOOL=OFF -DALSOFT_EXAMPLES:BOOL=OFF -DALSOFT_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="$(if $CXX --version 2> /dev/null | grep -q clang; then echo "-femulated-tls"; fi)" -S. -Bbuild_static &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lportaudio $(${PKG_CONFIG:-pkg-config} --libs-only-l jack) -lpulse -lpffft/" build_static/build.ninja &&
+ # fix missing link libraries (version >= 1.24.3)
+ sed -i.bak2 -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lfmt/" build_static/build.ninja &&
  wl-showstatus configure &&
  PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLIBTYPE:STRING=SHARED -DBUILD_SHARED_LIBS:BOOL=ON -DALSOFT_BACKEND_WINMM:BOOL=ON -DALSOFT_REQUIRE_WINMM:BOOL=ON -DALSOFT_REQUIRE_WASAPI:BOOL=ON -DALSOFT_BACKEND_PORTAUDIO:BOOL=ON -DALSOFT_BACKEND_PULSEAUDIO:BOOL=ON -DALSOFT_BACKEND_DSOUND:BOOL=OFF -DALSOFT_REQUIRE_DSOUND:BOOL=OFF -DALSOFT_EXAMPLES:BOOL=OFF -DALSOFT_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="$(if $CXX --version 2> /dev/null | grep -q clang; then echo "-femulated-tls"; fi)" -S. -Bbuild_shared &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lportaudio $(${PKG_CONFIG:-pkg-config} --libs-only-l jack) -lpulse -lpffft/" build_shared/build.ninja &&
+ # fix missing link libraries (version >= 1.24.3)
+ sed -i.bak2 -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lfmt/" build_shared/build.ninja &&
  wl-showstatus build-install &&
  PATH=$PATH:$MINGWPREFIX/qt/bin ninja -Cbuild_static install/strip &&
  wl-showstatus build-install &&
