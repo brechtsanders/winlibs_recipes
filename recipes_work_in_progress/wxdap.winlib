@@ -79,6 +79,8 @@ patch -ulbf dap/msw.cpp << EOF
 EOF
 ## fix undefined wxStyledTextCtrl
 #sed -i.bak -e "1i #undef wxUSE_STC\n#define wxUSE_STC 1" $(grep -l wxStyledTextCtrl $(find -name '*.hpp'))
+# fix issue with mb_str(wxConvUTF8).data() in dap/JSON.hpp
+sed -i.bak -e "s/\(mb_str(wxConvUTF8)\)\.data()/\1/g" dap/JSON.hpp
 # create dummy wx-config which supports --version and uses UNIX-style paths
 cat > wx-config.sh << EOF
 #!/bin/sh
@@ -97,10 +99,13 @@ EOF
 sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" dap/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure-static &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=ON -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$PWD/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:STRING="$(wx-config.exe --prefix=$MINGWPREFIX/wx --libs|sed -e "s/^\s*//")" -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=ON -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$PWD/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:STRING="$(wx-config.exe --prefix=$MINGWPREFIX/wx --libs|sed -e "s/^\s*//")" -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=ON -DwxWidgets_CONFIGURATION:STRING=msw -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$PWD/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:STRING="$(wx-config.exe --prefix=$MINGWPREFIX/wx --libs|sed -e "s/^\s*//")" -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/wxrc.exe -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/wxrc.exe -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DwxWidgets_CONFIGURATION:STRING=mswu
  #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
  wl-showstatus configure-shared &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$PWD/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:STRING="$(wx-config.exe --prefix=$MINGWPREFIX/wx --libs|sed -e "s/^\s*//")" -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$PWD/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:STRING="$(wx-config.exe --prefix=$MINGWPREFIX/wx --libs|sed -e "s/^\s*//")" -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_CONFIGURATION:STRING=msw -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$PWD/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:STRING="$(wx-config.exe --prefix=$MINGWPREFIX/wx --libs|sed -e "s/^\s*//")" -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/wxrc.exe -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  ## fix execution of Python scripts
  #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
  ## fix missing link libraries
