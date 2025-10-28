@@ -1,0 +1,70 @@
+export NAME="wol-magic-packet"
+export STATUS=
+export URL=https://github.com/taufiqnoorani/wol-magic-packet
+export BASENAME=wol-magic-packet
+export DESCRIPTION="Sends a Wake-on-LAN magic packet to wake up a machine on the local network."
+export CATEGORY=communication
+export TYPE=application
+export VERSION=main
+export VERSIONDATE=20251028
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/taufiqnoorani/wol-magic-packet/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/taufiqnoorani/wol-magic-packet/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix wake_on_lan.c
+patch -ulbf wake_on_lan.c << EOF
+@@ -5,2 +5,5 @@
+ #include <unistd.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <sys/socket.h>
+@@ -8,2 +11,3 @@
+ #include <arpa/inet.h>
++#endif
+ #include <string.h>
+@@ -17,2 +21,9 @@
+     int broadcast = 1;
++#ifdef _WIN32
++    static WSADATA wsaData;
++    int wsaerr = WSAStartup(MAKEWORD(2, 0), &wsaData);
++    if (wsaerr)
++      return 1;
++    atexit((void(*)())WSACleanup);
++#endif
+ 
+@@ -26,3 +37,3 @@
+     // Set the socket to allow broadcast
+-    if (setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof broadcast) == -1) {
++    if (setsockopt(udpSocket, SOL_SOCKET, SO_BROADCAST, (void*)&broadcast, sizeof broadcast) == -1) {
+         perror("setsockopt (SO_BROADCAST)");
+@@ -68,3 +79,3 @@
+ 
+-    if (sendto(udpSocket, &toSend, sizeof(toSend), 0, (struct sockaddr*)&udpServer, sizeof(udpServer)) < 0) {
++    if (sendto(udpSocket, (void*)&toSend, sizeof(toSend), 0, (struct sockaddr*)&udpServer, sizeof(udpServer)) < 0) {
+         perror("sendto failed");
+EOF
+wl-showstatus build &&
+ ${CC:-gcc} -c -o wake_on_lan.o wake_on_lan.c &&
+ ${CC:-gcc} -s -o wake_on_lan.exe wake_on_lan.o -lws2_32 &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f *.exe $INSTALLPREFIX/bin/ &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: needs command line arguments to specify which address to wake up
+
+
+

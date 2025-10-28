@@ -1,0 +1,83 @@
+export NAME="gtup"
+export STATUS=
+export URL=https://github.com/marzeq/gtup
+export BASENAME=gtup
+export DESCRIPTION="a simple cli wake-on-lan by magic packet utility"
+export CATEGORY=communication
+export TYPE=application
+export VERSION=dev
+export VERSIONDATE=20251028
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/marzeq/gtup/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/marzeq/gtup/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/net.c (version >= dev)
+patch -ulbf src/net.c << EOF
+@@ -2,3 +2,7 @@
+ #include "shared.h"
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <arpa/inet.h>
++#endif
+ #include <stdio.h>
+@@ -24,3 +28,3 @@
+   int broadcast_enable = 1;
+-  if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast_enable,
++  if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&broadcast_enable,
+                  sizeof(broadcast_enable)) < 0) {
+EOF
+# fix src/main.c (version >= dev)
+patch -ulbf src/main.c << EOF
+@@ -7,2 +7,5 @@
+ #include <string.h>
++#ifdef _WIN32
++#include <winsock2.h>
++#endif
+
+@@ -31,2 +34,9 @@
+   }
++#ifdef _WIN32
++  static WSADATA wsaData;
++  int wsaerr = WSAStartup(MAKEWORD(2, 0), &wsaData);
++  if (wsaerr)
++    return 1;
++  atexit((void(*)())WSACleanup);
++#endif
+
+EOF
+# fix src/save.c (version >= dev)
+patch -ulbf src/save.c << EOF
+@@ -34,3 +34,7 @@
+   if (stat(path, &st) == -1) {
++#ifdef _WIN32
++    if (mkdir(path) == -1) {
++#else
+     if (mkdir(path, 0700) == -1) {
++#endif
+       return -1;
+EOF
+# fix makefile
+sed -i.bak -e "s/\$(CC) \$(CFLAGS) \$^ -o \$@$/& \$(LDFLAGS)/" makefile
+wl-showstatus build &&
+ make CC=${CC:-gcc} LDFLAGS="-s -lws2_32" &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build/*.exe $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####Note: not working (probably because it's not sending to the broadcast address)
+
+
+
