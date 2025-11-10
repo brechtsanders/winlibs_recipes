@@ -76,8 +76,10 @@ export TYPE=library
 #export VERSIONDATE=20250406
 #export VERSION=6.09.00
 #export VERSIONDATE=20250910
-export VERSION=6.10.00
-export VERSIONDATE=20251008
+#export VERSION=6.10.00
+#export VERSIONDATE=20251008
+export VERSION=6.11.00
+export VERSIONDATE=20251110
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -94,11 +96,41 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2 &> /tmp/$BASENAME.err
+#sed -e "s/^tar: \([^:]*\/\)\([^:\/]*\): Cannot create symlink to \`\([^']*\)': No such file or directory/ln -s \\1\\3 \\1\\2/" -e "s/^\(tar:.*\)$/#\\1/" /tmp/$BASENAME.err | sh
+#rm /tmp/$BASENAME.err
 cd $BASENAME-$VERSION
+
+mkdir -p include/bobcat
+#cp -rf bobcat/exception/* include/bobcat/
+#cp -rf bobcat/exception/exception bobcat/exception/*.f include/bobcat/
+#cp -rf bobcat/arg/arg bobcat/arg/*.f include/bobcat/
+#cp -rf bobcat/configfile/configfile bobcat/configfile/*.f include/bobcat/
+#cp -rf bobcat/*/* include/bobcat/
+#cp -f bobcat/exception/*.f include/bobcat/
+#cp -f bobcat/arg/*.f include/bobcat/
+for D in bobcat/*; do
+ if [ -f $D/$(basename $D) ]; then
+  #cp -f $D/$(basename $D) include/bobcat/
+  echo "#include \"../bobcat/$(basename $D)/$(basename $D)\"" > include/bobcat/$(basename $D)
+ fi
+done
+wl-showstatus build &&
+ touch SUCCESS &&
+ for F in $(find -name '*.cc'); do
+  if [ ! -f $F.o ]; then
+   echo CXX $F
+   ${CXX:-g++} -c -o $F.o $F -std=c++20 -Iinclude -I. -Dlstat=stat -Dstrcasestr=stristr || ( rm -f SUCCESS; false ) || break
+  fi
+ done &&
+ rm SUCCESS &&
+    echo OK
+
   ./configure --help 2> /dev/null
   cat meson_options.txt 2> /dev/null
   head COPYING* LICENSE* COPYRIGHT*
   ls -ld COPYING* LICENSE* COPYRIGHT* configure* m4 CMakeLists.txt cmake Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro build 2> /dev/null
+
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
