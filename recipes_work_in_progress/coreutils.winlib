@@ -61,8 +61,10 @@ export TYPE=application
 #export VERSIONDATE=20250118
 #export VERSION=9.7
 #export VERSIONDATE=20250409
-export VERSION=9.8
-export VERSIONDATE=20250923
+#export VERSION=9.8
+#export VERSIONDATE=20250923
+export VERSION=9.9
+export VERSIONDATE=20251111
 ####src/cat.o:cat.c:(.text+0x599): undefined reference to `_ioctl_used_without_requesting_gnulib_module_ioctl'
 wl-showstatus --package-version
 export DEPENDENCIES=
@@ -79,35 +81,35 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
-## fix missing files
-#mkdir -p winfix
-#cat > winfix/pwd.h << EOF
-#struct passwd {
-# int pw_uid;
-# int pw_gid;
-# char *pw_name;
-#};
-##define getuid() 0
-##define geteuid() 0
-##define getpwuid(uid) NULL
-##define getpwnam(username) NULL
-##define HAVE_DECL_GETEUID
-##define HAVE_DECL_GETPWUID
-#EOF
-#cat > winfix/grp.h << EOF
-#struct group {
-# int gr_gid;
-# char *gr_name;
-# char **gr_mem; 
-#};
-##define getgid() 0
-##define getegid() 0
-##define getgrgid(gid) NULL
-##define getgrnam(groupname) NULL
-##define getgrent() NULL
-##define setgrent() NULL
-##define endgrent() NULL
-##define HAVE_DECL_GETGRGID
+# fix missing files
+mkdir -p winfix
+cat > winfix/pwd.h << EOF
+struct passwd {
+ int pw_uid;
+ int pw_gid;
+ char *pw_name;
+};
+#define getuid() 0
+#define geteuid() 0
+#define getpwuid(uid) NULL
+#define getpwnam(username) NULL
+#define HAVE_DECL_GETEUID
+#define HAVE_DECL_GETPWUID
+EOF
+cat > winfix/grp.h << EOF
+struct group {
+ int gr_gid;
+ char *gr_name;
+ char **gr_mem; 
+};
+#define getgid() 0
+#define getegid() 0
+#define getgrgid(gid) NULL
+#define getgrnam(groupname) NULL
+#define getgrent() NULL
+#define setgrent() NULL
+#define endgrent() NULL
+#define HAVE_DECL_GETGRGID
 #EOF
 # fix missing getuid/getgid/geteuid/getegid in lib/euidaccess.c
 mv lib/euidaccess.c lib/euidaccess.c.bak
@@ -124,36 +126,51 @@ cat lib/euidaccess.c.bak >> lib/euidaccess.c
 #EOF
 #cat src/lbracket.c.bak >> src/lbracket.c
 # fix src/system.h
-patch -ulbf src/system.h << EOF
---- src/system.h  2012-07-23 12:05:16 +0200
-+++ src/system.h  2012-08-25 10:12:46 +0200
-@@ -205,3 +205,3 @@
-
--#if !HAVE_DECL_GETEUID
-+#if !defined(HAVE_DECL_GETEUID)
- uid_t geteuid ();
-EOF
-# fix src/test.c
+sed -i.bak -e "s/\(#if \)\!\(HAVE_[^ ]*\)/\1\!defined(\2)/" src/system.h
+## fix src/test.c (version <= 9.8)
+#patch -ulbf src/test.c << EOF
+#--- src/test.c  2012-07-21 16:54:32 +0200
+#+++ src/test.c  2012-08-25 10:30:12 +0200
+#@@ -423,2 +423,5 @@
+#         unary_advance ();
+#+#ifdef _WIN32
+#+        return 0;
+#+#else
+#         if (stat (argv[pos - 1], &stat_buf) != 0)
+#@@ -429,2 +432,3 @@
+#         return ! (euid == NO_UID && errno) && euid == stat_buf.st_uid;
+#+#endif
+#       }
+#@@ -434,2 +438,5 @@
+#         unary_advance ();
+#+#ifdef _WIN32
+#+        return 0;
+#+#else
+#         if (stat (argv[pos - 1], &stat_buf) != 0)
+#@@ -440,2 +447,3 @@
+#         return ! (egid == NO_GID && errno) && egid == stat_buf.st_gid;
+#+#endif
+#       }
+#EOF
+# fix src/test.c (version >= 9.9)
 patch -ulbf src/test.c << EOF
---- src/test.c  2012-07-21 16:54:32 +0200
-+++ src/test.c  2012-08-25 10:30:12 +0200
-@@ -423,2 +423,5 @@
-         unary_advance ();
+@@ -408,2 +408,5 @@
+       {
 +#ifdef _WIN32
-+        return 0;
++        return false;
 +#else
-         if (stat (argv[pos - 1], &stat_buf) != 0)
-@@ -429,2 +432,3 @@
+         unary_advance ();
+@@ -415,2 +418,3 @@
          return ! (euid == NO_UID && errno) && euid == stat_buf.st_uid;
 +#endif
        }
-@@ -434,2 +438,5 @@
-         unary_advance ();
+@@ -419,2 +423,5 @@
+       {
 +#ifdef _WIN32
-+        return 0;
++        return false;
 +#else
-         if (stat (argv[pos - 1], &stat_buf) != 0)
-@@ -440,2 +447,3 @@
+         unary_advance ();
+@@ -426,2 +433,3 @@
          return ! (egid == NO_GID && errno) && egid == stat_buf.st_gid;
 +#endif
        }
@@ -168,18 +185,39 @@ patch -ulbf src/make-prime-list.c << EOF
 +#include <../lib/config.h>
 
 EOF
-# avoid ioctl in src/cat.c (version >= 8.32)
+## avoid ioctl in src/cat.c (version >= 8.32 <= 9.8)
+#patch -ulbf src/cat.c << EOF
+#@@ -259,3 +259,3 @@
+#
+#-#ifdef FIONREAD
+#+#if defined(FIONREAD) && !defined(_WIN32)
+#   /* If nonzero, use the FIONREAD ioctl, as an optimization.
+#@@ -304,3 +304,3 @@
+#               bool input_pending = false;
+#-#ifdef FIONREAD
+#+#if defined(FIONREAD) && !defined(_WIN32)
+#               int n_to_read = 0;
+#EOF
+# fix src/cat.c (version >= 9.9)
 patch -ulbf src/cat.c << EOF
-@@ -259,3 +259,3 @@
+@@ -224,3 +224,3 @@
 
 -#ifdef FIONREAD
 +#if defined(FIONREAD) && !defined(_WIN32)
    /* If nonzero, use the FIONREAD ioctl, as an optimization.
-@@ -304,3 +304,3 @@
+@@ -274,3 +274,3 @@
                bool input_pending = false;
 -#ifdef FIONREAD
 +#if defined(FIONREAD) && !defined(_WIN32)
                int n_to_read = 0;
+@@ -716,2 +716,3 @@
+
++#ifndef _WIN32
+       if (! (S_ISFIFO (stat_buf.st_mode) || S_ISSOCK (stat_buf.st_mode)
+@@ -737,2 +738,3 @@
+         }
++#endif
+
 EOF
 # fix missing fpathconf (version >= 8.32)
 sed -i.bak -e "s/fpathconf (dir_fd, _PC_NAME_MAX)/255/; s/fpathconf (destdirfd, _PC_TIMESTAMP_RESOLUTION)/2000000000/; s/fpathconf (desc, _PC_ACL_ENABLED)/0/" $(grep -l fpathconf $(find -name '*.c'))
@@ -430,7 +468,8 @@ patch -ulbf configure << EOF
    # FIXME -- no need to abort building the whole package
 EOF
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-selinux --enable-threads=win32 CFLAGS="-I$PWD/winfix" LIBS="-Wl,--as-needed -lws2_32" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-selinux --enable-threads=win32 CFLAGS="-I$PWD/winfix" LIBS="-Wl,--as-needed -lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-selinux --enable-threads=win32 CFLAGS="-I$PWD/winfix" LIBS="-Wl,--as-needed -lws2_32 -lbcrypt" &&
  echo "#ifndef _PC_NAME_MAX" >> lib/config.h &&
  echo "#define _PC_NAME_MAX 255" >> lib/config.h &&
  echo "#endif" >> lib/config.h &&
