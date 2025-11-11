@@ -1,0 +1,53 @@
+export NAME="ocpp"
+export STATUS=
+export URL=https://github.com/pazzk-labs/ocpp
+export BASENAME=ocpp
+export DESCRIPTION="OCPP client implementation in C"
+export CATEGORY=communication
+export TYPE=library
+export VERSION=main
+export VERSIONDATE=20251111
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/pazzk-labs/ocpp/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/pazzk-labs/ocpp/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## also allow building shared library
+#sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+ #wl-showstatus configure-shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build-static &&
+ ninja -Cbuild_static &&
+ #wl-showstatus build-shared &&
+ #ninja -Cbuild_shared &&
+ wl-showstatus build-shared &&
+ mkdir -p build_shared &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p build_static/libocpp.a | sed -n -e "s/^_\{0,1\}\([^ ]*\) T .*$/\1/p; s/^_\{0,1\}\([^ ]*\) D .*$/\1 DATA/p" ) > build_shared/ocpp.def &&
+ ${CC:-gcc} -shared -s -mwindows -def build_shared/ocpp.def -o build_shared/ocpp.dll build_static/libocpp.a -Wl,--out-implib,build_shared/libocpp.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/ocpp $INSTALLPREFIX/lib &&
+ cp -rf include/ocpp/* $INSTALLPREFIX/include/ocpp/ &&
+ cp build_static/*.a $INSTALLPREFIX/lib/ &&
+ #wl-showstatus build-install-static &&
+ #ninja -Cbuild_static install/strip &&
+ #wl-showstatus build-install-shared &&
+ #ninja -Cbuild_shared install/strip &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
