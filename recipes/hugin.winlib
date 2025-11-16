@@ -1,39 +1,238 @@
+#export NAME="Hugin"
+#export STATUS=
+#export URL=http://hugin.sourceforge.net/
+##export URL=https://sourceforge.net/projects/hugin/
+#export BASENAME=hugin
+#export DESCRIPTION="Panorama photo stitcher"
+#export CATEGORY=graphics
+#export TYPE=application
+##export VERSION=2016.2.0
+##export VERSIONDATE=20170520
+##export VERSION=2017.0
+##export VERSIONDATE=20170701
+##export VERSION=2017.0.0
+##export VERSIONDATE=20170706
+##export VERSION=2018.0
+##export VERSIONDATE=20180203
+##export VERSION=2018.0.0
+##export VERSIONDATE=20180204
+##export VERSION=2019.0.0
+##export VERSIONDATE=20190406
+##export VERSION=2019.2.0
+##export VERSIONDATE=20191230
+##export VERSION=2020.0.0
+##export VERSIONDATE=20201212
+#export VERSION=2021.0.0
+#export VERSIONDATE=20211230
+##export VERSION=2022.0.0
+##export VERSIONDATE=20221218
+##export VERSION=2023.0.0
+##export VERSIONDATE=20231111
+##export VERSION=2024.0.0
+##export VERSIONDATE=20241116
+##export VERSION=2024.0.1
+##export VERSIONDATE=20241120
+#wl-showstatus --package-version
+#export DEPENDENCIES=wxwidgets,wx-config-win,libtiff,libjpeg,zlib,libpng,imath,openexr,vigra,exiv2,glew,libpano13,pthreads,boost,lcms2,fftw,flann,sqlite3,enblend-enfuse
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=COPYING.txt
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="https://sourceforge.net/projects/hugin/files/hugin/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/hugin/hugin/hugin-$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\).*/\1/")/$BASENAME-$VERSION.tar.bz2
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#cd $BASENAME-$VERSION*
+## fix redefinition of NOMINMAX in src/hugin_base/panotools/PanoToolsInterface.h
+#patch -ulbf src/hugin_base/panotools/PanoToolsInterface.h << EOF
+#@@ -49,3 +49,5 @@
+# //#define _USE_MATH_DEFINES
+#+#ifndef NOMINMAX
+# #define NOMINMAX
+#+#endif
+# #define VC_EXTRALEAN
+#EOF
+## fix redefinition of NOMINMAX in hugin-2017.0.0/src/hugin_cpfind/cpfind/ImageImport.h
+#patch -ulbf hugin-2017.0.0/src/hugin_cpfind/cpfind/ImageImport.h << EOF
+#@@ -24,3 +24,5 @@
+# #ifdef _WIN32
+#+#ifndef NOMINMAX
+# #define NOMINMAX
+#+#endif
+# #include "vigra/windows.h"
+#EOF
+## fix missing Exiv2::Error in src/hugin_base/panodata/SrcPanoImage.cpp (version >= 2019.0.0)
+#mv src/hugin_base/panodata/SrcPanoImage.cpp src/hugin_base/panodata/SrcPanoImage.cpp.bak &&
+#echo "#include <exiv2/error.hpp>" > src/hugin_base/panodata/SrcPanoImage.cpp &&
+#cat src/hugin_base/panodata/SrcPanoImage.cpp.bak >> src/hugin_base/panodata/SrcPanoImage.cpp
+## fix missing Exiv2::Error in src/hugin1/hugin/RawImport.cpp (version >= 2019.0.0)
+#mv src/hugin1/hugin/RawImport.cpp src/hugin1/hugin/RawImport.cpp.bak &&
+#echo "#include <exiv2/error.hpp>" > src/hugin1/hugin/RawImport.cpp &&
+#cat src/hugin1/hugin/RawImport.cpp.bak >> src/hugin1/hugin/RawImport.cpp
+### fix src/hugin1/ptbatcher/Batch.h and src/hugin1/ptbatcher/Batch.cpp (version >= 2019.0.0)
+##patch -ulbf src/hugin1/ptbatcher/Batch.h << EOF
+##@@ -188,3 +188,3 @@
+##
+##-#if defined _WIN32 && defined Hugin_shared
+##+#if defined _WIN32
+## DECLARE_LOCAL_EVENT_TYPE(EVT_BATCH_FAILED,-1)
+##EOF
+##patch -ulbf src/hugin1/ptbatcher/Batch.cpp << EOF
+##@@ -46,3 +46,3 @@
+##
+##-#if defined _WIN32 && defined Hugin_shared
+##+#if defined _WIN32
+## DEFINE_LOCAL_EVENT_TYPE(EVT_BATCH_FAILED)
+##EOF
+## create dummy wx-config which supports --version and uses UNIX-style paths
+#cat > wx-config.sh << EOF
+##!/bin/sh
+#if echo " \$* "|grep -q " --version "; then
+# shift
+# wx-config.exe --release \$* | grep -v "wx-config Error:" | sed -e "s/^\\([0-9]*\\.[0-9]*\\)\$/\\1.0/"
+#else
+# #wx-config.exe --static=no --unicode=yes --debug=no --universal=no --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+# #wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=gcc_dll/mswu --static=no --unicode=yes --debug=no --universal=no --compiler=gcc \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+# #wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=gcc_dll/mswu \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+# wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/mswu \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+# #wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=gcc_lib/mswu \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
+#fi
+#EOF
+## remove exiftool.exe installation from CMakeModules/win_bundle.cmake
+#patch -ulbf CMakeModules/win_bundle.cmake << EOF
+#@@ -59,7 +58,0 @@
+#-  # install exiftool
+#-  FIND_PATH(EXIFTOOL_EXE_DIR exiftool.exe
+#-        \${SOURCE_BASE_DIR}/tools
+#-        \${SOURCE_BASE_DIR}/exiftool
+#-        DOC "Location of exiftool.exe"
+#-        NO_DEFAULT_PATH)
+#-  INSTALL(FILES \${EXIFTOOL_EXE_DIR}/exiftool.exe DESTINATION \${BINDIR})
+#EOF
+## don't fail on missing MS HTML Help Workshop and don't bundle
+#mv CMakeLists.txt CMakeLists.txt.bak &&
+#sed -e "s/^.*MS HTML Help Workshop not found/#&/; s?^\(.*/INSTALL/FILES\|.*win_bundle\)?#&?" CMakeLists.txt.bak > CMakeLists.txt
+### fix detection of wxWidgets (version >= 2019.2.0)
+##patch -ulbf CMakeLists.txt << EOF
+##@@ -133,3 +133,3 @@
+## #
+##-IF (WIN32)
+##+IF (MSVC)
+##   ##
+##@@ -153,3 +153,3 @@
+##   ENDIF()
+##-ENDIF(WIN32)
+##+ENDIF(MSVC)
+##
+##EOF
+## fix missing manifest in src/hugin1/CMakeLists.txt (version >= 2020.0.0)
+#patch -ulbf src/hugin1/CMakeLists.txt << EOF
+#@@ -15,3 +15,3 @@
+#     FIND_FILE(WINDOWS_DPI_MANIFEST
+#-      NAMES amd64_dpi_aware_pmv2.manifest amd64-dpi-aware-pmv2.manifest
+#+      NAMES wx.manifest
+#       PATHS "\${wxWidgets_ROOT_DIR}/include/wx/msw/"
+#@@ -21,3 +21,3 @@
+#     FIND_FILE(WINDOWS_DPI_MANIFEST
+#-      NAMES wx_dpi_aware_pmv2.manifest wx-dpi-aware-pmv2.manifest
+#+      NAMES wx.manifest
+#       PATHS "\${wxWidgets_ROOT_DIR}/include/wx/msw/"
+#EOF
+#mkdir -p build_shared &&
+# wl-showstatus configure &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*{u,u_xml}.a $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxmsw*u_{core,aui,xrc,html,adv,gl}.a | sed -e ':a;N;$!ba;s/\n/ /g')" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.a)" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
+# #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:BOOL=ON -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.dll.a)" -DOPENEXR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/OpenEXR -DOPENEXR_LIBRARIES:STRING="$(pkg-config --libs OpenEXR)" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/Imath" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:BOOL=ON -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.dll.a)" -DOPENEXR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/OpenEXR -DOPENEXR_LIBRARIES:STRING="$(pkg-config --libs OpenEXR)" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/Imath" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(which wx-config.exe) -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:BOOL=ON -DHUGIN_SHARED_LIBS:BOOL=ON -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/../wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
+# #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/../wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=ON -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
+# # fix link order in icpfind
+# sed -i.bak -e "s?\(\blibicpfindlib.a\b\)\(.*\)\(\s../base_wx/libhuginbasewx.a\b\)?\1\3\2?" build_shared/src/hugin1/icpfind/CMakeFiles/icpfind.dir/linklibs.rsp &&
+# sed -i.bak -e "s/-ladvapi32/& -llz4/" build_shared/src/hugin1/icpfind/CMakeFiles/icpfind.dir/linklibs.rsp &&
+# ### fix missing linked library (version >= 2024.0.0)
+# ###sed -i.bak -e "s/-ladvapi32/& -llz4/" build_shared/src/hugin1/icpfind/CMakeFiles/cpfind.dir/linklibs.rsp &&
+# #sed -i.bak -e "s/-ladvapi32/& -llz4/" build_shared/src/hugin_cpfind/cpfind/CMakeFiles/cpfind.dir/linkLibs.rsp &&
+# ## skip installation of .chm file
+# sed -i.bak -e "s/^.*\.chm/#&/" build_shared/src/hugin1/hugin/xrc/data/help_en_EN/cmake_install.cmake &&
+# ## ignore multiple definition of TIFFSetWarningHandler
+# #echo "-Wl,--allow-multiple-definition" >> build_shared/src/hugin1/hugin/CMakeFiles/hugin.dir/linklibs.rsp &&
+# # fix missing libraries
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/base_wx/CMakeFiles/huginbasewx.dir/linklibs.rsp &&
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/stitch_project/CMakeFiles/hugin_stitch_project.dir/linklibs.rsp &&
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/icpfind/CMakeFiles/icpfind.dir/linklibs.rsp &&
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/icpfind/CMakeFiles/icpfindlib.dir/linklibs.rsp &&
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/executor/CMakeFiles/hugin_executor.dir/linklibs.rsp &&
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/ptbatcher/CMakeFiles/PTBatcherGUI.dir/linklibs.rsp &&
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/calibrate_lens/CMakeFiles/calibrate_lens_gui.dir/linklibs.rsp &&
+# echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release) -lwx_baseu_xml-$(wx-config --release) -lwx_mswu_aui-$(wx-config --release) -lwx_mswu_gl-$(wx-config --release) -lwx_mswu_html-$(wx-config --release)" >> build_shared/src/hugin1/hugin/CMakeFiles/hugin.dir/linklibs.rsp &&
+# ## fix missing libraries (version >= 2022.0.0)
+# #echo " -Wl,--as-needed -llz4" >> build_shared/src/hugin_cpfind/cpfind/CMakeFiles/cpfind.dir/linklibs.rsp &&
+# #sed -i.bak -e "s/\(-lwx\)_\([^ _]*[^u]\)\(u*\)\(_[^ ]*\|\)-\([0-9]*\)\.\([0-9]*\)\b/\1\2\5\6\3\4/g" $(grep -l "\-lwx_[^ ]*_[^ ]*-[0-9]*\.[0-9]*\b" $(find -name '*.rsp')) &&
+# wl-showstatus build-install &&
+# make -Cbuild_shared install/strip &&
+# #mkdir -p $INSTALLPREFIX/hugin &&
+# #cp -rf build_shared/INSTALL/FILES/* $INSTALLPREFIX/hugin/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION*
+##PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH build_shared/INSTALL/FILES/bin/hugin.exe
+##PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH $MINGWPREFIX/hugin/bin/hugin.exe
+##PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH $INSTALLPREFIX/bin/hugin.exe
+##PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH hugin.exe
+##PATH=$MINGWPREFIX/wx/lib:$PATH hugin.exe
+#
+#
+#
+### fix src/hugin1/CMakeLists.txt (version >= 2024.0.0)
+##patch -ulbf src/hugin1/CMakeLists.txt << EOF
+##@@ -11,3 +11,8 @@
+## # populate correct dpi aware manifest from wxWidgets
+##-IF(WIN32)
+##+IF(MINGW)
+##+  FIND_FILE(WINDOWS_DPI_MANIFEST
+##+    NAMES wx.manifest
+##+    PATHS "\${wxWidgets_ROOT_DIR}/include/wx/msw/"
+##+  )
+##+ELSEIF(WIN32)
+##   IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
+##EOF
+##mkdir -p build_win &&
+## wl-showstatus configure &&
+## #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_BUILDER:STRING="${BUILDER:- }" -S. -Bbuild_win -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $(cygpath -m $MINGWPREFIX)/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/lib{wxbase,wxmsw}*u.a|tr "\n" " ")" -DENBLEND_DIR:PATH=$MINGWPREFIX &&
+## cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_BUILDER:STRING="${BUILDER:- }" -S. -Bbuild_win -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="-L$MINGWPREFIX/wx/lib/gcc_x64_dll -lwxbase32u -lwxmsw32u -lwxmsw32u_propgrid -lwxmsw32u_xrc -lwxmsw32u_richtext" -DENBLEND_DIR:PATH=$MINGWPREFIX &&
+## #-DHUGIN_SHARED:BOOL=ON -DENABLE_LAPACK:BOOL=OFF -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DwxWidgets_LIBRARIES:PATH=$MINGWPREFIX/wx/lib/gcc_dll -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.dll.a)" -DOPENEXR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/OpenEXR -DOPENEXR_LIBRARIES:STRING="$(pkg-config --libs OpenEXR)" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/Imath" -DHUGIN_BUILDER:STRING=" " 
+## # fix missing link libraries
+## sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -llz4/" build_win/build.ninja &&
+## #wl-showstatus build &&
+## #cmake.exe --build build_win &&
+## #ninja -Cbuild_win &&
+## wl-showstatus build-install &&
+## #cmake.exe --install build_win --strip &&
+## #cmake.exe --build build_win --target "install/strip" &&
+## ninja -Cbuild_win install/strip &&
+##    echo OK
+#
+#
+#
+##ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u_xml.a $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxmsw*u_{core,aui,xrc,html,adv,gl}.a >> build_shared/src/hugin1/stitch_project/CMakeFiles/hugin_stitch_project.dir/linklibs.rsp
+
+
+
 export NAME="Hugin"
 export STATUS=
-export URL=http://hugin.sourceforge.net/
 #export URL=https://sourceforge.net/projects/hugin/
+export URL=http://hugin.sourceforge.net/
 export BASENAME=hugin
 export DESCRIPTION="Panorama photo stitcher"
 export CATEGORY=graphics
 export TYPE=application
-#export VERSION=2016.2.0
-#export VERSIONDATE=20170520
-#export VERSION=2017.0
-#export VERSIONDATE=20170701
-#export VERSION=2017.0.0
-#export VERSIONDATE=20170706
-#export VERSION=2018.0
-#export VERSIONDATE=20180203
-#export VERSION=2018.0.0
-#export VERSIONDATE=20180204
-#export VERSION=2019.0.0
-#export VERSIONDATE=20190406
-#export VERSION=2019.2.0
-#export VERSIONDATE=20191230
-#export VERSION=2020.0.0
-#export VERSIONDATE=20201212
-export VERSION=2021.0.0
-export VERSIONDATE=20211230
-#export VERSION=2022.0.0
-#export VERSIONDATE=20221218
-#export VERSION=2023.0.0
-#export VERSIONDATE=20231111
-#export VERSION=2024.0.0
-#export VERSIONDATE=20241116
-#export VERSION=2024.0.1
-#export VERSIONDATE=20241120
-#export VERSION=2025.0.0
-#export VERSIONDATE=20251116
+export VERSION=2025.0.0
+export VERSIONDATE=20251116
 wl-showstatus --package-version
 export DEPENDENCIES=wxwidgets,wx-config-win,libtiff,libjpeg,zlib,libpng,imath,openexr,vigra,exiv2,glew,libpano13,pthreads,boost,lcms2,fftw,flann,sqlite3,enblend-enfuse
 export OPTIONALDEPENDENCIES=
@@ -49,48 +248,7 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
-cd $BASENAME-$VERSION*
-# fix redefinition of NOMINMAX in src/hugin_base/panotools/PanoToolsInterface.h
-patch -ulbf src/hugin_base/panotools/PanoToolsInterface.h << EOF
-@@ -49,3 +49,5 @@
- //#define _USE_MATH_DEFINES
-+#ifndef NOMINMAX
- #define NOMINMAX
-+#endif
- #define VC_EXTRALEAN
-EOF
-# fix redefinition of NOMINMAX in hugin-2017.0.0/src/hugin_cpfind/cpfind/ImageImport.h
-patch -ulbf hugin-2017.0.0/src/hugin_cpfind/cpfind/ImageImport.h << EOF
-@@ -24,3 +24,5 @@
- #ifdef _WIN32
-+#ifndef NOMINMAX
- #define NOMINMAX
-+#endif
- #include "vigra/windows.h"
-EOF
-# fix missing Exiv2::Error in src/hugin_base/panodata/SrcPanoImage.cpp (version >= 2019.0.0)
-mv src/hugin_base/panodata/SrcPanoImage.cpp src/hugin_base/panodata/SrcPanoImage.cpp.bak &&
-echo "#include <exiv2/error.hpp>" > src/hugin_base/panodata/SrcPanoImage.cpp &&
-cat src/hugin_base/panodata/SrcPanoImage.cpp.bak >> src/hugin_base/panodata/SrcPanoImage.cpp
-# fix missing Exiv2::Error in src/hugin1/hugin/RawImport.cpp (version >= 2019.0.0)
-mv src/hugin1/hugin/RawImport.cpp src/hugin1/hugin/RawImport.cpp.bak &&
-echo "#include <exiv2/error.hpp>" > src/hugin1/hugin/RawImport.cpp &&
-cat src/hugin1/hugin/RawImport.cpp.bak >> src/hugin1/hugin/RawImport.cpp
-## fix src/hugin1/ptbatcher/Batch.h and src/hugin1/ptbatcher/Batch.cpp (version >= 2019.0.0)
-#patch -ulbf src/hugin1/ptbatcher/Batch.h << EOF
-#@@ -188,3 +188,3 @@
-#
-#-#if defined _WIN32 && defined Hugin_shared
-#+#if defined _WIN32
-# DECLARE_LOCAL_EVENT_TYPE(EVT_BATCH_FAILED,-1)
-#EOF
-#patch -ulbf src/hugin1/ptbatcher/Batch.cpp << EOF
-#@@ -46,3 +46,3 @@
-#
-#-#if defined _WIN32 && defined Hugin_shared
-#+#if defined _WIN32
-# DEFINE_LOCAL_EVENT_TYPE(EVT_BATCH_FAILED)
-#EOF
+cd $BASENAME-$VERSION
 # create dummy wx-config which supports --version and uses UNIX-style paths
 cat > wx-config.sh << EOF
 #!/bin/sh
@@ -105,122 +263,38 @@ else
  #wx-config.exe --prefix=$MINGWPREFIX/wx --wxcfg=gcc_lib/mswu \$* | grep -v "wx-config Error:" | sed -e "s?\\([A-Z]\\):\\\\\\\\?\\1:/?g; s?\\\\\\\\?/?g; s/\(-lwxmsw[0-9]*[ud]*_\)std\(.*-lwx[^ ]*\)/\2 \1core -Wl,--as-needed -lshlwapi/g"
 fi
 EOF
-# remove exiftool.exe installation from CMakeModules/win_bundle.cmake
-patch -ulbf CMakeModules/win_bundle.cmake << EOF
-@@ -59,7 +58,0 @@
--  # install exiftool
--  FIND_PATH(EXIFTOOL_EXE_DIR exiftool.exe
--        \${SOURCE_BASE_DIR}/tools
--        \${SOURCE_BASE_DIR}/exiftool
--        DOC "Location of exiftool.exe"
--        NO_DEFAULT_PATH)
--  INSTALL(FILES \${EXIFTOOL_EXE_DIR}/exiftool.exe DESTINATION \${BINDIR})
-EOF
 # don't fail on missing MS HTML Help Workshop and don't bundle
-mv CMakeLists.txt CMakeLists.txt.bak &&
-sed -e "s/^.*MS HTML Help Workshop not found/#&/; s?^\(.*/INSTALL/FILES\|.*win_bundle\)?#&?" CMakeLists.txt.bak > CMakeLists.txt
-## fix detection of wxWidgets (version >= 2019.2.0)
-#patch -ulbf CMakeLists.txt << EOF
-#@@ -133,3 +133,3 @@
-# #
-#-IF (WIN32)
-#+IF (MSVC)
-#   ##
-#@@ -153,3 +153,3 @@
-#   ENDIF()
-#-ENDIF(WIN32)
-#+ENDIF(MSVC)
-#
-#EOF
-# fix missing manifest in src/hugin1/CMakeLists.txt (version >= 2020.0.0)
+sed -i.bak -e "s/^.*MS HTML Help Workshop not found/#&/; s?^\(.*/INSTALL/FILES\|.*win_bundle\)?#&?" CMakeLists.txt
+# fix missing manifest in src/hugin1/CMakeLists.txt (version >= 2024.0.0)
 patch -ulbf src/hugin1/CMakeLists.txt << EOF
-@@ -15,3 +15,3 @@
-     FIND_FILE(WINDOWS_DPI_MANIFEST
--      NAMES amd64_dpi_aware_pmv2.manifest amd64-dpi-aware-pmv2.manifest
-+      NAMES wx.manifest
-       PATHS "\${wxWidgets_ROOT_DIR}/include/wx/msw/"
-@@ -21,3 +21,3 @@
-     FIND_FILE(WINDOWS_DPI_MANIFEST
--      NAMES wx_dpi_aware_pmv2.manifest wx-dpi-aware-pmv2.manifest
-+      NAMES wx.manifest
-       PATHS "\${wxWidgets_ROOT_DIR}/include/wx/msw/"
+@@ -11,3 +11,8 @@
+ # populate correct dpi aware manifest from wxWidgets
+-IF(WIN32)
++IF(MINGW)
++  FIND_FILE(WINDOWS_DPI_MANIFEST
++    NAMES wx.manifest
++    PATHS "\${wxWidgets_ROOT_DIR}/include/wx/msw/"
++  )
++ELSEIF(WIN32)
+   IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
 EOF
-mkdir -p build_shared &&
+mkdir -p build_win &&
  wl-showstatus configure &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
- #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*{u,u_xml}.a $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxmsw*u_{core,aui,xrc,html,adv,gl}.a | sed -e ':a;N;$!ba;s/\n/ /g')" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
- #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.a)" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
- #cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:BOOL=ON -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.dll.a)" -DOPENEXR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/OpenEXR -DOPENEXR_LIBRARIES:STRING="$(pkg-config --libs OpenEXR)" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/Imath" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:BOOL=ON -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.dll.a)" -DOPENEXR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/OpenEXR -DOPENEXR_LIBRARIES:STRING="$(pkg-config --libs OpenEXR)" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/Imath" -DHUGIN_BUILDER:STRING=" " -S. -Bbuild_shared &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(which wx-config.exe) -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:BOOL=ON -DHUGIN_SHARED_LIBS:BOOL=ON -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/../wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
- #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_SHARED:STRING=0 -DHUGIN_BUILDER:STRING="$BUILDER" -DENABLE_LAPACK:BOOL=OFF -DENBLEND_DIR:PATH=$MINGWPREFIX -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/../wx-config.sh -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=ON -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -S. -Bbuild_shared &&
- # fix link order in icpfind
- sed -i.bak -e "s?\(\blibicpfindlib.a\b\)\(.*\)\(\s../base_wx/libhuginbasewx.a\b\)?\1\3\2?" build_shared/src/hugin1/icpfind/CMakeFiles/icpfind.dir/linklibs.rsp &&
- sed -i.bak -e "s/-ladvapi32/& -llz4/" build_shared/src/hugin1/icpfind/CMakeFiles/icpfind.dir/linklibs.rsp &&
- ### fix missing linked library (version >= 2024.0.0)
- ###sed -i.bak -e "s/-ladvapi32/& -llz4/" build_shared/src/hugin1/icpfind/CMakeFiles/cpfind.dir/linklibs.rsp &&
- #sed -i.bak -e "s/-ladvapi32/& -llz4/" build_shared/src/hugin_cpfind/cpfind/CMakeFiles/cpfind.dir/linkLibs.rsp &&
- ## skip installation of .chm file
- sed -i.bak -e "s/^.*\.chm/#&/" build_shared/src/hugin1/hugin/xrc/data/help_en_EN/cmake_install.cmake &&
- ## ignore multiple definition of TIFFSetWarningHandler
- #echo "-Wl,--allow-multiple-definition" >> build_shared/src/hugin1/hugin/CMakeFiles/hugin.dir/linklibs.rsp &&
- # fix missing libraries
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/base_wx/CMakeFiles/huginbasewx.dir/linklibs.rsp &&
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/stitch_project/CMakeFiles/hugin_stitch_project.dir/linklibs.rsp &&
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/icpfind/CMakeFiles/icpfind.dir/linklibs.rsp &&
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/icpfind/CMakeFiles/icpfindlib.dir/linklibs.rsp &&
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/executor/CMakeFiles/hugin_executor.dir/linklibs.rsp &&
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/ptbatcher/CMakeFiles/PTBatcherGUI.dir/linklibs.rsp &&
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release)" >> build_shared/src/hugin1/calibrate_lens/CMakeFiles/calibrate_lens_gui.dir/linklibs.rsp &&
- echo " -Wl,--as-needed -L$(cygpath -m $MINGWPREFIX)/wx/lib -lwx_baseu-$(wx-config --release) -lwx_mswu_core-$(wx-config --release) -lwx_mswu_xrc-$(wx-config --release) -lwx_baseu_xml-$(wx-config --release) -lwx_mswu_aui-$(wx-config --release) -lwx_mswu_gl-$(wx-config --release) -lwx_mswu_html-$(wx-config --release)" >> build_shared/src/hugin1/hugin/CMakeFiles/hugin.dir/linklibs.rsp &&
- ## fix missing libraries (version >= 2022.0.0)
- #echo " -Wl,--as-needed -llz4" >> build_shared/src/hugin_cpfind/cpfind/CMakeFiles/cpfind.dir/linklibs.rsp &&
- #sed -i.bak -e "s/\(-lwx\)_\([^ _]*[^u]\)\(u*\)\(_[^ ]*\|\)-\([0-9]*\)\.\([0-9]*\)\b/\1\2\5\6\3\4/g" $(grep -l "\-lwx_[^ ]*_[^ ]*-[0-9]*\.[0-9]*\b" $(find -name '*.rsp')) &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_BUILDER:STRING="${BUILDER:- }" -S. -Bbuild_win -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $(cygpath -m $MINGWPREFIX)/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/lib{wxbase,wxmsw}*u.a|tr "\n" " ")" -DENBLEND_DIR:PATH=$MINGWPREFIX &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_BUILDER:STRING="${BUILDER:- }" -S. -Bbuild_win -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="-L$MINGWPREFIX/wx/lib/gcc_x64_dll -lwxbase32u -lwxmsw32u -lwxmsw32u_propgrid -lwxmsw32u_xrc -lwxmsw32u_richtext" -DWINDOWS_DPI_MANIFEST:FILEPATH=$MINGWPREFIX/wx/include/wx/msw/wx.manifest -DENBLEND_DIR:PATH=$MINGWPREFIX &&
+ #-DHUGIN_SHARED:BOOL=ON -DENABLE_LAPACK:BOOL=OFF -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DwxWidgets_LIBRARIES:PATH=$MINGWPREFIX/wx/lib/gcc_dll -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.dll.a)" -DWINDOWS_DPI_MANIFEST:FILEPATH=$MINGWPREFIX/wx/include/wx/msw/wx.manifest -DOPENEXR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/OpenEXR -DOPENEXR_LIBRARIES:STRING="$(pkg-config --libs OpenEXR)" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/Imath" -DHUGIN_BUILDER:STRING=" " 
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -llz4/" build_win/build.ninja &&
+ wl-showstatus build &&
+ ninja -Cbuild_win &&
  wl-showstatus build-install &&
- make -Cbuild_shared install/strip &&
- #mkdir -p $INSTALLPREFIX/hugin &&
- #cp -rf build_shared/INSTALL/FILES/* $INSTALLPREFIX/hugin/ &&
+ ( ninja -Cbuild_win install/strip || (
+  touch build_win/help/hugin_help_en_EN.chm &&
+  ninja -Cbuild_win install/strip &&
+  rm -f $INSTALLPREFIX/share/hugin/xrc/data/hugin_help_en_EN.chm
+ )) &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION*
-#PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH build_shared/INSTALL/FILES/bin/hugin.exe
-#PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH $MINGWPREFIX/hugin/bin/hugin.exe
-#PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH $INSTALLPREFIX/bin/hugin.exe
-#PATH=$MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll:$PATH hugin.exe
-#PATH=$MINGWPREFIX/wx/lib:$PATH hugin.exe
+####PATH=$MINGWPREFIX/wx/lib/gcc_dll:$PATH $MINGWPREFIX/bin/hugin.exe
 
 
 
-## fix src/hugin1/CMakeLists.txt (version >= 2024.0.0)
-#patch -ulbf src/hugin1/CMakeLists.txt << EOF
-#@@ -11,3 +11,8 @@
-# # populate correct dpi aware manifest from wxWidgets
-#-IF(WIN32)
-#+IF(MINGW)
-#+  FIND_FILE(WINDOWS_DPI_MANIFEST
-#+    NAMES wx.manifest
-#+    PATHS "\${wxWidgets_ROOT_DIR}/include/wx/msw/"
-#+  )
-#+ELSEIF(WIN32)
-#   IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
-#EOF
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_BUILDER:STRING="${BUILDER:- }" -S. -Bbuild_win -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $(cygpath -m $MINGWPREFIX)/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/lib{wxbase,wxmsw}*u.a|tr "\n" " ")" -DENBLEND_DIR:PATH=$MINGWPREFIX &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DHUGIN_BUILDER:STRING="${BUILDER:- }" -S. -Bbuild_win -DwxWidgets_CONFIG_EXECUTABLE:FILEPATH=$(pwd)/wx-config.sh -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="-L$MINGWPREFIX/wx/lib/gcc_x64_dll -lwxbase32u -lwxmsw32u -lwxmsw32u_propgrid -lwxmsw32u_xrc -lwxmsw32u_richtext" -DENBLEND_DIR:PATH=$MINGWPREFIX &&
-# #-DHUGIN_SHARED:BOOL=ON -DENABLE_LAPACK:BOOL=OFF -DPANO13_EXE_DIR:PATH=$MINGWPREFIX -DwxWidgets_USE_DEBUG:BOOL=OFF -DwxWidgets_USE_STATIC:BOOL=OFF -DwxWidgets_USE_UNICODE:BOOL=ON -DwxWidgets_USE_UNIVERSAL:BOOL=OFF -DwxWidgets_wxrc_EXECUTABLE:FILEPATH=$MINGWPREFIX/wx/bin/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_msw/wxrc.exe -DwxWidgets_LIBRARIES:PATH=$MINGWPREFIX/wx/lib/gcc_dll -DBUILD_HSI:BOOL=OFF -DBUILD_HUGINSETUP:BOOL=OFF -DwxWidgets_ROOT_DIR:PATH=$MINGWPREFIX/wx -DwxWidgets_INCLUDE_DIRS:PATH=$MINGWPREFIX/wx/include -DwxWidgets_LIBRARIES:PATH="$(ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u.dll.a)" -DWINDOWS_DPI_MANIFEST:FILEPATH=$MINGWPREFIX/wx/include/wx/msw/wx.manifest -DOPENEXR_INCLUDE_DIR:PATH=$MINGWPREFIX/include/OpenEXR -DOPENEXR_LIBRARIES:STRING="$(pkg-config --libs OpenEXR)" -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/Imath" -DHUGIN_BUILDER:STRING=" " 
-# # fix missing link libraries
-# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -llz4/" build_win/build.ninja &&
-# #wl-showstatus build &&
-# #cmake.exe --build build_win &&
-# #ninja -Cbuild_win &&
-# #touch build_win/help/hugin_help_en_EN.chm &&
-# wl-showstatus build-install &&
-# #cmake.exe --install build_win --strip &&
-# #cmake.exe --build build_win --target "install/strip" &&
-# ninja -Cbuild_win install/strip &&
-# #rm -f $INSTALLPREFIX/share/hugin/xrc/data/hugin_help_en_EN.chm &&
-#    echo OK
-
-
-
-#ls -1 $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxbase*u_xml.a $MINGWPREFIX/wx/lib/$(if ${CC:-gcc} --version|grep -q "^clang"; then echo -n clang; else echo -n gcc; fi)_dll/libwxmsw*u_{core,aui,xrc,html,adv,gl}.a >> build_shared/src/hugin1/stitch_project/CMakeFiles/hugin_stitch_project.dir/linklibs.rsp
