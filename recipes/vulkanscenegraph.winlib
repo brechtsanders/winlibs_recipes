@@ -46,10 +46,10 @@ export TYPE=library
 #export VERSIONDATE=20250110
 #export VERSION=1.1.10
 #export VERSIONDATE=20250204
-#export VERSION=1.1.11
-#export VERSIONDATE=20250802
-export VERSION=1.1.12
-export VERSIONDATE=20251128
+export VERSION=1.1.11
+export VERSIONDATE=20250802
+#export VERSION=1.1.12
+#export VERSIONDATE=20251128
 wl-showstatus --package-version
 export DEPENDENCIES=vulkan-headers,vulkan-loader,spirv-tools,glslang
 export OPTIONALDEPENDENCIES=
@@ -82,6 +82,16 @@ cd VulkanSceneGraph-$VERSION
 # fix missing constants in src/vsg/platform/win32/Win32_Window.cpp (version >= 1.0.3)
 #### Note: this should not be needed if _WIN32_WINNT >= 0x0604
 sed -i.bak -e "s/^\s*{\(VK_[^ ]*\).*$/#ifdef \1\n&\n#endif/" src/vsg/platform/win32/Win32_Window.cpp
+# fix undefined WIN32 (version >= 1.1.12)
+sed -i -e "s/(WIN32)/(_WIN32)/" include/vsg/core/Export.h src/vsg/io/FileSystem.cpp
+## fix include/vsg/core/Export.h (version >= 1.1.12)
+#patch -ulf include/vsg/core/Export.h << EOF
+#@@ -21,3 +21,3 @@
+# #        define VSG_DECLSPEC __declspec(dllexport)
+#-#    elif defined(VSG_SHARED_LIBRARY)
+#+#    elif !defined(STATIC) && !defined(VSG_STATIC_LIBRARY)
+# #        define VSG_DECLSPEC __declspec(dllimport)
+#EOF
 # use already installed shaderc (version >= 1.0.3)
 touch src/glslang/build_vars.cmake
 # fix CMakeLists.txt (version >= 1.1.6)
@@ -91,11 +101,13 @@ mkdir -p build_static build_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DVSG_SUPPORTS_ShaderCompiler:STRING=0 -S. -Bbuild_static &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/glslang" -S. -Bbuild_static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/glslang -DVSG_STATIC_LIBRARY" -S. -Bbuild_static &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DVSG_SUPPORTS_ShaderCompiler:STRING=0 -S. -Bbuild_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/glslang -DGLSLANG_IS_SHARED_LIBRARY" -S. -Bbuild_shared &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/glslang -DGLSLANG_IS_SHARED_LIBRARY -DGLSLANG_EXPORTING" -S. -Bbuild_shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/glslang -DGLSLANG_EXPORTING" -S. -Bbuild_shared &&
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lglslang -lglslang-default-resource-limits -lSPIRV/" build_shared/build.ninja &&
  # fix multiple definitions (version >= 1.0.5)
