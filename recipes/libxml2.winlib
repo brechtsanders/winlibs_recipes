@@ -543,17 +543,36 @@ wl-showstatus preconfigure &&
 #export OPTIONALDEPENDENCIES=xz
 #export BUILDDEPENDENCIES=cmake,ninja
 #export OPTIONALBUILDDEPENDENCIES=
+## fix Python 3.8 or higher dependency DLL lookup path
+#mv python/libxml.py python/libxml.py.bak
+#cat > python/libxml.py << EOF
+#import sys
+#if sys.version_info >= (3,8):
+#    import os
+#    os.add_dll_directory(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "bin"))
+#EOF
+#cat python/libxml.py.bak >> python/libxml.py
+## fix missing Python library files
+#mkdir -p pylibs &&
+#pexports $PYDIR/python[0-9][0-9]*.dll > pylibs/python3.def &&
+#(( grep -q Py_InitModule4_64 pylibs/python3.def && echo "Py_InitModule4 = Py_InitModule4_64" >> pylibs/python3.def ) || true ) &&
+#(( grep -q PyModule_Create2 pylibs/python3.def && echo "PyModule_Create = PyModule_Create2" >> pylibs/python3.def ) || true ) &&
+#${DLLTOOL:-dlltool} -D $PYDIR/python[0-9][0-9]*.dll -d pylibs/python3.def -l pylibs/libpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p").dll.a
 ## fix Python installation location
 #sed -i.bak -e "s/\(\${CMAKE_INSTALL_PREFIX}\/python\)\"/\1\/Lib\/site-packages\"/" CMakeLists.txt
-## don't include ABI version information in Python module
+## don't include ABI version information in Python module file name
 #sed -i.bak2 -e "s/\(MODULE\) WITH_SOABI/\1/" CMakeLists.txt
 #mkdir -p build_static build_shared &&
 # wl-showstatus configure-static &&
 # cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLIBXML2_WITH_THREADS:BOOL=ON -DLIBXML2_WITH_THREAD_ALLOC:BOOL=ON -DLIBXML2_WITH_TLS:BOOL=ON -DLIBXML2_WITH_WRITER:BOOL=ON -DLIBXML2_WITH_ZLIB:BOOL=ON -DLIBXML2_WITH_READLINE:BOOL=ON -DLIBXML2_WITH_ICONV:BOOL=ON -DLIBXML2_WITH_ICU:BOOL=OFF -DLIBXML2_WITH_HTTP:BOOL=ON -DLIBXML2_WITH_SCHEMATRON:BOOL=ON -DLIBXML2_WITH_LEGACY:BOOL=ON -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libz.a -DIconv_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DIconv_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libiconv.a -DLIBXML2_WITH_PYTHON:BOOL=OFF -DLIBXML2_WITH_PROGRAMS:BOOL=OFF -DLIBXML2_WITH_DOCS:BOOL=OFF -DLIBXML2_WITH_TESTS:BOOL=OFF -S. -Bbuild_static &&
 # wl-showstatus configure-shared &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIBXML2_WITH_THREADS:BOOL=ON -DLIBXML2_WITH_THREAD_ALLOC:BOOL=ON -DLIBXML2_WITH_TLS:BOOL=ON -DLIBXML2_WITH_WRITER:BOOL=ON -DLIBXML2_WITH_ZLIB:BOOL=ON -DLIBXML2_WITH_READLINE:BOOL=ON -DLIBXML2_WITH_ICONV:BOOL=ON -DLIBXML2_WITH_ICU:BOOL=OFF -DLIBXML2_WITH_HTTP:BOOL=ON -DLIBXML2_WITH_SCHEMATRON:BOOL=ON -DLIBXML2_WITH_LEGACY:BOOL=ON -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libz.dll.a -DIconv_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DIconv_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libiconv.dll.a -DLIBXML2_WITH_PYTHON:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DLIBXML2_WITH_PROGRAMS:BOOL=ON -DLIBXML2_WITH_DOCS:BOOL=OFF -DLIBXML2_WITH_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLIBXML2_WITH_THREADS:BOOL=ON -DLIBXML2_WITH_THREAD_ALLOC:BOOL=ON -DLIBXML2_WITH_TLS:BOOL=ON -DLIBXML2_WITH_WRITER:BOOL=ON -DLIBXML2_WITH_ZLIB:BOOL=ON -DLIBXML2_WITH_READLINE:BOOL=ON -DLIBXML2_WITH_ICONV:BOOL=ON -DLIBXML2_WITH_ICU:BOOL=OFF -DLIBXML2_WITH_HTTP:BOOL=ON -DLIBXML2_WITH_SCHEMATRON:BOOL=ON -DLIBXML2_WITH_LEGACY:BOOL=ON -DZLIB_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DZLIB_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libz.dll.a -DIconv_INCLUDE_DIR:PATH=$MINGWPREFIX/include -DIconv_LIBRARY:FILEPATH=$MINGWPREFIX/lib/libiconv.dll.a -DLIBXML2_WITH_PYTHON:BOOL=ON -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DLIBXML2_WITH_PROGRAMS:BOOL=ON -DLIBXML2_WITH_DOCS:BOOL=OFF -DLIBXML2_WITH_TESTS:BOOL=OFF -DCMAKE_SHARED_LINKER_FLAGS="-L$PWD/pylibs" -S. -Bbuild_shared &&
 # wl-showstatus build-install-static &&
 # ninja -Cbuild_static install/strip &&
 # wl-showstatus build-install-shared &&
 # ninja -Cbuild_shared install/strip &&
+# # delete any __pycache__ folder(s)
+# find $INSTALLPREFIX -name __pycache__ -exec echo rm -rf {} \; | sh &&
+# # test Python module
+# echo "import libxml2" | PATH=$INSTALLPREFIX/bin:$PYDIR:$PATH PYTHONPATH=$INSTALLPREFIX/python/Lib/site-packages PYTHONLEGACYWINDOWSDLLLOADING=1 $PYDIR/python.exe &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-v$VERSION
