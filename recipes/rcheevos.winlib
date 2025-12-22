@@ -25,12 +25,14 @@ export TYPE=library
 #export VERSIONDATE=20240618
 #export VERSION=11.5.0
 #export VERSIONDATE=20240728
-export VERSION=11.6.0
-export VERSIONDATE=20241010
+#export VERSION=11.6.0
+#export VERSIONDATE=20241010
 #export VERSION=12.0.0
 #export VERSIONDATE=20250623
 #export VERSION=12.1.0
 #export VERSIONDATE=20251008
+export VERSION=12.2.0
+export VERSIONDATE=20251222
 wl-showstatus --package-version
 export DEPENDENCIES=lua
 export OPTIONALDEPENDENCIES=
@@ -51,12 +53,72 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+## fix src/rc_client_external.c (version >= 12.2.0)
+#patch -ulbf src/rc_client_external.c << EOF
+#@@ -48,2 +48,3 @@
+# {
+#+#ifdef RC_CLIENT_SUPPORTS_EXTERNAL
+#   if (!client->state.external_client_conversions) {
+#@@ -57,2 +58,3 @@
+#   }
+#+#endif
+# }
+#@@ -61,2 +63,5 @@
+# {
+#+#ifndef RC_CLIENT_SUPPORTS_EXTERNAL
+#+  return NULL;
+#+#else
+#   rc_client_user_t* converted;
+#@@ -78,2 +83,3 @@
+#   return converted;
+#+#endif
+# }
+#@@ -82,2 +88,5 @@
+# {
+#+#ifndef RC_CLIENT_SUPPORTS_EXTERNAL
+#+  return NULL;
+#+#else
+#   rc_client_game_t* converted;
+#@@ -99,2 +108,3 @@
+#   return converted;
+#+#endif
+# }
+#@@ -103,2 +113,5 @@
+# {
+#+#ifndef RC_CLIENT_SUPPORTS_EXTERNAL
+#+  return NULL;
+#+#else
+#   rc_client_subset_t* converted = NULL;
+#@@ -136,2 +149,3 @@
+#   return converted;
+#+#endif
+# }
+#@@ -140,2 +154,5 @@
+# {
+#+#ifndef RC_CLIENT_SUPPORTS_EXTERNAL
+#+  return NULL;
+#+#else
+#   rc_client_achievement_t* converted = NULL;
+#@@ -179,2 +196,3 @@
+#   return converted;
+#+#endif
+# }
+#@@ -260,2 +278,3 @@
+#
+#+#ifdef RC_CLIENT_SUPPORTS_EXTERNAL
+#           (*achievement)->badge_url = rc_client_external_build_avatar_url(badge_url,
+#@@ -268,2 +287,3 @@
+#           badge_url += RC_CLIENT_IMAGE_URL_BUFFER_SIZE;
+#+#endif
+#         }
+#EOF
 wl-showstatus build &&
  touch SUCCESS &&
  #for F in src/*/*.c; do
  for F in src/*.c src/*/*.c; do
   echo CC $F
-  ${CC:-gcc} -c -o $F.o $F -Iinclude -Itest || (rm -f SUCCESS && false ) || break
+  #${CC:-gcc} -c -o $F.o $F -Iinclude -Itest || (rm -f SUCCESS && false ) || break
+  ${CC:-gcc} -c -o $F.o $F -Iinclude -Itest -DRC_CLIENT_SUPPORTS_EXTERNAL -DRC_CLIENT_SUPPORTS_RAINTEGRATION -DRC_CLIENT_SUPPORTS_HASH || (rm -f SUCCESS && false ) || break
  done &&
  rm SUCCESS &>/dev/null &&
  #ar cr librcheevos.a src/{rcheevos,rhash}/*.o &&
