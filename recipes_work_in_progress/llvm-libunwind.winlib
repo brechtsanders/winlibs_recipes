@@ -1,3 +1,108 @@
+#export NAME="libunwind"
+#export STATUS=
+#export URL=http://llvm.org/
+#export BASENAME=libunwind
+#export DESCRIPTION="LLVM's unwinder library"
+#export CATEGORY=development
+#export TYPE=application
+##export VERSION=5.0.0
+##export VERSIONDATE=20170909
+##export VERSION=5.0.1
+##export VERSIONDATE=20171220
+##export VERSION=5.0.2
+##export VERSIONDATE=20180703
+##export VERSION=6.0.0
+##export VERSIONDATE=20180318
+##export VERSION=6.0.1
+##export VERSIONDATE=20180703
+##export VERSION=7.0.0
+##export VERSIONDATE=20181029
+##export VERSION=7.0.1
+##export VERSIONDATE=20181230
+##export VERSION=7.1.0
+##export VERSIONDATE=20190502
+##export VERSION=8.0.0
+##export VERSIONDATE=20190401
+##export VERSION=8.0.1
+##export VERSIONDATE=20190818
+##export VERSION=9.0.0
+##export VERSIONDATE=20190930
+##export VERSION=9.0.1
+##export VERSIONDATE=20200224
+##export VERSION=10.0.0
+##export VERSIONDATE=20200326
+##export VERSION=10.0.1
+##export VERSIONDATE=20200804
+##export VERSION=11.0.0
+##export VERSIONDATE=20201012
+#export VERSION=11.1.0
+#export VERSIONDATE=20210408
+#####LIBUNWIND_BUILD_32_BITS=ON is not supported on this platform.
+##export VERSION=12.0.0
+##export VERSIONDATE=20210419
+##export VERSION=18.1.6
+##export VERSIONDATE=20240519
+#wl-showstatus --package-version
+#export DEPENDENCIES=llvm
+#export OPTIONALDEPENDENCIES=
+##export BUILDDEPENDENCIES=cmake
+##export OPTIONALBUILDDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE.TXT
+#export LICENSETYPE=
+##export DOWNLOADURL="http://llvm.org/releases/download.html libunwind- .src.tar.xz"
+#export DOWNLOADURL="https://github.com/llvm/llvm-project/releases libunwind- .src.tar.xz"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+##export DOWNLOADSOURCEURL=http://releases.llvm.org/$VERSION/$BASENAME-$VERSION.src.tar.xz
+#export DOWNLOADSOURCEURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$VERSION/$BASENAME-$VERSION.src.tar.xz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.src.tar.xz
+#cd $BASENAME-$VERSION.src
+## fix missing AcquireSRWLockShared in src/libunwind.cpp
+#mv src/libunwind.cpp src/libunwind.cpp.bak
+#cat > src/libunwind.cpp << EOF
+##if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0600
+##endif
+##include <synchapi.h>
+#EOF
+#cat src/libunwind.cpp.bak >> src/libunwind.cpp
+## fix missing AcquireSRWLockShared in src/Unwind-seh.cpp
+#mv src/Unwind-seh.cpp src/Unwind-seh.cpp.bak
+#cat > src/Unwind-seh.cpp << EOF
+##if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+##undef _WIN32_WINNT
+##define _WIN32_WINNT 0x0600
+##endif
+##include <synchapi.h>
+#EOF
+#cat src/Unwind-seh.cpp.bak >> src/Unwind-seh.cpp
+##mkdir -p build_win &&
+## wl-showstatus configure &&
+## cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLIBUNWIND_ENABLE_SHARED:BOOL=ON -DLIBUNWIND_ENABLE_STATIC:BOOL=ON -DLLVM_CONFIG=$MINGWPREFIX/share/llvm/bin/llvm-config.exe -DLLVM_PATH:PATH=$MINGWPREFIX/share/llvm -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM -S. -Bbuild_win &&
+## #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLIBUNWIND_ENABLE_SHARED:BOOL=ON -DLIBUNWIND_ENABLE_STATIC:BOOL=ON -DLIBUNWIND_BUILD_32_BITS:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "OFF"; else echo "ON"; fi) -DLLVM_CONFIG=$MINGWPREFIX/share/llvm/bin/llvm-config.exe -DLLVM_PATH:PATH=$MINGWPREFIX/share/llvm -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM -S. -Bbuild_win &&
+## #echo "-Wl,--as-needed -lpsapi" >> src/CMakeFiles/unwind_shared.dir/linklibs.rsp &&
+## wl-showstatus build-install &&
+## ( make -Cbuild_win install/strip || make -j1 -Cbuild_win install/strip ) &&
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf $BASENAME-$VERSION.src
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llvm -DCMAKE_BUILD_TYPE:STRING=Release -DLIBUNWIND_ENABLE_SHARED:BOOL=ON -DLIBUNWIND_ENABLE_STATIC:BOOL=ON -DLIBUNWIND_INSTALL_LIBRARY:BOOL=ON -DLIBUNWIND_USE_COMPILER_RT:BOOL=OFF -DLLVM_CONFIG=$MINGWPREFIX/share/llvm/bin/llvm-config.exe -DLLVM_PATH:PATH=$MINGWPREFIX/share/llvm -DLLVM_HOST_TRIPLE:STRING=$RUNPLATFORM -S. -Bbuild_win &&
+# #-DLIBUNWIND_BUILD_32_BITS:BOOL=$(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "OFF"; else echo "ON"; fi) 
+# # fix error: undefined reference to `EnumProcessModules@16'
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lpsapi/" build_win/build.ninja &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_win install/strip &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION.src
+#####Superseded by llvm-project all-in-one build
+
+
+
 export NAME="LLVM libunwind"
 export STATUS=
 export URL=https://llvm.org/
