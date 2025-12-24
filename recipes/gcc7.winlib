@@ -8,7 +8,7 @@ export TYPE=application
 export VERSION=7.5.0
 export VERSIONDATE=20220122
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl,mman-win32
+export DEPENDENCIES=zlib,zstd,pthreads,libiconv,mpfr,gmp,mpc,isl,mingw-w64,libdl,mman-win32,sys_wait_h
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=binutils
 export OPTIONALBUILDDEPENDENCIES=
@@ -33,6 +33,17 @@ fi
 if [ "$USE_UCRT" == "" ]; then
  USE_UCRT=0
 fi
+# fix libiberty/waitpid.c (version >= 7.5.0)
+mv libiberty/waitpid.c libiberty/waitpid.c.bak &&
+echo "#include <sys/wait.h>" > libiberty/waitpid.c
+# fix libgomp/env.c (version >= 7.5.0)
+patch -ulbf libgomp/env.c << EOF
+@@ -1174,3 +1174,3 @@
+       fprintf (stderr, "  GOMP_STACKSIZE = '%lu'\\n", stacksize);
+-#ifdef HAVE_INTTYPES_H
++#if 0
+       fprintf (stderr, "  GOMP_SPINCOUNT = '%"PRIu64"'\\n",
+EOF
 # fix printf format issues with MinGW-w64 >= 8.0.0 (version >= 10.2.0)
 ####See also: https://sourceforge.net/p/mingw-w64/bugs/853/
 ####See also: https://github.com/msys2/MINGW-packages-dev/blob/master/mingw-w64-gcc-git/0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch
@@ -44,8 +55,7 @@ sed -i.bak -e "s?/lib/cpp?$(which cpp.exe)?" $(find -name configure)
 # copy MinGW-w64 files
 mkdir -p build_mingw/mingw-w64/mingw/lib &&
 cp -rf $MINGWPREFIX/share/mingw-w64/include build_mingw/mingw-w64/mingw/ &&
-#cp -f $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/include/*.h build_mingw/mingw-w64/mingw/include &&
-( cp -rf $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/lib/* build_mingw/mingw-w64/mingw/lib/ || cp -rf $MINGWPREFIX/share/mingw-w64/lib/* build_mingw/mingw-w64/mingw/lib/ ) &&
+( cp -rf $MINGWPREFIX/share/mingw-w64/$RUNPLATFORM/lib/* build_mingw/mingw-w64/mingw/lib/ || cp -rf $MINGWPREFIX/share/mingw-w64/lib build_mingw/mingw-w64/mingw/ ) &&
 mkdir -p build_mingw/mingw-w64/mingw &&
  wl-showstatus configure &&
  cd build_mingw &&
@@ -80,12 +90,13 @@ mkdir -p build_mingw/mingw-w64/mingw &&
   --with-build-sysroot=$PWD/mingw-w64 \
   --with-native-system-header-dir=$MINGWPREFIX/share/mingw-w64/include \
   --enable-version-specific-runtime-libs \
-  CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -Wno-int-conversion" \
+  CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/win32ports/include -Wno-int-conversion" \
   CXXFLAGS="-Wno-int-conversion" \
-  LDFLAGS="-pthread $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--dynamicbase &> /dev/null; then echo "-Wl,--dynamicbase"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--high-entropy-va &> /dev/null; then echo "-Wl,--high-entropy-va"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--nxcompat &> /dev/null; then echo "-Wl,--nxcompat"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--tsaware &> /dev/null; then echo "-Wl,--tsaware"; fi)" \
+  LDFLAGS="-pthread -Wl,--as-needed -lkernel32 $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--dynamicbase &> /dev/null; then echo "-Wl,--dynamicbase"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--high-entropy-va &> /dev/null; then echo "-Wl,--high-entropy-va"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--nxcompat &> /dev/null; then echo "-Wl,--nxcompat"; fi) $(if echo "int main() { return 0; }" | gcc -xc - -o test_arg.exe -Wl,--tsaware &> /dev/null; then echo "-Wl,--tsaware"; fi)" \
   &&
  cd .. &&
  make -Cbuild_mingw configure-host &&
+ #make -Cbuild_mingw configure-host configure-target &&
  wl-showstatus build &&
  PATH=$MINGWPREFIX/share/binutils/bin:$PATH:$PWD/build_mingw/gcc make -Cbuild_mingw &&
  wl-showstatus build-install &&

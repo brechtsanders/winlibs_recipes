@@ -1,0 +1,152 @@
+export NAME="Dialog"
+export STATUS=
+export URL=https://invisible-island.net/dialog/
+export BASENAME=dialog
+export DESCRIPTION="Script-interpreter which provides a set of curses widgets. Widgets are objects whose appearance and behavior can be customized. There is a much-reduced variation of dialog, called lxdialog, which is used in Linux kernel configuration."
+export CATEGORY=console,tui
+export TYPE=application
+#export VERSION=1.3-20230209
+#export VERSIONDATE=20230411
+#export VERSION=1.3-20231002
+#export VERSIONDATE=20231003
+#export VERSION=1.3-20240101
+#export VERSIONDATE=20240101
+#export VERSION=1.3-20240307
+#export VERSIONDATE=20240311
+#export VERSION=1.3-20240619
+#export VERSIONDATE=20240621
+#export VERSION=1.3-20250116
+#export VERSIONDATE=20250117
+#export VERSION=1.3-20250817
+#export VERSIONDATE=20250818
+#export VERSION=1.3-20251001
+#export VERSIONDATE=20251006
+export VERSION=1.3-20251223
+export VERSIONDATE=20251224
+wl-showstatus --package-version
+export DEPENDENCIES=gettext,ncurses,wcwidth,win32-fork,sys_wait_h
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=groff
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://invisible-island.net/archives/dialog/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://invisible-island.net/archives/dialog/dialog-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/dialog-$VERSION.tgz
+## avoid using ldconfig
+#sed -i.bak -e "s?^\(\s*\)\(.*/sbin/ldconfig\)?\1#\2?" makefile
+cd $BASENAME-$VERSION
+# don't support dialog_prgbox() in prgbox.c (version >= 1.3-20240619)
+patch -ulbf prgbox.c << EOF
+@@ -25,2 +25,3 @@
+
++#ifdef SIGCHLD
+ static void
+@@ -91,2 +92,3 @@
+ }
++#endif
+
+@@ -103,2 +105,6 @@
+ {
++#ifndef SIGCHLD
++    dlg_exiterr("pipe open not supported on Windows, called command: %s", command);
++    return DLG_EXIT_ERROR;
++#else
+     int code;
+@@ -117,2 +123,3 @@
+     return code;
++#endif
+ }
+EOF
+# fix missing wcwidth
+sed -i.bak -e "1i #include <wcwidth.h>" trace.c inputstr.c util.c
+# fix ui_getc.c (version >= 1.3-20251223)
+patch -ulbf ui_getc.c << EOF
+@@ -29,2 +29,3 @@
+ #endif
++#include <win32fork.h>
+
+@@ -173,2 +174,5 @@
+ {
++#ifndef FD_ISSET
++    return -1;
++#else
+     DIALOG_CALLBACK *p;
+@@ -216,2 +220,3 @@
+     return result;
++#endif
+ }
+@@ -321,2 +326,5 @@
+ {
++#ifndef F_GETFL
++    return FALSE;
++#else
+     bool code = FALSE;
+@@ -330,2 +338,3 @@
+     return code;
++#endif
+ }
+@@ -650,6 +659,10 @@
+                } else {        /* child, pid==0 */
++#ifdef SIGHUP
+                    if (!dialog_vars.cant_kill)
+                        (void) signal(SIGHUP, finish_bg);
++#endif
+                    (void) signal(SIGINT, finish_bg);
++#ifdef SIGQUIT
+                    (void) signal(SIGQUIT, finish_bg);
++#endif
+                    (void) signal(SIGSEGV, finish_bg);
+EOF
+# fix util.c (version >= 1.3-20251223)
+patch -ulbf util.c << EOF
+@@ -274,2 +274,3 @@
+     const char *device;
++#ifndef _WIN32
+     if (!isatty(fileno(stderr))
+@@ -284,2 +285,3 @@
+     }
++#endif
+     *result = dlg_strclone(device);
+EOF
+# fix prgbox.c (version >= 1.3-20251223)
+patch -ulbf prgbox.c << EOF
+@@ -24,2 +24,7 @@
+ #include <dlg_internals.h>
++#ifdef _WIN32
++#include <win32fork.h>
++#include <fcntl.h>
++#define pipe(fds) _pipe(fds, 4096, _O_BINARY)
++#endif
+
+@@ -31,2 +36,3 @@
+ }
++#endif
+
+@@ -92,3 +98,2 @@
+ }
+-#endif
+
+EOF
+# also allow building static library
+cat >> makefile.in << EOF
+libdialog.a: \${LIB_OBJECT}
+$(echo -e "\t")\$(AR) cr \$@ \${LIB_OBJECT}
+EOF
+wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-shared --enable-pc-files --with-ncursesw --enable-widec --without-x CFLAGS="-I$MINGWPREFIX/include/compat -I$MINGWPREFIX/win32ports/include" LDFLAGS="-Wl,--as-needed -lwcwidth -lwin32fork" &&
+ wl-showstatus build-install &&
+ make libdialog.a install-strip &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib &&
+ cp -f *.h $INSTALLPREFIX/include/ &&
+ cp -f *.a $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
