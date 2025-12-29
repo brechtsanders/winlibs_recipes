@@ -1,0 +1,58 @@
+export NAME="TFEL/MFront"
+export STATUS=
+export URL=https://thelfer.github.io/tfel/web/
+#export URL=https://github.com/thelfer/tfel
+export BASENAME=tfel
+export DESCRIPTION="TFEL is a collaborative development of CEA and EDF. MFront is a code generator which translates a set of closely related domain specific languages into plain C++ on top of the TFEL library."
+export CATEGORY=development
+export TYPE=library
+export VERSION=5.1.0
+export VERSIONDATE=20251229
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="GPL/LGPL/CECILL B"
+export DOWNLOADURL="https://github.com/thelfer/tfel/releases TFEL-"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/thelfer/tfel/archive/refs/tags/TFEL-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/TFEL-$VERSION.tar.gz
+cd tfel-TFEL-$VERSION
+## fix mfront/src/CodeGeneratorUtilities.cxx (version >= 5.1.0)
+#patch -ulbf mfront/src/CodeGeneratorUtilities.cxx << EOF
+#@@ -549,3 +549,5 @@
+#          << "#ifndef MFRONT_SHAREDOBJ\\n"
+#-         << "#ifdef  MFRONT_COMPILING\\n"
+#+         << "#ifdef  STATIC\\n"
+#+         << "#define MFRONT_SHAREDOBJ\\n"
+#+         << "#elif   defined(MFRONT_COMPILING)\\n"
+#          << "#define MFRONT_SHAREDOBJ __declspec(dllexport)\\n"
+#EOF
+# fix include/TFEL/Config/TFELConfig.hxx (version >= 5.1.0)
+patch -ulbf include/TFEL/Config/TFELConfig.hxx << EOF
+@@ -93,3 +93,3 @@
+  */
+-#if defined _WIN32 || defined _WIN64 || defined __CYGWIN__
++#if (defined _WIN32 || defined _WIN64 || defined __CYGWIN__) && !defined(STATIC)
+ #define TFEL_VISIBILITY_IMPORT __declspec(dllimport)
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -Denable-static:BOOL=ON -Denable-portable-build:BOOL=ON -DW_AVAILABLE:BOOL=OFF -DWall_AVAILABLE:BOOL=OFF -Dm64_AVAILABLE:BOOL=OFF -Denable-fortran:BOOL=ON -Denable-java:BOOL=OFF -Denable-testing:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-DSTATIC" -S. -Bbuild_static &&
+ sed -i.bak -e "s/^ *FLAGS *= */&-DSTATIC /" build_static/build.ninja &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -Denable-static:BOOL=OFF -Denable-portable-build:BOOL=ON -DW_AVAILABLE:BOOL=OFF -DWall_AVAILABLE:BOOL=OFF -Dm64_AVAILABLE:BOOL=OFF -Denable-fortran:BOOL=ON -Denable-java:BOOL=OFF -Denable-testing:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf tfel-TFEL-$VERSION
+
+
+
