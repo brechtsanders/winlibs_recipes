@@ -42,8 +42,9 @@ export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
 #export BUILDDEPENDENCIES=cmake
 #export OPTIONALBUILDDEPENDENCIES=
-export LICENSEFILE=COPYING
-export LICENSETYPE=
+#export LICENSEFILE=COPYING
+export LICENSEFILE=LICENSE.md
+export LICENSETYPE=LGPL
 #export DOWNLOADURL="http://www3.freefem.org/ff++/download.php freefem++-"
 export DOWNLOADURL="https://github.com/FreeFem/FreeFem-sources/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
@@ -66,13 +67,25 @@ patch -ulbf src/bin-win32/launchff++.cpp << EOF
 +using namespace std;
 
 EOF
+## fix src/fflib/strversionnumber.cpp (version >= 4.15)
+#patch -ulbf src/fflib/strversionnumber.cpp << EOF
+#@@ -4,3 +4,3 @@
+#
+#-#include "config-wrapper.h"
+#+#include "config.h"
+#
+#EOF
 ## fix undefined LD_LBFGS_NOCEDAL in plugin/seq/ff-NLopt.cpp (version >= 4.15)
 #sed -i.bak -e "s/LD_LBFGS_NOCEDAL/NLOPT_LD_LBFGS_NOCEDAL/" plugin/seq/ff-NLopt.cpp
 wl-showstatus configure &&
  mkdir -p m4 &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
- ./configure --prefix=$INSTALLPREFIX/share/FreeFem++ --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ #./configure --prefix=$INSTALLPREFIX/share/FreeFem++ --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  #./configure --prefix=$INSTALLPREFIX/share/FreeFem++ --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-mpi=no --with-mpipath= &&
+ CC="${CC:-gcc}" CXX="${CXX:-g++}" FC="${FC:-gfortran}" F77= ./configure --prefix=$INSTALLPREFIX/share/FreeFem++ --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-fortran CC="${CC%% *}" CFLAGS="${CC#* }" CXX="${CXX%% *}" CXXFLAGS="${CXX#* } $(if ${CC:-gcc} --help -v 2> /dev/null | grep -qw "\-Wtemplate-body"; then echo "-Wno-error=template-body"; fi)" FC="${FC%% *}" FCFLAGS="${FC#* }" &&
+ #wl-showstatus build &&
+ #make all bin/md2edp.exe &&
+ #cp -u bin/md2edp.exe src/bin-win32/ &&
  wl-showstatus build-install &&
  make install-strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf FreeFem-sources-$VERSION
@@ -88,9 +101,11 @@ wl-showstatus configure &&
 #export BUILDDEPENDENCIES=cmake
 #export OPTIONALBUILDDEPENDENCIES=
 #PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
+## skip building examples/CMakeLists
+#sed -i.bak -e "s/^add_subdirectory(examples)/#&/" CMakeLists.txt
 #mkdir -p build_win &&
 # wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/FreeFem++ -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/FreeFem++ -DCMAKE_BUILD_TYPE:STRING=Release -DDLOPEN_INCLUDES:PATH=$MINGWPREFIX/include/libdl-win32 -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
 # wl-showstatus build-install &&
 # ninja -Cbuild_win install/strip &&
 #    echo OK
