@@ -104,6 +104,16 @@ patch -ulbf src/common/ssl.c << EOF
 +    SSL_CTX_set1_param(ssl_ctx, param);
 
 EOF
+# fix src/common/expr-parser.h (version >= 2.8.1248)
+patch -ulbf src/common/expr-parser.h << EOF
+@@ -18,5 +18,4 @@
+ /* This is a hack to get it built on darwin */
+-# ifdef __APPLE__
+ # undef bool
+-#endif
++# define bool NXLOG_bool
+
+EOF
 # ignore nl_langinfo detection error
 patch -ulbf configure << EOF
 --- configure  2012-08-27 10:06:12 +0200
@@ -135,11 +145,12 @@ wl-showstatus configure &&
  #PATH=$PATH:$PERLDIR/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -lplibc -liconv" &&
  #PATH=$PATH:$PERLDIR/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -liconv" &&
  #PATH=$PATH:$PERLDIR/bin:$PERLDIR/../c/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -liconv" &&
- PATH=$PATH:$PERLDIR/bin:$PERLDIR/../c/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -liconv" &&
+ PATH=$PATH:$PERLDIR/bin:$PERLDIR/../c/bin ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-std=c11 $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -liconv" &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  # fix detection of shared libraries
- sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
  ( make install-strip || (
 cat > src/modules/extension/perl/Makefile << EOF

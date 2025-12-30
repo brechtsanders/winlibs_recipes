@@ -2,7 +2,7 @@ export NAME="plotutils"
 export STATUS=
 export URL=http://www.gnu.org/software/plotutils/
 export BASENAME=plotutils
-export DESCRIPTION=" The GNU plotutils package contains software for both programmers and technical users. Its centerpiece is libplot, a powerful C/C++ function library for exporting 2-D vector graphics in many file formats, both vector and raster. It can also do vector graphics animations. libplot is device-independent in the sense that its API (application programming interface) does not depend on the type of graphics file to be exported."
+export DESCRIPTION="The GNU plotutils package contains software for both programmers and technical users. Its centerpiece is libplot, a powerful C/C++ function library for exporting 2-D vector graphics in many file formats, both vector and raster. It can also do vector graphics animations. libplot is device-independent in the sense that its API (application programming interface) does not depend on the type of graphics file to be exported."
 export CATEGORY=graphics
 export TYPE=application
 #export VERSION=2.5
@@ -39,12 +39,15 @@ patch -ulbf libplot/z_write.c << EOF
 +  png_longjmp (png_ptr, 1);
  }
 EOF
+# fix already defined bool in include/sys-defines.h
+sed -i.bak -e "s/^typedef enum { false = 0, true = 1 } bool;/#if defined(__STDC_VERSION__) \&\& __STDC_VERSION__ >= 202311L\n#include <stdbool.h>\n#else\n&\n#endif/" include/sys-defines.h
 # support ARM64 in config.sub
 sed -i.bak -e "s/| x86_64-\* /&| aarch64-\* /" config.sub
 wl-showstatus configure &&
  # build and fix missing signgam
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x LDFLAGS="-no-undefined -Wl,-no-undefined" && 
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x LDFLAGS="-Wl,-no-undefined" && 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x LDFLAGS="-Wl,-no-undefined" && 
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" LDFLAGS="-Wl,-no-undefined" && 
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  # fix detection of shared libraries
