@@ -25,6 +25,8 @@ export VERSIONDATE=20190619
 #export VERSIONDATE=20250819
 #export VERSION=3.7.6
 #export VERSIONDATE=20251230
+#export VERSION=3.7.7
+#export VERSIONDATE=20251231
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -108,11 +110,99 @@ wl-showstatus configure &&
 #touch winfix/netinet/in.h winfix/netinet/tcp.h winfix/arpa/inet.h winfix/netdb.h winfix/sys/poll.h winfix/sys/wait.h winfix/sys/resource.h winfix/poll.h
 ### fix missing version.h
 ##echo "#include \"../version.h\"" > src/version.h
+## fix include/sipp.hpp (version >= 3.7.7)
+#patch -ulbf include/sipp.hpp << EOF
+#@@ -30,2 +30,5 @@
+# #include <sys/types.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/socket.h>
+#@@ -38,4 +41,7 @@
+# #endif
+#+#endif
+# #include <sys/time.h>
+#+#ifndef _WIN32
+# #include <poll.h>
+#+#endif
+# #ifdef HAVE_EPOLL
+#@@ -43,8 +49,14 @@
+# #endif
+#+#ifndef _WIN32
+# #include <sys/resource.h>
+#+#endif
+# #include <fcntl.h>
+# #include <unistd.h>
+#+#ifndef _WIN32
+# #include <arpa/inet.h>
+#+#endif
+# #include <errno.h>
+#+#ifndef _WIN32
+# #include <netdb.h>
+#+#endif
+# #include <ctype.h>
+#EOF
+## fix include/scenario.hpp (version >= 3.7.7)
+#patch -ulbf include/scenario.hpp << EOF
+#@@ -29,3 +29,7 @@
+# 
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/socket.h>
+#+#endif
+# #include "actions.hpp"
+#EOF
+## fix include/prepare_pcap.h (version >= 3.7.7)
+#patch -ulbf include/prepare_pcap.h << EOF
+#@@ -20,4 +20,8 @@
+# #include <pcap.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <netinet/in.h>
+# #include <netinet/udp.h>
+#+#endif
+# #include <stdint.h>
+#EOF
+## fix include/call.hpp (version >= 3.7.7)
+#patch -ulbf include/call.hpp << EOF
+#@@ -27,3 +27,7 @@
+# #include <sys/types.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/socket.h>
+#+#endif
+# #include <string.h>
+#EOF
+## fix include/send_packets.h (version >= 3.7.7)
+#patch -ulbf include/send_packets.h << EOF
+#@@ -40,4 +40,8 @@
+# #include <math.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <netinet/in.h>
+# #include <sys/socket.h>
+#+#endif
+# 
+#EOF
+## fix include/comp.h (version >= 3.7.7)
+#patch -ulbf include/comp.h << EOF
+#@@ -22,3 +22,7 @@
+# #include <sys/types.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/socket.h>
+#+#endif
+# 
+#EOF
 ## fix CMakeLists.txt (version >= 3.6.1)
 #patch -ulbf CMakeLists.txt << EOF
 #@@ -18,3 +18,3 @@
-#   \${PROJECT_BINARY_DIR}
-#-  "/usr/local/include")
+#   \${PROJECT_BINARY_DIR}#-  "/usr/local/include")
 #+  "$(pwd)/winfix")
 #
 #@@ -92,20 +92,3 @@
@@ -138,6 +228,8 @@ wl-showstatus configure &&
 #+set(VERSION "$VERSION")
 # add_dependencies(sipp version)
 #EOF
+## don't abort on warnings (version >= 3.7.7)
+#sed -i.bak -e "s/-Wall -Werror -pedantic//" CMakeLists.txt
 #mkdir -p build_static build_shared &&
 # wl-showstatus configure &&
 # #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_STATIC:BOOL=ON -DUSE_GSL:BOOL=ON -DUSE_SCTP:BOOL=OFF -DUSE_SSL:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-IPWD/winfix -I$MINGWPREFIX/include/ncurses -I$MINGWPREFIX/win32ports/include" -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -w $PWD/winfix) -I$(cygpath -w $MINGWPREFIX/include/ncurses) -I$(cygpath -w $MINGWPREFIX/win32ports/include)" -S. -Bbuild_static &&
