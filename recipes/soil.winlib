@@ -1,35 +1,142 @@
+#export NAME="SOIL"
+#export STATUS=
+#export URL=http://www.lonesock.net/soil.html
+#export BASENAME=soil
+#export DESCRIPTION="SOIL is a tiny C library used primarily for uploading textures into OpenGL."
+#export CATEGORY=graphics,fileformat
+#export TYPE=library
+#export VERSION=current
+#export VERSIONDATE=20111229
+#wl-showstatus --package-version
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=
+#export LICENSETYPE=
+#export DOWNLOADURL=
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=http://www.lonesock.net/files/soil.zip
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#unzip -oq $TARBALLDIR/$BASENAME/soil.zip
+#cd "Simple OpenGL Image Library"
+#wl-showstatus build-install &&
+# mkdir -p projects/makefile/obj $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+# make -Cprojects/makefile install CC="${CC:-gcc}" CXX="${CC:-gcc}" LOCAL=$INSTALLPREFIX &&
+# #make -Csrc -f"../projects/makefile/alternate Makefile.txt" install DESTDIR=$INSTALLPREFIX SOFILE=libSOIL.dll INSTALL_FILE="install -p -m 644" INSTALL_DIR="install -p -d" &&
+# # manually build and install DLL
+# ( echo EXPORTS; nm -f posix --defined-only -p $INSTALLPREFIX/lib/libSOIL.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" | grep "^SOIL_" ) > $INSTALLPREFIX/lib/libSOIL.def &&
+# ${CC:-gcc} -shared -s -mwindows -def $INSTALLPREFIX/lib/libSOIL.def -o $INSTALLPREFIX/bin/SOIL.dll $INSTALLPREFIX/lib/libSOIL.a -Wl,--out-implib,$INSTALLPREFIX/lib/libSOIL.dll.a -lopengl32 &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf "Simple OpenGL Image Library"
+
+
+
 export NAME="SOIL"
 export STATUS=
-export URL=http://www.lonesock.net/soil.html
+export URL=https://github.com/littlstar/soil
 export BASENAME=soil
 export DESCRIPTION="SOIL is a tiny C library used primarily for uploading textures into OpenGL."
 export CATEGORY=graphics,fileformat
 export TYPE=library
-export VERSION=current
-export VERSIONDATE=20111229
+export VERSION=0.1.1
+export VERSIONDATE=20260104
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
-export LICENSEFILE=
-export LICENSETYPE=
-export DOWNLOADURL=
+export LICENSEFILE=LICENSE.txt
+export LICENSETYPE=MIT
+export DOWNLOADURL=https://github.com/littlstar/soil/tags
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=http://www.lonesock.net/files/soil.zip
+export DOWNLOADSOURCEURL=https://github.com/littlstar/soil/archive/refs/tags/$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
-unzip -oq $TARBALLDIR/$BASENAME/soil.zip
-cd "Simple OpenGL Image Library"
-wl-showstatus build-install &&
- mkdir -p projects/makefile/obj $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
- make -Cprojects/makefile install CC="${CC:-gcc}" CXX=${CC:-gcc} LOCAL=$INSTALLPREFIX &&
- #make -Csrc -f"../projects/makefile/alternate Makefile.txt" install DESTDIR=$INSTALLPREFIX SOFILE=libSOIL.dll INSTALL_FILE="install -p -m 644" INSTALL_DIR="install -p -d" &&
- # manually build and install DLL
- ( echo EXPORTS; nm -f posix --defined-only -p $INSTALLPREFIX/lib/libSOIL.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" | grep "^SOIL_" ) > $INSTALLPREFIX/lib/libSOIL.def &&
- ${CC:-gcc} -shared -s -mwindows -def $INSTALLPREFIX/lib/libSOIL.def -o $INSTALLPREFIX/bin/SOIL.dll $INSTALLPREFIX/lib/libSOIL.a -Wl,--out-implib,$INSTALLPREFIX/lib/libSOIL.dll.a -lopengl32 &&
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf "Simple OpenGL Image Library"
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix linking for Windows  in Makefile.in
+patch -ulbf Makefile.in << EOF
+@@ -12,5 +12,13 @@
+ TARGET_STATIC := lib\$(LIBRARY_NAME).a
++ifeq (\$(OS), Win32)
++TARGET_SOLIB = \$(LIBRARY_NAME).dll
++else
+ TARGET_SOLIB = lib\$(LIBRARY_NAME).so.\$(LIBRARY_VERSION_MAJOR)
++endif
+ TARGET_DYLIB = lib\$(LIBRARY_NAME).\$(LIBRARY_VERSION_MAJOR).\$(LIBRARY_VERSION_MINOR).dylib
++ifeq (\$(OS), Win32)
++TARGET_SO = \$(TARGET_SOLIB)
++else
+ TARGET_SO = lib\$(LIBRARY_NAME).so
++endif
+
+@@ -77,2 +85,4 @@
+        LDFLAGS += -shared -lc -Wl,-install_name,\$(TARGET_SO)
++else ifeq (\$(OS), Win32)
++$(echo -e '\t')LDFLAGS += -shared -s -Wl,--out-implib,lib\$(TARGET_SO).a -lopengl32
+ else
+@@ -140,3 +150,3 @@
+        \$(ENSURE_BUILD_DIRECTORY_STRUCTURE)
+-       \$(CC) \$(LDFLAGS) \$(CFLAGS) -o \$@ \$(OBJS)
++$(echo -e '\t')\$(CC) \$(CFLAGS) -o \$@ \$(OBJS) \$(LDFLAGS)
+ ifneq (\$(OS),Darwin)
+@@ -148,2 +158,3 @@
+ \$(TARGET_SOLIB): \$(BUILD_LIB)/\$(TARGET_SOLIB)
++ifneq (\$(OS), Win32)
+ \$(BUILD_LIB)/\$(TARGET_SOLIB): \$(BUILD_LIB)/\$(TARGET_SO)
+@@ -154,2 +165,3 @@
+        \$(LN) \$(shell basename \$<) \$@.\$(LIBRARY_VERSION_MINOR).\$(LIBRARY_VERSION_PATCH).\$(LIBRARY_VERSION_REVISION)
++endif
+
+EOF
+# fix configure
+sed -i.bak -e "s/^\(declare OS=\).*$/\1\"Win32\"/; s/ar cc //; s?\(which \)cc?\1${CC%% *}?; s/'math\.h' *'errno\.h' *'stdio\.h' *'stdlib\.h' *'string\.h'//" configure
+wl-showstatus configure &&
+ #wl-showstatus preconfigure &&
+ #mkdir -p m4 &&
+ ##libtoolize -f -i -c &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ ## allow building shared libraries when using clang
+ #if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+ # sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" configure
+ # #sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" $(find -name configure)
+ #fi &&
+ ## fix confusion between MSVC and clang
+ #if ${CC:-gcc} --version|grep -q "^clang"; then
+ # sed -i.bak2 -e "s/\b\(cl\)\(\*\)/\1.exe\2/g; s/\(ld_shlibs\)=no/\1yes/" configure
+ #fi &&
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build &&
+ make OS=Win32 BUILD_DIRECTORY=build CC="${CC:-gcc}" AR="${AR:-ar}" &&
+ wl-showstatus build-install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ make install BUILD_DIRECTORY=build &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ cp -u *.dll.a $INSTALLPREFIX/lib/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 
