@@ -283,6 +283,10 @@ sed -i.bak -e "s/^struct cmplx/#undef cmplx\n&/" src/gp_types.h
 # fix undefined GCL_HICON/GWL_WNDPROC (version >= 4.6.4)
 sed -i.bak -e "s/GCL_HICON/GCLP_HICON/" src/win/winmain.c src/win/wgraph.c src/win/wtext.c
 sed -i.bak -e "s/GCL_HICON/GCLP_HICON/; s/GWL_WNDPROC/GWLP_WNDPROC/" src/win/wpause.c
+# fix undefined gnu_main() in src/win/winmain.c (version >= 4.6.4)
+sed -i.bak -e "1i int gnu_main(int argc, char **argv);" src/win/winmain.c
+# fix undefined _chdir() in src/win/wgraph.c (version >= 4.6.4)
+sed -i.bak -e "1i #include <direct.h>" src/win/wgraph.c
 ## fix HTML Help files and -lbgd in config/mingw/Makefile
 #patch -ulbf config/mingw/Makefile << EOF
 #@@ -298,3 +298,3 @@
@@ -314,8 +318,10 @@ EOF
 wl-showstatus build-install &&
  #PATH=$WXWIN/lib/gcc_dll:$PATH make -j1 -Cconfig/mingw console windows pipes support CC="${CC:-gcc}" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=0 &&
  # PATH=$WXWIN/lib/gcc_dll:$PATH make -i -Cconfig/mingw install CC="${CC:-gcc}" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=0 &&
- PATH=$WXWIN/lib/gcc_dll:$PATH make -j1 -Cconfig/mingw console windows pipes support CC="${CC:-gcc}" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=1 HHWPATH=$(pwd)/htmlhelp/ &&
- PATH=$WXWIN/lib/gcc_dll:$PATH make -i -Cconfig/mingw install CC="${CC:-gcc}" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=1 HHWPATH=$(pwd)/htmlhelp/ &&
+ #PATH=$WXWIN/lib/gcc_dll:$PATH make -j1 -Cconfig/mingw console windows pipes support CC="${CC:-gcc}" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=1 HHWPATH=$PWD/htmlhelp/ &&
+ #PATH=$WXWIN/lib/gcc_dll:$PATH make -i -Cconfig/mingw install CC="${CC:-gcc}" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=1 HHWPATH=$PWD/htmlhelp/ &&
+ PATH=$WXWIN/lib/gcc_dll:$PATH make -j1 -Cconfig/mingw console windows pipes support CC="${CC:-gcc} -std=c17 $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=1 HHWPATH=$PWD/htmlhelp/ &&
+ PATH=$WXWIN/lib/gcc_dll:$PATH make -i -Cconfig/mingw install CC="${CC:-gcc} -std=c17" DESTDIR=$INSTALLPREFIX/gnuplot NEWGD=1 JPEG=1 FREETYPE=1 GDAUTOCONFIGLIBS=1 BGD=1 CAIROTERMS=1 CAIROLIBS=1 WXT=1 ICONV=1 LUA=lua HTML_HELP=1 HHWPATH=$PWD/htmlhelp/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####To do: fix 64-bit build
 ####src/internal.c:63:1: warning: '_matherr' redeclared without dllimport attribute: previous dllimport ignored [-Wattributes]
@@ -636,9 +642,9 @@ wl-showstatus build-install &&
 #mkdir -p src/win/.deps
 #wl-showstatus build-install &&
 # #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CXXFLAGS="-I$MINGWPREFIX/wx/include -I$MINGWPREFIX/wx/lib/gcc_dll/msw" &&
-# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-wxwidgets --without-qt --with-cairo --with-readline=$MINGWPREFIX CXXFLAGS="-I$(pwd)/src -fpermissive" &&
-# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$(pwd)/src -I$MINGWPREFIX/wx/include" &&
-# #PKG_CONFIG_PATH=$MINGWPREFIX/qt/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-qt=qt5 --without-x --disable-wxwidgets --with-readline=gnu CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$(pwd)/src -I$MINGWPREFIX/wx/include" &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x --disable-wxwidgets --without-qt --with-cairo --with-readline=$MINGWPREFIX CXXFLAGS="-I$PWD/src -fpermissive" &&
+# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-x CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$PWD/src -I$MINGWPREFIX/wx/include" &&
+# #PKG_CONFIG_PATH=$MINGWPREFIX/qt/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-qt=qt5 --without-x --disable-wxwidgets --with-readline=gnu CXXFLAGS="$(wx-config --cxxflags|tr \\\\ /) -I$PWD/src -I$MINGWPREFIX/wx/include" &&
 # echo "#define USE_FAKEPIPES 1" >> config.h &&
 # sed -i.bak -e "s?^am_gnuplot_OBJECTS = ?&win/screenbuf.o win/wgnuplib.o win/wgraph.o win/wmenu.o win/wpause.o win/wprinter.o win/wtext.o win/wgdiplus.o win/wredirect.o gpexecute.o ?; s?^LIBS = ?&-lole32 -lgdi32 -lgdiplus -lshlwapi ?" src/Makefile &&
 # wl-showstatus build &&
