@@ -29,11 +29,64 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd ORADAD-$VERSION
+# fix Buffer.cpp (version >= 3.6.220)
+patch -ulbf Buffer.cpp << EOF
+@@ -3,3 +3,12 @@
+ #include <intsafe.h>
++#include <string.h>
+ #include "ORADAD.h"
++#ifndef _MAX_ULTOSTR_BASE10_COUNT
++#define _MAX_ULTOSTR_BASE10_COUNT 21
++#define _MAX_U64TOSTR_BASE10_COUNT 21
++#define _MAX_I64TOSTR_BASE10_COUNT 21
++#endif
++#ifndef min
++#define min(a,b) ((a) <= (b) ? (a) : (b))
++#endif
+
+@@ -57,3 +66,3 @@
+
+-      _tcscpy_s(pBuffer->szFileName, MAX_PATH, szFilePath);
++      wcscpy_s((WCHAR*)pBuffer->szFileName, MAX_PATH, (WCHAR*)szFilePath);
+
+EOF
+# fix Engine.cpp (version >= 3.6.220)
+patch -ulbf Engine.cpp << EOF
+@@ -3,5 +3,10 @@
+ #include <DsGetDC.h>
+-#include <Lm.h>
++#include <levmar.h>
++#include <lmcons.h>
++#include <lmapibuf.h>
+ #include <sddl.h>
+ #include "ORADAD.h"
++#ifndef min
++#define min(a,b) ((a) <= (b) ? (a) : (b))
++#endif
+
+EOF
+# fix LDAP.cpp (version >= 3.6.220)
+patch -ulbf LDAP.cpp << EOF
+@@ -9,2 +9,5 @@
+ #include "ORADAD.h"
++#ifndef min
++#define min(a,b) ((a) <= (b) ? (a) : (b))
++#endif
+
+EOF
+# fix Main.cpp (version >= 3.6.220)
+patch -ulbf Main.cpp << EOF
+@@ -326,3 +326,3 @@
+
+-      _stprintf_s(szFinalPath, MAX_PATH, TEXT("%s\\\\oradad.log"), g_GlobalConfig.szFileOutDirectory);
++      _stprintf_s((TCHAR*)szFinalPath, MAX_PATH, TEXT("%s\\\\oradad.log"), g_GlobalConfig.szFileOutDirectory);
+       MoveFile(g_GlobalConfig.szLogfilePath, szFinalPath);
+EOF
 wl-showstatus build &&
  touch SUCCESS &&
  for F in *.cpp; do
    echo CXX $F
-   ${CXX:-g++} -c -o $F.o $F -I. || ( rm -f SUCCESS; false ) || break
+   ${CXX:-g++} -c -o $F.o $F -I. -municode -fpermissive || ( rm -f SUCCESS; false ) || break
  done &&
  rm SUCCESS &&
     echo OK
