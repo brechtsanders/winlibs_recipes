@@ -1,0 +1,122 @@
+export NAME="LibDAQ"
+export STATUS=
+export URL=https://github.com/snort3/libdaq
+export BASENAME=libdaq
+export DESCRIPTION="LibDAQ: The Data AcQuisition Library"
+export CATEGORY=dataprocessing
+export TYPE=library
+export VERSION=3.0.24
+export VERSIONDATE=20260114
+wl-showstatus --package-version
+export DEPENDENCIES=libdl,mman-win32
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/snort3/libdaq/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/snort3/libdaq/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix api/daq_common.h (version >= 3.0.24)
+patch -ulbf api/daq_common.h << EOF
+@@ -28,3 +28,8 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <netinet/in.h>
++#endif
+ #include <sys/time.h>
+EOF
+# fix example/netinet_compat.h (version >= 3.0.24)
+patch -ulbf example/netinet_compat.h << EOF
+@@ -31,3 +31,8 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <netinet/if_ether.h>
++#endif
+
+@@ -37,3 +42,5 @@
+
++#ifndef _WIN32
+ #include <netinet/in.h>
++#endif
+
+@@ -43,3 +50,5 @@
+
++#ifndef _WIN32
+ #include <netinet/tcp.h>
++#endif
+
+@@ -47,3 +56,5 @@
+
++#ifndef _WIN32
+ #include <netinet/udp.h>
++#endif
+
+EOF
+# fix missing timeradd/timersub in modules/pcap/daq_pcap.c (version >= 3.0.24)
+mv modules/pcap/daq_pcap.c modules/pcap/daq_pcap.c.bak
+cat > modules/pcap/daq_pcap.c << EOF
+#ifndef timeradd
+#define timeradd(a,b,result)                          \\
+  do {                                                \\
+    (result)->tv_sec = (a)->tv_sec + (b)->tv_sec;     \\
+    (result)->tv_usec = (a)->tv_usec + (b)->tv_usec;  \\
+    if ((result)->tv_usec >= 1000000)                 \\
+      {                                               \\
+        ++(result)->tv_sec;                           \\
+        (result)->tv_usec -= 1000000;                 \\
+      }                                               \\
+  } while (0)
+#endif
+#ifndef timersub
+#define timersub(a,b,result)                          \\
+  do {                                                \\
+    (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;     \\
+    (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;  \\
+    if ((result)->tv_usec < 0) {                      \\
+      --(result)->tv_sec;                             \\
+      (result)->tv_usec += 1000000;                   \\
+    }                                                 \\
+  } while (0)
+#endif
+EOF
+cat modules/pcap/daq_pcap.c.bak >> modules/pcap/daq_pcap.c
+# fix modules/trace/daq_trace.c (version >= 3.0.24)
+patch -ulbf modules/trace/daq_trace.c << EOF
+@@ -25,3 +25,7 @@
+
++#ifdef _WIN32
++#include <winsock2.h>
++#else
+ #include <arpa/inet.h>
++#endif
+ #include <stdio.h>
+EOF
+# don't build example
+sed -i.bak -e "s/ example / /" Makefile.am
+wl-showstatus preconfigure &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-fst-module CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -ldl -lmman -lws2_32" &&
+ # fix building DLLs
+ sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ # fix detection of shared libraries
+ sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
