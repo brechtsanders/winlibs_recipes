@@ -8,7 +8,7 @@ export TYPE=library
 export VERSION=3.0.24
 export VERSIONDATE=20260114
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=libdl,mman-win32
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -23,20 +23,20 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix api/daq_common.h (version >= 3.0.24)
+patch -ulbf api/daq_common.h << EOF
+@@ -28,3 +28,8 @@
 
-  ./configure --help 2> /dev/null
-  cat meson_options.txt 2> /dev/null
-  head COPYING* LICENSE* LICENCE* COPYRIGHT*
-  ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake xmake.lua Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt meson.options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
-
-wl-showstatus build &&
- make &&
- #make CC="${CC:-gcc}" CXX="${CXX:-g++}" LD="${LD:-ld}" AR="${AR:-ar}" &&
-    echo OK
-
-#GCCFLAG_ASNEEDED=$(echo "int main () { return 0; }"|${CC:-gcc} -xc - -Wl,--as-needed &>/dev/null && echo "-Wl,--as-needed")
-#GCCFLAG_ASNEEDED=$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q " --as-needed"; then echo "-Wl,--as-needed"; fi)
-
++#ifdef _WIN32
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
+ #include <netinet/in.h>
++#endif
+ #include <sys/time.h>
+EOF
+# don't build example
+sed -i.bak -e "s/ example / /" Makefile.am
 wl-showstatus preconfigure &&
  #mkdir -p m4 &&
  ##libtoolize -f -i -c &&
@@ -65,7 +65,7 @@ wl-showstatus preconfigure &&
  #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
  #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$MINGWPREFIX/include/libdl-win32 -I$MINGWPREFIX/include/mman-win32" LDFLAGS="-Wl,--as-needed -ldl -lmman -lws2_32" &&
  ## fix building DLLs
  #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  ## fix detection of shared libraries

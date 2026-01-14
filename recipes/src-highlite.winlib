@@ -111,6 +111,17 @@ patch -ulbf lib/srchilite/fileutil.h << EOF
 +DLL_EXPORT_SRCHIGHLITE string get_input_file_name(const string &file_name);
 
 EOF
+# fix redefinition of bool/false/true in gl/stdbool.in.h (version >= 3.1.9)
+patch -ulbf gl/stdbool.in.h << EOF
+@@ -1 +1,4 @@
++#if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L) || defined(__cplusplus)
++#include_next <stdbool.h>
++#else
+ /* Copyright (C) 2001-2003, 2006-2011 Free Software Foundation, Inc.
+@@ -122 +125,2 @@
+ #endif /* _GL_STDBOOL_H */
++#endif
+EOF
 # fix building DLL
 sed -i.bak -e "s/\$(CXX) /&-DBUILD_SRCHIGHLITE_DLL /" lib/srchilite/Makefile.in
 # fix detection of Boost::Regex from boost 1.83.0 or higher (version >= 3.1.9)
@@ -118,14 +129,16 @@ sed -i.bak -e "s/as_fn_error\(.*\)\(Could not find a version of the Boost::Regex
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM $(if ! [ -f $MINGWPREFIX/lib/libboost_regex-mt.dll.a ]; then echo "--without-boost"; else echo "--with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt"; fi) &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-boost-libdir=$MINGWPREFIX --with-boost-regex=boost_regex-mt CXXFLAGS="-std=c++14" &&
  # fix building DLLs
  sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
  # fix detection of shared libraries
  sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
  #make install-strip &&
- ( make install-strip || ( make clean; make install-strip CXX="${CXX:-g++} -std=c++14" )) &&
+ #( make install-strip || ( make clean; make install-strip CXX="${CXX:-g++} -std=c++14" )) &&
+ make install-strip &&
  ( cp -f lib/srchilite/dllexp.h $INSTALLPREFIX/include/srchilite || true) &&
  # fix wrong -L flag
  sed -i -e "s? -L$MINGWPREFIX ? ?" $INSTALLPREFIX/lib/libsource-highlight.la $INSTALLPREFIX/lib/pkgconfig/source-highlight.pc &&
