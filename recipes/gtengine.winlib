@@ -232,16 +232,39 @@ wl-showstatus build &&
 
 
 
+#export NAME="Geometric Tools Engine"
+#export STATUS=
+#export URL=https://www.geometrictools.com/
+#export BASENAME=gtengine
+#export DESCRIPTION="A library of source code for computing in the fields of mathematics, graphics, image analysis and physics. The engine is written in C++ 11 and, as such, has portable access to standard constructs for multithreading programming on cores. The engine also supports high-performance computing using general purpose GPU programming (GPGPU). SIMD code is also available using Intel Streaming SIMD Extensions (SSE)."
+#export CATEGORY=math,science
+#export TYPE=library
+#export VERSION=8.1
+#export VERSIONDATE=20251218
+#wl-showstatus --package-version
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
 #export BUILDDEPENDENCIES=cmake,ninja
 #export OPTIONALBUILDDEPENDENCIES=
-## fix ../gte/mathematics/math.h (version >= 6.0)
-#patch -ulbf ../gte/mathematics/math.h << EOF
-#@@ -24,2 +24,4 @@
-# #include <type_traits>
-#+#include <cstdint>
-#+#include <stdint.h>
-#
-#EOF
+#export LICENSEFILE=Gte4p6InstallationRelease.pdf
+#export LICENSETYPE=Boost
+#export DOWNLOADURL="https://www.geometrictools.com/Downloads/Downloads.html GeometricToolsEngine"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://www.geometrictools.com/Downloads/GeometricToolsEngine$(echo $VERSION|sed -e "s/\./p/").zip
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#unzip -oq $TARBALLDIR/$BASENAME/GeometricToolsEngine$(echo $VERSION|sed -e "s/\./p/").zip -d$BASENAME-$VERSION
+#cd $BASENAME-$VERSION/GeometricTools/GTE
+### fix ../gte/mathematics/math.h (version >= 6.0)
+##patch -ulbf ../gte/mathematics/math.h << EOF
+##@@ -24,2 +24,4 @@
+## #include <type_traits>
+##+#include <cstdint>
+##+#include <stdint.h>
+##
+##EOF
 ## fix Applications/GTApplications.cpp (version >= 8.1)
 #patch -ulbf Applications/GTApplications.cpp << EOF
 #@@ -38,2 +38,3 @@
@@ -264,15 +287,42 @@ wl-showstatus build &&
 #+#endif
 #
 #EOF
-## replace GTE_USE_LINUX with GTE_USE_MSWINDOWS
-#sed -i.bak -e "s/GTE_USE_LINUX/GTE_USE_MSWINDOWS/g" $(grep -l GTE_USE_LINUX $(find -name CMakeLists.txt ))
+## fix MathematicsGPU/GTMathematicsGPU.cpp (version >= 8.1)
+#patch -ulbf MathematicsGPU/GTMathematicsGPU.cpp << EOF
+#@@ -38,2 +38,3 @@
+# // macro allows you to compile with Visual Studio 2015 or later.
+#+#ifndef __MINGW32__
+# #if !defined(_MSC_VER)
+#@@ -44,2 +45,3 @@
+# #endif
+#+#endif
+#
+#EOF
+## fix Graphics/GL46/GTGraphicsGL46.cpp (version >= 8.1)
+#patch -ulbf Graphics/GL46/GTGraphicsGL46.cpp << EOF
+#@@ -38,2 +38,3 @@
+# // macro allows you to compile with Visual Studio 2015 or later.
+#+#ifndef __MINGW32__
+# #if !defined(_MSC_VER)
+#@@ -44,2 +45,3 @@
+# #endif
+#+#endif
+#
+#EOF
 ## fix undefined int32_t (version >= 8.1)
-#sed -i.bak2 -e "1i #include <cstdint>" $(grep -rwl "u*int[0-9]*_t")
+#sed -i.bak2 -e "1i #include <cstdint>" $(grep -rwl "u*int[0-9]*_t" $(find -name '*.h' -or -name '*.cpp'))
+## replace GTE_USE_LINUX with GTE_USE_MSWINDOWS (version >= 8.1)
+#sed -i.bak -e "s/GTE_USE_LINUX/GTE_USE_MSWINDOWS -DUNICODE/g" $(grep -l GTE_USE_LINUX $(find -name CMakeLists.txt))
+## use MSW instead of GLX sources (version >= 8.1)
+#sed -i.bak2 -e "s/GLX/MSW/g" Applications/CMakeLists.txt 
+#sed -i.bak2 -e "s/GLX/WGL/g" Graphics/CMakeLists.txt
 #mkdir -p build_static build_shared &&
 # wl-showstatus configure &&
 # cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_SHARED_LIB:BOOL=OFF -DBUILD_RELEASE_LIB:BOOL=ON -S. -Bbuild_static &&
 # wl-showstatus configure &&
 # cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_SHARED_LIB:BOOL=ON -DBUILD_RELEASE_LIB:BOOL=ON -S. -Bbuild_shared &&
+# # fix missing link libraries
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lopengl32/" build_shared/build.ninja &&
 # ## fix execution of Python scripts
 # #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
 # wl-showstatus build &&
@@ -284,3 +334,8 @@ wl-showstatus build &&
 # wl-showstatus build-install &&
 # ninja -Cbuild_shared install/strip &&
 #    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd ../../.. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: configure dllexport/dllimport in Tools/GenerateOpenGLWrapper/glcorearb.h 
+
+
+
