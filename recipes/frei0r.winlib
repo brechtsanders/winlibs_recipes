@@ -64,6 +64,39 @@ wl-wait4deps
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/frei0r-plugins-$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+ fix src/filter/tint0r/tint0r.c (version >= 2.5.1)
+patch -ulbf src/filter/tint0r/tint0r.c << EOF
+@@ -194,9 +194,9 @@
+     /* Load four pixels at once. */
+-    p = _mm_loadu_si128((__m128i*)(inframe + i * 4));
++    p = (__m128)_mm_loadu_si128((__m128i*)(inframe + i * 4));
+
+     /* Extract four pixels into separate XMM registers and convert them to float. */
+-    p0 = _mm_cvtepi32_ps(_mm_cvtepu8_epi32(p));
+-    p1 = _mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128(p, 4)));
+-    p2 = _mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128(p, 8)));
+-    p3 = _mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128(p, 12)));
++    p0 = (__m128)_mm_cvtepi32_ps(_mm_cvtepu8_epi32((__m128i)p));
++    p1 = (__m128)_mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128((__m128i)p, 4)));
++    p2 = (__m128)_mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128((__m128i)p, 8)));
++    p3 = (__m128)_mm_cvtepi32_ps(_mm_cvtepu8_epi32(_mm_srli_si128((__m128i)p, 12)));
+
+@@ -206,3 +206,3 @@
+                      _mm_add_ps(_mm_mul_ps(luma, tmp0), tmp1)); \\
+-      v = _mm_cvtps_epi32(v)
++      v = (__m128)_mm_cvtps_epi32(v)
+
+@@ -211,6 +211,6 @@
+     /* Gather the processed pixels */
+-    p = _mm_packus_epi16(_mm_packus_epi32(p0, p1),
+-                         _mm_packus_epi32(p2, p3));
++    p = (__m128)_mm_packus_epi16(_mm_packus_epi32((__m128i)p0, (__m128i)p1),
++                         _mm_packus_epi32((__m128i)p2, (__m128i)p3));
+
+-    _mm_storeu_si128((__m128i*)(outframe + i * 4), p);
++    _mm_storeu_si128((__m128i*)(outframe + i * 4), (__m128i)p);
+   }
+EOF
 ## fix src/Makefile
 #mv src/Makefile.in src/Makefile.in.bak
 #sed -e "s?\$(DESTDIR)/\(\$(plugindir)\)?\1?g; s?\.so?.dll?" src/Makefile.in.bak > src/Makefile.in
