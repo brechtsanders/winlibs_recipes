@@ -23,16 +23,26 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd jv_json-$VERSION
-# fix Makefile
+# fix missing valuefractional in struct cJSON when using already installed cJSON in source/document.cpp (version >= master)
+patch -ulbf source/document.cpp << EOF
+@@ -217,3 +217,3 @@
+             // are different handle things.)
+-            if (item->valuefractional)
++            if (item->type == cJSON_Number)
+             {
+EOF
+# use the correct compiler in Makefile
 sed -i.bak -e "s/\$(CC)/\$(CXX)/; s/gcc/\$(CC)/" Makefile
+# use already installed cJSON in Makefile
+sed -i.bak2 -e "s?\(OBJECTS=.*\)source/cJSON\.o?\1?" Makefile
 wl-showstatus build &&
  make CC="${CC:-gcc}" CXX="${CXX:-g++}" AR="${AR:-ar}" &&
  ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p source/libjv_json.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p; s/^\([^ ]*\) D .*$/\1 DATA/p" | grep -v "^cJSON" ) > source/jv_js.def &&
- ${CXX:-g++} -shared -s -mwindows -def source/jv_js.def -o source/jv_js.dll source/libjv_json.a -Wl,--out-implib,source/libjv_js.dll.a &&
+ ${CXX:-g++} -shared -s -mwindows -def source/jv_js.def -o source/jv_js.dll source/libjv_json.a -Wl,--out-implib,source/libjv_js.dll.a -lcjson &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/include/jv_json $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
  cp -f source/*.hpp $INSTALLPREFIX/include/jv_json/ &&
- cp -f source/*.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f source/*.a $INSTALLPREFIX/lib/ &&
  cp -f source/*.dll $INSTALLPREFIX/bin/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf jv_json-$VERSION
 
