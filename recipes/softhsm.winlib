@@ -7,10 +7,10 @@ export BASENAME=softhsm
 export DESCRIPTION="SoftHSM is an implementation of a cryptographic store accessible through a PKCS #11 interface. You can use it to explore PKCS #11 without having a Hardware Security Module. It is being developed as a part of the OpenDNSSEC project. SoftHSM uses Botan for its cryptographic operations."
 export CATEGORY=security
 export TYPE=library
-export VERSION=2.6.1
-export VERSIONDATE=20201006
-#export VERSION=2.7.0
-#export VERSIONDATE=20260120
+#export VERSION=2.6.1
+#export VERSIONDATE=20201006
+export VERSION=2.7.0
+export VERSIONDATE=20260120
 wl-showstatus --package-version
 export DEPENDENCIES=openssl,libdl,p11-kit,sqlite3
 #export DEPENDENCIES=botan,libdl,p11-kit,sqlite3
@@ -56,12 +56,14 @@ cd SoftHSMv2-$VERSION
 mv src/lib/object_store/DB.cpp src/lib/object_store/DB.cpp.bak &&
 echo "#define _POSIX_THREAD_SAFE_FUNCTIONS" > src/lib/object_store/DB.cpp &&
 sed -e "s/\(struct tm .* = {0,0,0,0,0,0,0,0,0\)[,0]*/\1/" src/lib/object_store/DB.cpp.bak >> src/lib/object_store/DB.cpp
-# fix mkdir parameters in src/lib/object_store/DBToken.cpp (version >= 2.6.1)
-sed -i.bak -e "s/\(mkdir(.*\),[^)]*/\1/" src/lib/object_store/DBToken.cpp
+## fix mkdir parameters in src/lib/object_store/DBToken.cpp (version = 2.6.1)
+#sed -i.bak -e "s/\(mkdir(.*\),[^)]*/\1/" src/lib/object_store/DBToken.cpp
 # fix missing syslog in src/lib/common/log.cpp (version >= 2.6.1)
 mv src/lib/common/log.cpp src/lib/common/log.cpp.bak &&
 echo "#include \"../win32/syslog.cpp\"" > src/lib/common/log.cpp
 cat src/lib/common/log.cpp.bak >> src/lib/common/log.cpp
+# avoid redefinitions and issue with gmtime_r() in src/lib/object_store/DB.cpp (version >= 2.7.0)
+sed -i.bak2 -e "s/^#define\s*\(S_[^\s]*\)\s.*$/#ifndef \1\n&\n#endif/; s/\(#define gmtime_r(tt, pm) \)(pm=gmtime(tt))/\1{ struct tm* result = gmtime(tt); memcpy(pm, tm, sizeof(struct tm)); }/" src/lib/object_store/DB.cpp
 mkdir -p build_win &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_STATIC:BOOL=ON -DDEFAULT_SOFTHSM2_CONF:STRING=$INSTALLPREFIX/etc/softhsm2.conf -DDEFAULT_TOKENDIR:STRING=$INSTALLPREFIX/var/lib/softhsm/tokens/ -DWITH_CRYPTO_BACKEND:STRING=openssl -DENABLE_GOST:BOOL=OFF -DWITH_MIGRATE:BOOL=ON -DWITH_OBJECTSTORE_BACKEND_DB:BOOL=ON -DBUILD_TESTS:BOOL=OFF -DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) -DCMAKE_CXX_FLAGS:STRING="-I$(pwd)/src/lib/win32" -S. -Bbuild_win &&
