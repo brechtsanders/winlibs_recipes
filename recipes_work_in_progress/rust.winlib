@@ -266,11 +266,11 @@ cd rustc-$VERSION-src
 #for F in prebuilt/download/*.tar.xz; do
 # tar xfJ $F -Cprebuilt --strip-components=2
 #done
-# download prebuilt version
-mkdir -p prebuilt/download
-wl-download -v -d $TARBALLDIR/$BASENAME https://static.rust-lang.org/dist/rust-$VERSION-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu.tar.xz
-tar xfJ $TARBALLDIR/$BASENAME/rust-$VERSION-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu.tar.xz -Cprebuilt --strip-components=2
-mv prebuilt/bin/cargo.exe prebuilt/bin/cargo
+## download prebuilt version
+#mkdir -p prebuilt/download
+#wl-download -v -d $TARBALLDIR/$BASENAME https://static.rust-lang.org/dist/rust-$VERSION-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu.tar.xz
+#tar xfJ $TARBALLDIR/$BASENAME/rust-$VERSION-$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu.tar.xz -Cprebuilt --strip-components=2
+#mv prebuilt/bin/cargo.exe prebuilt/bin/cargo
 ## fix .exe issue
 #mkdir prebuilt/bin/stripexe
 #mv prebuilt/bin/*.exe prebuilt/bin/stripexe/
@@ -290,42 +290,49 @@ sed -i.bak -e "s/\bIN\b/it_&/g" src/llvm/utils/TableGen/CodeEmitterGen.cpp
 #+    return 'x86_64-w64-mingw32'
 #     """Build triple as in LLVM"""
 #EOF
-# fix src/bootstrap/configure.py (version >= 1.69.0)
-patch -ulbf src/bootstrap/configure.py << EOF
-@@ -300,2 +300,8 @@
-
-+def exe_suffix():
-+    """Return a suffix for executables"""
-+    if sys.platform == 'win32':
-+        return '.exe'
-+    return ''
-+
- for key in known_args:
-@@ -331,14 +337,14 @@
-         for path in os.environ['PATH'].split(os.pathsep):
--            if os.path.exists(path + '/rustc'):
--                set('build.rustc', path + '/rustc')
-+            if os.path.exists(path + '/rustc' + exe_suffix()):
-+                set('build.rustc', path + '/rustc' + exe_suffix())
-                 break
-         for path in os.environ['PATH'].split(os.pathsep):
--            if os.path.exists(path + '/cargo'):
--                set('build.cargo', path + '/cargo')
-+            if os.path.exists(path + '/cargo' + exe_suffix()):
-+                set('build.cargo', path + '/cargo' + exe_suffix())
-                 break
-     elif option.name == 'local-rust-root':
--        set('build.rustc', value + '/bin/rustc')
--        set('build.cargo', value + '/bin/cargo')
-+        set('build.rustc', value + '/bin/rustc' + exe_suffix())
-+        set('build.cargo', value + '/bin/cargo' + exe_suffix())
-     elif option.name == 'llvm-root':
--        set('target.{}.llvm-config'.format(build()), value + '/bin/llvm-config')
-+        set('target.{}.llvm-config'.format(build()), value + '/bin/llvm-config' + exe_suffix())
-     elif option.name == 'llvm-config':
+# fix issue building rusqlite in compiler/rustc_target/src/spec/base/windows_gnu.rs (version >= 1.93.0)
+patch -ulbf compiler/rustc_target/src/spec/base/windows_gnu.rs << EOF
+@@ -49,2 +49,3 @@
+         "-lkernel32",
++        "-lsecur32",
+     ];
 EOF
+## fix src/bootstrap/configure.py (version >= 1.69.0)
+#patch -ulbf src/bootstrap/configure.py << EOF
+#@@ -300,2 +300,8 @@
+#
+#+def exe_suffix():
+#+    """Return a suffix for executables"""
+#+    if sys.platform == 'win32':
+#+        return '.exe'
+#+    return ''
+#+
+# for key in known_args:
+#@@ -331,14 +337,14 @@
+#         for path in os.environ['PATH'].split(os.pathsep):
+#-            if os.path.exists(path + '/rustc'):
+#-                set('build.rustc', path + '/rustc')
+#+            if os.path.exists(path + '/rustc' + exe_suffix()):
+#+                set('build.rustc', path + '/rustc' + exe_suffix())
+#                 break
+#         for path in os.environ['PATH'].split(os.pathsep):
+#-            if os.path.exists(path + '/cargo'):
+#-                set('build.cargo', path + '/cargo')
+#+            if os.path.exists(path + '/cargo' + exe_suffix()):
+#+                set('build.cargo', path + '/cargo' + exe_suffix())
+#                 break
+#     elif option.name == 'local-rust-root':
+#-        set('build.rustc', value + '/bin/rustc')
+#-        set('build.cargo', value + '/bin/cargo')
+#+        set('build.rustc', value + '/bin/rustc' + exe_suffix())
+#+        set('build.cargo', value + '/bin/cargo' + exe_suffix())
+#     elif option.name == 'llvm-root':
+#-        set('target.{}.llvm-config'.format(build()), value + '/bin/llvm-config')
+#+        set('target.{}.llvm-config'.format(build()), value + '/bin/llvm-config' + exe_suffix())
+#     elif option.name == 'llvm-config':
+#EOF
 sed -i.bak "s/^exec python\b/&.exe/" configure
-wl-showstatus preconfigure &&
+wl-showstatus bootstrap &&
  PATH=$PYDIR:$PATH \
  $PYDIR/python.exe $(cygpath -m $PWD/src/bootstrap/bootstrap.py) build &&
  wl-showstatus configure &&
@@ -343,12 +350,14 @@ wl-showstatus preconfigure &&
  MSYS2_ARG_CONV_EXCL="--prefix;--sysconfdir;--localstatedir" \
  GIT_DIR=/dev/null \
  $PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --build=$(echo $BUILDPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --host=$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --target=$(echo $TARGETPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --sysconfdir=$INSTALLPREFIX/etc --localstatedir=$INSTALLPREFIX/var/lib --enable-ninja --disable-debug --disable-llvm-assertions --disable-docs --enable-local-rust --local-rust-root=$PWD/prebuilt --python=$PYDIR/python.exe &&
+ #$PYDIR/python.exe src/bootstrap/configure.py --prefix=$INSTALLPREFIX --build=$(echo $BUILDPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --host=$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --target=$(echo $TARGETPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --disable-full-bootstrap --sysconfdir=$INSTALLPREFIX/etc --localstatedir=$INSTALLPREFIX/var/lib --enable-ninja --disable-debug --disable-llvm-assertions --disable-docs --enable-local-rust --local-rust-root=$PWD/build/$BUILDPLATFORM-pc-windows-gnu/stage2/bin --python=$PYDIR/python.exe &&
  #--enable-extended 
  #--enable-use-libcxx 
  ## avoid colon in .d files
  #sed -i.bak -e "s?\b\([A-Z]\):\\\\?/\1/?g" $(find build/bootstrap -name '*.d') &&
  wl-showstatus build &&
  # use PATH=$PATH:$ORIGINAL_PATH to be able to find PowerShell.exe (version >= 1.22.1)
+ #PATH=$PWD/build/$RUNPLATFORM-pc-windows-gnu/stage2/bin:$PWD/build/$RUNPLATFORM-pc-windows-gnu/stage2-tools-bin:$PYDIR:$PATH \
  PATH=$PATH:$ORIGINAL_PATH make &&
  wl-showstatus build-install &&
  make install &&
