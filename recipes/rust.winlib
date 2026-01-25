@@ -450,6 +450,15 @@ patch -ulbf compiler/rustc_target/src/spec/base/windows_gnu.rs << EOF
 +        "-lsecur32",
      ];
 EOF
+## manually extract GCC
+#if ${CC:-gcc} --version | head -n1 | grep -qv "^clang"; then
+# GCCVERSION=$(gcc --version | head -n1 | sed -ne "s/^.* \([0-9.]*\)$/\1/p")
+# mkdir -p build/$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu/gcc/src &&
+# tar xJlh --force-local -f $TARBALLDIR/gcc/gcc-$GCCVERSION.tar.xz --strip-components=1 -Cbuild/$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu/gcc/src
+# pushd build/$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu/gcc &&
+# contrib/download_prerequisites &&
+# popd
+#fi
 ## fix python shebang
 #sed -i.bak "s/^exec python\b/&.exe/" configure
 # create boostrap configuration file
@@ -463,9 +472,9 @@ cp -f bootstrap.example.toml bootstrap.toml
 # cp -rf build/$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu/stage2/* $INSTALLPREFIX/ &&
 wl-showstatus build-install &&
  PATH=$PYDIR:$PATH $PYDIR/python.exe $(cygpath -m $PWD/x.py) install --build=$(echo $BUILDPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --host=$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --target=$(echo $RUNPLATFORM |sed -e "s/-.*$//")-pc-windows-gnu --config=bootstrap.toml --set install.prefix=$INSTALLPREFIX/share/rust --set rust.strip=true --set change-id=ignore &&
- #--set rust.codegen-backends="[\"$(if $CC --version|grep -q "^clang"; then echo "llvm"; else echo "gcc"; fi)\"]" 
- #--config=$(cygpath -m $PWD/bootstrap.toml)
- #--config=$(cygpath -m $PWD/bootstrap.example.toml)
+ #--set llvm-config=$MINGWPREFIX/share/llvm/bin/llvm-config.exe 
+ #--set rust.codegen-backends="[\"$(if ${CC:-gcc} --version|grep -q "^clang"; then echo "llvm"; else echo "gcc"; fi)\"]" 
+ #--set cc="$(cygpath -m $(which ${CC:-gcc}))" --set cxx="$(cygpath -m $(which ${CXX:-g++}))" --set ranlib="$(cygpath -m $(which ${RANLIB:-ranlib}))" --set linker="$(cygpath -m $(which ${CC:-gcc}))" 
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf rustc-$VERSION
 ####Note: don't run from RAM drive
 
