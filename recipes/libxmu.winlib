@@ -20,8 +20,10 @@ export TYPE=library
 #export VERSIONDATE=20221018
 #export VERSION=1.2.0
 #export VERSIONDATE=20240325
-export VERSION=1.2.1
-export VERSIONDATE=20240417
+#export VERSION=1.2.1
+#export VERSIONDATE=20240417
+export VERSION=1.3.0
+export VERSIONDATE=20260125
 wl-showstatus --package-version
 export DEPENDENCIES=libxt,libsm,libice,libxext,libx11,libxau,libxdmcp
 export OPTIONALDEPENDENCIES=
@@ -300,64 +302,187 @@ cd libXmu-$VERSION
 #+    *(char **)(intptr_t)(warg->value) = string;
 #     XtFree((char *)res_list);
 #EOF
-# fix src/EditresCom.c (version >= 1.1.4)
+## fix src/EditresCom.c (version >= 1.1.4)
+#patch -ulbf src/EditresCom.c << EOF
+#@@ -49,2 +49,3 @@
+# #include <string.h>
+#+#include <stdint.h>
+#
+#@@ -162,3 +163,3 @@
+# static void InsertWidget(ProtocolStream*, Widget);
+#-static Bool IsChild(Widget, Widget, Widget);
+#+static Bool WindowIsChild(Widget, Widget, Widget);
+# static Bool isApplicationShell(Widget);
+#@@ -249,3 +250,3 @@
+#        XtGetSelectionValue(w, res_comm, res_editor_command,
+#-                           GetCommand, (XtPointer)(long)ident, time);
+#+                           GetCommand, (XtPointer)(intptr_t)ident, time);
+#     }
+#@@ -452,3 +453,3 @@
+# {
+#-    ResIdent ident = (ResIdent)(long)data;
+#+    ResIdent ident = (ResIdent)(intptr_t)data;
+#     EditresEvent *event;
+#@@ -502,3 +503,3 @@
+# #if defined(LONG64) || defined(WORD64)
+#-       globals.base_address = (unsigned long)w & 0xFFFFFFFF00000000;
+#+       globals.base_address = (uintptr_t)w & 0xFFFFFFFF00000000;
+# #endif
+#@@ -756,3 +757,3 @@
+#                widget = NULL;
+#-               XtSetArg(args[0], norm_list[i].resource_name, &widget);
+#+               XtSetArg(args[0], norm_list[i].resource_name, (intptr_t)&widget);
+#                XtGetValues(parent, args, 1);
+#@@ -770,3 +771,3 @@
+#                widget = NULL;
+#-               XtSetArg(args[0], cons_list[i].resource_name, &widget);
+#+               XtSetArg(args[0], cons_list[i].resource_name, (intptr_t)&widget);
+#                XtGetValues(parent, args, 1);
+#@@ -848,3 +849,3 @@
+#  * Function:
+#- *     IsChild
+#+ *     WindowIsChild
+#  *
+#@@ -859,3 +860,3 @@
+# static Bool
+#-IsChild(Widget top, Widget parent, Widget child)
+#+WindowIsChild(Widget top, Widget parent, Widget child)
+# {
+#@@ -897,3 +898,3 @@
+#     register Widget parent;
+#-    register unsigned long *child;
+#+    register uintptr_t *child;
+#
+#@@ -908,3 +909,3 @@
+#     {
+#-       if (!IsChild(top, parent, (Widget) *child))
+#+       if (!WindowIsChild(top, parent, (Widget) *child))
+#            return ("This widget no longer exists in the client.");
+#@@ -1264,6 +1265,6 @@
+#
+#-    XtSetArg(args[num_args], XtNwidth, &width); num_args++;
+#-    XtSetArg(args[num_args], XtNheight, &height); num_args++;
+#-    XtSetArg(args[num_args], XtNborderWidth, &border_width); num_args++;
+#-    XtSetArg(args[num_args], XtNmappedWhenManaged, &mapped_when_man);
+#+    XtSetArg(args[num_args], XtNwidth, (intptr_t)&width); num_args++;
+#+    XtSetArg(args[num_args], XtNheight, (intptr_t)&height); num_args++;
+#+    XtSetArg(args[num_args], XtNborderWidth, (intptr_t)&border_width); num_args++;
+#+    XtSetArg(args[num_args], XtNmappedWhenManaged, (intptr_t)&mapped_when_man);
+#     num_args++;
+#@@ -1337,8 +1338,8 @@
+#     num = 0;
+#-    XtSetArg(args[num], XtNmappedWhenManaged, &mapped_when_managed); num++;
+#-    XtSetArg(args[num], XtNwidth, &width); num++;
+#-    XtSetArg(args[num], XtNheight, &height); num++;
+#-    XtSetArg(args[num], XtNx, &child_x); num++;
+#-    XtSetArg(args[num], XtNy, &child_y); num++;
+#-    XtSetArg(args[num], XtNborderWidth, &border_width); num++;
+#+    XtSetArg(args[num], XtNmappedWhenManaged, (intptr_t)&mapped_when_managed); num++;
+#+    XtSetArg(args[num], XtNwidth, (intptr_t)&width); num++;
+#+    XtSetArg(args[num], XtNheight, (intptr_t)&height); num++;
+#+    XtSetArg(args[num], XtNx, (intptr_t)&child_x); num++;
+#+    XtSetArg(args[num], XtNy, (intptr_t)&child_y); num++;
+#+    XtSetArg(args[num], XtNborderWidth, (intptr_t)&border_width); num++;
+#     XtGetValues(child, args, num);
+#@@ -1575,3 +1576,3 @@
+#      */
+#-    XtSetArg(warg[0], gv_event->name, &res_value);
+#+    XtSetArg(warg[0], gv_event->name, (intptr_t)&res_value);
+#
+#@@ -1623,3 +1624,3 @@
+#     for (i--, temp = w; temp != NULL; temp = XtParent(temp), i--)
+#-    widget_list[i] = (unsigned long)temp;
+#+    widget_list[i] = (uintptr_t)temp;
+#
+#@@ -2117,3 +2118,3 @@
+#        XtFree((char *)res_list);
+#-       *(XtPointer *)warg->value = NULL;
+#+       *(XtPointer *)(intptr_t)warg->value = NULL;
+#        return;
+#@@ -2132,3 +2133,3 @@
+#     case 1:
+#-       XtSetArg(args[0], res->resource_name, &v1);
+#+       XtSetArg(args[0], res->resource_name, (intptr_t)&v1);
+#        XtGetValues(w, args, 1);
+#@@ -2137,3 +2138,3 @@
+#     case 2:
+#-       XtSetArg(args[0], res->resource_name, &v2);
+#+       XtSetArg(args[0], res->resource_name, (intptr_t)&v2);
+#        XtGetValues(w, args, 1);
+#@@ -2142,3 +2143,3 @@
+#     case 4:
+#-       XtSetArg(args[0], res->resource_name, &v4);
+#+       XtSetArg(args[0], res->resource_name, (intptr_t)&v4);
+#        XtGetValues(w, args, 1);
+#@@ -2157,3 +2158,3 @@
+#        string = "bad size";
+#-       *(char **)(warg->value) = (char *) string;
+#+       *(char **)(intptr_t)(warg->value) = (char *) string;
+#        XtFree((char *)res_list);
+#@@ -2170,3 +2171,3 @@
+#        else
+#-           string = (char *)value;
+#+           string = (char *)(intptr_t)value;
+#     }
+#@@ -2198,3 +2199,3 @@
+#                break;
+#-#ifdef LONG64
+#+#if defined(LONG64) && 0
+#            case sizeof(long):
+#@@ -2210,3 +2211,3 @@
+#
+#-    *(char **)(warg->value) = (char *) string;
+#+    *(char **)(intptr_t)(warg->value) = (char *) string;
+#     XtFree((char *)res_list);
+#EOF
+# fix src/EditresCom.c (version >= 1.3.0)
 patch -ulbf src/EditresCom.c << EOF
 @@ -49,2 +49,3 @@
  #include <string.h>
 +#include <stdint.h>
-
-@@ -162,3 +163,3 @@
+ 
+@@ -159,3 +160,3 @@
  static void InsertWidget(ProtocolStream*, Widget);
 -static Bool IsChild(Widget, Widget, Widget);
 +static Bool WindowIsChild(Widget, Widget, Widget);
  static Bool isApplicationShell(Widget);
-@@ -249,3 +250,3 @@
-        XtGetSelectionValue(w, res_comm, res_editor_command,
+@@ -247,3 +248,3 @@
+         XtGetSelectionValue(w, res_comm, res_editor_command,
 -                           GetCommand, (XtPointer)(long)ident, time);
-+                           GetCommand, (XtPointer)(intptr_t)ident, time);
++                          GetCommand, (XtPointer)(intptr_t)ident, time);
      }
-@@ -452,3 +453,3 @@
+@@ -466,3 +467,3 @@
  {
 -    ResIdent ident = (ResIdent)(long)data;
 +    ResIdent ident = (ResIdent)(intptr_t)data;
      EditresEvent *event;
-@@ -502,3 +503,3 @@
- #if defined(LONG64) || defined(WORD64)
--       globals.base_address = (unsigned long)w & 0xFFFFFFFF00000000;
-+       globals.base_address = (uintptr_t)w & 0xFFFFFFFF00000000;
- #endif
-@@ -756,3 +757,3 @@
-                widget = NULL;
+@@ -767,3 +768,3 @@
+                 widget = NULL;
 -               XtSetArg(args[0], norm_list[i].resource_name, &widget);
-+               XtSetArg(args[0], norm_list[i].resource_name, (intptr_t)&widget);
-                XtGetValues(parent, args, 1);
-@@ -770,3 +771,3 @@
-                widget = NULL;
++              XtSetArg(args[0], norm_list[i].resource_name, (intptr_t)&widget);
+                 XtGetValues(parent, args, 1);
+@@ -781,3 +782,3 @@
+                 widget = NULL;
 -               XtSetArg(args[0], cons_list[i].resource_name, &widget);
-+               XtSetArg(args[0], cons_list[i].resource_name, (intptr_t)&widget);
-                XtGetValues(parent, args, 1);
-@@ -848,3 +849,3 @@
++              XtSetArg(args[0], cons_list[i].resource_name, (intptr_t)&widget);
+                 XtGetValues(parent, args, 1);
+@@ -859,3 +860,3 @@
   * Function:
-- *     IsChild
+- *        IsChild
 + *     WindowIsChild
   *
-@@ -859,3 +860,3 @@
+@@ -870,3 +871,3 @@
  static Bool
 -IsChild(Widget top, Widget parent, Widget child)
 +WindowIsChild(Widget top, Widget parent, Widget child)
  {
-@@ -897,3 +898,3 @@
-     register Widget parent;
--    register unsigned long *child;
-+    register uintptr_t *child;
-
-@@ -908,3 +909,3 @@
+@@ -919,3 +920,3 @@
      {
--       if (!IsChild(top, parent, (Widget) *child))
-+       if (!WindowIsChild(top, parent, (Widget) *child))
-            return ("This widget no longer exists in the client.");
-@@ -1264,6 +1265,6 @@
-
+-       if (!IsChild(top, parent, ID2WIDGET(*child)))
++       if (!WindowIsChild(top, parent, ID2WIDGET(*child)))
+             return ("This widget no longer exists in the client.");
+@@ -1274,6 +1275,6 @@
+ 
 -    XtSetArg(args[num_args], XtNwidth, &width); num_args++;
 -    XtSetArg(args[num_args], XtNheight, &height); num_args++;
 -    XtSetArg(args[num_args], XtNborderWidth, &border_width); num_args++;
@@ -367,7 +492,7 @@ patch -ulbf src/EditresCom.c << EOF
 +    XtSetArg(args[num_args], XtNborderWidth, (intptr_t)&border_width); num_args++;
 +    XtSetArg(args[num_args], XtNmappedWhenManaged, (intptr_t)&mapped_when_man);
      num_args++;
-@@ -1337,8 +1338,8 @@
+@@ -1347,8 +1348,8 @@
      num = 0;
 -    XtSetArg(args[num], XtNmappedWhenManaged, &mapped_when_managed); num++;
 -    XtSetArg(args[num], XtNwidth, &width); num++;
@@ -382,53 +507,48 @@ patch -ulbf src/EditresCom.c << EOF
 +    XtSetArg(args[num], XtNy, (intptr_t)&child_y); num++;
 +    XtSetArg(args[num], XtNborderWidth, (intptr_t)&border_width); num++;
      XtGetValues(child, args, num);
-@@ -1575,3 +1576,3 @@
+@@ -1585,3 +1586,3 @@
       */
 -    XtSetArg(warg[0], gv_event->name, &res_value);
 +    XtSetArg(warg[0], gv_event->name, (intptr_t)&res_value);
-
-@@ -1623,3 +1624,3 @@
-     for (i--, temp = w; temp != NULL; temp = XtParent(temp), i--)
--    widget_list[i] = (unsigned long)temp;
-+    widget_list[i] = (uintptr_t)temp;
-
-@@ -2117,3 +2118,3 @@
-        XtFree((char *)res_list);
+ 
+@@ -2190,3 +2191,3 @@
+         XtFree((char *)res_list);
 -       *(XtPointer *)warg->value = NULL;
 +       *(XtPointer *)(intptr_t)warg->value = NULL;
-        return;
-@@ -2132,3 +2133,3 @@
+         return;
+@@ -2205,3 +2206,3 @@
      case 1:
 -       XtSetArg(args[0], res->resource_name, &v1);
 +       XtSetArg(args[0], res->resource_name, (intptr_t)&v1);
-        XtGetValues(w, args, 1);
-@@ -2137,3 +2138,3 @@
+         XtGetValues(w, args, 1);
+@@ -2210,3 +2211,3 @@
      case 2:
 -       XtSetArg(args[0], res->resource_name, &v2);
 +       XtSetArg(args[0], res->resource_name, (intptr_t)&v2);
-        XtGetValues(w, args, 1);
-@@ -2142,3 +2143,3 @@
+         XtGetValues(w, args, 1);
+@@ -2215,3 +2216,3 @@
      case 4:
 -       XtSetArg(args[0], res->resource_name, &v4);
 +       XtSetArg(args[0], res->resource_name, (intptr_t)&v4);
-        XtGetValues(w, args, 1);
-@@ -2157,3 +2158,3 @@
-        string = "bad size";
+         XtGetValues(w, args, 1);
+@@ -2230,3 +2231,3 @@
+         string = "bad size";
 -       *(char **)(warg->value) = (char *) string;
 +       *(char **)(intptr_t)(warg->value) = (char *) string;
-        XtFree((char *)res_list);
-@@ -2170,3 +2171,3 @@
-        else
+         XtFree((char *)res_list);
+@@ -2243,3 +2244,3 @@
+         else
 -           string = (char *)value;
-+           string = (char *)(intptr_t)value;
++          string = (char *)(intptr_t)value;
      }
-@@ -2198,3 +2199,3 @@
-                break;
+@@ -2271,3 +2272,3 @@
+                 break;
 -#ifdef LONG64
 +#if defined(LONG64) && 0
-            case sizeof(long):
-@@ -2210,3 +2211,3 @@
-
+             case sizeof(long):
+@@ -2283,3 +2284,3 @@
+ 
 -    *(char **)(warg->value) = (char *) string;
 +    *(char **)(intptr_t)(warg->value) = (char *) string;
      XtFree((char *)res_list);
