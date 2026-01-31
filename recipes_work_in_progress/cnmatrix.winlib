@@ -1,0 +1,74 @@
+export NAME="cnmatrix"
+export STATUS=
+export URL=https://github.com/collabora/cnmatrix
+export BASENAME=cnmatrix
+export DESCRIPTION="This library provides a consistent C interface to a few matrix backends."
+export CATEGORY=math
+export TYPE=library
+export VERSION=0.0
+export VERSIONDATE=20260131
+wl-showstatus --package-version
+export DEPENDENCIES=eigen,openblas
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/collabora/cnmatrix/tags"
+export DOWNLOADURL=
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/collabora/cnmatrix/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# also support newer versions of Eigen and fix invalid compiler flags
+patch -ulbf CMakeLists.txt << EOF
+@@ -17,3 +17,3 @@
+
+-find_package (Eigen3 3.3)
++find_package (Eigen3)
+ if(NOT EIGEN3_FOUND)
+@@ -56,3 +56,3 @@
+
+-IF(UNIX)
++IF(UNIX OR MINGW)
+   set(SHARED_FLAGS "-fPIC -Wall -Wno-unused-variable -Wno-switch -Wno-parentheses -Wno-missing-braces -Werror=return-type -fvisibility=hidden -Werror=vla -fno-math-errno -Werror=missing-field-initializers -Werror=pointer-arith")
+EOF
+# also allow building shared library and avoid invalid compiler flag -bigobj
+patch -ulbf src/CMakeLists.txt << EOF
+@@ -54,3 +54,3 @@
+
+-add_library(cnmatrix STATIC \${CN_MATRIX_SRCS})
++add_library(cnmatrix \${CN_MATRIX_SRCS})
+ target_include_directories(cnmatrix PUBLIC
+@@ -61,2 +61,5 @@
+ set_target_properties(cnmatrix PROPERTIES FOLDER "libraries")
++if(WIN32)
++  set_target_properties(cnmatrix PROPERTIES RUNTIME_OUTPUT_DIRECTORY \${CMAKE_INSTALL_BINDIR})
++endif()
+
+@@ -66,3 +69,3 @@
+
+-  if(WIN32)
++  if(MSVC)
+     target_compile_options(cnmatrix PRIVATE -bigobj)
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####TO DO: Fix OpenBLAS issue
+
+
+
