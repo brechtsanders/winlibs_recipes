@@ -1,0 +1,85 @@
+export NAME="Duff"
+export STATUS=
+export URL=https://github.com/elmindreda/duff
+export BASENAME=duff
+export DESCRIPTION="Duff is a command-line utility for identifying duplicates in a given set of files.  It attempts to be usably fast and uses the SHA family of message digests as a part of the comparisons."
+export CATEGORY=system
+export TYPE=application
+export VERSION=0.5.2
+export VERSIONDATE=20260205
+wl-showstatus --package-version
+export DEPENDENCIES=gettext,libiconv
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=zlib/libpng
+export DOWNLOADURL="https://github.com/elmindreda/duff/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/elmindreda/duff/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/duffdriver.c (version >= 0.5.2)
+patch -ulbf src/duffdriver.c << EOF
+@@ -200,3 +200,7 @@
+
++#ifdef S_IFLNK
+   if (lstat(path, sb) != 0)
++#else
++  if (stat(path, sb) != 0)
++#endif
+   {
+@@ -208,2 +212,3 @@
+
++#ifdef S_ISLNK
+   if (S_ISLNK(sb->st_mode))
+@@ -227,2 +232,3 @@
+   }
++#endif
+
+@@ -392,2 +398,3 @@
+        {
++#ifdef S_IFLNK
+          case S_IFLNK:
+@@ -395,2 +402,3 @@
+            break;
++#endif
+          case S_IFIFO:
+@@ -407,2 +415,3 @@
+            break;
++#ifdef S_IFSOCK
+          case S_IFSOCK:
+@@ -410,2 +419,3 @@
+            break;
++#endif
+          default:
+EOF
+## fix missing file
+mkdir -p build-aux
+touch build-aux/config.rpath
+#touch po/Makefile.in.in
+# avoid issues building po
+cat > po/Makefile.in << EOF
+clean:
+all:
+install:
+install-strip:
+EOF
+# add missing IT_PROG_INTLTOOL to configure.ac
+echo "IT_PROG_INTLTOOL" >> configure.ac
+wl-showstatus preconfigure &&
+ intltoolize -f -c &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ cp -f po/Makefile.in po/Makefile.in.in &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-largefile --enable-year2038 --disable-nls &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

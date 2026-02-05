@@ -1,0 +1,99 @@
+export NAME="Rdfind"
+export STATUS=
+export URL=https://github.com/pauldreik/rdfind
+export BASENAME=rdfind
+export DESCRIPTION="Rdfind is a command line tool that finds duplicate files. It is useful for compressing backup directories or just finding duplicate files. It compares files based on their content, NOT on their file names."
+export CATEGORY=system
+export TYPE=application
+export VERSION=1.7.0
+export VERSIONDATE=20260205
+wl-showstatus --package-version
+export DEPENDENCIES=xxhash,libnettle
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/pauldreik/rdfind/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/pauldreik/rdfind/archive/refs/tags/releases/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd rdfind-releases-$VERSION
+# fix Dirlist.cc (version >= 1.7.0)
+patch -ulbf Dirlist.cc << EOF
+@@ -60,3 +60,7 @@
+     const int statval =
++#ifdef S_ISLNK
+       lstat((dir + "/" + std::string(dp->d_name)).c_str(), &info);
++#else
++      stat((dir + "/" + std::string(dp->d_name)).c_str(), &info);
++#endif
+     if (statval != 0) {
+@@ -69,2 +73,3 @@
+
++#ifdef S_ISLNK
+     if (S_ISLNK(info.st_mode)) {
+@@ -75,3 +80,5 @@
+       }
+-    } else if (S_ISDIR(info.st_mode)) {
++    } else
++#endif
++    if (S_ISDIR(info.st_mode)) {
+       // directory
+@@ -136,3 +143,7 @@
+   do {
++#ifdef S_ISLNK
+     statval = lstat(possiblefile.c_str(), &info);
++#else
++    statval = stat(possiblefile.c_str(), &info);
++#endif
+   } while (statval < 0 && errno == EINTR);
+@@ -148,2 +159,3 @@
+
++#ifdef S_ISLNK
+   if (S_ISLNK(info.st_mode)) {
+@@ -157,2 +169,3 @@
+   }
++#endif
+
+EOF
+# fix Fileinfo.cc (version >= 1.7.0)
+patch -ulbf Fileinfo.cc << EOF
+@@ -270,2 +270,6 @@
+ {
++#ifndef S_ISLNK
++  std::cerr << "Failed to make symlink " << name() << " to " << A.name() << " (symlinks not supported on Windows)\\n";
++  return -1;
++#else
+   const int retval =
+@@ -288,2 +292,3 @@
+   return retval;
++#endif
+ }
+@@ -294,2 +299,6 @@
+ {
++#ifndef S_ISLNK
++  std::cerr << "Failed to make hardlink " << name() << " to " << A.name() << " (hardlink not supported on Windows)\\n";
++  return -1;
++#else
+   return transactional_operation(name(), [&](const std::string& filename) {
+@@ -303,2 +312,3 @@
+   });
++#endif
+ }
+EOF
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-xxhash --enable-year2038 &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf rdfind-releases-$VERSION
+
+
+
