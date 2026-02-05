@@ -65,10 +65,10 @@ export TYPE=application
 #export VERSIONDATE=20250924
 #export VERSION=0.5.14
 #export VERSIONDATE=20251028
-export VERSION=2026.01.30
-export VERSIONDATE=20260131
-#export VERSION=2026.02.03
-#export VERSIONDATE=20260204
+#export VERSION=2026.01.30
+#export VERSIONDATE=20260131
+export VERSION=2026.02.03
+export VERSIONDATE=20260204
 wl-showstatus --package-version
 export DEPENDENCIES=girara
 export OPTIONALDEPENDENCIES=
@@ -121,28 +121,67 @@ EOF
 #+#endif
 #
 #EOF
-# fix zathura/main.c (version >= 0.5.10)
+## fix zathura/main.c (version >= 0.5.10)
+#patch -ulbf zathura/main.c << EOF
+#@@ -107,3 +107,5 @@
+#   gchar* search_string  = NULL;
+#+#ifndef _WIN32
+#   bool forkback         = false;
+#+#endif
+#   bool print_version    = false;
+#@@ -120,3 +122,5 @@
+#        "path"},
+#+#ifndef _WIN32
+#       {"fork", '\\0', 0, G_OPTION_ARG_NONE, &forkback, _("Fork into the background"), NULL},
+#+#endif
+#       {"password", 'w', 0, G_OPTION_ARG_STRING, &password, _("Document password"), "password"},
+#@@ -201,2 +205,3 @@
+#   int file_idx = argc > file_idx_base ? file_idx_base : 0;
+#+#ifndef _WIN32
+#   /* Fork instances for other files. */
+#@@ -238,2 +243,3 @@
+#   }
+#+#endif
+# 
+#EOF
+# fix zathura/main.c (version >= 2026.02.03)
 patch -ulbf zathura/main.c << EOF
-@@ -107,3 +107,5 @@
-   gchar* search_string  = NULL;
+@@ -16,3 +16,5 @@
+ #include <string.h>
 +#ifndef _WIN32
-   bool forkback         = false;
+ #include <sys/wait.h>
 +#endif
-   bool print_version    = false;
-@@ -120,3 +122,5 @@
+
+@@ -103,3 +105,5 @@
+   g_autofree gchar* search_string  = NULL;
++#ifndef _WIN32
+   gboolean forkback                = false;
++#endif
+   gboolean print_version           = false;
+@@ -116,3 +120,5 @@
         "path"},
 +#ifndef _WIN32
        {"fork", '\\0', 0, G_OPTION_ARG_NONE, &forkback, _("Fork into the background"), NULL},
 +#endif
        {"password", 'w', 0, G_OPTION_ARG_STRING, &password, _("Document password"), "password"},
-@@ -201,2 +205,3 @@
-   int file_idx = argc > file_idx_base ? file_idx_base : 0;
+@@ -192,2 +198,5 @@
+   if (print_version == false && argc > file_idx_base + 1) {
++#ifdef _WIN32
++    girara_error("fork() not supported in Windows");
++#else
+     const pid_t parent_pid              = getpid();
+@@ -229,2 +238,3 @@
+     }
++#endif
+   }
+@@ -232,2 +242,3 @@
+   /* Fork into the background if the user really wants to ... */
 +#ifndef _WIN32
-   /* Fork instances for other files. */
-@@ -238,2 +243,3 @@
+   if (print_version == false && forkback == true && file_idx < file_idx_base + 1) {
+@@ -246,2 +257,3 @@
    }
 +#endif
- 
+
 EOF
 # fix maybe uninitialized errors in zathura/document-widget.c (version >= 2026.01.30)
 sed -i.bak -e "s/unsigned int doc_height, doc_width;/unsigned int doc_height = 0, doc_width = 0;/" zathura/document-widget.c
