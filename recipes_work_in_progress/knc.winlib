@@ -1,0 +1,285 @@
+export NAME="KNC"
+export STATUS=
+export URL=https://oskt.secure-endpoints.com/knc.html
+export BASENAME=knc
+export DESCRIPTION="KNC is Kerberised NetCat. It works in basically the same way as either netcat or stunnel except that it is uses GSS-API to secure the communication. You can use it to construct client/server applications while keeping the Kerberos libraries out of your programs address space quickly and easily."
+export CATEGORY=security
+export TYPE=application
+export VERSION=1.7.1
+export VERSIONDATE=20260209
+wl-showstatus --package-version
+export DEPENDENCIES=libgssapi,krb5
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE="BSD/MIT style license"
+export DOWNLOADURL="https://github.com/elric1/knc/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/elric1/knc/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+## fix bin/knc.c (version >= 1.7.1)
+#patch -ulbf bin/knc.c << EOF
+#@@ -27,2 +27,5 @@
+# #include <sys/types.h>
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/select.h>
+#@@ -34,2 +37,3 @@
+# #include <arpa/inet.h>
+#+#endif
+# 
+#@@ -38,3 +42,5 @@
+# #include <inttypes.h>
+#+#ifndef _WIN32
+# #include <netdb.h>
+#+#endif
+# #include <signal.h>
+#EOF
+## fix bin/gssstdio.c (version >= 1.7.1)
+#patch -ulbf bin/gssstdio.c << EOF
+#@@ -53,2 +53,5 @@
+# 
+#+#ifdef _WIN32
+#+#include <winsock2.h>
+#+#else
+# #include <sys/socket.h>
+#@@ -56,2 +59,3 @@
+# #include <netinet/in.h>
+#+#endif
+# 
+#EOF
+# fix missing uint32_t in bin/gssstdio.c (version >= 1.7.1)
+sed -i.bak -e "1i #include <stdint.h>" bin/gssstdio.c
+# fix missing files
+mkdir -p winfix/sys winfix/netinet winfix/arpa
+cat > winfix/sys/socket.h << EOF
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define _POSIX_SOURCE
+#include <unistd.h>
+EOF
+touch winfix/sys/select.h winfix/sys/un.h winfix/netinet/in.h winfix/arpa/inet.h winfix/arpa/nameser.h winfix/netdb.h winfix/sys/wait.h
+cat >  winfix/syslog.h << EOF
+#define LOG_CRIT    2
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_NOTICE  5
+#define LOG_INFO    6
+#define LOG_DEBUG   7
+#define openlog(...)
+#define syslog(...)
+EOF
+# fix bin/knc.c (version >= 1.7.1)
+patch -ulbf bin/knc.c << EOF
+@@ -86,4 +86,8 @@
+ int shutdown_or_close(int, int);
++#ifdef _WIN32
++int nonblocking_socket_set(int);
++#else
+ int nonblocking_set(int);
+ int nonblocking_clr(int);
++#endif
+ /* END_DECLS */
+@@ -156,2 +160,6 @@
+ 	if ((ret = shutdown(fd, how)) == -1)
++#ifdef _WIN32
++		if (closesocket(fd) == 0)
++			return 0;
++#endif
+ 		return close(fd);
+@@ -625,2 +633,3 @@
+ 
++#ifdef FD_CLOEXEC
+ 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
+@@ -630,2 +639,3 @@
+ 	}
++#endif
+ 
+@@ -633,3 +643,3 @@
+ 	opt = 1;
+-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
++	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*)&opt, sizeof(opt)) < 0) {
+ 		LOG_ERRNO(LOG_ERR, ("unable to set SO_REUSEADDR on listener"
+@@ -962,2 +972,5 @@
+ 
++#ifdef _WIN32
++	nonblocking_socket_set(work->network_fd);
++#else
+ 	nonblocking_set(work->network_fd);
+@@ -965,2 +978,3 @@
+ 	nonblocking_set(work->local_out);
++#endif
+ 
+@@ -1288,3 +1302,3 @@
+ 	if (setsockopt(work->network_fd, SOL_SOCKET, SO_LINGER,
+-		       &l, sizeof(l)) < 0) {
++		       (void*)&l, sizeof(l)) < 0) {
+ 		LOG_ERRNO(LOG_ERR, ("unable to set SO_LINGER on network"
+@@ -1295,3 +1309,7 @@
+ 	/* Use non-blocking network I/O */
++#ifdef _WIN32
++	if (nonblocking_socket_set(work->network_fd) < 0) {
++#else
+ 	if (nonblocking_set(work->network_fd) < 0) {
++#endif
+ 		LOG_ERRNO(LOG_ERR, ("unable to set O_NONBLOCK on network"
+@@ -1306,3 +1324,3 @@
+ 		if (setsockopt(work->network_fd, SOL_SOCKET, SO_KEEPALIVE,
+-			       &keepalive, sizeof(keepalive)) < 0) {
++			       (void*)&keepalive, sizeof(keepalive)) < 0) {
+ 			LOG_ERRNO(LOG_ERR, ("unable to set SO_KEEPALIVE on "
+@@ -1352,3 +1370,7 @@
+ 	/* Use non-blocking local writes I/O */
++#ifdef _WIN32
++	if (nonblocking_socket_set(work->local_out) < 0) {
++#else
+ 	if (nonblocking_set(work->local_out) < 0) {
++#endif
+ 		LOG_ERRNO(LOG_ERR, ("unable to set O_NONBLOCK on local"
+@@ -1369,2 +1391,6 @@
+ launch_program(work_t *work, int argc, char **argv) {
++#ifdef _WIN32
++	LOG_ERRNO(LOG_ERR, ("fork() not supported on Windows"));
++	return -1;
++#else
+ 	pid_t			pid;
+@@ -1437,2 +1463,3 @@
+ 	}
++#endif
+ }
+@@ -1441,2 +1468,6 @@
+ fork_and_do_work(work_t *work, int listener, int argc, char **argv) {
++#ifdef _WIN32
++	LOG_ERRNO(LOG_ERR, ("fork() not supported on Windows"));
++	return -1;
++#else
+ 	pid_t pid;
+@@ -1456,2 +1487,3 @@
+ 	return 1;
++#endif
+ }
+@@ -1460,2 +1492,6 @@
+ do_unix_socket(work_t *work) {
++#ifdef _WIN32
++	LOG_ERRNO(LOG_ERR, ("listener not supported on Windows"));
++	return -1;
++#else
+ 	int			fd;
+@@ -1502,2 +1538,3 @@
+ 	return ret;
++#endif
+ }
+@@ -1506,2 +1543,6 @@
+ fork_and_do_unix_socket(work_t *work, int listener) {
++#ifdef _WIN32
++	LOG_ERRNO(LOG_ERR, ("UNIX sockets not supported on Windows"));
++	return -1;
++#else
+ 	pid_t pid;
+@@ -1521,2 +1562,3 @@
+ 	return 1;
++#endif
+ }
+@@ -1614,2 +1656,6 @@
+ do_listener(int listener, int argc, char **argv) {
++#ifdef _WIN32
++	LOG_ERRNO(LOG_ERR, ("listener not supported on Windows"));
++	return -1;
++#else
+ 	uint16_t		port;
+@@ -1727,2 +1773,3 @@
+ 	return 0;
++#endif
+ }
+@@ -1742,3 +1789,3 @@
+ 	/* Pick out the hostname portion of service@host */
+-	if ((hostname = (index(argv[0], '@'))) == NULL) {
++	if ((hostname = (strstr("@", argv[0]))) == NULL) {
+ 		    LOG(LOG_ERR, ("invalid service@host: %s", argv[0]));
+@@ -1776,3 +1823,3 @@
+ 		if (setsockopt(work.network_fd, SOL_SOCKET, SO_KEEPALIVE,
+-			       &keepalive, sizeof(keepalive)) < 0) {
++			       (void*)&keepalive, sizeof(keepalive)) < 0) {
+ 			LOG_ERRNO(LOG_ERR, ("unable to set SO_KEEPALIVE on "
+@@ -1829,2 +1876,10 @@
+ 
++#ifdef _WIN32
++int
++nonblocking_set(int fd) {
++	unsigned long flags = 1;
++	return ioctlsocket(fd, FIONBIO, &flags);
++}
++#else
++
+ int
+@@ -1871 +1926,2 @@
+ }
++#endif
+EOF
+
+
+  ./configure --help 2> /dev/null
+  cat meson_options.txt 2> /dev/null
+  head COPYING* LICENSE* LICENCE* COPYRIGHT*
+  ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake xmake.lua Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt meson.options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
+
+wl-showstatus build &&
+ make &&
+ #make CC="${CC:-gcc}" CXX="${CXX:-g++}" LD="${LD:-ld}" AR="${AR:-ar}" &&
+    echo OK
+
+#GCCFLAG_ASNEEDED=$(echo "int main () { return 0; }"|${CC:-gcc} -xc - -Wl,--as-needed &>/dev/null && echo "-Wl,--as-needed")
+#GCCFLAG_ASNEEDED=$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q " --as-needed"; then echo "-Wl,--as-needed"; fi)
+
+wl-showstatus preconfigure &&
+ mkdir -p m4 &&
+ ##libtoolize -f -i -c &&
+ ##intltoolize -f -c &&
+ autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ wl-showstatus configure &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ ## allow building shared libraries when using clang
+ #if ${CC:-gcc} --version|grep -q "^clang" && ! ${CC:-gcc} --help|grep auto-import; then
+ # sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" configure
+ # #sed -i.bak -e "s/\$LD --help 2>&1 | \(\$GREP\|grep\) 'auto-import'/true/" $(find -name configure)
+ #fi &&
+ ## fix confusion between MSVC and clang
+ #if ${CC:-gcc} --version|grep -q "^clang"; then
+ # sed -i.bak2 -e "s/\b\(cl\)\(\*\)/\1.exe\2/g; s/\(ld_shlibs\)=no/\1yes/" configure
+ #fi &&
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PWD/winfix -I$MINGWPREFIX/include/gssglue" LDFLAGS="-Wl,--as-needed -lws2_32" &&
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ #wl-showstatus build &&
+ #make &&
+ wl-showstatus build-install &&
+ make install-strip &&
+ #( make install-strip || ( make install && strip $INSTALLPREFIX/bin/*.{dll,exe} )) &&
+    echo OK
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
