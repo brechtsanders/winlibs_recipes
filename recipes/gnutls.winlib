@@ -335,8 +335,10 @@ export TYPE=library
 #export VERSIONDATE=20220916
 #export VERSION=3.8.0
 #export VERSIONDATE=20230210
-export VERSION=3.8.1
-export VERSIONDATE=20230928
+#export VERSION=3.8.1
+#export VERSIONDATE=20230928
+export VERSION=3.8.12
+export VERSIONDATE=20260209
 wl-showstatus --package-version
 export DEPENDENCIES=gmp,libnettle,gettext,p11-kit,zlib,libgcrypt,libtasn1,readline,libgpg-error,pthreads,libunistring,libdl
 export OPTIONALDEPENDENCIES=guile,libcfg+,gaa,unbound,trousers,tpm2-tss
@@ -349,7 +351,7 @@ export LICENSETYPE=LGPL
 #export DOWNLOADURL="https://www.gnupg.org/ftp/gcrypt/gnutls/"
 #export DOWNLOADURL="http://ftp.gnu.org/pub/gnu/gnutls/"
 #export DOWNLOADURL="ftp://ftp.gnutls.org/gcrypt/gnutls/"
-export DOWNLOADURL="https://www.gnupg.org/ftp/gcrypt/gnutls/"
+export DOWNLOADURL="https://www.gnupg.org/ftp/gcrypt/gnutls/ v"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/gnutls/$BASENAME-$VERSION.tar.bz2
 #export DOWNLOADSOURCEURL=http://ftp.gnu.org/pub/gnu/gnutls/$BASENAME-$VERSION.tar.xz
@@ -551,9 +553,7 @@ cat lib/opencdk/main.c.bak >> lib/opencdk/main.c
 #cat lib/nettle/rnd.c.bak >> lib/nettle/rnd.c
 # fix missing struct dsa_public_key in lib/nettle/pk.c for libnettle >= 3.0 (version >= 2.12.20)
 if [ -f $MINGWPREFIX/include/nettle/dsa-compat.h ]; then
-mv lib/nettle/pk.c lib/nettle/pk.c.bak &&
-echo "#include <nettle/dsa-compat.h>" > lib/nettle/pk.c &&
-cat lib/nettle/pk.c.bak >> lib/nettle/pk.c
+sed -i.bak -e "s?#include \"gnutls_int\.h\"?&\n#include <nettle/dsa-compat.h>?" lib/nettle/pk.c
 fi
 # fix missing camellia_ctx in lib/nettle/cipher.c for libnettle >= 3.0
 if grep -qv camellia_ctx $MINGWPREFIX/include/nettle/camellia.h; then
@@ -787,13 +787,7 @@ echo "#define endservent()" > src/socket.c
 cat src/socket.c.bak >> src/socket.c
 # fix already defined DELETE in 3.4.6 (version >= 3.4.6)
 ####error: pasting "INDEX_OPT_" and "(" does not give a valid preprocessing token
-mv -f src/systemkey.c src/systemkey.c.bak
-cat > src/systemkey.c << EOF
-#include <winsock2.h>
-#include <windows.h>
-#undef DELETE
-EOF
-cat src/systemkey.c.bak >> src/systemkey.c
+sed -i.bak -e "s?#include \"config\.h\"?&\n#include <winsock2.h>\n#include <windows.h>\n#undef DELETE?" src/systemkey.c
 ## fix missing ncrypt.h for older MinGW versions (version >= 3.4.6 <= 3.5.2)
 #cat > check_ncrypt_h.c << EOF
 ##include <windows.h>
@@ -884,6 +878,67 @@ patch -ulbf src/benchmark.h << EOF
 +#elif !defined(__MINGW32__)
  inline static void gettime(struct timespec *ts)
 EOF
+## don't specify digest size for sha384_digest in lib/nettle/int/dsa-fips.h (version >= 3.8.12)
+#patch -ulbf lib/nettle/int/dsa-fips.h << EOF
+#@@ -102,3 +111,3 @@
+#        sha384_update(&ctx, length, data);
+#-       sha384_digest(&ctx, DIGEST_SIZE, digest);
+#+       sha384_digest(&ctx, digest);
+#
+#EOF
+## fix lib/nettle/mac.c (version >= 3.8.12)
+#patch -ulbf lib/nettle/mac.c << EOF
+#@@ -31,3 +31,3 @@
+# #include <nettle/ripemd160.h>
+#-#include <nettle/sha.h>
+#+#include <nettle/sha1.h>
+# #include <nettle/sha3.h>
+#@@ -51,3 +51,3 @@
+# typedef void (*update_func)(void *, size_t, const uint8_t *);
+#-typedef void (*digest_func)(void *, size_t, uint8_t *);
+#+typedef void (*digest_func)(void *, uint8_t *);
+# typedef void (*set_key_func)(void *, size_t, const uint8_t *);
+#@@ -286,3 +286,3 @@
+# 		gcm_update(&ctx->ctx, &ctx->key, ctx->pos, ctx->buffer);
+#-	gcm_digest(&ctx->ctx, &ctx->key, &ctx->cipher, ctx->encrypt, length,
+#+	gcm_digest(&ctx->ctx, &ctx->key, &ctx->cipher, ctx->encrypt,
+# 		   digest);
+#@@ -470,3 +470,3 @@
+# 	ctx.update(&ctx, text_size, text);
+#-	ctx.digest(&ctx, ctx.length, digest);
+#+	ctx.digest(&ctx, digest);
+# 
+#@@ -591,3 +591,3 @@
+# 
+#-	ctx->digest(ctx->ctx_ptr, digestsize, digest);
+#+	ctx->digest(ctx->ctx_ptr, digest);
+# 
+#@@ -671,3 +671,3 @@
+# 
+#-	md5_digest(&ctx->md5, len <= MD5_DIGEST_SIZE ? len : MD5_DIGEST_SIZE,
+#+	md5_digest(&ctx->md5, 
+# 		   digest);
+#@@ -675,3 +675,3 @@
+# 	if (len > MD5_DIGEST_SIZE)
+#-		sha1_digest(&ctx->sha1, len - MD5_DIGEST_SIZE,
+#+		sha1_digest(&ctx->sha1,
+# 			    digest + MD5_DIGEST_SIZE);
+#@@ -850,3 +850,3 @@
+# 	}
+#-	ctx.digest(&ctx, ctx.length, digest);
+#+	ctx.digest(&ctx, digest);
+# 	zeroize_key(&ctx, sizeof(ctx));
+#@@ -912,3 +912,3 @@
+# 
+#-	ctx->digest(ctx->ctx_ptr, digestsize, digest);
+#+	ctx->digest(ctx->ctx_ptr, digest);
+# 
+#@@ -931,3 +931,3 @@
+# 	ctx.set_key(&ctx, saltsize, salt);
+#-	hkdf_extract(&ctx.ctx, ctx.update, ctx.digest, ctx.length, keysize, key,
+#+	hkdf_extract(&ctx.ctx, ctx.update, ctx.digest, ctx.length, key,
+# 		     output);
+#EOF
 # skip making src/crywrap (version >= 3.0.8)
 cat > src/crywrap/Makefile.in << EOF
 clean:
