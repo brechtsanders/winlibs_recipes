@@ -7,10 +7,10 @@ export CATEGORY=development
 export TYPE=application
 #export VERSION=0.1.1
 #export VERSIONDATE=20260125
-export VERSION=0.4.0
-export VERSIONDATE=20260201
-#export VERSION=0.4.1
-#export VERSIONDATE=20260214
+#export VERSION=0.4.0
+#export VERSIONDATE=20260201
+export VERSION=0.4.1
+export VERSIONDATE=20260214
 wl-showstatus --package-version
 export DEPENDENCIES=libdl
 export OPTIONALDEPENDENCIES=
@@ -27,28 +27,40 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd Zen-C-$VERSION
-# fix missing realpath in src/parser/parser_stmt.c
-sed -i.bak -e "1i #include <stdlib.h>\n#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" src/parser/parser_stmt.c
-# fix missing termios.h in src/repl/repl.c (version >= 0.4.0)
-patch -ulbf src/repl/repl.c << EOF
-@@ -8,3 +8,5 @@
- #include <string.h>
-+#ifndef _WIN32
- #include <termios.h>
-+#endif
- #include <unistd.h>
-@@ -76,2 +78,6 @@
-
-+#ifdef _WIN32
-+#define disable_raw_mode()
-+#define enable_raw_mode()
-+#else
- static struct termios orig_termios;
-@@ -105,2 +111,3 @@
- }
-+#endif
-
+## fix missing realpath in src/parser/parser_stmt.c (version <= 0.4.0)
+#sed -i.bak -e "1i #include <stdlib.h>\n#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)" src/parser/parser_stmt.c
+## fix missing termios.h in src/repl/repl.c (version = 0.4.0)
+#patch -ulbf src/repl/repl.c << EOF
+#@@ -8,3 +8,5 @@
+# #include <string.h>
+#+#ifndef _WIN32
+# #include <termios.h>
+#+#endif
+# #include <unistd.h>
+#@@ -76,2 +78,6 @@
+#
+#+#ifdef _WIN32
+#+#define disable_raw_mode()
+#+#define enable_raw_mode()
+#+#else
+# static struct termios orig_termios;
+#@@ -105,2 +111,3 @@
+# }
+#+#endif
+#
+#EOF
+# fix src/utils/utils.c (version >= 0.4.1)
+patch -ulbf src/utils/utils.c << EOF
+@@ -77,3 +77,3 @@
+ {
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+     struct timespec ts;
 EOF
+# fix src/zprep.h (version >= 0.4.1)
+sed -i.bak -e "1i #include <windows.h>\n#define TokenType ZEN_TokenType" src/zprep.h
+# fix src/ast/ast.h (version >= 0.4.1)
+sed -i.bak -e "1i #include <windows.h>\n#define NODE_COMMENT ZEN_NODE_COMMENT" src/ast/ast.h
 wl-showstatus build-install &&
  make install PREFIX=$INSTALLPREFIX OS=MinGW CC="${CC:-gcc}" CFLAGS="$(sed -ne "s/^CFLAGS\s*=\s*//p" Makefile) -I$MINGWPREFIX/include/libdl-win32" LIBS="$(sed -ne "s/^LIBS\s*=\s*//p" Makefile) -s" &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf Zen-C-$VERSION
