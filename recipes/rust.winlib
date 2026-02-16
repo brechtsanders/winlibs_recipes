@@ -452,6 +452,34 @@ patch -ulbf compiler/rustc_target/src/spec/base/windows_gnu.rs << EOF
 +        "-lsecur32",
      ];
 EOF
+# fix embedded long path support by including manifest
+sed -i.bak "s/\&\& Ok(\"msvc\") == target_env.as_deref()//" src/tools/cargo/build.rs src/tools/rustc-perf/collector/compile-benchmarks/cargo-0.87.1/build.rs
+cat > "compiler/rustc/Windows Manifest.rc" << EOF
+#include <windows.h>
+1 RT_MANIFEST "Windows Manifest.xml"
+2 ICON "../../src/etc/installer/gfx/rust-logo.ico"
+EOF
+${WINDRES:-windres} "compiler/rustc/Windows Manifest.rc" -O coff -o "compiler/rustc/Windows Manifest.o"
+patch -ulbf compiler/rustc/build.rs << EOF
+@@ -29,13 +29,9 @@
+ fn set_windows_manifest() {
+-    static WINDOWS_MANIFEST_FILE: &str = "Windows Manifest.xml";
++    static WINDOWS_MANIFEST_OBJ: &str = "windows_manifest.o";
+
+     let mut manifest = env::current_dir().unwrap();
+-    manifest.push(WINDOWS_MANIFEST_FILE);
++    manifest.push(WINDOWS_MANIFEST_OBJ);
+
+-    println!("cargo:rerun-if-changed={WINDOWS_MANIFEST_FILE}");
+-    // Embed the Windows application manifest file.
+-    println!("cargo:rustc-link-arg-bin=rustc-main=/MANIFEST:EMBED");
+-    println!("cargo:rustc-link-arg-bin=rustc-main=/MANIFESTINPUT:{}", manifest.to_str().unwrap());
+-    // Turn linker warnings into errors.
+-    println!("cargo:rustc-link-arg-bin=rustc-main=/WX");
++    println!("cargo:rerun-if-changed={WINDOWS_MANIFEST_OBJ}");
++    println!("cargo:rustc-link-arg-bin=rustc-main={}", manifest.to_str().unwrap());
+ }
+EOF
 ## manually extract GCC
 #if ${CC:-gcc} --version | head -n1 | grep -qv "^clang"; then
 # GCCVERSION=$(gcc --version | head -n1 | sed -ne "s/^.* \([0-9.]*\)$/\1/p")
@@ -494,6 +522,7 @@ wl-showstatus build-install &&
  #--set cc="$(cygpath -m $(which ${CC:-gcc}))" --set cxx="$(cygpath -m $(which ${CXX:-g++}))" --set ranlib="$(cygpath -m $(which ${RANLIB:-ranlib}))" --set linker="$(cygpath -m $(which ${CC:-gcc}))" 
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf rustc-$VERSION
 ####Note: don't run from RAM drive
+####$MINGWPREFIX/share/rust/bin/cargo -Z help
 
 
 
