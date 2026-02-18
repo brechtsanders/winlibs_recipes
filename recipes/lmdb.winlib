@@ -56,9 +56,20 @@ wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/LMDB_$VERSION.tar.gz
 cd lmdb-LMDB_$VERSION
 # fix missing GetFileSizeEx in libraries/liblmdb/mdb.c
-mv libraries/liblmdb/mdb.c libraries/liblmdb/mdb.c.bak &&
-echo "#define _WIN32_WINNT 0x0500" > libraries/liblmdb/mdb.c &&
-cat libraries/liblmdb/mdb.c.bak >> libraries/liblmdb/mdb.c
+sed -i.bak -e "1i #define _WIN32_WINNT 0x0500" libraries/liblmdb/mdb.c
+# fix missing lmdb.pc
+cat > lmdb.pc << EOF
+prefix=$INSTALLPREFIX
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: $BASENAME
+Description: $DESCRIPTION
+Version: $VERSION
+Libs: -L\${libdir} -llmdb
+Cflags: -I\${includedir}
+EOF
 # fix building .dll extension for shared library
 sed -i.bak -e "s/\.so/\.dll/g; s/\(-shared\)/\1 -Wl,--out-implib,liblmdb.dll.a/" libraries/liblmdb/Makefile
 # avoid -fPIC (useless on Windows and not supported by clang) in libraries/liblmdb/Makefile
@@ -70,6 +81,9 @@ wl-showstatus build &&
  make -Clibraries/liblmdb install prefix=$INSTALLPREFIX &&
  mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
  cp -f libraries/liblmdb/*.dll.a $INSTALLPREFIX/lib/ &&
+ # manually install lmdb.pc
+ mkdir -p $INSTALLPREFIX/lib/pkgconfig &&
+ cp -u lmdb.pc $INSTALLPREFIX/lib/pkgconfig/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lmdb-LMDB_$VERSION
 
 

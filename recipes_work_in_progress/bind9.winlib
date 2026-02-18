@@ -151,8 +151,10 @@ export TYPE=application
 #export VERSIONDATE=20251119
 #export VERSION=9.21.16
 #export VERSIONDATE=20251218
-export VERSION=9.21.17
-export VERSIONDATE=20260121
+#export VERSION=9.21.17
+#export VERSIONDATE=20260121
+export VERSION=9.21.18
+export VERSIONDATE=20260218
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,libdl,openssl,p11-kit,libidn2,gss,libmaxminddb,libxml2,libxslt,json,zlib,readline,libuv,libcurl,lmdb,mariadb-client
 export OPTIONALDEPENDENCIES=
@@ -190,3 +192,43 @@ wl-showstatus preconfigure &&
 
 
 
+#export BUILDDEPENDENCIES=meson,ninja
+#-Dc_args=$CFLAGS -Dcpp_args=$CXXFLAGS -Dc_link_args=$LDFLAGS -Dcpp_link_args=$LDFLAGS
+## fix location of Perl
+#sed -i.bak -e "s?'perl'?'$(cygpath -w $PERLDIR/bin/perl.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix detection of Python
+#sed -i.bak -e "s?'python3'?'$(cygpath -w $PYDIR/python.exe|sed -e 's/\\/&&&&/g')'?" meson.build
+## fix missing gio-unix
+##sed -i.bak -e "s/gio-unix-/gio-/" meson.build
+#sed -i.bak -e "s/gio-unix-/gio-windows-/" meson.build
+# fix meson.build (version >= 9.21.18)
+patch -ulbf meson.build << EOF
+@@ -123,9 +123,3 @@
+
+-src_id = ''
+-if fs.is_file('srcid')
+-    src_id = fs.read('srcid', encoding: 'utf-8').strip()
+-elif git.found()
+-    src_id = run_command(git, 'rev-parse', '--short', 'HEAD', check: true).stdout().substring(0, 7)
+-    meson.add_dist_script('util' / 'meson-dist-package.sh', 'srcid', src_id)
+-endif
++src_id = '$VERSION'
+
+EOF
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dzlib=enabled  -Dstats-json=enabled -Dstats-xml=enabled -Didn=enabled -Dlmdb=enabled -Dline=enabled -Dgeoip=enabled . build_both &&
+ ## fix slash/backslash path issue when calling Python from Ninja
+ #sed -i.bak -e "s/join_paths/os.path.join/g; /COMMAND =.*python\.exe/ s?\"/\([a-zA-Z]\)/?\"\1:/?; /COMMAND =.*python\.exe/ s?/?\\\\?g" build_*/build.ninja &&
+ ## fix Python path issues in meson_exe
+ #sed -i.bak -e "s?$PYDIR?$(echo $PYDIR|sed -e "s?^/\([a-zA-Z]\)/?\1:/?")?" build_both/meson-private/meson_exe_python.exe_*.dat &&
+ ## fix execution of Python scripts
+ #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *= *\| *=.*\&\& *\)\(\"\{0,1\}[^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\|asciidoc\)\(\"\{0,1\} \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_both/build.ninja &&
+ ## fix executing shell scripts
+ #sed -i.bak -e "s?^\(\s*COMMAND\s*=\s*\)\(\"[^\"]*\.sh\"\)?\1\"$(cygpath -m $(which sh.exe))\" \2?" build_both/build.ninja &&
+ wl-showstatus build-install &&
+ #PATH=$PATH:$PYDIR PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib \
+ #PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} \
+ #ninja -Cbuild_both install/strip &&
+ ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
