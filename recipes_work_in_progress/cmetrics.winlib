@@ -43,8 +43,10 @@ export TYPE=library
 #export VERSIONDATE=20250911
 #export VERSION=1.0.6
 #export VERSIONDATE=20251224
-export VERSION=2.0.0
-export VERSIONDATE=20260212
+#export VERSION=2.0.0
+#export VERSIONDATE=20260212
+export VERSION=2.0.2
+export VERSIONDATE=20260219
 ####include/cmetrics/cmt_encode_opentelemetry.h:25:10: fatal error: opentelemetry/proto/metrics/v1/metrics.pb-c.h: No such file or directory
 wl-showstatus --package-version
 export DEPENDENCIES=fluent-cfl,fluent-otel-proto
@@ -101,28 +103,21 @@ sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" src/CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/share/fluent/include -I$MINGWPREFIX/share/fluent/include/cfl" -S. -Bbuild_static &&
- #-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
  wl-showstatus configure &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_C_FLAGS:STRING="-I$MINGWPREFIX/share/fluent/include -I$MINGWPREFIX/share/fluent/include/cfl" -S. -Bbuild_shared &&
  ## fix execution of Python scripts
  #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
  ## fix missing link libraries
  #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_shared/build.ninja &&
- #wl-showstatus build &&
- #cmake.exe --build build_static &&
- #ninja -Cbuild_static &&
- #wl-showstatus build &&
- #cmake.exe --build build_shared &&
- #ninja -Cbuild_shared &&
  wl-showstatus build-install &&
- #cmake.exe --install build_static --strip &&
- #cmake.exe --build build_static --target "install/strip" &&
- #cmake.exe --build build_static --target "library/install/strip" &&
+ # fix undefined isatty in build_static/cmt_decode_prometheus_lexer.c (version >= 2.0.2)
+ ninja -Cbuild_static cmt_decode_prometheus_lexer.c &&
+ sed -i.bak -e "1i #include <io.h>" build_static/cmt_decode_prometheus_lexer.c &&
  ninja -Cbuild_static install/strip &&
- #ninja -Cbuild_static library/install/strip &&
  wl-showstatus build-install &&
- #cmake.exe --install build_shared --strip &&
- #cmake.exe --build build_shared --target "install/strip" &&
+ # fix undefined isatty in build_static/cmt_decode_prometheus_lexer.c (version >= 2.0.2)
+ ninja -Cbuild_shared cmt_decode_prometheus_lexer.c &&
+ sed -i.bak -e "1i #include <io.h>" build_shared/cmt_decode_prometheus_lexer.c &&
  ninja -Cbuild_shared install/strip &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
