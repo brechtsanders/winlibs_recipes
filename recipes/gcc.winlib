@@ -1140,6 +1140,27 @@ const char *strcasestr(const char *s1, const char *s2)
 }
 EOF
 cat libgcobol/charmaps.cc.bak >> libgcobol/charmaps.cc
+## fix gcc/rust/typecheck/rust-tyty.cc (version >= 16-20260222)
+#patch -ulbf gcc/rust/typecheck/rust-tyty.cc << EOF
+#@@ -3519,14 +3519,5 @@
+# {
+#-  char *buf = nullptr;
+#-  size_t size = 0;
+#-
+#-  FILE *stream = open_memstream (&buf, &size);
+#-  if (!stream)
+#-    return "<error>";
+#-
+#-  print_generic_stmt (stream, value, TDF_NONE);
+#-  fclose (stream);
+#-
+#-  std::string result = (buf ? std::string (buf, size) : "<error>");
+#-  free (buf);
+#+  pretty_printer pp;
+#+  dump_generic_node (&pp, value, 0, TDF_NONE, true);
+#+  std::string result = pp_formatted_text (&pp);
+#
+#EOF
 ## fix AVX misalignment bug
 #####See also: https://github.com/msys2/MINGW-packages/pull/8317
 #sed -i.bak '/vmovapd/s/0x6628/0x6610/g;/vmovaps/s/0x28/0x10/g;/vmovdqa/s/0x666f/0xf36f/g;/vmovdqa/s/0x666F/0xF36F/g' opcodes/i386-opc.tbl opcodes/i386-tbl.h
@@ -1558,6 +1579,8 @@ mkdir -p build_mingw &&
  wl-showstatus build-install &&
  #make -Cbuild_mingw install-strip &&
  ( make -Cbuild_mingw install-strip || make -Cbuild_mingw install-strip LIBS="-lmman" ) &&
+ # to fix building with GCC16: touch build_mingw/gcc/-lws2_32 
+ # to fix building Rust with GCC16: ZSTD_LIB="-lzstd -lntdll -luserenv -lws2_32" 
  ## strip absolute -L paths from libstdc++.la and libsupc++.la
  #sed -i -e "s? -L$(pwd)[^\s]*??g; s? -L$INSTALLPREFIX/share/gcc/? -L../?g" $INSTALLPREFIX/share/gcc/lib/*.la &&
  # remove .la files
@@ -2172,6 +2195,8 @@ echo -e "#include <iostream>\n#if defined(__clang__)\n#define COMPILERNAME \"cla
 echo -e "#include <iostream>\n#if defined(__clang__)\n#define COMPILERNAME \"clang++\"\n#elif defined(__GNUC__)\n#define COMPILERNAME \"g++\"\n#else\n#define COMPILERNAME \"unknown compiler\"\n#endif\nint main() {\nstd::cout << \"C++ compiled with \" << COMPILERNAME << \": OK\" << std::endl;\nreturn 0;\n}\n" | clang++ -xc++ - -o test.exe && ./test.exe && rm test.exe
 # test D
 echo -e "module conftest;\nint main()\n{ return 0; }\n" | gdc -xd - -o test.exe
+# test Rust
+echo -e 'fn main() {\nprintln!("Hello World!");\n}\n' | GCCRS_INCOMPLETE_AND_EXPERIMENTAL_COMPILER_DO_NOT_USE=1 $MINGWPREFIX/share/gcc/bin/gccrs.exe -xrust - -o test.exe && rm test.exe
 
 
 
@@ -2191,6 +2216,7 @@ echo -e "module conftest;\nint main()\n{ return 0; }\n" | gdc -xd - -o test.exe
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=118244 (GCC15 libstdc++-v3 build errors) -> remove compiler flag -D__USE_MINGW_ANSI_STDIO=0
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=118283 (GCC15 build issues: bool is defined and error: too many arguments to function)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=118495 (GCC15 build issues when building D language: d21.exe: internal compiler error: Segmentation fault)
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=124233 (GCC16 build issues when building Rust language: open_memstream() does not exist)
 # -fstack-protector need -lssp_nonshared -lssp -> https://sourceware.org/legacy-ml/gdb-patches/2019-12/msg00795.html
 # --enable-offload-targets doesn't work when using ucrt
 
