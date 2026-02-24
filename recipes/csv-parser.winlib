@@ -29,8 +29,10 @@ export TYPE=library
 #export VERSIONDATE=20260216
 #export VERSION=2.4.2
 #export VERSIONDATE=20260217
-export VERSION=2.5.0
-export VERSIONDATE=20260220
+#export VERSION=2.5.0
+#export VERSIONDATE=20260220
+export VERSION=2.5.1
+export VERSIONDATE=20260224
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -47,13 +49,41 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix include/external/mio.hpp (version >= 2.5.1)
+patch -ulbf include/external/mio.hpp << EOF
+@@ -787,3 +787,3 @@
+ {
+-    return n >> 32;
++    return (DWORD)(n >> 32);
+ }
+@@ -793,3 +793,3 @@
+ {
+-    return n & 0xffffffff;
++    return (DWORD)(n & 0xffffffff);
+ }
+EOF
+# fix single_include_test/csv.hpp (version >= 2.5.1)
+patch -ulbf single_include_test/csv.hpp << EOF
+@@ -847,3 +847,3 @@
+ {
+-    return n >> 32;
++    return (DWORD)(n >> 32);
+ }
+@@ -853,3 +853,3 @@
+ {
+-    return n & 0xffffffff;
++    return (DWORD)(n & 0xffffffff);
+ }
+EOF
 # also allow building shared library
 sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" include/internal/CMakeLists.txt
+# skip building tests (version >= 2.5.1)
+sed -i.bak -e "s/\(CSV_DEVELOPER \)TRUE/\1FALSE/" CMakeLists.txt
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/csv-parser -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_PYTHON:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/csv-parser -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_PYTHON:BOOL=OFF -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_static &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/csv-parser -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PYTHON:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/csv-parser -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_PYTHON:BOOL=OFF -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -S. -Bbuild_shared &&
  wl-showstatus build &&
  ninja -Cbuild_static &&
  wl-showstatus build &&
