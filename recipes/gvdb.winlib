@@ -1,0 +1,53 @@
+export NAME="GVDB"
+export STATUS=
+export URL=https://gitlab.gnome.org/GNOME/gvdb
+export BASENAME=gvdb
+export DESCRIPTION="GVDB (GVariant Database) is a simple database file format that stores a mapping from strings to GVariant values in a way that is extremely efficient for lookups."
+export CATEGORY=database
+export TYPE=library
+export VERSION=main
+export VERSIONDATE=20260225
+wl-showstatus --package-version
+export DEPENDENCIES=glib2
+export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=meson,ninja
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://gitlab.gnome.org/GNOME/gvdb/-/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://gitlab.gnome.org/GNOME/gvdb/-/archive/$VERSION/$BASENAME-$VERSION.tar.bz2
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
+#cd $BASENAME-$VERSION*
+cd $BASENAME-$VERSION
+#mkdir -p build_both &&
+# wl-showstatus configure &&
+# PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dtests=false . build_both &&
+# wl-showstatus build-install &&
+# ninja -Cbuild_both install &&
+#    echo OK && find . -name '*.a'
+wl-showstatus build &&
+ touch SUCCESS &&
+ #for F in gvdb/*.c gvdb/tests/*.c; do
+ for F in gvdb/*.c; do
+  echo CC $F
+  ${CC:-gcc} -c -o $F.o $F -I. $(${PKG_CONFIG:-pkg-config} --cflags glib-2.0) || ( rm -f SUCCESS; false ) || break
+ done &&
+ rm SUCCESS &&
+ ${AR:-ar} cru libgvdb.a gvdb/*.o &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libgvdb.a | sed -n -e "s/^_\{0,1\}\([^ ]*\) T .*$/\1/p; s/^_\{0,1\}\([^ ]*\) D .*$/\1 DATA/p" ) > gvdb.def &&
+ ${CC:-gcc} -shared -s -mwindows -def gvdb.def -o gvdb.dll libgvdb.a -Wl,--out-implib,libgvdb.dll.a $(${PKG_CONFIG:-pkg-config} --libs gio-2.0) &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f gvdb/*.h $INSTALLPREFIX/include/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
