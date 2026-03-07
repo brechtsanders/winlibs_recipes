@@ -458,6 +458,8 @@ export TYPE=library,application
 #export VERSIONDATE=20251129
 export VERSION=3.51.2.0
 export VERSIONDATE=20260110
+#export VERSION=3.52.0.0
+#export VERSIONDATE=20260307
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,readline,tcl
 export OPTIONALDEPENDENCIES=
@@ -492,6 +494,27 @@ patch -ulbf tool/mksqlite3c.tcl << EOF
 -set today [clock format [clock seconds] -format "%Y-%m-%d %H:%M:%S UTC" -gmt 1]
 +set today "$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
  puts \$out [subst \\
+EOF
+#ifdef __MINGW32__
+#include <windows.h>
+#include <shellapi.h>
+int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+{
+    LPWSTR* wargv;
+    int argc;
+    wargv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    return wmain(argc, wargv);
+}
+#endif
+# fix missing WinMain in shell.c (version >= 3.52.0.0)
+cat >> src/shell.c.in << EOF
+#ifdef __MINGW32__
+#include <windows.h>
+int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+{
+    return main(__argc, __argv);
+}
+#endif
 EOF
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-threadsafe --with-tempstore=yes --enable-fts5 --enable-session --disable-editline CFLAGS="-DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_UNLOCK_NOTIFY" LDFLAGS="-Wl,-no-undefined -Wl,--as-needed -lreadline" &&
