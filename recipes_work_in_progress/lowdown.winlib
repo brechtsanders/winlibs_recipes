@@ -34,10 +34,12 @@ export TYPE=application
 #export VERSIONDATE=20250126
 #export VERSION=2.0.3
 #export VERSIONDATE=20251116
-export VERSION=2.0.4
-export VERSIONDATE=20251117
+#export VERSION=2.0.4
+#export VERSIONDATE=20251117
+export VERSION=3.0.0
+export VERSIONDATE=20260308
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=wcwidth
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -113,10 +115,55 @@ patch -ulbf compats.c << EOF
 +
 
 EOF
+# fix missing wcswidth and mbsnrtowcs in gemini.c and term.c (version >= 3.0.0)
+sed -i.bak -e "1i #include <compat/wcwidth.h>\n#define mbsnrtowcs(dest,src,nms,size,ps) mbsrtowcs(dest,src,size,ps)" gemini.c term.c
+# fix Makefile (version >= 3.0.0)
+patch -ulbf Makefile << EOF
+@@ -145,9 +145,8 @@
+ # Has no effect unless HAVE_SANDBOX_INIT is defined.
+-.ifdef SANDBOX_INIT_ERROR_IGNORE
+-.if \$(SANDBOX_INIT_ERROR_IGNORE) == "always"
++ifeq (\$(SANDBOX_INIT_ERROR_IGNORE),)
++else ifeq (\$(SANDBOX_INIT_ERROR_IGNORE),always)
+ CFLAGS         += -DSANDBOX_INIT_ERROR_IGNORE=2
+-.else
++else
+ CFLAGS         += -DSANDBOX_INIT_ERROR_IGNORE=1
+-.endif
+-.endif
++endif
+
+@@ -165,8 +164,7 @@
+ MAIN_OBJS       =
+-.ifdef LINK_METHOD
+-.if \$(LINK_METHOD) == "shared"
++ifeq (\$(LINK_METHOD),)
++else ifeq (\$(LINK_METHOD),shared)
+ LIB_LOWDOWN     = \$(LIB_SO)
+ MAIN_OBJS       = \$(COMPAT_OBJS)
+-.endif
+-.endif
++endif
+
+@@ -174,7 +172,7 @@
+ # indicating shared library versions.
+-.if \$(LINKER_SOSUFFIX) == "dylib"
++ifeq (\$(LINKER_SOSUFFIX),dylib)
+ LIB_SOVER       = liblowdown.\$(LIBVER).\$(LINKER_SOSUFFIX)
+-.else
++else
+ LIB_SOVER       = liblowdown.\$(LINKER_SOSUFFIX).\$(LIBVER)
+-.endif
++endif
+
+EOF
 wl-showstatus configure &&
  CC="${CC:-gcc}" AR=${AR:-ar} ./configure &&
  wl-showstatus build &&
- make CC="${CC:-gcc} -Duid_t=int -Dgid_t=int -Dnlink_t=size_t" &&
+ make CC="${CC:-gcc} -Duid_t=int -Dgid_t=int -Dnlink_t=size_t" CFLAGS="-D_GNU_SOURCE -DVERSION=\\\"$VERSION\\\"" &&
+ #LINKER_SOFLAG: using -shared
+ #LINKER_SOSUFFIX: using so
+ #LINKER_SONAME: using -soname
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf lowdown-VERSION_$(echo $VERSION|tr . _)
 
