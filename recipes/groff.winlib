@@ -27,6 +27,8 @@ export VERSION=1.23.0
 export VERSIONDATE=20230706
 #export VERSION=1.24.0
 #export VERSIONDATE=20260301
+#export VERSION=1.24.1
+#export VERSIONDATE=20260314
 wl-showstatus --package-version
 export DEPENDENCIES=libiconv,uchardet,libunistring,netpbm,wcwidth
 #export DEPENDENCIES=libiconv,uchardet,libunistring,netpbm,wcwidth,gnu-ghostscript
@@ -168,6 +170,77 @@ patch -ulbf src/libs/libgroff/getopt.c << EOF
 +extern char *getenv (const char* name);
  #endif
 EOF
+## fix missing stdcountof.h in src/libs/libgroff/font.cpp (version >= 1.24.1)
+#patch -ulbf src/libs/libgroff/font.cpp << EOF
+#@@ -27,3 +27,2 @@
+# #include <math.h>
+#-#include <stdcountof.h>
+# #include <stdlib.h>
+#@@ -1292,3 +1291,3 @@
+#     for (idx = 0;
+#-        !numeric_directive_found && (idx < countof(numeric_directive_table));
+#+        !numeric_directive_found && (idx < sizeof(numeric_directive_table) / sizeof(*numeric_directive_table));
+#         idx++)
+#EOF
+## fix missing stdcountof.h in src/libs/libgroff/glyphuni.cpp (version >= 1.24.1)
+#patch -ulbf src/libs/libgroff/glyphuni.cpp << EOF
+#@@ -22,4 +22,2 @@
+#
+#-#include <stdcountof.h>
+#-
+# #include "lib.h"
+#@@ -520,3 +518,3 @@
+# {
+#-  for (size_t i = 0; i < countof(glyph_to_unicode_list); i++) {
+#+  for (size_t i = 0; i < sizeof(glyph_to_unicode_list) / sizeof(*glyph_to_unicode_list); i++) {
+#     glyph_to_unicode_map *gtu = new glyph_to_unicode_map[1];
+#EOF
+## fix missing stdcountof.h in src/libs/libgroff/uniglyph.cpp (version >= 1.24.1)
+#patch -ulbf src/libs/libgroff/uniglyph.cpp << EOF
+#@@ -22,4 +22,2 @@
+#
+#-#include <stdcountof.h>
+#-
+# #include "lib.h"
+#@@ -435,3 +433,3 @@
+# {
+#-  for (unsigned int i = 0; i < countof(unicode_to_glyph_list); i++) {
+#+  for (unsigned int i = 0; i < sizeof(unicode_to_glyph_list) / sizeof(*unicode_to_glyph_list); i++) {
+#     unicode_to_glyph *utg = new unicode_to_glyph[1];
+#EOF
+## fix missing stdcountof.h in src/libs/libgroff/uniuni.cpp (version >= 1.24.1)
+#patch -ulbf src/libs/libgroff/uniuni.cpp << EOF
+#@@ -22,4 +22,2 @@
+#
+#-#include <stdcountof.h>
+#-
+# #include "lib.h"
+#@@ -2141,3 +2139,3 @@
+# {
+#-  for (size_t i = 0; i < countof(unicode_decompose_list); i++) {
+#+  for (size_t i = 0; i < sizeof(unicode_decompose_list) / sizeof(*unicode_decompose_list); i++) {
+#     unicode_decompose *dec = new unicode_decompose[1];
+#EOF
+## fix missing memmmem() (version >= 1.24.1)
+#mv src/libs/libgroff/string.cpp src/libs/libgroff/string.cpp.bak
+#cat > src/libs/libgroff/string.cpp << EOF
+##include <stddef.h>
+##include <string.h>
+#static void* memmem (const void *haystack, size_t haystacklen, const void *needle, size_t needlelen)
+#{
+#  const char* p;
+#  const char* const q = (const char*)haystack + haystacklen - needlelen;
+#  if (needlelen == 0)
+#    return (void*)haystack;
+#  if (haystacklen < needlelen)
+#    return NULL;
+#  for (p = (const char*)haystack; p <= q; ++p)
+#    if (memcmp((const void*)p, needle, needlelen) == 0)
+#      return (void *)p;
+#  return NULL;
+#}
+#EOF
+#cat src/libs/libgroff/string.cpp.bak >> src/libs/libgroff/string.cpp
 # fix missing _GL_INLINE_HEADER_BEGIN/_GL_INLINE_HEADER_END in src/libs/gnulib/lib/wctype.in.h for 64-bit (version >= 1.22.2 <= 1.22.4)
 mv src/libs/gnulib/lib/wctype.in.h src/libs/gnulib/lib/wctype.in.h.bak
 cat > src/libs/gnulib/lib/wctype.in.h << EOF
