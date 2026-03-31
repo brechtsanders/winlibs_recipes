@@ -236,10 +236,12 @@ export TYPE=library
 #export VERSIONDATE=20241128
 #export VERSION=1.24.2
 #export VERSIONDATE=20250111
-export VERSION=1.24.3
-export VERSIONDATE=20250330
+#export VERSION=1.24.3
+#export VERSIONDATE=20250330
 #export VERSION=1.25.0
 #export VERSIONDATE=20251222
+export VERSION=1.25.1
+export VERSIONDATE=20260331
 wl-showstatus --package-version
 export DEPENDENCIES=libsoundio,portaudio,pulseaudio,pffft
 export OPTIONALDEPENDENCIES=qt,sdl2,jack,libmysofa
@@ -297,114 +299,114 @@ cd openal-soft*$VERSION
 #+            pffft_transform(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
 #                 PFFFT_BACKWARD);
 #EOF
-# fix alc/effects/convolution.cpp (version >= 1.24.3)
-patch -ulbf alc/effects/convolution.cpp << EOF
-@@ -229,3 +229,3 @@
-
--    PFFFTSetup mFft;
-+    PFFFT_Setup* mFft;
-     alignas(16) std::array<float,ConvolveUpdateSize> mFftBuffer{};
-@@ -290,3 +290,3 @@
-     if(!mFft)
--        mFft = PFFFTSetup{ConvolveUpdateSize, PFFFT_REAL};
-+        mFft = pffft_new_setup(ConvolveUpdateSize, PFFFT_REAL);
-
-@@ -420,3 +420,3 @@
-              */
--            mFft.zreorder(ffttmp.data(), al::to_address(filteriter), PFFFT_BACKWARD);
-+            pffft_zreorder(mFft, ffttmp.data(), al::to_address(filteriter), PFFFT_BACKWARD);
-             filteriter += ConvolveUpdateSize;
-@@ -669,3 +669,3 @@
-          */
--        mFft.transform(mInput.data(), &mComplexData[curseg*ConvolveUpdateSize],
-+        pffft_transform(mFft, mInput.data(), &mComplexData[curseg*ConvolveUpdateSize],
-             mFftWorkBuffer.data(), PFFFT_FORWARD);
-@@ -682,4 +682,4 @@
-             {
--                mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
--                    mFftBuffer.data());
-+                pffft_zconvolve_accumulate(mFft, al::to_address(input), al::to_address(filter),
-+                    mFftBuffer.data(), 1);
-                 input += ConvolveUpdateSize;
-@@ -690,4 +690,4 @@
-             {
--                mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
--                    mFftBuffer.data());
-+                pffft_zconvolve_accumulate(mFft, al::to_address(input), al::to_address(filter),
-+                    mFftBuffer.data(), 1);
-                 input += ConvolveUpdateSize;
-@@ -701,3 +701,3 @@
-              */
--            mFft.transform(mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
-+            pffft_transform(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
-                 PFFFT_BACKWARD);
-EOF
-# fix alc/effects/pshifter.cpp (version >= 1.24.0)
-patch -ulbf alc/effects/pshifter.cpp << EOF
-@@ -96,3 +96,3 @@
-
--    PFFFTSetup mFft;
-+    PFFFT_Setup *mFft;
-     alignas(16) std::array<float,StftSize> mFftBuffer{};
-@@ -137,3 +137,3 @@
-     if(!mFft)
--        mFft = PFFFTSetup{StftSize, PFFFT_REAL};
-+        mFft = pffft_new_setup(StftSize, PFFFT_REAL);
- }
-@@ -194,3 +194,3 @@
-             mFftBuffer[k] = mFIFO[src] * gWindow.mData[k];
--        mFft.transform_ordered(mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
-+        pffft_transform_ordered(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
-             PFFFT_FORWARD);
-@@ -293,3 +293,3 @@
-          */
--        mFft.transform_ordered(mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
-+        pffft_transform_ordered(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
-             PFFFT_BACKWARD);
-EOF
-# fix core/uhjfilter.cpp (version >= 1.24.0)
-patch -ulbf core/uhjfilter.cpp << EOF
-@@ -59,7 +59,8 @@
-
--    PFFFTSetup mFft;
-+    PFFFT_Setup* mFft;
-     alignas(16) std::array<float,sFftLength*sNumSegments> mFilterData;
-
--    SegmentedFilter() : mFft{sFftLength, PFFFT_REAL}
-+    SegmentedFilter() 
-     {
-+        pffft_new_setup(sFftLength, PFFFT_REAL);
-         static constexpr size_t fft_size{N};
-@@ -106,3 +107,3 @@
-             }
--            mFft.zreorder(fftTmp.data(), al::to_address(filter), PFFFT_BACKWARD);
-+            pffft_zreorder(mFft, fftTmp.data(), al::to_address(filter), PFFFT_BACKWARD);
-             filter += sFftLength;
-@@ -244,3 +245,3 @@
-
--        Filter.mFft.transform(al::to_address(input), al::to_address(input), mWorkData.data(),
-+        pffft_transform(Filter.mFft, al::to_address(input), al::to_address(input), mWorkData.data(),
-             PFFFT_FORWARD);
-@@ -254,4 +255,4 @@
-         {
--            Filter.mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
--                mFftBuffer.data());
-+            pffft_zconvolve_accumulate(Filter.mFft, al::to_address(input), al::to_address(filter),
-+                mFftBuffer.data(), 1);
-             input += sFftLength;
-@@ -262,4 +263,4 @@
-         {
--            Filter.mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
--                mFftBuffer.data());
-+            pffft_zconvolve_accumulate(Filter.mFft, al::to_address(input), al::to_address(filter),
-+                mFftBuffer.data(), 1);
-             input += sFftLength;
-@@ -271,3 +272,3 @@
-          */
--        Filter.mFft.transform(mFftBuffer.data(), mFftBuffer.data(), mWorkData.data(),
-+        pffft_transform(Filter.mFft, mFftBuffer.data(), mFftBuffer.data(), mWorkData.data(),
-             PFFFT_BACKWARD);
-EOF
+## fix alc/effects/convolution.cpp (version = 1.24.3)
+#patch -ulbf alc/effects/convolution.cpp << EOF
+#@@ -229,3 +229,3 @@
+#
+#-    PFFFTSetup mFft;
+#+    PFFFT_Setup* mFft;
+#     alignas(16) std::array<float,ConvolveUpdateSize> mFftBuffer{};
+#@@ -290,3 +290,3 @@
+#     if(!mFft)
+#-        mFft = PFFFTSetup{ConvolveUpdateSize, PFFFT_REAL};
+#+        mFft = pffft_new_setup(ConvolveUpdateSize, PFFFT_REAL);
+#
+#@@ -420,3 +420,3 @@
+#              */
+#-            mFft.zreorder(ffttmp.data(), al::to_address(filteriter), PFFFT_BACKWARD);
+#+            pffft_zreorder(mFft, ffttmp.data(), al::to_address(filteriter), PFFFT_BACKWARD);
+#             filteriter += ConvolveUpdateSize;
+#@@ -669,3 +669,3 @@
+#          */
+#-        mFft.transform(mInput.data(), &mComplexData[curseg*ConvolveUpdateSize],
+#+        pffft_transform(mFft, mInput.data(), &mComplexData[curseg*ConvolveUpdateSize],
+#             mFftWorkBuffer.data(), PFFFT_FORWARD);
+#@@ -682,4 +682,4 @@
+#             {
+#-                mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
+#-                    mFftBuffer.data());
+#+                pffft_zconvolve_accumulate(mFft, al::to_address(input), al::to_address(filter),
+#+                    mFftBuffer.data(), 1);
+#                 input += ConvolveUpdateSize;
+#@@ -690,4 +690,4 @@
+#             {
+#-                mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
+#-                    mFftBuffer.data());
+#+                pffft_zconvolve_accumulate(mFft, al::to_address(input), al::to_address(filter),
+#+                    mFftBuffer.data(), 1);
+#                 input += ConvolveUpdateSize;
+#@@ -701,3 +701,3 @@
+#              */
+#-            mFft.transform(mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#+            pffft_transform(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#                 PFFFT_BACKWARD);
+#EOF
+## fix alc/effects/pshifter.cpp (version = 1.24.0)
+#patch -ulbf alc/effects/pshifter.cpp << EOF
+#@@ -96,3 +96,3 @@
+#
+#-    PFFFTSetup mFft;
+#+    PFFFT_Setup *mFft;
+#     alignas(16) std::array<float,StftSize> mFftBuffer{};
+#@@ -137,3 +137,3 @@
+#     if(!mFft)
+#-        mFft = PFFFTSetup{StftSize, PFFFT_REAL};
+#+        mFft = pffft_new_setup(StftSize, PFFFT_REAL);
+# }
+#@@ -194,3 +194,3 @@
+#             mFftBuffer[k] = mFIFO[src] * gWindow.mData[k];
+#-        mFft.transform_ordered(mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#+        pffft_transform_ordered(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#             PFFFT_FORWARD);
+#@@ -293,3 +293,3 @@
+#          */
+#-        mFft.transform_ordered(mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#+        pffft_transform_ordered(mFft, mFftBuffer.data(), mFftBuffer.data(), mFftWorkBuffer.data(),
+#             PFFFT_BACKWARD);
+#EOF
+## fix core/uhjfilter.cpp (version = 1.24.0)
+#patch -ulbf core/uhjfilter.cpp << EOF
+#@@ -59,7 +59,8 @@
+#
+#-    PFFFTSetup mFft;
+#+    PFFFT_Setup* mFft;
+#     alignas(16) std::array<float,sFftLength*sNumSegments> mFilterData;
+#
+#-    SegmentedFilter() : mFft{sFftLength, PFFFT_REAL}
+#+    SegmentedFilter() 
+#     {
+#+        pffft_new_setup(sFftLength, PFFFT_REAL);
+#         static constexpr size_t fft_size{N};
+#@@ -106,3 +107,3 @@
+#             }
+#-            mFft.zreorder(fftTmp.data(), al::to_address(filter), PFFFT_BACKWARD);
+#+            pffft_zreorder(mFft, fftTmp.data(), al::to_address(filter), PFFFT_BACKWARD);
+#             filter += sFftLength;
+#@@ -244,3 +245,3 @@
+#
+#-        Filter.mFft.transform(al::to_address(input), al::to_address(input), mWorkData.data(),
+#+        pffft_transform(Filter.mFft, al::to_address(input), al::to_address(input), mWorkData.data(),
+#             PFFFT_FORWARD);
+#@@ -254,4 +255,4 @@
+#         {
+#-            Filter.mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
+#-                mFftBuffer.data());
+#+            pffft_zconvolve_accumulate(Filter.mFft, al::to_address(input), al::to_address(filter),
+#+                mFftBuffer.data(), 1);
+#             input += sFftLength;
+#@@ -262,4 +263,4 @@
+#         {
+#-            Filter.mFft.zconvolve_accumulate(al::to_address(input), al::to_address(filter),
+#-                mFftBuffer.data());
+#+            pffft_zconvolve_accumulate(Filter.mFft, al::to_address(input), al::to_address(filter),
+#+                mFftBuffer.data(), 1);
+#             input += sFftLength;
+#@@ -271,3 +272,3 @@
+#          */
+#-        Filter.mFft.transform(mFftBuffer.data(), mFftBuffer.data(), mWorkData.data(),
+#+        pffft_transform(Filter.mFft, mFftBuffer.data(), mFftBuffer.data(), mWorkData.data(),
+#             PFFFT_BACKWARD);
+#EOF
 # fix alc/backends/pulseaudio.cpp (version >= 1.24.3)
 patch -ulbf alc/backends/pulseaudio.cpp << EOF
 @@ -63,3 +63,3 @@
