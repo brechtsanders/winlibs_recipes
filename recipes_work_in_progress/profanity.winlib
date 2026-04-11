@@ -29,12 +29,18 @@ export TYPE=application
 #export VERSIONDATE=20250822
 #export VERSION=0.16.0
 #export VERSIONDATE=20260223
-export VERSION=0.17.0
-export VERSIONDATE=20260326
+#export VERSION=0.17.0
+#export VERSIONDATE=20260326
+#export DEPENDENCIES=libstrophe,ncurses,readline,sqlite3,libcurl,libdl,date-time
+#export OPTIONALDEPENDENCIES=libomemo,libsignal-protocol-c,stabber
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+export VERSION=0.18.0
+export VERSIONDATE=20260411
 wl-showstatus --package-version
 export DEPENDENCIES=libstrophe,ncurses,readline,sqlite3,libcurl,libdl,date-time
 export OPTIONALDEPENDENCIES=libomemo,libsignal-protocol-c,stabber
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
 export OPTIONALBUILDDEPENDENCIES=
 #export LICENSEFILE=COPYING
 export LICENSEFILE=LICENSE.txt
@@ -42,12 +48,14 @@ export LICENSETYPE=GPL
 #export DOWNLOADURL="https://profanity-im.github.io/"
 export DOWNLOADURL="https://github.com/profanity-im/profanity/releases/"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/profanity-im/profanity/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/profanity-im/profanity/releases/download/$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/profanity-im/profanity/releases/download/$VERSION/$BASENAME-$VERSION.tar.xz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
 # fix missing files
 mkdir -p winfix/sys
@@ -269,16 +277,22 @@ patch -ulbf src/database.c << EOF
 +#endif
  }
 EOF
-wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python-plugins CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -ldl" &&
- ## fix building DLLs
- #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
- #wl-showstatus build &&
- #make &&
- echo "#include <pthread.h>" >> src/config.h &&
+#wl-showstatus configure &&
+# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-python-plugins CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -lws2_32 -ldl" &&
+# ## fix building DLLs
+# #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+# #wl-showstatus build &&
+# #make &&
+# echo "#include <pthread.h>" >> src/config.h &&
+# wl-showstatus build-install &&
+# make install-strip &&
+#    echo OK
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dc-plugins=enabled -Dpython-plugins=disabled -Dtests=false . build_both &&
  wl-showstatus build-install &&
- make install-strip &&
-    echo OK
+ ninja -Cbuild_both install &&
+    echo OK && find . -name '*.a'
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
