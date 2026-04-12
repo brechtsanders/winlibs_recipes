@@ -48,10 +48,10 @@ export TYPE=application
 #export VERSIONDATE=20250807
 #export VERSION=0.34.0
 #export VERSIONDATE=20250818
-export VERSION=0.35.0
-export VERSIONDATE=20260215
-#export VERSION=0.36.0
-#export VERSIONDATE=20260321
+#export VERSION=0.35.0
+#export VERSIONDATE=20260215
+export VERSION=0.36.0
+export VERSIONDATE=20260321
 wl-showstatus --package-version
 export DEPENDENCIES=date-time
 export OPTIONALDEPENDENCIES=
@@ -86,25 +86,25 @@ cat > $F << EOF
 EOF
 sed -e "s/str[pf]time/ya_&/g" $F.bak2 >> $F
 done
-# fix missing setenv() in src/libraries/bufr2tac_synop.c (version >= 0.17.0)
-patch -ulbf src/libraries/bufr2tac_synop.c << EOF
-@@ -51,2 +51,3 @@
-
-+#ifndef _WIN32
-   // Get current TZ
-@@ -62,2 +63,3 @@
-   tzset();
-+#endif
-
-@@ -72,2 +74,3 @@
-   // Revert TZ changes
-+#ifndef _WIN32
-   if ( tz[0] )
-@@ -81,2 +84,3 @@
-     }
-+#endif
-
-EOF
+## fix missing setenv() in src/libraries/bufr2tac_synop.c (version >= 0.17.0 <= 0.35.0)
+#patch -ulbf src/libraries/bufr2tac_synop.c << EOF
+#@@ -51,2 +51,3 @@
+#
+#+#ifndef _WIN32
+#   // Get current TZ
+#@@ -62,2 +63,3 @@
+#   tzset();
+#+#endif
+#
+#@@ -72,2 +74,3 @@
+#   // Revert TZ changes
+#+#ifndef _WIN32
+#   if ( tz[0] )
+#@@ -81,2 +84,3 @@
+#     }
+#+#endif
+#
+#EOF
 ## fix undefined strlcpy (version = 0.28.0)
 #for F in $(grep -lw "strlcpy\|strlcat" $(find -name '*.c')); do
 # mv $F $F.bak &&
@@ -112,6 +112,21 @@ EOF
 # echo "#define strlcat strncat" >> $F &&
 # cat $F.bak >> $F
 #done
+# fix undefined timegm() (version >= 0.36.0)
+for F in $(grep -lw timegm $(find -name '*.c')); do
+mv $F $F.bak
+cat > $F << EOF
+#include <time.h>
+#include <string.h>
+static inline time_t timegm(struct tm *tm)
+{
+  struct tm tm_copy;
+  memcpy(&tm_copy, tm, sizeof(struct tm));
+  return _mkgmtime(&tm_copy);
+}
+EOF
+cat $F.bak >> $F
+done
 wl-showstatus preconfigure &&
  mkdir -p m4 &&
  autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
