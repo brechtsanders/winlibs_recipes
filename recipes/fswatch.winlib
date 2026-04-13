@@ -280,8 +280,10 @@ export TYPE=library
 #export VERSIONDATE=20250118
 #export VERSION=1.18.2
 #export VERSIONDATE=20250127
-export VERSION=1.18.3
-export VERSIONDATE=20250205
+#export VERSION=1.18.3
+#export VERSIONDATE=20250205
+export VERSION=1.19.0
+export VERSIONDATE=20260413
 wl-showstatus --package-version
 export DEPENDENCIES=gettext,pcre
 export OPTIONALDEPENDENCIES=
@@ -310,28 +312,28 @@ cd $BASENAME-$VERSION
 #+#endif
 #
 #EOF
-# fix libfswatch/src/libfswatch/c++/poll_monitor.cpp (version >= 1.18.0)
-patch -ulbf libfswatch/src/libfswatch/c++/poll_monitor.cpp << EOF
-@@ -127,2 +127,3 @@
-       // Check if the path is a symbolic link
-+#ifndef __MINGW32__
-       if (follow_symlinks && std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
-@@ -133,4 +134,5 @@
-       }
-+#endif
-
--      if (!accept_path(path)) return;
-+      if (!accept_path(path.u8string())) return;
-
-@@ -139,5 +141,5 @@
-       struct stat fd_stat;
--      if (!stat_path(path, fd_stat, follow_symlinks)) return;
-+      if (!stat_path(path.u8string(), fd_stat, follow_symlinks)) return;
-
--      if (!add_path(path, fd_stat, fn)) return;
-+      if (!add_path(path.u8string(), fd_stat, fn)) return;
-       if (!recursive) return;
-EOF
+## fix libfswatch/src/libfswatch/c++/poll_monitor.cpp (version >= 1.18.0 <= 1.18.3)
+#patch -ulbf libfswatch/src/libfswatch/c++/poll_monitor.cpp << EOF
+#@@ -127,2 +127,3 @@
+#       // Check if the path is a symbolic link
+#+#ifndef __MINGW32__
+#       if (follow_symlinks && std::filesystem::is_symlink(std::filesystem::symlink_status(path)))
+#@@ -133,4 +134,5 @@
+#       }
+#+#endif
+#
+#-      if (!accept_path(path)) return;
+#+      if (!accept_path(path.u8string())) return;
+#
+#@@ -139,5 +141,5 @@
+#       struct stat fd_stat;
+#-      if (!stat_path(path, fd_stat, follow_symlinks)) return;
+#+      if (!stat_path(path.u8string(), fd_stat, follow_symlinks)) return;
+#
+#-      if (!add_path(path, fd_stat, fn)) return;
+#+      if (!add_path(path.u8string(), fd_stat, fn)) return;
+#       if (!recursive) return;
+#EOF
 # fix fswatch/src/fswatch.cpp (version >= 1.17.1)
 patch -ulbf fswatch/src/fswatch.cpp << EOF
 @@ -306,2 +306,3 @@
@@ -343,54 +345,54 @@ patch -ulbf fswatch/src/fswatch.cpp << EOF
 +#endif
  }
 EOF
-# fix libfswatch/src/libfswatch/c++/path_utils.cpp (version >= 1.17.1)
-patch -ulbf libfswatch/src/libfswatch/c++/path_utils.cpp << EOF
-@@ -24,2 +24,5 @@
- #include <system_error>
-+#ifdef __MINGW32__
-+#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
-+#endif
-
-@@ -96,3 +99,7 @@
-   {
-+#ifdef __MINGW32__
-+    if (stat(path.c_str(), &fd_stat) == 0)
-+#else
-     if (lstat(path.c_str(), &fd_stat) == 0)
-+#endif
-       return true;
-EOF
-# fix libfswatch/src/libfswatch/c++/windows/win_paths.cpp (version >= 1.17.1)
-patch -ulbf libfswatch/src/libfswatch/c++/windows/win_paths.cpp << EOF
-@@ -16,3 +16,7 @@
- #include "win_paths.hpp"
-+#ifdef __MINGW32__
-+#include <windows.h>
-+#else
- #include <sys/cygwin.h>
-+#endif
- #include "../libfswatch_exception.hpp"
-@@ -28,2 +32,5 @@
-     {
-+#ifdef __MINGW32__
-+      return wstring(path.begin(), path.end());
-+#else
-       void * raw_path = cygwin_create_path(CCP_POSIX_TO_WIN_W, path.c_str());
-@@ -36,2 +43,3 @@
-       return win_path;
-+#endif
-     }
-@@ -40,2 +48,5 @@
-     {
-+#ifdef __MINGW32__
-+      return string(path.begin(), path.end());
-+#else
-       void * raw_path = cygwin_create_path(CCP_WIN_W_TO_POSIX, path.c_str());
-@@ -48,2 +59,3 @@
-       return posix_path;
-+#endif
-     }
-EOF
+## fix libfswatch/src/libfswatch/c++/path_utils.cpp (version >= 1.17.1 <= 1.18.3)
+#patch -ulbf libfswatch/src/libfswatch/c++/path_utils.cpp << EOF
+#@@ -24,2 +24,5 @@
+# #include <system_error>
+#+#ifdef __MINGW32__
+#+#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
+#+#endif
+#
+#@@ -96,3 +99,7 @@
+#   {
+#+#ifdef __MINGW32__
+#+    if (stat(path.c_str(), &fd_stat) == 0)
+#+#else
+#     if (lstat(path.c_str(), &fd_stat) == 0)
+#+#endif
+#       return true;
+#EOF
+## fix libfswatch/src/libfswatch/c++/windows/win_paths.cpp (version >= 1.17.1 <= 1.18.3)
+#patch -ulbf libfswatch/src/libfswatch/c++/windows/win_paths.cpp << EOF
+#@@ -16,3 +16,7 @@
+# #include "win_paths.hpp"
+#+#ifdef __MINGW32__
+#+#include <windows.h>
+#+#else
+# #include <sys/cygwin.h>
+#+#endif
+# #include "../libfswatch_exception.hpp"
+#@@ -28,2 +32,5 @@
+#     {
+#+#ifdef __MINGW32__
+#+      return wstring(path.begin(), path.end());
+#+#else
+#       void * raw_path = cygwin_create_path(CCP_POSIX_TO_WIN_W, path.c_str());
+#@@ -36,2 +43,3 @@
+#       return win_path;
+#+#endif
+#     }
+#@@ -40,2 +48,5 @@
+#     {
+#+#ifdef __MINGW32__
+#+      return string(path.begin(), path.end());
+#+#else
+#       void * raw_path = cygwin_create_path(CCP_WIN_W_TO_POSIX, path.c_str());
+#@@ -48,2 +59,3 @@
+#       return posix_path;
+#+#endif
+#     }
+#EOF
 #touch libfswatch_config.h
 #echo '#define PACKAGE_STRING "fswatch"' > libfswatch_config.h
 #echo '#define FSW_MTIME(stat) ((stat).st_mtime)' >> libfswatch_config.h

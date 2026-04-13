@@ -172,7 +172,7 @@ export VERSIONDATE=20240713
 #export VERSION=48.0
 #export VERSIONDATE=20250319
 wl-showstatus --package-version
-export DEPENDENCIES=gconf,libtasn1,libgcrypt,dbus,glib2,gtk3,pango,gettext,p11-kit,gcr,pthreads
+export DEPENDENCIES=gconf,libtasn1,libgcrypt,dbus,glib2,gtk3,pango,gettext,p11-kit,gcr,pthreads,mman-win32
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -335,47 +335,81 @@ patch -ulbf library/gnome-keyring-socket.c << EOF
 +#endif
         }
 EOF
-# fix mman stuff in egg/egg-secure-memory.c
+## fix mman stuff in egg/egg-secure-memory.c
+#patch -ulbf egg/egg-secure-memory.c << EOF
+#--- egg/egg-secure-memory.c  Mon Dec 14 15:38:06 2009
+#+++ egg/egg-secure-memory.c  Tue Dec 15 08:59:42 2009
+#@@ -34,3 +34,7 @@
+# #include <sys/types.h>
+#+#ifndef __MINGW32__
+# #include <sys/mman.h>
+#+#else
+#+#include <windows.h>
+#+#endif
+# #include <stddef.h>
+#@@ -186,2 +190,3 @@
+#        if (pool == NULL) {
+#+#ifndef __MINGW32__
+#                len = getpagesize () * 2;
+#@@ -190,2 +195,8 @@
+#                        return NULL;
+#+#else
+#+               SYSTEM_INFO sysinfo;
+#+               GetSystemInfo(&sysinfo);
+#+               len = sysinfo.dwPageSize * 2;
+#+               pages = VirtualAlloc(NULL, len, 0, PAGE_READWRITE);
+#+#endif
+# 
+#@@ -217,3 +228,7 @@
+#        
+#+#ifndef __MINGW32__
+#        return memset (item, 0, sizeof (Item));
+#+#else
+#+       return item;
+#+#endif
+# }
+#@@ -250,3 +265,7 @@
+#                
+#+#ifndef __MINGW32__
+#                munmap (pool, pool->length);
+#+#else
+#+               VirtualFree (pool, 0, MEM_RELEASE);
+#+#endif
+#                return;
+#EOF
+# fix missing getpagesize() in egg/egg-secure-memory.c (version >= 46.2)
 patch -ulbf egg/egg-secure-memory.c << EOF
---- egg/egg-secure-memory.c  Mon Dec 14 15:38:06 2009
-+++ egg/egg-secure-memory.c  Tue Dec 15 08:59:42 2009
-@@ -34,3 +34,7 @@
- #include <sys/types.h>
-+#ifndef __MINGW32__
- #include <sys/mman.h>
-+#else
+@@ -41,2 +41,5 @@
+ #include <assert.h>
++#ifdef _WIN32
 +#include <windows.h>
 +#endif
- #include <stddef.h>
-@@ -186,2 +190,3 @@
+
+@@ -189,2 +192,10 @@
         if (pool == NULL) {
-+#ifndef __MINGW32__
++#ifdef _WIN32
++                SYSTEM_INFO sysinfo;
++                GetSystemInfo(&sysinfo);
++                len = sysinfo.dwPageSize * 2;
++                pages = VirtualAlloc(NULL, len, 0, PAGE_READWRITE);
++               if (pages == NULL)
++                       return NULL;
++#else
                 len = getpagesize () * 2;
-@@ -190,2 +195,8 @@
+@@ -193,2 +204,3 @@
                         return NULL;
-+#else
-+               SYSTEM_INFO sysinfo;
-+               GetSystemInfo(&sysinfo);
-+               len = sysinfo.dwPageSize * 2;
-+               pages = VirtualAlloc(NULL, len, 0, PAGE_READWRITE);
 +#endif
- 
-@@ -217,3 +228,7 @@
-        
-+#ifndef __MINGW32__
-        return memset (item, 0, sizeof (Item));
+
+@@ -862,3 +874,9 @@
+        /* Make sure sz is a multiple of the page size */
++#ifdef _WIN32
++       SYSTEM_INFO sysinfo;
++       GetSystemInfo(&sysinfo);
++       pgsize = sysinfo.dwPageSize;
 +#else
-+       return item;
+        pgsize = getpagesize ();
 +#endif
- }
-@@ -250,3 +265,7 @@
-                
-+#ifndef __MINGW32__
-                munmap (pool, pool->length);
-+#else
-+               VirtualFree (pool, 0, MEM_RELEASE);
-+#endif
-                return;
+        *sz = (*sz + pgsize -1) & ~(pgsize - 1);
 EOF
 # fix missing gmtime_r in egg/egg-asn1.c
 mv egg/egg-asn1.c egg/egg-asn1.c.bak
@@ -684,7 +718,8 @@ wl-showstatus configure &&
  #PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-root-certs --with-gtk=3.0 --disable-gpg-agent --enable-debug=no --enable-tests=no --disable-p11-tests LDFLAGS="-Wl,--as-needed -lpthread" &&
  #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-root-certs --with-gtk=3.0 --disable-gpg-agent --enable-debug=no --enable-tests=no --disable-p11-tests LDFLAGS="-Wl,--as-needed -lpthread" &&
  #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-root-certs --with-gtk=3.0 --disable-gpg-agent --disable-pam --without-systemd --disable-selinux --disable-p11-tests --disable-debug --disable-tests LDFLAGS="-Wl,--as-needed -lpthread" &&
- PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-root-certs --with-gtk=3.0 --disable-gpg-agent --disable-pam --without-systemd --disable-selinux --disable-p11-tests --disable-debug --disable-tests CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"; fi)" LDFLAGS="-Wl,--as-needed -lpthread" &&
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-root-certs --with-gtk=3.0 --disable-gpg-agent --disable-pam --without-systemd --disable-selinux --disable-p11-tests --disable-debug --disable-tests CFLAGS="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"; fi)" LDFLAGS="-Wl,--as-needed -lpthread" &&
+ PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --without-root-certs --with-gtk=3.0 --disable-gpg-agent --disable-pam --without-systemd --disable-selinux --disable-p11-tests --disable-debug --disable-tests CFLAGS="-I$MINGWPREFIX/include/mman-win32 $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types -Wno-incompatible-function-pointer-types"; fi)" LDFLAGS="-Wl,--as-needed -lmman -lpthread" &&
  #INTLTOOL_PERL="$PERLDIR/bin/perl.exe" ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --enable-debug=no --disable-p11-tests --without-libcap-ng LDFLAGS="-Wl,--as-needed -lpthread" &&
  # fix incorrect library in all Makefiles
  for F in $(find . -name Makefile); do
