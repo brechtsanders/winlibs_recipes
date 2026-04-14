@@ -263,6 +263,24 @@ fi
 #EOF
 # fix util/netevent.c (version >= 1.17.0)
 sed -i.bak -e "s/\(#if defined(HAVE_POLL) || \)\(defined(USE_WINSOCK)\)/\1(\2 \&\& defined(_WIN32_WINNT) \&\& _WIN32_WINNT >= 0x0600)/" util/netevent.c
+# fix smallapp/unbound-anchor.c (version >= 1.24.2)
+patch -ulbf smallapp/unbound-anchor.c << EOF
+@@ -1678,6 +1678,10 @@
+        if((s=X509_get_ext_d2i(cert, NID_key_usage, NULL, NULL))) {
+-               if(s->length > 0) {
+-                       val = s->data[0];
+-                       if(s->length > 1)
+-                               val |= s->data[1] << 8;
++               size_t len;
++                int unused_bits;
++                unsigned char* data;
++                if(ASN1_BIT_STRING_get_length(s, &len, &unused_bits) && len > 0) {
++                       data = ASN1_STRING_get0_data(s);
++                       val = data[0];
++                       if(len > 1)
++                               val |= data[1] << 8;
+                }
+EOF
 ## fix Makefile (version >= 1.5.4)
 #mv Makefile.in Makefile.in.bak
 #sed -e "s/^\(LIBOBJ_WITHOUT_CTIME=.*\)$/\1 locks.o log.o/" Makefile.in.bak > Makefile.in
@@ -285,7 +303,7 @@ wl-showstatus configure &&
  # fix invalid double pipe in libtool (version >= 1.5.5)
  sed -i.bak -e 's/^\(global_symbol_pipe=\)""/\1"cat"/' libtool &&
  # fix error: lto1.exe: internal compiler error: in gen_subprogram_die, at dwarf2out.c:22668
- sed -i.bak "s/-g//" Makefile &&
+ sed -i.bak "s/ -g / /" Makefile &&
  # avoid using syslog
  echo "#undef HAVE_SYSLOG_H" >> config.h &&
  # fix for Windows build (version >= 1.5.5 <= 1.5.10)
