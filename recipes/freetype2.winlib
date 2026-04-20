@@ -114,8 +114,7 @@ export DEPENDENCIES=zlib,libpng,libbz2,brotli
 export OPTIONALDEPENDENCIES=harfbuzz
 #export BUILDDEPENDENCIES=
 export BUILDDEPENDENCIES=meson,ninja
-#export BUILDDEPENDENCIES=cmake,ninja
-export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=cmake
 #export OPTIONALBUILDDEPENDENCIES=docwriter
 #export LICENSEFILE=docs/GPL.TXT
 export LICENSEFILE=docs/GPLv2.TXT
@@ -186,7 +185,15 @@ EOF
 # # fix absolute paths in freetype-config
 # sed -i -e "s?$INSTALLPREFIX?\$(dirname \$0)/..?g" $INSTALLPREFIX/bin/freetype-config &&
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
-mkdir -p build_both &&
+## fix CMakeLists.txt for building DLL
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -103,3 +102,0 @@
+#-if (WIN32 AND BUILD_SHARED_LIBS)
+#-  message(FATAL_ERROR "Shared libraries not supported on Windows.")
+#-endif ()
+#EOF
+if ! cmake --version &> /dev/null; then
+ mkdir -p build_both &&
  wl-showstatus configure &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) setup --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dc_args="['-I$(cygpath -m $MINGWPREFIX/include/harfbuzz)','-I$(cygpath -m $MINGWPREFIX/include/mman-win32)']" -Dc_link_args="-Wl,--as-needed -lmman" $PWD build_both &&
  #PKG_CONFIG= PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) setup --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dharfbuzz=disabled -Dzlib=system -Dbzip2=enabled -Dpng=enabled -Dbrotli=enabled -Dmmap=enabled -Dtests=disabled -Dc_args="-I$MINGWPREFIX/include/mman-win32" -Dc_link_args="-Wl,--as-needed -lmman" $PWD build_both &&
@@ -205,30 +212,27 @@ mkdir -p build_both &&
  ( ls -1 $INSTALLPREFIX/bin/freetype-config &>/dev/null || sed -e "s?%PKG_CONFIG%?\${PKG_CONFIG:-pkg-config}?; s?%prefix%?\$(dirname \$(dirname \$0))?; s?%exec_prefix%?\$prefix?; s?%\(include\|lib\)dir%?\$prefix/\1?; s?%ft_version%?$(sed -ne "s/^Version: //p" build_both/meson-private/freetype2.pc)?; s?%LIBSSTATIC_CONFIG%?-L\$libdir $(PKG_CONFIG_PATH=$PWD/build_both/meson-private ${PKG_CONFIG:-pkg-config} --static --libs-only-l freetype2)?" builds/unix/freetype-config.in > $INSTALLPREFIX/bin/freetype-config ) &&
  # fix linker flag (version >= 2.14.1)
  sed -i -e "s?[^ ]*/libbz2\.dll\.a?-lbz2?p" $INSTALLPREFIX/lib/pkgconfig/freetype2.pc &&
+ touch SUCCESS
+else
+ mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFT_ENABLE_ERROR_STRINGS:BOOL=ON -DFT_REQUIRE_ZLIB:BOOL=ON -DFT_REQUIRE_BZIP2:BOOL=ON -DFT_REQUIRE_PNG:BOOL=ON -DFT_REQUIRE_HARFBUZZ:BOOL=ON -DFT_REQUIRE_BROTLI:BOOL=ON -S. -Bbuild_static &&
+ #-DCMAKE_PLATFORM_NO_VERSIONED_SONAME:BOOL=OFF 
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFT_ENABLE_ERROR_STRINGS:BOOL=ON -DFT_REQUIRE_ZLIB:BOOL=ON -DFT_REQUIRE_BZIP2:BOOL=ON -DFT_REQUIRE_PNG:BOOL=ON -DFT_REQUIRE_HARFBUZZ:BOOL=ON -DFT_REQUIRE_BROTLI:BOOL=ON -DCMAKE_DLL_NAME_WITH_SOVERSION:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ # manually copy .m4 file
+ mkdir -p $INSTALLPREFIX/share/aclocal &&
+ cp -f builds/unix/freetype2.m4 $INSTALLPREFIX/share/aclocal/ &&
+ # manually install freetype-config
+ sed -e "s?%PKG_CONFIG%?\${PKG_CONFIG:-pkg-config}?; s?%prefix%?\$(dirname \$(dirname \$0))?; s?%exec_prefix%?\$prefix?; s?%\(include\|lib\)dir%?\$prefix/\1?; s?%ft_version%?$(sed -ne "s/^Version: //p" build_shared/freetype2.pc)?; s?%LIBSSTATIC_CONFIG%?${PKG_CONFIG:-pkg-config} --libs-only-l zlib bzip2 libpng harfbuzz libbrotlidec?" builds/unix/freetype-config.in > $INSTALLPREFIX/bin/freetype-config &&
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
-
-
-
-#export BUILDDEPENDENCIES=cmake,ninja
-### fix CMakeLists.txt for building DLL
-##patch -ulbf CMakeLists.txt << EOF
-##@@ -103,3 +102,0 @@
-##-if (WIN32 AND BUILD_SHARED_LIBS)
-##-  message(FATAL_ERROR "Shared libraries not supported on Windows.")
-##-endif ()
-##EOF
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -S. -Bbuild_shared &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_static install/strip &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_shared install/strip &&
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf freetype-$VERSION
-####TO DO: also install freetype-config
-####grep % builds/unix/freetype-config.in
 
 
 

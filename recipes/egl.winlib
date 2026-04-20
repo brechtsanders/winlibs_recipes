@@ -55,6 +55,92 @@
 
 
 
+#export NAME="EGL"
+#export STATUS=
+#export URL=https://github.com/McNopper/EGL
+#export BASENAME=egl
+#export DESCRIPTION="EGL 1.5 implementation for Windows and X11 supporting OpenGL"
+#export CATEGORY=system,graphics
+#export TYPE=library
+#export VERSION=master
+#export VERSIONDATE=20200312
+#wl-showstatus --package-version
+#export DEPENDENCIES=glew
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=EGL/LICENCE.txt
+#export LICENSETYPE=MIT
+#export DOWNLOADURL="https://github.com/McNopper/EGL/releases"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/McNopper/EGL/archive/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xzv --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd EGL-$VERSION
+## fix EGL/src/egl_windows.cpp
+#patch -ulbf EGL/src/egl_windows.cpp << EOF
+#@@ -89,2 +89,3 @@
+#
+#+#if defined(EGL_NO_GLEW)
+#        opengl32dll = LoadLibrary("opengl32.dll");
+#@@ -95,2 +96,8 @@
+#        wglGetProcAddress_PTR = (__PFN_wglGetProcAddress)GetProcAddress(opengl32dll, "wglGetProcAddress");
+#+#else
+#+#define wglCreateContext_PTR wglCreateContext
+#+#define wglDeleteContext_PTR wglDeleteContext
+#+#define wglMakeCurrent_PTR wglMakeCurrent
+#+#define wglGetProcAddress_PTR wglGetProcAddress
+#+#endif
+#
+#EOF
+## fix missing std::min/std::max in EGL/src/egl_common.cpp
+#sed -i.bak -e "1i #include <algorithm>" EGL/src/egl_common.cpp
+## fix missing egl.pc
+#cat > egl.pc << EOF
+#prefix=$INSTALLPREFIX
+#libdir=\${prefix}/lib
+#includedir=\${prefix}/include
+#
+#Name: egl
+#Description: EGL implementation supporting OpenGL
+#Version: $VERSION
+#Libs: -L\${libdir} -legl
+#Cflags: -I\${includedir}
+#EOF
+## fix EGL/CMakeLists.txt
+#patch -ulbf EGL/CMakeLists.txt << EOF
+#@@ -25,2 +25,5 @@
+#     \${EGL_SOURCES})
+#+add_library(egl_shared SHARED
+#+    \${EGL_SOURCES})
+#+set_target_properties(egl_shared PROPERTIES OUTPUT_NAME egl)
+#
+#@@ -28,2 +31,4 @@
+#     \${CMAKE_CURRENT_LIST_DIR}/include)
+#+target_include_directories(egl_shared PUBLIC
+#+    \${CMAKE_CURRENT_LIST_DIR}/include)
+# add_definitions(-DEGLAPI=)
+#EOF
+#mkdir -p build &&
+# wl-showstatus configure &&
+# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -SEGL -Bbuild &&
+# echo "-Wl,--as-needed -lopengl32 -lglew32" >> build/CMakeFiles/egl_shared.dir/linklibs.rsp &&
+# wl-showstatus build &&
+# make -Cbuild &&
+# strip build/*.dll &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+# cp -rf EGL/include/* $INSTALLPREFIX/include/ &&
+# cp -f build/lib*.a $INSTALLPREFIX/lib/ &&
+# cp -f build/*.dll $INSTALLPREFIX/bin/ &&
+# cp -f egl.pc $INSTALLPREFIX/lib/pkgconfig/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf EGL-$VERSION
+
+
+
 export NAME="EGL"
 export STATUS=
 export URL=https://github.com/McNopper/EGL
@@ -62,12 +148,10 @@ export BASENAME=egl
 export DESCRIPTION="EGL 1.5 implementation for Windows and X11 supporting OpenGL"
 export CATEGORY=system,graphics
 export TYPE=library
-export VERSION=master
-export VERSIONDATE=20200312
-#export VERSION=1.0.1
-#export VERSIONDATE=20260420
+export VERSION=1.0.1
+export VERSIONDATE=20260420
 wl-showstatus --package-version
-export DEPENDENCIES=glew
+export DEPENDENCIES=glew,vulkan-loader
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake
 export OPTIONALBUILDDEPENDENCIES=
@@ -75,33 +159,13 @@ export LICENSEFILE=EGL/LICENCE.txt
 export LICENSETYPE=MIT
 export DOWNLOADURL="https://github.com/McNopper/EGL/releases"
 export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-#export DOWNLOADSOURCEURL=https://github.com/McNopper/EGL/archive/$VERSION.tar.gz
 export DOWNLOADSOURCEURL=https://github.com/McNopper/EGL/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
-#tar xzv --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
-tar xzv --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd EGL-$VERSION
-# fix EGL/src/egl_windows.cpp
-patch -ulbf EGL/src/egl_windows.cpp << EOF
-@@ -89,2 +89,3 @@
-
-+#if defined(EGL_NO_GLEW)
-        opengl32dll = LoadLibrary("opengl32.dll");
-@@ -95,2 +96,8 @@
-        wglGetProcAddress_PTR = (__PFN_wglGetProcAddress)GetProcAddress(opengl32dll, "wglGetProcAddress");
-+#else
-+#define wglCreateContext_PTR wglCreateContext
-+#define wglDeleteContext_PTR wglDeleteContext
-+#define wglMakeCurrent_PTR wglMakeCurrent
-+#define wglGetProcAddress_PTR wglGetProcAddress
-+#endif
-
-EOF
-# fix missing std::min/std::max in EGL/src/egl_common.cpp
-sed -i.bak -e "1i #include <algorithm>" EGL/src/egl_common.cpp
 # fix missing egl.pc
 cat > egl.pc << EOF
 prefix=$INSTALLPREFIX
@@ -114,46 +178,43 @@ Version: $VERSION
 Libs: -L\${libdir} -legl
 Cflags: -I\${includedir}
 EOF
-# fix EGL/CMakeLists.txt
-patch -ulbf EGL/CMakeLists.txt << EOF
-@@ -25,2 +25,5 @@
-     \${EGL_SOURCES})
-+add_library(egl_shared SHARED
-+    \${EGL_SOURCES})
-+set_target_properties(egl_shared PROPERTIES OUTPUT_NAME egl)
+# fix CMakeLists.txt (version >= 1.0.1)
+patch -ulbf CMakeLists.txt << EOF
+@@ -89,2 +89,5 @@
 
-@@ -28,2 +31,4 @@
-     \${CMAKE_CURRENT_LIST_DIR}/include)
-+target_include_directories(egl_shared PUBLIC
++add_library(EGL_SHARED SHARED
++    \${EGL_SOURCES})
++set_target_properties(EGL_SHARED PROPERTIES OUTPUT_NAME EGL)
+ add_library(EGL STATIC
+@@ -103,2 +106,4 @@
+
++target_include_directories(EGL_SHARED PUBLIC
 +    \${CMAKE_CURRENT_LIST_DIR}/include)
- add_definitions(-DEGLAPI=)
+ target_include_directories(EGL PUBLIC
 EOF
-mkdir -p build &&
+# fix src/egl_windows.cpp (version >= 1.0.1)
+patch -ulbf src/egl_windows.cpp << EOF
+@@ -28,3 +28,3 @@
+ #include "egl_common.h"
+-#include "../../EGL/include/EGL/eglctxinternals.h"
++#include "../include/EGL/eglctxinternals.h"
+
+EOF
+mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -SEGL -Bbuild &&
- echo "-Wl,--as-needed -lopengl32 -lglew32" >> build/CMakeFiles/egl_shared.dir/linklibs.rsp &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed $(pkg-config.exe --libs-only-l vulkan) -lopengl32/" build_win/build.ninja &&
  wl-showstatus build &&
- make -Cbuild &&
- strip build/*.dll &&
+ ninja -Cbuild_win &&
+ strip build_win/*.dll &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
- cp -rf EGL/include/* $INSTALLPREFIX/include/ &&
- cp -f build/lib*.a $INSTALLPREFIX/lib/ &&
- cp -f build/*.dll $INSTALLPREFIX/bin/ &&
+ cp -rf include/* $INSTALLPREFIX/include/ &&
+ cp -f build_win/lib*.a lib/lib*.a $INSTALLPREFIX/lib/ &&
+ cp -f build_win/*.dll $INSTALLPREFIX/bin/ &&
  cp -f egl.pc $INSTALLPREFIX/lib/pkgconfig/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf EGL-$VERSION
 
 
 
-## fix src/egl_windows.cpp (version >= 1.0.1)
-#patch -ulbf src/egl_windows.cpp << EOF
-#@@ -28,3 +28,3 @@
-# #include "egl_common.h"
-#-#include "../../EGL/include/EGL/eglctxinternals.h"
-#+#include "../include/EGL/eglctxinternals.h"
-#
-#EOF
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
-# ninja -Cbuild_win install/strip &&
