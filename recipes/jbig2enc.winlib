@@ -118,8 +118,10 @@ export TYPE=library
 ####src/jbig2.cc:137:71: error: 'expandBinaryPower2Low' was not declared in this scope
 #export VERSION=0.29
 #export VERSIONDATE=20180327
-export VERSION=0.30
-export VERSIONDATE=20241224
+#export VERSION=0.30
+#export VERSIONDATE=20241224
+export VERSION=0.31
+export VERSIONDATE=20260421
 ####Error! zlib not detected.
 wl-showstatus --package-version
 export DEPENDENCIES=leptonlib,libtiff
@@ -199,6 +201,45 @@ wl-showstatus preconfigure &&
  wl-showstatus build-install &&
  make install-strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
+##export BUILDDEPENDENCIES=cmake,ninja
+## fix undefined M_PI in src/jbig2comparator.cc (version >= 0.31)
+#sed -i.bak -e "1i #define _USE_MATH_DEFINES" src/jbig2comparator.cc
+## fix CMakeLists.txt (version >= 0.31)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -24,4 +24,4 @@
+#   set(LIBS \${LIBS} Ws2_32)
+#+  add_definitions(-DWIN32)
+#   if(MSVC)
+#-    add_definitions(-DWIN32)
+#     add_definitions(-D_LIB)
+#@@ -97,3 +97,3 @@
+# add_library(libjbig2enc \${libjbig2enc_src} \${libjbig2enc_hdr})
+#-set_target_properties(libjbig2enc PROPERTIES DEBUG_POSTFIX
+#+set_target_properties(libjbig2enc PROPERTIES PREFIX "" DEBUG_POSTFIX
+#                                              \${CMAKE_DEBUG_POSTFIX})
+#@@ -119,3 +119,3 @@
+# add_executable(jbig2 "\${CMAKE_CURRENT_SOURCE_DIR}/src/jbig2.cc")
+#-set_target_properties(jbig2 PROPERTIES DEBUG_POSTFIX \${CMAKE_DEBUG_POSTFIX})
+#+set_target_properties(jbig2 PROPERTIES PREFIX "" DEBUG_POSTFIX \${CMAKE_DEBUG_POSTFIX})
+# target_link_libraries(jbig2 PRIVATE \${LIBS} libjbig2enc)
+#EOF
+#mkdir -p build_static build_shared &&
+# wl-showstatus configure-static &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -S. -Bbuild_static &&
+# # fix missing link libraries
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lws2_32/" build_static/build.ninja &&
+# wl-showstatus configure-shared &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_DLL_NAME_WITH_SOVERSION:BOOL=ON -S. -Bbuild_shared &&
+# # fix missing link libraries
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lleptonica -lws2_32/" build_shared/build.ninja &&
+# wl-showstatus build-install-static &&
+# ninja -Cbuild_static install/strip &&
+# wl-showstatus build-install-shared &&
+# ninja -Cbuild_shared install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
 
