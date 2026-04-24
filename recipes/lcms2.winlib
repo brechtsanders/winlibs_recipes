@@ -43,16 +43,19 @@ export TYPE=library
 #export VERSIONDATE=20230302
 #export VERSION=2.16
 #export VERSIONDATE=20231204
-export VERSION=2.17
-export VERSIONDATE=20250210
+#export VERSION=2.17
+#export VERSIONDATE=20250210
 #export VERSION=2.18
 #export VERSIONDATE=20251201
 ####configure: error: cannot find install-sh, install.sh, or shtool in "." "./.." "./../.."
+export VERSION=2.19
+export VERSIONDATE=20260424
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libjpeg,libtiff
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
-export OPTIONALBUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=cmake,ninja
 export LICENSEFILE=COPYING
 export LICENSETYPE=MIT
 #export DOWNLOADURL="http://sourceforge.net/projects/lcms/files/"
@@ -68,14 +71,27 @@ wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 #mv lcms-2.0 $BASENAME-$VERSION
 cd $BASENAME-$VERSION
+# avoid _static suffix in cmake/Lcms2Library.cmake (version >= 2.19)
+sed -i.bak -e "s/\(OUTPUT_NAME.*\)_static/\1/" cmake/Lcms2Library.cmake
 #make check
-wl-showstatus configure &&
+if ! cmake --version &> /dev/null || ! ninja --version &> /dev/null; then
+ wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  ## fix detection of shared libraries
  #sed -i.bak -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
  wl-showstatus build-install &&
  #make install-strip &&
  ( make install-strip || make -j1 install-strip ) &&
+ touch SUCCESS
+else
+ mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DLCMS2_BUILD_STATIC:BOOL=ON -DLCMS2_BUILD_SHARED:BOOL=ON -DLCMS2_WITH_FASTFLOAT:BOOL=ON -DLCMS2_BUILD_TESTS:BOOL=OFF -DCMAKE_DLL_NAME_WITH_SOVERSION:BOOL=ON -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
 
