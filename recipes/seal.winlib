@@ -32,8 +32,10 @@ export TYPE=library
 #export VERSIONDATE=20230104
 #export VERSION=4.1.1
 #export VERSIONDATE=20230108
-export VERSION=4.1.2
-export VERSIONDATE=20240523
+#export VERSION=4.1.2
+#export VERSIONDATE=20240523
+export VERSION=4.3.0
+export VERSIONDATE=20260425
 ####SEAL_C requires 64-bit platform
 wl-showstatus --package-version
 export DEPENDENCIES=msgsl,zlib,zstd
@@ -52,59 +54,67 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd SEAL-$VERSION
-# fix invalid __always_inline in native/src/seal/util/gcc.h (version >= 3.6.2)
+## fix invalid __always_inline in native/src/seal/util/gcc.h (version >= 3.6.2 <= 4.1.2)
+#patch -ulbf native/src/seal/util/gcc.h << EOF
+#@@ -19,3 +19,5 @@
+#
+#+#ifndef __MINGW32__
+# #define SEAL_FORCE_INLINE __always_inline
+#+#endif
+#
+#EOF
+# fix native/src/seal/util/gcc.h (version >= 4.3.0)
 patch -ulbf native/src/seal/util/gcc.h << EOF
-@@ -19,3 +19,5 @@
-
-+#ifndef __MINGW32__
- #define SEAL_FORCE_INLINE __always_inline
-+#endif
-
+@@ -24,3 +24,3 @@
+ #define SEAL_MALLOC(size) \\
+-    static_cast<seal_byte *>((((size) & 63) == 0) ? std::aligned_alloc(64, (size)) : std::malloc((size)))
++    static_cast<seal_byte *>((((size) & 63) == 0) ? ::aligned_alloc(64, (size)) : std::malloc((size)))
+ #define SEAL_FREE(ptr) std::free(ptr)
 EOF
-# fix detection of zstd and building shared library on Windows
-patch -ulbf CMakeLists.txt << EOF
-@@ -170,22 +170,5 @@
-     else()
--        find_package(zstd CONFIG)
--        if(NOT zstd_FOUND)
--            message(FATAL_ERROR "Zstandard: not found")
--        else()
--            if(TARGET zstd::libzstd_static)
--                set(zstd_static "zstd::libzstd_static")
--            elseif(TARGET libzstd)
--                get_target_property(libzstd_type libzstd TYPE)
--                if(libzstd_type STREQUAL "STATIC_LIBRARY")
--                    set(zstd_static "libzstd")
--                    message(STATUS "Zstandard: found")
--                else()
--                    message(FATAL_ERROR "Zstandard: must be static")
--                endif()
--            elseif(TARGET zstd::libzstd_shared)
--                message(FATAL_ERROR "Zstandard: must be static")
--            else()
--                message(FATAL_ERROR "Zstandard: not found")
--            endif()
--        endif()
-+        find_package(PkgConfig)
-+        pkg_check_modules(ZSTD libzstd IMPORTED_TARGET GLOBAL)
-+        set(zstd_static "PkgConfig::ZSTD")
-     endif()
-@@ -201,3 +184,3 @@
- option(BUILD_SHARED_LIBS \${BUILD_SHARED_LIBS_STR} OFF)
--if(WIN32 AND BUILD_SHARED_LIBS)
-+if(MSVC AND BUILD_SHARED_LIBS)
-     message(FATAL_ERROR "On Windows only static build is supported; set \`BUILD_SHARED_LIBS=OFF\`")
-@@ -420,9 +403,2 @@
-
--    if(BUILD_SHARED_LIBS)
--        message(FATAL_ERROR "SEAL_C requires \`BUILD_SHARED_LIBS=OFF\`")
--    endif()
--
--    if(NOT SEAL_BUILD_DEPS)
--        message(FATAL_ERROR "SEAL_C requires \`SEAL_BUILD_DEPS=ON\`")
--    endif()
-
-EOF
+## fix detection of zstd and building shared library on Windows (version <= 4.1.2)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -170,22 +170,5 @@
+#     else()
+#-        find_package(zstd CONFIG)
+#-        if(NOT zstd_FOUND)
+#-            message(FATAL_ERROR "Zstandard: not found")
+#-        else()
+#-            if(TARGET zstd::libzstd_static)
+#-                set(zstd_static "zstd::libzstd_static")
+#-            elseif(TARGET libzstd)
+#-                get_target_property(libzstd_type libzstd TYPE)
+#-                if(libzstd_type STREQUAL "STATIC_LIBRARY")
+#-                    set(zstd_static "libzstd")
+#-                    message(STATUS "Zstandard: found")
+#-                else()
+#-                    message(FATAL_ERROR "Zstandard: must be static")
+#-                endif()
+#-            elseif(TARGET zstd::libzstd_shared)
+#-                message(FATAL_ERROR "Zstandard: must be static")
+#-            else()
+#-                message(FATAL_ERROR "Zstandard: not found")
+#-            endif()
+#-        endif()
+#+        find_package(PkgConfig)
+#+        pkg_check_modules(ZSTD libzstd IMPORTED_TARGET GLOBAL)
+#+        set(zstd_static "PkgConfig::ZSTD")
+#     endif()
+#@@ -201,3 +184,3 @@
+# option(BUILD_SHARED_LIBS \${BUILD_SHARED_LIBS_STR} OFF)
+#-if(WIN32 AND BUILD_SHARED_LIBS)
+#+if(MSVC AND BUILD_SHARED_LIBS)
+#     message(FATAL_ERROR "On Windows only static build is supported; set \`BUILD_SHARED_LIBS=OFF\`")
+#@@ -420,9 +403,2 @@
+#
+#-    if(BUILD_SHARED_LIBS)
+#-        message(FATAL_ERROR "SEAL_C requires \`BUILD_SHARED_LIBS=OFF\`")
+#-    endif()
+#-
+#-    if(NOT SEAL_BUILD_DEPS)
+#-        message(FATAL_ERROR "SEAL_C requires \`SEAL_BUILD_DEPS=ON\`")
+#-    endif()
+#
+#EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSEAL_BUILD_SEAL_C:BOOL=OFF -DSEAL_BUILD_DEPS:BOOL=OFF -DSEAL_USE_ZSTD:BOOL=ON -DSEAL_BUILD_EXAMPLES:BOOL=OFF -DSEAL_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
