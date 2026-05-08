@@ -1,0 +1,94 @@
+export NAME="libsupport"
+export STATUS=
+export URL=https://github.com/JeffBezanson/libsupport
+export BASENAME=libsupport
+export DESCRIPTION="a library of useful C utilities"
+export CATEGORY=development
+export TYPE=library
+export VERSION=master
+export VERSIONDATE=20260508
+wl-showstatus --package-version
+export DEPENDENCIES=wcwidth
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/JeffBezanson/libsupport/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/JeffBezanson/libsupport/archive/refs/heads/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined S_IRUSR/S_IWUSR/S_IRGRP/S_IROTH in ios.c
+sed -i.bak -e "1i #include <sys/stat.h>" ios.c
+# fix missing memrchr in ios.c
+mv ios.c ios.c.bak
+cat > ios.c << EOF
+#include <string.h>
+inline void* memrchr (const void* buf, int c, size_t num)
+{
+  unsigned char* p;
+  if (num == 0)
+    return NULL;
+  for (p = (unsigned char*)buf + num - 1; p >= (unsigned char*)buf; p--) {
+    if (*p == (unsigned char)c)
+      break;
+  }
+  if (p >= (unsigned char*)buf)
+    return ((void*)p);
+  return NULL;
+}
+EOF
+cat ios.c.bak >> ios.c
+# avoid undefined getifaddrs() in socket.c (version >= master)
+patch -ulbf socket.c << EOF
+@@ -173,2 +173,5 @@
+ {
++#ifdef _WIN32
++    buf[0] = 0;
++#else
+     struct ifaddrs * ifAddrStruct=NULL;
+@@ -200,2 +203,3 @@
+     if (ifAddrStruct!=NULL) freeifaddrs(ifAddrStruct);
++#endif
+ }
+EOF
+# fix undefined wcwidth() in utf8.c
+sed -i.bak -e "1i #include <compat/wcwidth.h>" utf8.c
+# fix dtypes.h (version >= master)
+patch -ulbf dtypes.h << EOF
+@@ -18,3 +18,3 @@
+
+-#ifdef WIN32
++#if defined(WIN32) && !defined(__MINGW32__)
+ #define STDCALL __stdcall
+EOF
+# fix ieee754.h (version >= master)
+patch -ulbf ieee754.h << EOF
+@@ -1,1 +1,6 @@
++#if _WIN32 && BYTE_ORDER == BIG_ENDIAN
++#define LITTLE_ENDIAN 1234
++#define BIG_ENDIAN    4321
++#define BYTE_ORDER    LITTLE_ENDIAN
++#endif
+ #ifndef IEEE754_H
+EOF
+# fix Makefile to use ar specified in AR environment variable
+sed -i.bak -e "s/\bar\b/\$(AR)/" Makefile
+wl-showstatus build &&
+ make CC="${CC:-gcc}" CFLAGS="-DWIN32 -DIMPORT_EXPORTS $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wincompatible-pointer-types" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-incompatible-pointer-types"; fi)" AR="${AR:-ar}" &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libsupport.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p; s/^_\{0,1\}\([^ ]*\) D .*$/\1 DATA/p" ) > libsupport.def &&
+ ${CC:-gcc} -shared -s -mwindows -def libsupport.def -o libsupport.dll libsupport.a -Wl,--out-implib,libsupport.dll.a -lws2_32 -lwcwidth &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/libsupport $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ cp -f *.h $INSTALLPREFIX/include/libsupport/ &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

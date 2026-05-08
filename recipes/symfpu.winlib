@@ -1,0 +1,48 @@
+export NAME="SymFPU"
+export STATUS=
+export URL=https://github.com/martin-cs/symfpu
+export BASENAME=symfpu
+export DESCRIPTION="SymFPU is an implementation of the SMT-LIB / IEEE-754 operations in terms of bit-vector operations. It is templated in terms of the bit-vectors, propositions, floating-point formats and rounding mode types used."
+export CATEGORY=math
+export TYPE=library
+export VERSION=1.0.0-dual-license-format-fix-attempt-2
+export VERSIONDATE=20260508
+wl-showstatus --package-version
+export DEPENDENCIES=libsupport
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/martin-cs/symfpu/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/martin-cs/symfpu/archive/refs/tags/$BASENAME-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+cd symfpu-symfpu-$VERSION
+# fix include paths
+sed -i.bak -e "s?symfpu/??" $(grep -l symfpu/ $(find -name '*.h' -or -name '*.cpp'))
+# fix Makefile to use ar specified in AR environment variable
+sed -i.bak -e "s/\bar\b/\$(AR)/" Makefile
+wl-showstatus build &&
+ make PROGS= CXX="${CXX:-g++}" CXXFLAGS="-DWIN32 -I$PWD -I$MINGWPREFIX/include/libsupport" AR="${AR:-ar}" &&
+ mv -f symfpu.a libsymfpu.a &&
+ ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libsymfpu.a | sed -n -e "s/^\([^ ]*\) T .*$/\1/p; s/^_\{0,1\}\([^ ]*\) D .*$/\1 DATA/p" ) > libsymfpu.def &&
+ ${CXX:-g++} -shared -s -mwindows -def libsymfpu.def -o libsymfpu.dll libsymfpu.a -Wl,--out-implib,libsymfpu.dll.a &&
+ wl-showstatus install &&
+ mkdir -p $INSTALLPREFIX/include/symfpu $INSTALLPREFIX/lib $INSTALLPREFIX/bin &&
+ touch SUCCESS &&
+ for F in */*.h; do
+  mkdir -p $(dirname $INSTALLPREFIX/include/symfpu/$F)
+  cp -f $F $INSTALLPREFIX/include/symfpu/$F || ( rm -f SUCCESS; false ) || break
+ done &&
+ rm SUCCESS &&
+ cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+ cp -f *.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf symfpu-symfpu-$VERSION
+
+
+
