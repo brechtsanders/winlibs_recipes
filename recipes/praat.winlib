@@ -472,8 +472,10 @@ export TYPE=library
 #export VERSIONDATE=20260305
 #export VERSION=6.4.64
 #export VERSIONDATE=20260419
-export VERSION=6.4.65
-export VERSIONDATE=20260425
+#export VERSION=6.4.65
+#export VERSIONDATE=20260425
+export VERSION=6.4.66
+export VERSIONDATE=20260519
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -562,22 +564,35 @@ patch -ulbf foned/SoundRecorder.cpp << EOF
 +               if (! (Melder_debug == 8) )
                         waveInReset (my hWaveIn);
 EOF
-# avoid mouse wheel below Windows 8 in sys/motifEmulator.cpp (version >= 6.4.52)
+## avoid mouse wheel below Windows 8 in sys/motifEmulator.cpp (version >= 6.4.52 <= 6.4.65)
+#patch -ulbf sys/motifEmulator.cpp << EOF
+#@@ -1843,3 +1843,5 @@
+#        InitCommonControls ();
+#+#ifdef WM_POINTERWHEEL
+#        EnableMouseInPointer (TRUE);   // from Windows 8 on
+#+#endif
+# }
+#@@ -2871,2 +2873,3 @@
+#                HANDLE_MSG (window, WM_ACTIVATE, on_activate);
+#+#ifdef WM_POINTERWHEEL
+#                case WM_POINTERWHEEL: {   // from Windows 8 on
+#@@ -2889,2 +2892,3 @@
+#                }
+#+#endif
+#                case WM_USER:   // TODO: remove once Elan's sendpraat is updated to using WM_APP instead of WM_USER
+#EOF
+# fix sys/motifEmulator.cpp (version >= 6.4.66)
 patch -ulbf sys/motifEmulator.cpp << EOF
-@@ -1843,3 +1843,5 @@
+@@ -1842,3 +1842,3 @@
         InitCommonControls ();
-+#ifdef WM_POINTERWHEEL
-        EnableMouseInPointer (TRUE);   // from Windows 8 on
-+#endif
- }
-@@ -2871,2 +2873,3 @@
+-       #ifdef _WIN64
++       #ifdef WM_POINTERWHEEL
+                EnableMouseInPointer (TRUE);   // from Windows 8 on
+@@ -2891,3 +2891,3 @@
                 HANDLE_MSG (window, WM_ACTIVATE, on_activate);
-+#ifdef WM_POINTERWHEEL
+-               #ifdef _WIN64
++               #ifdef WM_POINTERWHEEL
                 case WM_POINTERWHEEL: {   // from Windows 8 on
-@@ -2889,2 +2892,3 @@
-                }
-+#endif
-                case WM_USER:   // TODO: remove once Elan's sendpraat is updated to using WM_APP instead of WM_USER
 EOF
 #wl-showstatus configure &&
 #cat > makefile.defs << EOF
@@ -609,7 +624,8 @@ wl-showstatus configure &&
  sed -i.bak -e "s/^LIBS = /&-pthread /" makefile.defs &&
  wl-showstatus build &&
  #make &&
- make CC="${CC:-gcc}" CXX="${CXX:-g++}" AR=${AR:-ar} RANLIB=${RANLIB:-ranlib} WINDRES=${WINDRES:-windres} &&
+ #make CC="${CC:-gcc}" CXX="${CXX:-g++}" AR=${AR:-ar} RANLIB=${RANLIB:-ranlib} WINDRES=${WINDRES:-windres} &&
+ mingw32-make CC="${CC:-gcc}" CXX="${CXX:-g++}" AR=${AR:-ar} RANLIB=${RANLIB:-ranlib} WINDRES=${WINDRES:-windres} &&
  strip *.exe &&
  wl-showstatus build-install &&
  mkdir -p $INSTALLPREFIX/bin &&
