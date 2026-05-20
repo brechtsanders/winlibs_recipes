@@ -32,10 +32,10 @@ export TYPE=library
 #export VERSIONDATE=20230712
 #export VERSION=0.9.34
 #export VERSIONDATE=20260129
-export VERSION=0.9.35
-export VERSIONDATE=20260131
-#export VERSION=1.0.0-branch
-#export VERSIONDATE=20260520
+#export VERSION=0.9.35
+#export VERSIONDATE=20260131
+export VERSION=1.0.0-branch
+export VERSIONDATE=20260520
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -58,7 +58,34 @@ wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/LMDB_$VERSION.tar.gz
 cd lmdb-LMDB_$VERSION
 # fix missing GetFileSizeEx in libraries/liblmdb/mdb.c
-sed -i.bak -e "1i #define _WIN32_WINNT 0x0500" libraries/liblmdb/mdb.c
+sed -i.bak -e "1i #if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0500\n#undef _WIN32_WINNT\n#define _WIN32_WINNT 0x0500\n#endif" libraries/liblmdb/mdb.c
+# fix libraries/liblmdb/module.c (version >= 1.0.0-branch)
+patch -ulbf libraries/liblmdb/module.c << EOF
+@@ -35,3 +35,3 @@
+                if (mlm) {
+-                       hookfunc = GetProcAddress(mlm, name);
++                       hookfunc = (void*)GetProcAddress(mlm, name);
+                        if (hookfunc)
+@@ -44,3 +44,3 @@
+                } else {
+-                       *errmsg = GetLastError();
++                       *errmsg = "Error in LoadLibrary()";
+                }
+EOF
+# fix libraries/liblmdb/mdb.c (version >= 1.0.0-branch)
+patch -ulbf libraries/liblmdb/mdb.c << EOF
+@@ -1,1 +1,2 @@
++#define _WIN32_WINNT 0x0500
+ /** @file mdb.c
+@@ -11768,3 +11769,7 @@
+        size_t rsize;
++#ifdef _WIN32
++       DWORD rlen;
++#else
+        ssize_t rlen;
++#endif
+        char buf[PAGEHDRSZ], *ptr;
+EOF
 # fix missing lmdb.pc
 cat > lmdb.pc << EOF
 prefix=$INSTALLPREFIX
