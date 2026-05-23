@@ -1444,10 +1444,8 @@ export TYPE=library
 #export VERSIONDATE=20260514
 export VERSION=b9151
 export VERSIONDATE=20260515
-#export VERSION=b9181
-#export VERSIONDATE=20260516
-#export VERSION=b9191
-#export VERSIONDATE=20260517
+#export VERSION=b9292
+#export VERSIONDATE=20260523
 wl-showstatus --package-version
 export DEPENDENCIES=ggml
 export OPTIONALDEPENDENCIES=
@@ -1524,15 +1522,32 @@ patch -ulbf vendor/cpp-httplib/httplib.h << EOF
 +#warning                                                                         \\
      "cpp-httplib doesn't support Windows 8 or lower. Please use Windows 10 or later."
 EOF
+## fix missing build-info.h (version >= b9292)
+#mkdir -p winfix
+#cat > winfix/build-info.h << EOF
+##ifndef LLAMA_BUILD_INFO_INCLUDED
+##define LLAMA_BUILD_INFO_INCLUDED
+##define llama_build_number() 0
+##define llama_commit() "release"
+##define llama_compiler() "$(gcc --version|head -n1)"
+##define llama_build_target() "$RUNPLATFORM"
+##define llama_build_info() "$VERSION"
+##define llama_print_build_info() fprintf(stderr, "llama_print_build_info: build = $VERSION\n");
+##endif
+#EOF
+#mv common/build-info.cpp.in common/build-info.cpp.in.bak && touch common/build-info.cpp.in
 mkdir -p build_static build_shared &&
  #wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llamacpp -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLLAMA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llamacpp -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DLLAMA_BUILD_TOOLS:BOOL=OFF -DLLAMA_USE_SYSTEM_GGML:BOOL=ON -DCMAKE_TLS_VERIFY:BOOL=OFF -DLLAMA_BUILD_EXAMPLES:BOOL=OFF -DLLAMA_BUILD_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ #-DCMAKE_CXX_FLAGS:STRING="-I$PWD/winfix" 
+ #-DLLAMA_BUILD_SERVER:BOOL=OFF 
  #-DLLAMA_BUILD_UI:BOOL=OFF 
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llamacpp -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLLAMA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llamacpp -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLLAMA_BUILD_TOOLS:BOOL=ON -DLLAMA_USE_SYSTEM_GGML:BOOL=ON -DCMAKE_TLS_VERIFY:BOOL=OFF -DLLAMA_BUILD_EXAMPLES:BOOL=OFF -DLLAMA_BUILD_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/llamacpp -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DLLAMA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-fpermissive" -S. -Bbuild_shared &&
+ #-DCMAKE_CXX_FLAGS:STRING="$(if ${CXX:-g++} --help -v 2>/dev/null|grep -q "\-Wtemplate-body" || ${CXX:-g++} --version|grep -q "^clang"; then echo "-Wno-error=template-body"; fi)" 
  ## fix empty BUILD_NUMBER (version >= b1299 <= b1305)
  #sed -i.bak -e "s/^#define BUILD_NUMBER\s*$/& 0/" build-info.h &&
  wl-showstatus build-install &&
