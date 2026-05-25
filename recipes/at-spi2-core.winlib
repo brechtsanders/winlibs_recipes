@@ -661,8 +661,10 @@ export TYPE=library
 #export VERSIONDATE=20260419
 #export VERSION=2.60.2
 #export VERSIONDATE=20260426
-export VERSION=2.60.3
-export VERSIONDATE=20260430
+#export VERSION=2.60.3
+#export VERSIONDATE=20260430
+export VERSION=2.60.4
+export VERSIONDATE=20260525
 wl-showstatus --package-version
 #export DEPENDENCIES=dbus,libdl,glib2,dbus-glib,libsm,sys_wait_h,atk,libx11,libxtst,libxevie,xkbcommon
 export DEPENDENCIES=dbus,libdl,glib2,dbus-glib,libsm,sys_wait_h,atk
@@ -714,6 +716,39 @@ EOF
 sed -e "s?sys/wait\.h?../win32ports/include/&?; s?DATADIR??" bus/at-spi-bus-launcher.c.bak >> bus/at-spi-bus-launcher.c
 # avoid already defined word interface (version >= 2.35.1)
 sed -i.bak -e "s/\binterface\b/iface/g" atspi/atspi-misc-private.h atspi/atspi-misc.c dbind/dbind.h dbind/dbind.c registryd/deviceeventcontroller.h registryd/deviceeventcontroller.c
+# fix atspi/atspi-misc-private.h (version >= 2.60.4)
+patch -ulbf atspi/atspi-misc-private.h << EOF
+@@ -90,7 +90,7 @@
+
+-dbus_bool_t _atspi_dbus_call (gpointer obj, const char *interface, const char *method, GError **error, const char *type, ...);
++dbus_bool_t _atspi_dbus_call (gpointer obj, const char *iface, const char *method, GError **error, const char *type, ...);
+
+-DBusMessage *_atspi_dbus_call_partial (gpointer obj, const char *interface, const char *method, GError **error, const char *type, ...);
++DBusMessage *_atspi_dbus_call_partial (gpointer obj, const char *iface, const char *method, GError **error, const char *type, ...);
+
+-dbus_bool_t _atspi_dbus_get_property (gpointer obj, const char *interface, const char *name, GError **error, const char *type, void *data);
++dbus_bool_t _atspi_dbus_get_property (gpointer obj, const char *iface, const char *name, GError **error, const char *type, void *data);
+
+@@ -164,3 +164,7 @@
+
++#ifdef _WIN32
++AtspiAccessible *_atspi_get_accessible_from_pid (DWORD pid);
++#else
+ AtspiAccessible *_atspi_get_accessible_from_pid (pid_t pid);
++#endif
+ G_END_DECLS
+EOF
+# fix atspi/atspi-misc.c (version >= 2.60.4)
+patch -ulbf atspi/atspi-misc.c << EOF
+@@ -2273,3 +2273,7 @@
+ AtspiAccessible *
++#ifdef _WIN32
++_atspi_get_accessible_from_pid (DWORD pid)
++#else
+ _atspi_get_accessible_from_pid (pid_t pid)
++#endif
+ {
+EOF
 # fix undefined LockMask in registryd/deviceeventcontroller.c (version >= 2.44.0)
 mv registryd/deviceeventcontroller.c registryd/deviceeventcontroller.c.bak2 &&
 echo "#define LockMask 0" > registryd/deviceeventcontroller.c &&

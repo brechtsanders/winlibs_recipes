@@ -23,10 +23,16 @@ export TYPE=library
 #export VERSIONDATE=20251224
 #export VERSION=2.57.6
 #export VERSIONDATE=20260128
-export VERSION=2.57.7
-export VERSIONDATE=20260323
+#export VERSION=2.57.7
+#export VERSIONDATE=20260323
+#export DEPENDENCIES=glfw3,nlohmann-json,re2
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=cmake,ninja
+#export OPTIONALBUILDDEPENDENCIES=
+export VERSION=2.58.1
+export VERSIONDATE=20260525
 wl-showstatus --package-version
-export DEPENDENCIES=glfw3,nlohmann-json,re2
+export DEPENDENCIES=glfw3,nlohmann-json,re2,liblz4
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
@@ -83,13 +89,28 @@ sed -i.bak -e "1i #include <cstdint>" src/core/stream-profile-interface.h
 sed -i.bak -e "1i #include <cstdint>" src/core/frame-additional-data.h
 # fix undefined std::thread third-party/rsutils/src/network-adapter-watcher.cpp (version >= 2.56.4)
 sed -i.bak -e "1i #include <thread>" third-party/rsutils/src/network-adapter-watcher.cpp
+# fix CMake/security_flags_helper_functions.cmake (version >= 2.58.1)
+####Bug reported: https://github.com/realsenseai/librealsense/pull/15091
+patch -ulbf CMake/security_flags_helper_functions.cmake << EOF
+@@ -25,3 +25,3 @@
+         if (target_type STREQUAL "INTERFACE_LIBRARY")
+-            if (WIN32)
++            if (MSVC)
+                 target_compile_options(\${target} INTERFACE /W0)
+@@ -31,3 +31,3 @@
+         else()
+-            if (WIN32)
++            if (MSVC)
+                 target_compile_options(\${target} PRIVATE /W0)
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure-static &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFORCE_RSUSB_BACKEND:BOOL=ON -DBUILD_WITH_OPENMP:BOOL=ON -DCHECK_FOR_UPDATES:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_GRAPHICAL_EXAMPLES:BOOL=OFF -DBUILD_UNIT_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-mssse3" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DFORCE_RSUSB_BACKEND:BOOL=ON -DBUILD_WITH_OPENMP:BOOL=ON -DCHECK_FOR_UPDATES:BOOL=OFF -DBUILD_ROSBAG2:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_GRAPHICAL_EXAMPLES:BOOL=OFF -DBUILD_UNIT_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-mssse3" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
+ ####TO DO: -DBUILD_ROSBAG2:BOOL=OFF -> fix to use already installed sqlite3
  # fix missing link libraries
  sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -lcfgmgr32 -lsetupapi -lwinusb/" build_static/build.ninja &&
  wl-showstatus configure-shared &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFORCE_RSUSB_BACKEND:BOOL=ON -DBUILD_WITH_OPENMP:BOOL=ON -DCHECK_FOR_UPDATES:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_GRAPHICAL_EXAMPLES:BOOL=OFF -DBUILD_UNIT_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-mssse3" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DFORCE_RSUSB_BACKEND:BOOL=ON -DBUILD_WITH_OPENMP:BOOL=ON -DCHECK_FOR_UPDATES:BOOL=OFF -DBUILD_ROSBAG2:BOOL=OFF -DBUILD_EXAMPLES:BOOL=OFF -DBUILD_GRAPHICAL_EXAMPLES:BOOL=OFF -DBUILD_UNIT_TESTS:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-mssse3" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
  ## fix execution of Python scripts
  #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|glib-genmarshal\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
  # fix missing link libraries
