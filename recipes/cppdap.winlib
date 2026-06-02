@@ -1,0 +1,46 @@
+export NAME="cppdap"
+export STATUS=
+export URL=https://github.com/google/cppdap
+export BASENAME=cppdap
+export DESCRIPTION="cppdap is a C++11 library (\"SDK\") implementation of the Debug Adapter Protocol, providing an API for implementing a DAP client or server."
+export CATEGORY=development
+export TYPE=library
+export VERSION=1.58.0-a
+export VERSIONDATE=20260601
+wl-showstatus --package-version
+export DEPENDENCIES=jsoncpp
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=Apache
+export DOWNLOADURL="https://github.com/google/cppdap/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/google/cppdap/archive/refs/tags/dap-$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/dap-$VERSION.tar.gz
+cd cppdap-dap-$VERSION
+# fix missing uint32_t in src/network.cpp
+sed -i.bak -e "1i #include <cstdint>" src/network.cpp
+# also allow building shared library
+sed -i.bak -e "s/\(add_library([^ ]*\) STATIC/\1/" CMakeLists.txt
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DCPPDAP_USE_EXTERNAL_JSONCPP_PACKAGE:BOOL=ON -DCPPDAP_USE_EXTERNAL_NLOHMANN_JSON_PACKAGE:BOOL=OFF -DCPPDAP_USE_EXTERNAL_RAPIDJSON_PACKAGE:BOOL=OFF -DCPPDAP_BUILD_EXAMPLES:BOOL=OFF -DCPPDAP_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DCPPDAP_USE_EXTERNAL_JSONCPP_PACKAGE:BOOL=ON -DCPPDAP_USE_EXTERNAL_NLOHMANN_JSON_PACKAGE:BOOL=OFF -DCPPDAP_USE_EXTERNAL_RAPIDJSON_PACKAGE:BOOL=OFF -DCPPDAP_BUILD_EXAMPLES:BOOL=OFF -DCPPDAP_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ # manually install DLL
+ strip build_shared/*.dll &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -u build_shared/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf cppdap-dap-$VERSION
+
+
+
