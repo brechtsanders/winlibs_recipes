@@ -601,6 +601,23 @@ cp -rf * $INSTALLPREFIX/src/mingw-w64/
 # #    else
 #EOF
 #fi
+# create default manifest file to support long paths
+# see also: https://gcc.gnu.org/legacy-ml/gcc-patches/2014-04/msg01378.html
+cat > default-manifest.manifest << EOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" >
+ <asmv3:application>
+  <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+   <longPathAware>true</longPathAware>
+  </asmv3:windowsSettings>
+ </asmv3:application>
+</assembly>
+EOF
+cat > default-manifest.rc << EOF
+#include <winuser.h>
+1 RT_MANIFEST "default-manifest.manifest"
+EOF
+${WINDRES:-windres} default-manifest.rc -O coff -o default-manifest.o
 wl-showstatus configure &&
  #mkdir -p m4 &&
  #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
@@ -658,6 +675,8 @@ wl-showstatus configure &&
   wl-showstatus build-install winstorecompat &&
   make -Cbuild_winstorecompat install-strip || true
  fi &&
+ # install default manifest file
+ cp -u default-manifest.o $INSTALLPREFIX/share/mingw-w64/lib/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf mingw-w64-v$VERSION
  #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && rm -rf mingw-w64-mingw-w64-$VERSION
 ####Bug reported: https://sourceforge.net/p/mingw-w64/bugs/951/ - typo in include/gdiplus/gdiplusbrush.h: RotateTranform
