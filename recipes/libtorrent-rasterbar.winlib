@@ -235,8 +235,10 @@ export TYPE=library
 #export VERSIONDATE=20240219
 #export VERSION=2.0.11
 #export VERSIONDATE=20250128
-export VERSION=2.0.12
-export VERSIONDATE=20260314
+#export VERSION=2.0.12
+#export VERSIONDATE=20260314
+export VERSION=2.0.13
+export VERSIONDATE=20260609
 wl-showstatus --package-version
 export DEPENDENCIES=boost,openssl,zlib,pthreads,libgeoip,libiconv,try_signal
 export OPTIONALDEPENDENCIES=
@@ -250,15 +252,15 @@ export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
 #export DOWNLOADSOURCEURL=https://github.com/arvidn/libtorrent/releases/download/libtorrent_$(echo $VERSION|tr . _)/$BASENAME-$VERSION.tar.gz
 #export DOWNLOADSOURCEURL=https://github.com/arvidn/libtorrent/releases/download/libtorrent-$VERSION/$BASENAME-$VERSION.tar.gz
 #export DOWNLOADSOURCEURL=https://github.com/arvidn/libtorrent/releases/download/$(echo $VERSION|sed -e "s/^\([0-9]*\.[0-9]*\)\..*$/\1/")/$BASENAME-$VERSION.tar.gz
-export DOWNLOADSOURCEURL=https://github.com/arvidn/libtorrent/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
-#export DOWNLOADSOURCEURL=https://github.com/arvidn/libtorrent/archive/refs/tags/v$VERSION.tar.gz
+#export DOWNLOADSOURCEURL=https://github.com/arvidn/libtorrent/releases/download/v$VERSION/$BASENAME-$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/arvidn/libtorrent/archive/refs/tags/v$VERSION.tar.gz
 wl-showstatus download
 wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
-tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
-cd $BASENAME-$VERSION
-#tar xzv --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
-#cd libtorrent-$VERSION
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd libtorrent-$VERSION
 # remove failing assertion from include/libtorrent/aux_/allocating_handler.hpp (version >= 2.0.4)
 patch -ulf include/libtorrent/aux_/allocating_handler.hpp << EOF
 @@ -179,4 +179,2 @@
@@ -276,13 +278,31 @@ cat > include/libtorrent/stat.hpp << EOF
 EOF
 cat include/libtorrent/stat.hpp.bak >> include/libtorrent/stat.hpp
 rm -f include/libtorrent/stat.hpp.bak
-## fix CMakeLists.txt (version >= 2.0.6)
+## fix missing deps/try_signal/try_signal.cpp in CMakeLists.txt (version >= 2.0.6)
 #patch -ulbf CMakeLists.txt << EOF
 #@@ -546,3 +546,2 @@
 #        \${sources}
 #-       \${try_signal_sources}
 #        \${libtorrent_include_files}
 #EOF
+# fix missing deps/try_signal/try_signal.cpp in CMakeLists.txt (version >= 2.0.13)
+patch -ulbf CMakeLists.txt << EOF
+@@ -549,3 +549,2 @@
+        \${sources}
+-       \${try_signal_sources}
+        \${libtorrent_include_files}
+@@ -554,2 +553,10 @@
+ )
++if(BUILD_SHARED_LIBS)
++  add_library(try_signal SHARED IMPORTED)
++  set_property(TARGET try_signal PROPERTY IMPORTED_LOCATION "/c/Prog/winlibs16.1.0msvcrt/custombuilt64/lib/libtry_signal.dll.a")
++else()
++  add_library(try_signal STATIC IMPORTED)
++  set_property(TARGET try_signal PROPERTY IMPORTED_LOCATION "/c/Prog/winlibs16.1.0msvcrt/custombuilt64/lib/libtry_signal.a")
++endif()
++add_dependencies(torrent-rasterbar try_signal)
+
+EOF
 #mkdir -p build_static build_shared &&
 # wl-showstatus configure &&
 # #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -Dshared:BOOL=OFF -Dunicode:BOOL=ON -Dgeoip:BOOL=OFF -S. -Bbuild_static &&
@@ -303,6 +323,8 @@ mkdir -p build_static build_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -Dshared:BOOL=ON -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -Dunicode:BOOL=ON -Dgeoip:BOOL=OFF -S. -Bbuild_shared &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -Dshared:BOOL=ON -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -Dunicode:BOOL=ON -Dgeoip:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-Wno-narrowing" -S. -Bbuild_shared &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -Dshared:BOOL=ON -DBoost_USE_STATIC_LIBS:BOOL=OFF -DBoost_USE_STATIC_RUNTIME:BOOL=OFF -Dunicode:BOOL=ON -Dgeoip:BOOL=OFF -DCMAKE_{SHARED,MODULE,EXE}_LINKER_FLAGS:STRING="-Wl,--as-needed -ltry_signal" -S. -Bbuild_shared &&
+ # fix missing link libraries
+ sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*$/& -Wl,--as-needed -ltry_signal/" build_shared/build.ninja &&
  #wl-showstatus build &&
  #( ninja -Cbuild_static || ninja -Cbuild_static -j1 ) &&
  #wl-showstatus build &&
@@ -313,7 +335,8 @@ mkdir -p build_static build_shared &&
  wl-showstatus build-install &&
  #ninja -Cbuild_shared install/strip &&
  ( ninja -Cbuild_shared install/strip || ninja -j1 -Cbuild_shared install/strip ) &&
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf libtorrent-$VERSION
 
 
 
