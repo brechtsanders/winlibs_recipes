@@ -62,8 +62,10 @@ export TYPE=application
 #export VERSIONDATE=20221222
 #export VERSION=2.16.02
 #export VERSIONDATE=20230319
-export VERSION=2.16.03
-export VERSIONDATE=20250401
+#export VERSION=2.16.03
+#export VERSIONDATE=20250401
+export VERSION=3.01
+export VERSIONDATE=20260610
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -85,32 +87,38 @@ wl-wait4deps
 #tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
-# fix missing _realpath in realpath.c
-patch -ulbf realpath.c << EOF
-@@ -111,3 +111,3 @@
-
--#elif defined(HAVE__FULLPATH)
-+#elif defined(HAVE__FULLPATH) && defined(__MINGW64_VERSION_MAJOR)
-
-EOF
-# fix __attribute__((pure)) issue in include/compiler.h
-patch -ulbf include/compiler.h << EOF
-@@ -251,3 +251,3 @@
-  */
--#ifdef HAVE_FUNC_ATTRIBUTE_PURE
-+#if defined(HAVE_FUNC_ATTRIBUTE_PURE) && !defined(__MINGW64__)
- # define pure_func __attribute__((pure))
-EOF
+## fix missing _realpath in realpath.c (version <= 2.16.03)
+#patch -ulbf realpath.c << EOF
+#@@ -111,3 +111,3 @@
+#
+#-#elif defined(HAVE__FULLPATH)
+#+#elif defined(HAVE__FULLPATH) && defined(__MINGW64_VERSION_MAJOR)
+#
+#EOF
+## fix __attribute__((pure)) issue in include/compiler.h (version <= 2.16.03)
+#patch -ulbf include/compiler.h << EOF
+#@@ -251,3 +251,3 @@
+#  */
+#-#ifdef HAVE_FUNC_ATTRIBUTE_PURE
+#+#if defined(HAVE_FUNC_ATTRIBUTE_PURE) && !defined(__MINGW64__)
+# # define pure_func __attribute__((pure))
+#EOF
 ## remove -std=c99 from configure to fix missing off64_t/off_t and missing limits.h
-#mv configure configure.bak
-#sed -e "s/-std=c99//" configure.bak > configure
-# remove -Werror=attributes from configure
-sed -i.bak2 -e "s/-Werror=attributes\"/\"/" configure
+#sed -i.bak -e "s/-std=c99//" configure
+## remove -Werror=attributes from configure (version <= 2.16.03)
+#sed -i.bak2 -e "s/-Werror=attributes\"/\"/" configure
 wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --without-nsis --disable-werror &&
  wl-showstatus build-install &&
- make install &&
+ #make install &&
+ ( make install || (
+  # avoid linking with default manifest
+  ####collect2.exe: error: ld returned 5 exit status
+  mv $MINGWDIR/$RUNPLATFORM/lib/default-manifest.o $MINGWDIR/$RUNPLATFORM/lib/default-manifest.o.bak &&
+  make install &&
+  mv $MINGWDIR/$RUNPLATFORM/lib/default-manifest.o.bak $MINGWDIR/$RUNPLATFORM/lib/default-manifest.o
+ )) &&
  #( make install ASCIIDOC="$PYDIR/python.exe $MINGWPREFIX/bin/asciidoc.py" || (
  # ( make || make -j1 nasm.exe ndisasm.exe ) &&
  # make -i install
