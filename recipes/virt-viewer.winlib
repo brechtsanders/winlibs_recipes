@@ -71,6 +71,12 @@ wl-wait4deps
 wl-showstatus extract
 tar xJ --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.xz
 cd $BASENAME-$VERSION
+# create icon
+icotool.exe -c -o virt-viewer.ico -i1 icons/*/virt-viewer.png
+cat > icon.rc << EOF
+#include <winuser.h>
+1 ICON "virt-viewer.ico"
+EOF
 ## also allow building shared libraries
 #sed -i.bak -e "s/static_\(library\)/\1/" src/meson.build
 # fix detection of Python
@@ -81,6 +87,9 @@ sed -i.bak2 -e "s/'-fstack-protector[^ ']*',//g" meson.build
 sed -i.bak3 -e "s/^subdir('tests')/#&/" meson.build
 # skip updating mime/icon cache/desktop databases on installation
 sed -i.bak4 -e "s/if \(update_mime_database\|update_icon_cache\|update_desktop_database\).found()/if false/" meson.build
+# link with Windows icon in src/meson.build (version >= 11.0)
+sed -i.bak5 -e "1i windows = import('windows')\nicon = windows.compile_resources('../icon.rc')" src/meson.build
+sed -i.bak6 -e "s/\(-main\.c'\),*$/\1, icon/" src/meson.build
 mkdir -p build_both &&
  wl-showstatus configure &&
  PATH=$PATH:$PERLDIR/bin PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) setup --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dlibvirt=enabled -Dvnc=enabled -Dspice=enabled -Dvte=disabled -Dbash_completion=disabled $PWD build_both &&
@@ -89,13 +98,14 @@ mkdir -p build_both &&
  wl-showstatus build-install &&
  ninja -Cbuild_both install &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####virt-viewer.exe
 #####remote-viewer.exe
 
 
 
 ## create standalone package
 #mkdir -p virt-viewer/bin virt-viewer/share/icons/Adwaita virt-viewer/share/glib-2.0/schemas &&
-#copypedeps -r $MINGWPREFIX/bin/remote-viewer.exe virt-viewer/bin/ &&
+#copypedeps -r $MINGWPREFIX/bin/{remote-viewer,virt-viewer,windows-cmdline-wrapper}.exe virt-viewer/bin/ &&
 #for F in $(cat $C/var/lib/packages/virt-viewer/files); do
 # mkdir -p virt-viewer/$(dirname $F)
 # echo $MINGWPREFIX/$F virt-viewer/$F
