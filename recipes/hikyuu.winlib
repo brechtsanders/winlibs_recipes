@@ -118,6 +118,8 @@ export VERSION=2.7.8
 export VERSIONDATE=20260419
 #export VERSION=2.7.9
 #export VERSIONDATE=20260523
+#export VERSION=2.8.0
+#export VERSIONDATE=20260611
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libiconv,boost,fmt,hdf5,sqlite3,mariadb-client,openssl,nng,xxhash,eigen
 export OPTIONALDEPENDENCIES=
@@ -239,8 +241,10 @@ patch -ulbf hikyuu_cpp/hikyuu/utilities/plugin/PluginLoader.h << EOF
 +        void* func = (void*)GetProcAddress(m_handle, symbol);
  #else
 EOF
-# fix using MariaDB instead of MySQL
+# fix using MariaDB instead of MySQL (version <= 2.7.9)
 sed -i.bak -e "s?mysql\(/mysql\.h\)?mariadb\1?" $(grep -l "mysql/mysql\.h" $(find -name '*.h'))
+## fix using MariaDB instead of MySQL (version >= 2.8.0)
+#sed -i.bak -e "s?\(#include <\)mysql/\(mysql\.h>\)?\1mariadb/\2?" hikyuu_cpp/hikyuu/utilities/db_connect/mysql/MySQLConnect_libmysqlclient.cpp hikyuu_cpp/hikyuu/utilities/db_connect/mysql/MySQLStatement_libmysqlclient.cpp
 # fix undefined CR_SERVER_LOST in hikyuu_cpp/hikyuu/utilities/db_connect/mysql/MySQLStatement.cpp (version >= 2.3.0)
 sed -i.bak2 -e "1i #include <mariadb/errmsg.h>" hikyuu_cpp/hikyuu/utilities/db_connect/mysql/MySQLStatement.cpp
 ## fix undefined CreateFile2 in hikyuu_cpp/hikyuu/global/sysinfo.cpp (version >= 2.1.0)
@@ -252,18 +256,15 @@ sed -i.bak2 -e "1i #include <mariadb/errmsg.h>" hikyuu_cpp/hikyuu/utilities/db_c
 ##endif
 #EOF
 #cat hikyuu_cpp/hikyuu/global/sysinfo.cpp.bak >> hikyuu_cpp/hikyuu/global/sysinfo.cpp
-# fix missing Eigen/Dense in hikyuu_cpp/hikyuu/trade_sys/multifactor/MultiFactorBase.cpp (version >= 2.7.2)
-patch -ulbf hikyuu_cpp/hikyuu/trade_sys/multifactor/MultiFactorBase.cpp << EOF
-@@ -8,3 +8,3 @@
- #include <cmath>
--#include <Eigen/Dense>
-+#include <eigen3/Eigen/Dense>
- #include "hikyuu/utilities/thread/algorithm.h"
-EOF
+# fix missing Eigen/Dense in hikyuu_cpp/hikyuu/trade_sys/multifactor/MultiFactorBase.cpp (version >= 2.7.2 <= 2.7.9)
+sed -i.bak -e "s?\(#include <\)\(Eigen/Dense>\)?\1eigen3/\2?" hikyuu_cpp/hikyuu/trade_sys/multifactor/MultiFactorBase.cpp
+## fix missing Eigen/Dense in hikyuu_cpp/hikyuu/trade_sys/multifactor/MultiFactorBase.cpp (version >= 2.8.0)
+#sed -i.bak -e "s?\(#include <\)\(Eigen/Dense>\)?\1eigen3/\2?" hikyuu_cpp/hikyuu/trade_sys/multifactor/MultiFactorBase.cpp hikyuu_cpp/hikyuu/indicator/IndicatorImp.cpp hikyuu_cpp/hikyuu/indicator/utils.cpp
 wl-showstatus configure-static &&
  #xmake config --confirm=def --trybuild=ninja --kind=static --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --cxxflags="-I$PYDIR/include" &&
  #xmake config --confirm=def --trybuild=ninja --kind=static --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --cxxflags="-I$PYDIR/include" &&
  xmake config --confirm=def --trybuild=ninja --kind=static --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --cxxflags="-I$PYDIR/include -Wa,-mbig-obj" &&
+ #xmake config --confirm=def --trybuild=ninja --kind=static --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --cxxflags="-I$PYDIR/include -I$MINGWPREFIX/include/eigen3 -Wa,-mbig-obj" &&
  #xmake config --confirm=def --trybuild=ninja --kind=static --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --leak_check=n --cxxflags="-I$PYDIR/include" &&
  #--qt=$MINGWPREFIX/qt6
  wl-showstatus build-static &&
@@ -277,6 +278,7 @@ wl-showstatus configure-static &&
  #xmake config --confirm=def --trybuild=ninja --kind=shared --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --cxxflags="-I$PYDIR/include" --shflags="-Wl,--allow-multiple-definition -liconv -lz -lssl -lcrypto -lfmt -lboost_serialization-mt -lhdf5 -lhdf5_cpp -lsqlite3 -lmariadbclient -lnng -lws2_32 -lcrypt32 -lbcrypt" &&
  #xmake config --confirm=def --trybuild=ninja --kind=shared --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --cxxflags="-I$PYDIR/include" --shflags="-Wl,--allow-multiple-definition -liconv -lz -lssl -lcrypto -lfmt -lboost_serialization-mt -lhdf5 -lhdf5_cpp -lsqlite3 -lmariadbclient -lnng -lxxhash -lws2_32 -lcrypt32 -lbcrypt" &&
  xmake config --confirm=def --trybuild=ninja --kind=shared --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --cxxflags="-I$PYDIR/include -Wa,-mbig-obj" --shflags="-Wl,--allow-multiple-definition -liconv -lz -lssl -lcrypto -lfmt -lboost_serialization-mt -lhdf5 -lhdf5_cpp -lsqlite3 -lmariadbclient -lnng -lxxhash -lws2_32 -lcrypt32 -lbcrypt -lshlwapi" &&
+ #xmake config --confirm=def --trybuild=ninja --kind=shared --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --cxxflags="-I$PYDIR/include -I$MINGWPREFIX/include/eigen3 -Wa,-mbig-obj" --shflags="-Wl,--allow-multiple-definition -liconv -lz -lssl -lcrypto -lfmt -lboost_serialization-mt -lhdf5 -lhdf5_cpp -lsqlite3 -lmariadbclient -lnng -lxxhash -lws2_32 -lcrypt32 -lbcrypt -lshlwapi" &&
  #xmake config --confirm=def --trybuild=ninja --kind=shared --plat=mingw --arch=$(echo $RUNPLATFORM|sed -e "s/^\([^-]*\)-.*$/\1/"|sed -e "s/^i686/i386/; s/^aarch64/arm64/") --toolchain=$(if ${CC:-gcc} --version|grep -q clang; then echo clang; else echo gcc; fi) --ta_lib=n --leak_check=n --cxxflags="-I$PYDIR/include" --shflags="-Wl,--allow-multiple-definition -liconv -lz -lssl -lcrypto -lfmt -lboost_serialization-mt -lhdf5 -lhdf5_cpp -lsqlite3 -lmariadbclient -lnng -lxxhash -lws2_32 -lcrypt32 -lbcrypt" &&
  wl-showstatus build-shared &&
  xmake build --confirm=def &&
