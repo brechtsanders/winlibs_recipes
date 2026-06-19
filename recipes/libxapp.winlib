@@ -1,0 +1,114 @@
+export NAME="libxapp"
+export STATUS=
+export URL=https://github.com/linuxmint/xapp
+export BASENAME=libxapp
+export DESCRIPTION="This project gathers the components which are common to multiple GTK desktop environments (Cinnamon, MATE and Xfce) and required to implement cross-DE solutions."
+export CATEGORY=development
+export TYPE=library
+#export VERSION=2.8.12
+#export VERSIONDATE=20250912
+#export VERSION=3.2.0
+#export VERSIONDATE=20251113
+export VERSION=3.2.2
+export VERSIONDATE=20260109
+#export VERSION=3.3.1-unstable
+#export VERSIONDATE=20260522
+#export VERSION=3.3.2-unstable
+#export VERSIONDATE=20260618
+wl-showstatus --package-version
+export DEPENDENCIES=glib2,gtk3,gdk-pixbuf,cairo,libx11,libgnomekbd
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=LGPL
+export DOWNLOADURL="https://github.com/linuxmint/xapp/tags"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/linuxmint/xapp/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd xapp-$VERSION
+# fix libxapp/xapp-util.c (version >= 3.2.2)
+patch -ulbf libxapp/xapp-util.c << EOF
+@@ -265,2 +265,3 @@
+     {
++#ifndef _WIN32
+         if (access ("/dev/shm", W_OK) == 0)
+@@ -270,2 +271,3 @@
+         else
++#endif
+         {
+EOF
+# fix libxapp/xapp-gtk-window.c (version >= 3.2.2)
+patch -ulbf libxapp/xapp-gtk-window.c << EOF
+@@ -10,3 +10,7 @@
+ #include <gdk/gdk.h>
++#ifdef _WIN32
++#include <gdk/gdkwin32.h>
++#else
+ #include <gdk/gdkx.h>
++#endif
+ #include "xapp-gtk-window.h"
+@@ -76,4 +80,6 @@
+     {
++#ifndef _WIN32
+         running_x11 = GDK_IS_X11_DISPLAY(gdk_display_get_default());
+         DEBUG ("XAppGtkWindow: is_x11_session: %s\\n", running_x11 ? "TRUE" : "FALSE");
++#endif
+
+@@ -97,2 +103,3 @@
+ {
++#ifndef _WIN32
+     GdkDisplay *display;
+@@ -115,2 +122,3 @@
+     }
++#endif
+ }
+@@ -122,2 +130,3 @@
+ {
++#ifndef _WIN32
+     GdkDisplay *display;
+@@ -145,2 +154,3 @@
+     gdk_error_trap_pop_ignored ();
++#endif
+ }
+@@ -160,3 +170,7 @@
+
++#ifdef _WIN32
++    return (uintptr_t)GDK_WINDOW_HWND (gdk_window);
++#else
+     return GDK_WINDOW_XID (gdk_window);
++#endif
+ }
+EOF
+# fix xapp-sn-watcher/xapp-sn-watcher.c (version >= 3.2.2)
+patch -ulbf xapp-sn-watcher/xapp-sn-watcher.c << EOF
+@@ -10,3 +10,5 @@
+
++#ifndef _WIN32
+ #include <glib-unix.h>
++#endif
+
+@@ -504,3 +506,5 @@
+
++#ifndef _WIN32
+     g_unix_signal_add (SIGINT, (GSourceFunc) on_interrupt, watcher);
++#endif
+     g_application_hold (G_APPLICATION (watcher));
+EOF
+sed -i.bak -e "s/gio-unix-/gio-windows-/" libxapp/meson.build
+# fix invalid -z linker flag
+sed -i.bak2 -e "s/'-Wl,-z[^']*',//g" libxapp/meson.build
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) setup --prefix $INSTALLPREFIX --backend ninja --buildtype release --strip --default-library both -Dvapi=false -Dintrospection=false -Dpython_target=$PYDIR/python.exe -Ddocs=false $PWD build_both &&
+ wl-showstatus build-install &&
+ PATH=$PYDIR:$PATH PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} \
+ ninja -Cbuild_both install &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xapp-$VERSION
+
+
+
