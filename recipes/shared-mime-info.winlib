@@ -94,6 +94,38 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xj --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.bz2
 cd $BASENAME-$VERSION
+# fix UAC issues by adding manifest resource to update-mime-database in src/meson.build (version >= 2.5.1)
+cat > src/update-mime-database.manifest << EOF
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"> 
+  <assemblyIdentity
+     version="1.0.0.0"
+     name="winlibs_tools"/>
+  <description>WinLibs.com tools</description> 
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel
+          level="asInvoker"
+          uiAccess="false"/>
+        </requestedPrivileges>
+       </security>
+  </trustInfo>
+</assembly>
+EOF
+cat > src/update-mime-database.rc << EOF
+#include <winuser.h>
+1 RT_MANIFEST "update-mime-database.manifest"
+EOF
+patch -ulbf src/meson.build << EOF
+@@ -6,4 +6,5 @@
+
++windows = import('windows')
+ update_mime_database = executable('update-mime-database',
+-    'update-mime-database.cpp',
++    'update-mime-database.cpp', windows.compile_resources('update-mime-database.rc'),
+     dependencies: [
+EOF
 # avoid using xmlto (version >= 2.3)
 sed -i.bak -e "s/xmlto.found()/false/" data/meson.build
 mkdir -p build_both &&
