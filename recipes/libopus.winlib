@@ -46,7 +46,7 @@ export VERSIONDATE=20260115
 wl-showstatus --package-version
 export DEPENDENCIES=glib2,cairo,libthai
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=COPYING
 export LICENSETYPE=
@@ -62,11 +62,33 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/opus-$VERSION.tar.gz
 cd opus-$VERSION
-wl-showstatus configure &&
+# fix .dll filename in CMakeLists.txt (version >= 1.6.1)
+patch -ulbf CMakeLists.txt << EOF
+@@ -300,2 +300,3 @@
+                                  \${OPUS_LIBRARY_VERSION}
++                                 RUNTIME_OUTPUT_NAME opus-0
+                                  PUBLIC_HEADER
+EOF
+if ! cmake --version &> /dev/null || ! ninja --version &> /dev/null; then
+ wl-showstatus configure &&
  #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM $(if echo $RUNPLATFORM|grep -q "^aarch64" ; then echo "--disable-rtcd"; fi) LDFLAGS="-Wl,--as-needed -lssp" &&
  wl-showstatus build-install &&
  make install-strip &&
+ touch SUCCESS
+else
+ mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DOPUS_BUILD_SHARED_LIBRARY:BOOL=OFF -DOPUS_BUILD_PROGRAMS:BOOL=ON -DOPUS_BUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DOPUS_BUILD_SHARED_LIBRARY:BOOL=ON -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ touch SUCCESS
+fi &&
+ rm SUCCESS &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf opus-$VERSION
 
 
