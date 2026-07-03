@@ -79,8 +79,10 @@ export TYPE=application
 #export VERSIONDATE=20260510
 #export VERSION=2026.05.11
 #export VERSIONDATE=20260512
-export VERSION=2026.05.20
-export VERSIONDATE=20260520
+#export VERSION=2026.05.20
+#export VERSIONDATE=20260520
+export VERSION=2026.07.02
+export VERSIONDATE=20260703
 wl-showstatus --package-version
 export DEPENDENCIES=girara
 export OPTIONALDEPENDENCIES=
@@ -156,42 +158,97 @@ EOF
 #+#endif
 # 
 #EOF
-# fix zathura/main.c (version >= 2026.02.03)
+## fix zathura/main.c (version >= 2026.02.03)
+#patch -ulbf zathura/main.c << EOF
+#@@ -16,3 +16,5 @@
+# #include <string.h>
+#+#ifndef _WIN32
+# #include <sys/wait.h>
+#+#endif
+#
+#@@ -103,3 +105,5 @@
+#   g_autofree gchar* search_string  = NULL;
+#+#ifndef _WIN32
+#   gboolean forkback                = false;
+#+#endif
+#   gboolean print_version           = false;
+#@@ -116,3 +120,5 @@
+#        "path"},
+#+#ifndef _WIN32
+#       {"fork", '\\0', 0, G_OPTION_ARG_NONE, &forkback, _("Fork into the background"), NULL},
+#+#endif
+#       {"password", 'w', 0, G_OPTION_ARG_STRING, &password, _("Document password"), "password"},
+#@@ -192,2 +198,5 @@
+#   if (print_version == false && argc > file_idx_base + 1) {
+#+#ifdef _WIN32
+#+    girara_error("fork() not supported in Windows");
+#+#else
+#     const pid_t parent_pid              = getpid();
+#@@ -229,2 +238,3 @@
+#     }
+#+#endif
+#   }
+#@@ -232,2 +242,3 @@
+#   /* Fork into the background if the user really wants to ... */
+#+#ifndef _WIN32
+#   if (print_version == false && forkback == true && file_idx < file_idx_base + 1) {
+#@@ -246,2 +257,3 @@
+#   }
+#+#endif
+#
+#EOF
+# fix zathura/main.c (version >= 2026.07.02)
 patch -ulbf zathura/main.c << EOF
-@@ -16,3 +16,5 @@
+@@ -12,3 +12,5 @@
  #include <string.h>
 +#ifndef _WIN32
  #include <sys/wait.h>
 +#endif
 
-@@ -103,3 +105,5 @@
+@@ -218,2 +220,3 @@
+ static void start_process_group(void* GIRARA_UNUSED(data)) {
++#ifndef _WIN32
+   if (setsid() == -1) {
+@@ -222,2 +225,3 @@
+   }
++#endif
+ }
+@@ -255,3 +259,5 @@
    g_autofree gchar* search_string  = NULL;
 +#ifndef _WIN32
    gboolean forkback                = false;
 +#endif
    gboolean print_version           = false;
-@@ -116,3 +120,5 @@
+@@ -266,3 +272,5 @@
         "path"},
 +#ifndef _WIN32
        {"fork", '\\0', 0, G_OPTION_ARG_NONE, &forkback, _("Fork into the background"), NULL},
 +#endif
        {"password", 'w', 0, G_OPTION_ARG_STRING, &password, _("Document password"), "password"},
-@@ -192,2 +198,5 @@
+@@ -342,2 +350,5 @@
    if (print_version == false && argc > file_idx_base + 1) {
 +#ifdef _WIN32
 +    girara_error("fork() not supported in Windows");
 +#else
-     const pid_t parent_pid              = getpid();
-@@ -229,2 +238,3 @@
+     g_autoptr(girara_list_t) child_pids = girara_list_new();
+@@ -363,2 +374,3 @@
      }
 +#endif
-   }
-@@ -232,2 +242,3 @@
+     return 0;
+@@ -367,2 +379,3 @@
    /* Fork into the background if the user really wants to ... */
 +#ifndef _WIN32
    if (print_version == false && forkback == true && file_idx < file_idx_base + 1) {
-@@ -246,2 +257,3 @@
+@@ -377,2 +390,3 @@
    }
++#endif
+
+@@ -423,2 +437,3 @@
+   g_autoptr(GtkApplication) app = gtk_application_new(NULL, G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN);
++#ifndef _WIN32
+   g_signal_connect(app, "startup", G_CALLBACK(cb_app_startup), &ctx);
+@@ -427,2 +442,3 @@
+   g_signal_connect(app, "shutdown", G_CALLBACK(cb_app_shutdown), &ctx);
 +#endif
 
 EOF
