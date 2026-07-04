@@ -7,11 +7,13 @@ export DESCRIPTION="AWTK = Toolkit AnyWhere (a cross-platform embedded GUI)"
 export CATEGORY=
 export TYPE=library
 export VERSION=master
-export VERSIONDATE=20240425
+export VERSIONDATE=20260704
 wl-showstatus --package-version
-export DEPENDENCIES=
+#export DEPENDENCIES=sdl2
+export DEPENDENCIES=sdl3
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=scons
+#export BUILDDEPENDENCIES=scons
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=LGPL
@@ -24,15 +26,128 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd $BASENAME-$VERSION
-wl-showstatus build &&
- PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $MINGWPREFIX/python/Scripts/scons-script.py TOOLS_NAME=mingw DEBUG=False SHARED=True BUILD_TOOLS=True BUILD_DEMOS=False BUILD_TESTS=False &&
- ${DLLTOOL:-dlltool} -D bin/awtk.dll -l lib/awtk.dll.a &&
- ${DLLTOOL:-dlltool} -D bin/tkc.dll -l lib/tkc.dll.a &&
- wl-showstatus install &&
- #mkdir -p $INSTALLPREFIX/share/awtk/include $INSTALLPREFIX/share/awtk/lib $INSTALLPREFIX/share/awtk/bin &&
- #cp -f *.h $INSTALLPREFIX/share/awtk/include/ &&
- #cp -f lib/*.a $INSTALLPREFIX/share/awtk/lib/ &&
- #cp -f bin/*.dll $INSTALLPREFIX/share/awtk/bin/ &&
+# fix src/ext_widgets/slide_view/slide_view.c (version >= master)
+patch -ulbf src/ext_widgets/slide_view/slide_view.c << EOF
+@@ -223,5 +223,5 @@
+   pointer_event_init(&abort, EVT_POINTER_DOWN_ABORT, widget, 0, 0);
+-  widget_dispatch_event_to_target_recursive(widget, &abort);
++  widget_dispatch_event_to_target_recursive(widget, &abort.e);
+   if (slide_view->pressed) {
+-    widget_dispatch(widget, &abort);
++    widget_dispatch(widget, &abort.e);
+   }
+EOF
+# fix src/ext_widgets/slide_view/slide_view.c (version >= master)
+patch -ulbf src/ext_widgets/slide_view/slide_view.c << EOF
+@@ -223,5 +223,5 @@
+   pointer_event_init(&abort, EVT_POINTER_DOWN_ABORT, widget, 0, 0);
+-  widget_dispatch_event_to_target_recursive(widget, &abort);
++  widget_dispatch_event_to_target_recursive(widget, &abort.e);
+   if (slide_view->pressed) {
+-    widget_dispatch(widget, &abort);
++    widget_dispatch(widget, &abort.e);
+   }
+EOF
+# fix src/platforms/pc/thread_with_sdl.c (version >= master)
+patch -ulbf src/platforms/pc/thread_with_sdl.c << EOF
+@@ -53,2 +53,3 @@
+
++#if SDL_MAJOR_VERSION < 3
+   if (SDL_LockMutex(mutex->mutex) != 0) {
+@@ -57,2 +58,5 @@
+   }
++#else
++  SDL_LockMutex(mutex->mutex);
++#endif
+
+@@ -66,5 +70,8 @@
+   ret = SDL_TryLockMutex(mutex->mutex);
++#ifdef SDL_MUTEX_TIMEDOUT
+   if (ret == SDL_MUTEX_TIMEDOUT) {
+     return RET_TIMEOUT;
+-  } else if (ret == 0) {
++  } else
++#endif
++  if (ret == 0) {
+     return RET_OK;
+@@ -77,2 +84,3 @@
+   return_value_if_fail(mutex != NULL, RET_BAD_PARAMS);
++#if SDL_MAJOR_VERSION < 3
+   if (SDL_UnlockMutex(mutex->mutex) != 0) {
+@@ -81,2 +89,5 @@
+   }
++#else
++  SDL_UnlockMutex(mutex->mutex);
++#endif
+
+@@ -126,3 +137,8 @@
+
++#if SDL_MAJOR_VERSION < 3
+   return SDL_CondSignal(cond->cond) == 0 ? RET_OK : RET_FAIL;
++#else
++  SDL_CondSignal(cond->cond);
++  return RET_OK;
++#endif
+ }
+@@ -132,3 +148,8 @@
+
++#if SDL_MAJOR_VERSION < 3
+   return SDL_CondBroadcast(cond->cond) == 0 ? RET_OK : RET_FAIL;
++#else
++  SDL_CondBroadcast(cond->cond);
++  return RET_OK;
++#endif
+ }
+@@ -144,3 +165,8 @@
+
++#if SDL_MAJOR_VERSION < 3
+   return SDL_CondWait(cond->cond, mutex->mutex) == 0 ? RET_OK : RET_FAIL;
++#else
++  SDL_CondWait(cond->cond, mutex->mutex);
++  return RET_OK;
++#endif
+ }
+@@ -170,5 +196,8 @@
+   ret = SDL_SemWaitTimeout(semaphore->sem, timeout_ms);
++#ifdef SDL_MUTEX_TIMEDOUT
+   if (ret == SDL_MUTEX_TIMEDOUT) {
+     return RET_TIMEOUT;
+-  } else if (ret == 0) {
++  } else
++#endif
++  if (ret == 0) {
+     return RET_OK;
+@@ -182,3 +211,8 @@
+
++#if SDL_MAJOR_VERSION < 3
+   return SDL_SemPost(semaphore->sem) == 0 ? RET_OK : RET_FAIL;
++#else
++  SDL_SemPost(semaphore->sem);
++  return RET_OK;
++#endif
+ }
+EOF
+#wl-showstatus build &&
+# PYTHONPATH=$MINGWPREFIX/python/Lib/site-packages${PYTHONPATH:+:$PYTHONPATH} $PYDIR/python.exe $MINGWPREFIX/python/Scripts/scons-script.py TOOLS_NAME=mingw DEBUG=False SHARED=True BUILD_TOOLS=True BUILD_DEMOS=False BUILD_TESTS=False &&
+# ${DLLTOOL:-dlltool} -D bin/awtk.dll -l lib/awtk.dll.a &&
+# ${DLLTOOL:-dlltool} -D bin/tkc.dll -l lib/tkc.dll.a &&
+# wl-showstatus install &&
+# #mkdir -p $INSTALLPREFIX/share/awtk/include $INSTALLPREFIX/share/awtk/lib $INSTALLPREFIX/share/awtk/bin &&
+# #cp -f *.h $INSTALLPREFIX/share/awtk/include/ &&
+# #cp -f lib/*.a $INSTALLPREFIX/share/awtk/lib/ &&
+# #cp -f bin/*.dll $INSTALLPREFIX/share/awtk/bin/ &&
+#    echo OK
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/awtk -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DAWTK_BUILD_SHARED:BOOL=OFF -DLIBSAMPLERATE:BOOL=ON -DCLOCK_GETTIME:BOOL=ON -DDIRECTX:BOOL=OFF -DVIDEO_X11:BOOL=OFF -DPTHREADS:BOOL=ON -DAWTK_SDL_VERSION:STRING=2 -DAWTK_SDL_VIDEODRIVER:STRING=directx -DAWTK_BUILD_TOOLS:BOOL=ON -DAWTK_DEBUG:BOOL=OFF -DAWTK_BUILD_DEMOS:BOOL=ON -DAWTK_BUILD_TESTS:BOOL=OFF -S. -Bbuild_static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/awtk -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DAWTK_BUILD_SHARED:BOOL=OFF -DLIBSAMPLERATE:BOOL=ON -DCLOCK_GETTIME:BOOL=ON -DDIRECTX:BOOL=OFF -DVIDEO_X11:BOOL=OFF -DPTHREADS:BOOL=ON -DAWTK_SDL_VERSION:STRING=3 -DAWTK_SDL_VIDEODRIVER:STRING=directx -DAWTK_BUILD_TOOLS:BOOL=ON -DAWTK_DEBUG:BOOL=OFF -DAWTK_BUILD_DEMOS:BOOL=ON -DAWTK_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DSDL_ENABLE_OLD_NAMES" -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/awtk -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DAWTK_BUILD_SHARED:BOOL=OFF -DLIBSAMPLERATE:BOOL=ON -DCLOCK_GETTIME:BOOL=ON -DDIRECTX:BOOL=OFF -DVIDEO_X11:BOOL=OFF -DPTHREADS:BOOL=ON -DAWTK_SDL_VERSION:STRING=2 -DAWTK_SDL_VIDEODRIVER:STRING=directx -DAWTK_BUILD_TOOLS:BOOL=ON -DAWTK_DEBUG:BOOL=OFF -DAWTK_BUILD_DEMOS:BOOL=ON -DAWTK_BUILD_TESTS:BOOL=OFF -S. -Bbuild_shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX/share/awtk -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DAWTK_BUILD_SHARED:BOOL=OFF -DLIBSAMPLERATE:BOOL=ON -DCLOCK_GETTIME:BOOL=ON -DDIRECTX:BOOL=OFF -DVIDEO_X11:BOOL=OFF -DPTHREADS:BOOL=ON -DAWTK_SDL_VERSION:STRING=3 -DAWTK_SDL_VIDEODRIVER:STRING=directx -DAWTK_BUILD_TOOLS:BOOL=ON -DAWTK_DEBUG:BOOL=OFF -DAWTK_BUILD_DEMOS:BOOL=ON -DAWTK_BUILD_TESTS:BOOL=OFF -DCMAKE_C_FLAGS:STRING="-DSDL_ENABLE_OLD_NAMES" -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
     echo OK
 # wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 
