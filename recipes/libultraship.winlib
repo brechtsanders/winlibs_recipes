@@ -1,0 +1,65 @@
+export NAME="libultraship"
+export STATUS=
+export URL=https://github.com/Kenix3/libultraship/
+export BASENAME=libultraship
+export DESCRIPTION="libultraship (LUS) is a library meant to provide reimplementations of libultra (n64 sdk) functions that run on modern hardware."
+export CATEGORY=games,porting
+export TYPE=library
+export VERSION=1.4.2
+export VERSIONDATE=20260715
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,libbz2,glew,sdl2,stormlib
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/Kenix3/libultraship/releases"
+export INSTALLPREFIX=$PWD/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/Kenix3/libultraship/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/graphic/Fast3D/gfx_sdl2.cpp (version >= 1.4.2)
+patch -ulbf src/graphic/Fast3D/gfx_sdl2.cpp << EOF
+@@ -292,2 +292,5 @@
+     switch (message) {
++#ifndef WM_GETDPISCALEDSIZE
++#define WM_GETDPISCALEDSIZE 0x02e4
++#endif
+         case WM_GETDPISCALEDSIZE:
+EOF
+# fix src/graphic/Fast3D/gfx_direct3d11.cpp (version >= 1.4.2)
+patch -ulbf src/graphic/Fast3D/gfx_direct3d11.cpp << EOF
+@@ -856,4 +856,4 @@
+
+-    width = max(width, 1U);
+-    height = max(height, 1U);
++    width = (width >= 1U ? width : 1U);
++    height = (height >= 1U ? height : 1U);
+     while (msaa_level > 1 && d3d.msaa_num_quality_levels[msaa_level - 1] == 0) {
+EOF
+# fix extern/ZAPDUtils/CMakeLists.txt (version >= 1.4.2)
+patch -ulbf extern/ZAPDUtils/CMakeLists.txt << EOF
+@@ -68,3 +68,3 @@
+        endif()
+-       set_target_properties(\${PROJECT_NAME} PROPERTIES MSVC_RUNTIME_LIBRARY \${MSVC_RUNTIME_LIBRARY_STR})
++       set_target_properties(\${PROJECT_NAME} PROPERTIES MSVC_RUNTIME_LIBRARY "\${MSVC_RUNTIME_LIBRARY_STR}")
+ endif()
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSTORM_USE_BUNDLED_LIBRARIES:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSTORM_USE_BUNDLED_LIBRARIES:BOOL=OFF -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
