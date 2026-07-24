@@ -113,7 +113,49 @@ touch include/winres.h
 #+  elseif("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "ARM64" OR "\${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ARM64")
 #     set(LIB_INFO "\${LIB_INFO} (arm64)")
 #EOF
-# fix detection of ncurses
+## fix src/libcec/cmake/CheckPlatformSupport.cmake (version >= 8.0.0)
+#patch -ulbf src/libcec/cmake/CheckPlatformSupport.cmake << EOF
+#@@ -42,2 +42,5 @@
+#   add_definitions(-DTARGET_WINDOWS -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS -D_WINSOCKAPI_)
+#+ if (MINGW)
+#+  set(LIB_DESTINATION "\${CMAKE_INSTALL_LIBDIR}")
+#+ else()
+#   set(LIB_DESTINATION ".")
+#@@ -64,2 +67,3 @@
+#   endif()
+#+ endif()
+#
+#EOF
+## fix src/libcec/cmake/CheckPlatformSupport.cmake (version >= 8.0.0)
+#patch -ulbf src/libcec/cmake/CheckPlatformSupport.cmake << EOF
+#@@ -42,2 +42,5 @@
+#   add_definitions(-DTARGET_WINDOWS -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS -D_WINSOCKAPI_)
+#+ if(MSVC)
+#+  set(LIB_DESTINATION "\${CMAKE_INSTALL_LIBDIR}")
+#+ else()
+#   set(LIB_DESTINATION ".")
+#@@ -45,4 +48,5 @@
+#   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded\$<\$<CONFIG:Debug>:Debug>DLL")
+#+ endif()
+#
+#-  if("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "X86")
+#+  if("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "X86" OR "\${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "X86")
+#     set(LIB_INFO "\${LIB_INFO} (x86)")
+#@@ -51,3 +55,3 @@
+#     set(PYTHON_USE_VERSION 2)
+#-  elseif("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "x64")
+#+  elseif("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "x64" OR "\${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
+#     check_symbol_exists(_AMD64_ Windows.h WIN64)
+#@@ -56,5 +60,5 @@
+#     endif()
+#-  elseif("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "ARM")
+#+  elseif("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "ARM" OR "\${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ARM")
+#     set(LIB_INFO "\${LIB_INFO} (arm)")
+#-  elseif("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "ARM64")
+#+  elseif("\${MSVC_C_ARCHITECTURE_ID}" STREQUAL "ARM64" OR "\${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ARM64")
+#     check_symbol_exists(_ARM64_ Windows.h ARM64)
+#EOF
+## fix detection of ncurses
 sed -i.bak -e "s/\(check_library_exists(\)curses\( initscr\)/\1ncurses\2/" src/cec-client/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
@@ -122,6 +164,7 @@ mkdir -p build_win &&
  #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_EXE_LINKER_FLAGS:STRING="-lcurses -lsetupapi" $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DWIN64:BOOL=TRUE"; fi) -S. -Bbuild_win &&
  #cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DWIN64:BOOL=TRUE"; fi) -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/ncurses" -S. -Bbuild_win &&
  cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DWIN64:BOOL=TRUE"; fi) -DHAVE_P8_USB:BOOL=OFF -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/ncurses" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
+ #-DDISABLE_CLIENT:BOOL=ON 
  #PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_INCLUDE_DIRS:PATH=$PYDIR/include -DPYTHON_LIBRARIES:PATH=$(ls -1 $PYDIR/libs/libpython*.a|sort -V|tail -n1) -DCMAKE_EXE_LINKER_FLAGS:STRING="-lcurses -lsetupapi" $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DWIN64:BOOL=TRUE"; fi) -S. -Bbuild_win &&
  #PKG_CONFIG= cmake.exe -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DPYTHON_INCLUDE_DIRS:PATH=$PYDIR/include -DPYTHON_LIBRARIES:PATH=$(ls -1 $PYDIR/libs/libpython*.a|sort -V|tail -n1) $(if ( echo $RUNPLATFORM | grep -q x86_64 ); then echo "-DWIN64:BOOL=TRUE"; fi) -S. -Bbuild_win &&
  #echo " -lcurses" >> build_win/src/cec-client/CMakeFiles/cec-client.dir/linklibs.rsp &&

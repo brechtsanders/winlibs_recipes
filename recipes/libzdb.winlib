@@ -17,16 +17,16 @@ export TYPE=library
 #export VERSIONDATE=20220818
 #export VERSION=3.3.0
 #export VERSIONDATE=20240723
-export VERSION=3.4.0
-export VERSIONDATE=20240801
+#export VERSION=3.4.0
+#export VERSIONDATE=20240801
 ####configure: error: vsnprintf does not conform to c11
 #export VERSION=3.4.1
 #export VERSIONDATE=20250604
 #export VERSION=3.5.0
 #export VERSIONDATE=20251218
-#export VERSION=3.6.0
-#export VERSIONDATE=20260724
 ####configure: error: sigsetjmp is required
+export VERSION=3.6.0
+export VERSIONDATE=20260724
 wl-showstatus --package-version
 export DEPENDENCIES=pthreads,openssl,sqlite3,postgresql,mariadb-client
 export OPTIONALDEPENDENCIES=ocilib
@@ -142,12 +142,49 @@ patch -ulbf src/zdbpp.h << EOF
 
          //blob
 EOF
+# fix undefined strcasestr() in src/util/Str.c (version >= 3.6.0)
+patch -ulbf src/util/Str.c << EOF
+@@ -34,2 +34,21 @@
+ #include <limits.h>
++#ifdef _WIN32
++static char* strcasestr (const char* str, const char* pattern)
++{
++  size_t i;
++  if (!*pattern)
++    return (char*)str;
++  for (; *str; str++) {
++    if (toupper((unsigned char)*str) == toupper((unsigned char)*pattern)) {
++      for (i = 1;; i++) {
++        if (!pattern[i])
++          return (char*)str;
++        if (toupper((unsigned char)str[i]) != toupper((unsigned char)pattern[i]))
++          break;
++      }
++    }
++  }
++  return NULL;
++}
++#endif
+
+EOF
+# fix undefined sigjmp_buf in src/exceptions/Exception.h (version >= 3.6.0)
+patch -ulbf src/exceptions/Exception.h << EOF
+@@ -29,2 +29,8 @@
+ #include <pthread.h>
++#ifdef __MINGW32__
++#include <setjmp.h>
++typedef jmp_buf sigjmp_buf;
++#define sigsetjmp(env, savemask) setjmp(env)
++#define siglongjmp(env, val) longjmp(env, val)
++#endif
+
+EOF
 # detect _vsnprintf instead of vsnprintf (version >= 3.2)
 sed -i.bak -e "s/\(n = \)\(vsnprintf\)/\1_\2/" configure.ac
-## avoid issue detecting C++20 support (version >= 3.6.0)
-#sed -i.bak2 -e "s/AC_MSG_ERROR\(.*Your compiler does not support\)/AC_MSG_WARN\1/" configure.ac
-## avoid sigsetjmp requirement (version >= 3.4.1)
-#sed -i.bak3 -e "s/AC_MSG_FAILURE\(.*sigsetjmp is required\)/AC_MSG_WARN\1/" configure.ac
+# avoid issue detecting C++20 support (version >= 3.6.0)
+sed -i.bak2 -e "s/AC_MSG_ERROR\(.*Your compiler does not support\)/AC_MSG_WARN\1/" configure.ac
+# avoid sigsetjmp requirement (version >= 3.4.1)
+sed -i.bak3 -e "s/AC_MSG_FAILURE\(.*sigsetjmp is required\)/AC_MSG_WARN\1/" configure.ac
 wl-showstatus configure &&
  autoreconf -f -i -I m4 -I config -I $MINGWPREFIX/share/aclocal &&
  sed -i.bak -e "s/^as_fn_error\(.*vsnprintf does not conform to c[0-9]*\)/\$as_echo\1/" configure &&
