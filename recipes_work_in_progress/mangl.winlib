@@ -15,7 +15,7 @@ export VERSION=1.1.5
 export VERSIONDATE=20240516
 ####FATAL: no endian conversion functions found
 wl-showstatus --package-version
-export DEPENDENCIES=zlib,glfw3,freetype2
+export DEPENDENCIES=zlib,glfw3,freetype2,mman-win32,win32-fork
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 export OPTIONALBUILDDEPENDENCIES=
@@ -30,23 +30,6 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-
-  ./configure --help 2> /dev/null
-  cat meson_options.txt 2> /dev/null
-  head COPYING* LICENSE* LICENCE* COPYRIGHT*
-  ls -ld COPYING* LICENSE* LICENCE* COPYRIGHT* configure* m4 CMakeLists.txt cmake xmake.lua Makefile GNUmakefile setup.py scons SConscript SConstruct meson.build meson_options.txt *.pro *.proj *.sln BUILD.gn .gn build 2> /dev/null
-
-wl-showstatus build &&
- make &&
- #make CC="${CC:-gcc}" CXX="${CXX:-g++}" LD=${LD:-ld} AR=${AR:-ar} &&
-    echo OK
-
-#GCCFLAG_ASNEEDED=$(echo "int main () { return 0; }"|gcc -xc - -Wl,--as-needed &>/dev/null && echo "-Wl,--as-needed")
-#GCCFLAG_ASNEEDED=$(if gcc --help -v 2>/dev/null | grep -q " --as-needed"; then echo "-Wl,--as-needed"; fi)
-
-# avoid calling less from configure
-mkdir -p winfix/bin
-cp $(which true.exe) winfix/bin/less.exe
 # fix missing files
 mkdir -p winfix/arpa
 cat > winfix/endian.h << EOF
@@ -55,6 +38,115 @@ cat > winfix/endian.h << EOF
 #define __BYTE_ORDER __LITTLE_ENDIAN
 EOF
 echo "#include <winsock2.h>" > winfix/arpa/inet.h
+# avoid links in mandoc/compat_fts.h (version >= 1.1.5)
+patch -ulbf mandoc/compat_fts.h << EOF
+@@ -69,3 +69,5 @@
+        dev_t fts_dev;                  /* device */
++#ifndef _WIN32
+        nlink_t fts_nlink;              /* link count */
++#endif
+
+EOF
+# avoid links in mandoc/compat_fts.c (version >= 1.1.5)
+patch -ulbf mandoc/compat_fts.c << EOF
+@@ -513,3 +513,7 @@
+
++#ifdef _WIN32
++       if (stat(p->fts_accpath, sbp)) {
++#else
+        if (lstat(p->fts_accpath, sbp)) {
++#endif
+                p->fts_errno = errno;
+@@ -529,3 +533,5 @@
+                ino = p->fts_ino = sbp->st_ino;
++#ifndef _WIN32
+                p->fts_nlink = sbp->st_nlink;
++#endif
+
+@@ -548,4 +554,6 @@
+        }
++#ifndef _WIN32
+        if (S_ISLNK(sbp->st_mode))
+                return (FTS_SL);
++#endif
+        if (S_ISREG(sbp->st_mode))
+EOF
+# fix mkdir in mandoc/compat_mkdtemp.c (version >= 1.1.5)
+patch -ulbf mandoc/compat_mkdtemp.c << EOF
+@@ -40,3 +40,7 @@
+                        return NULL;
++#ifdef _WIN32
++               if (mkdir(path) == 0)
++#else
+                if (mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR) == 0)
++#endif
+                        return path;
+EOF
+# fix mandoc/read.c (version >= 1.1.5)
+patch -ulbf mandoc/read.c << EOF
+@@ -24,2 +24,5 @@
+  */
++#ifdef _WIN32
++#include <windows.h>
++#endif
+ #include "config.h"
+EOF
+# avoid signals (in a dirty way) in mandoc/term_tag.c (version >= 1.1.5)
+patch -ulbf mandoc/term_tag.c << EOF
+@@ -52,3 +52,5 @@
+ {
++#ifndef _WIN32
+        struct sigaction         sa;
++#endif
+        int                      ofd;   /* In /tmp/, dup(2)ed to stdout. */
+@@ -62,2 +64,3 @@
+
++#ifndef _WIN32
+        memset(&sa, 0, sizeof(sa));
+@@ -77,2 +80,3 @@
+        sigaction(SIGTTOU, &sa, NULL);
++#endif
+
+@@ -194,2 +198,3 @@
+ {
++#ifndef _WIN32
+        pid_t    tc_pgid;
+@@ -211,2 +216,3 @@
+        }
++#endif
+ }
+@@ -216,5 +222,8 @@
+ {
++#ifndef _WIN32
+        struct sigaction         sa;
++#endif
+
+        term_tag_unlink();
++#ifndef _WIN32
+        memset(&sa, 0, sizeof(sa));
+@@ -224,2 +233,3 @@
+        kill(getpid(), signum);
++#endif
+        /* NOTREACHED */
+EOF
+# fix main.c (version >= 1.1.5)
+patch -ulbf main.c << EOF
+@@ -19,5 +19,11 @@
+ #include <sys/stat.h>
++#ifdef _WIN32
++#include <win32fork.h>
++#else
+ #include <glob.h>
++#endif
+ #include <getopt.h>
++#ifndef _WIN32
+ #include <err.h>
++#endif
+ #include <stdbool.h>
+EOF
+# avoid calling less from configure
+mkdir -p winfix/bin
+cp $(which true.exe) winfix/bin/less.exe
 # don't abort on configure errors
 sed -i.bak -e "s/^\(\s*\)\(FATAL=1\)/\1#\2/" mandoc/configure
 
@@ -93,6 +185,10 @@ wl-showstatus configure &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
  #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ # define OSNAME in mandoc/config.h
+ echo -e "#ifndef OSNAME\n#define OSNAME \"Windows\"\n#endif" >> mandoc/config.h &&
+ # fix Makefile
+ sed -i.bak -e "s?^\(CFLAGS = \)\(-g \)*?\1-I$(cygpath -m $MINGWPREFIX/include/mman-win32) -I$(cygpath -m $MINGWPREFIX/include/freetype2) ?" Makefile &&
  wl-showstatus build &&
  make CC="${CC:-gcc}" &&
  wl-showstatus build-install &&
