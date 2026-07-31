@@ -55,8 +55,10 @@ export TYPE=application
 #export VERSIONDATE=20260611
 #export VERSION=49.3.0
 #export VERSIONDATE=20260612
-export VERSION=50.0.1
-export VERSIONDATE=20260729
+#export VERSION=50.0.1
+#export VERSIONDATE=20260729
+export VERSION=50.0.2
+export VERSIONDATE=20260731
 wl-showstatus --package-version
 export DEPENDENCIES=mman-win32
 export OPTIONALDEPENDENCIES=
@@ -75,6 +77,19 @@ tar xJ --force-local -f $TARBALLDIR/$BASENAME/wake_$VERSION.tar.xz
 cd $BASENAME-$VERSION
 # fix missing aligned_alloc in src/compat/aligned_alloc.c (version >= 44.0.1)
 sed -i.bak -e "s/\baligned_alloc\b/_aligned_malloc/g" src/compat/aligned_alloc.c
+# fix undefined int64_t in tools/wake-migrate/main.cpp (version >= 50.0.2)
+sed -i.bak -e "1i #include <cstdint>" tools/wake-migrate/main.cpp
+# fix src/util/mkdir_parents.cpp (version >= 50.0.2)
+patch -ulbf src/util/mkdir_parents.cpp << EOF
+@@ -43,3 +43,7 @@
+
++#ifdef _WIN32
++    if (0 != mkdir(dir.c_str()) && errno != EEXIST) return errno;
++#else
+     if (0 != mkdir(dir.c_str(), mode) && errno != EEXIST) return errno;
++#endif
+   }
+EOF
 
 wl-showstatus build &&
  make CC="${CC:-gcc}" CXX="${CXX:-g++}" CFLAGS="-I$MINGWPREFIX/include/mman-win32 -O2 -DVERSION=$VERSION $(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration"; fi)" &&
