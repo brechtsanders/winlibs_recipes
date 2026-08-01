@@ -1,0 +1,62 @@
+export NAME="DLNA Server"
+export STATUS=
+export URL=https://github.com/14ag/dlna-server
+export BASENAME=dlna-server
+export DESCRIPTION="dlna-server shares your videos, music, and photos with TVs, game consoles, and other DLNA-capable devices on your home network. Point it at a folder or a playlist, and any DLNA player on the same network can find it and start playing - no extra setup needed on the player's side."
+export CATEGORY=multimedia
+export TYPE=application
+export VERSION=1.6.0
+export VERSIONDATE=20260801
+wl-showstatus --package-version
+export DEPENDENCIES=libcurl
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=
+export DOWNLOADURL="https://github.com/14ag/dlna-server/releases"
+export INSTALLPREFIX=$PWD/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/14ag/dlna-server/archive/refs/tags/v$VERSION.tar.gz
+export DOWNLOADSOURCEURL=https://github.com/14ag/dlna-server/archive/refs/tags/$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix src/firewall_access_win.cpp (version >= 1.4.0)
+patch -ulbf src/firewall_access_win.cpp << EOF
+@@ -220,3 +220,8 @@
+            protocol == kProtocolUdp ||
+-           protocol == NET_FW_IP_PROTOCOL_ANY;
++#if NET_FW_IP_PROTOCOL_ANY
++           protocol == NET_FW_IP_PROTOCOL_ANY
++#else
++           0
++#endif
++           ;
+ }
+EOF
+# fix undefined uint64_t in src/firewall_access_win.cpp (version >= 1.6.0)
+sed -i.bak -e "1i #include <cstdint>" src/firewall_access_win.cpp
+# fix undefined std::find in src/firewall_access_win.cpp (version >= 1.6.0)
+sed -i.bak2 -e "1i #include <algorithm>" src/firewall_access_win.cpp
+# fix src/main.cpp (version >= 1.6.0)
+patch -ulbf src/main.cpp << EOF
+@@ -50,3 +50,3 @@
+
+-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
++int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow) {
+     (void)hPrevInstance;
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH="$INSTALLPREFIX/share/DLNA Server" -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####"$MINGWPREFIX/share/DLNA Server/DLNA Server.exe"
+
+
+
