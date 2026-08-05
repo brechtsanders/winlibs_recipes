@@ -1,0 +1,49 @@
+export NAME="freeciv"
+export STATUS=
+export URL=https://github.com/freeciv/freeciv
+export BASENAME=freeciv
+export DESCRIPTION="Freeciv is a Free and Open Source empire-building strategy game inspired by the history of human civilization."
+export CATEGORY=games
+export TYPE=application
+export VERSION=3.2.5
+export VERSIONDATE=20260805
+wl-showstatus --package-version
+export DEPENDENCIES=zlib,xz,libbz2,zstd,readline,qt6,gtk4,sdl3,sdl3ttf,sdl3image,gettext,libiconv,libjansson,libcurl,lua,imagemagick
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=meson,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=COPYING
+export LICENSETYPE=GPL
+export DOWNLOADURL="https://github.com/freeciv/freeciv/tags R"
+export INSTALLPREFIX=$PWD/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/freeciv/freeciv/archive/refs/tags/R$(echo $VERSION|tr . _).tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/R$(echo $VERSION|tr . _).tar.gz
+cd $BASENAME-R$(echo $VERSION|tr . _)
+# fix missing WinMain()
+for F in client/gui-*/gui_main.c; do
+cat >> $F << EOF
+#include <windows.h>
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+  return main(__argc, __argv);
+}
+EOF
+done
+mkdir -p build_both &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin PYTHONPATH=${PYTHONPATH:+:$PYTHONPATH}:$MINGWPREFIX/lib $PYDIR/python.exe $(which meson.py) setup --prefix $INSTALLPREFIX/share/freeciv --backend ninja --buildtype release --strip --default-library both -Dclients="['gtk4', 'sdl3']" -Dqtver=qt6 -Daudio=sdl3 -Djson-protocol=true -Dreadline=true -Dpython=$PYDIR/python.exe $PWD build_both &&
+ #-Dclients="['gtk4', 'qt', 'sdl3']"
+ wl-showstatus build &&
+ ninja -Cbuild_both &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_both install &&
+ #ninja -Cbuild_both install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-R$(echo $VERSION|tr . _)
+####$MINGWPREFIX/share/freeciv/bin/freeciv-sdl3.exe
+
+
+
