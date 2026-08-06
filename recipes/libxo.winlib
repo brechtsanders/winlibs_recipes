@@ -62,6 +62,8 @@ export TYPE=library
 #export VERSIONDATE=20240419
 export VERSION=1.7.5
 export VERSIONDATE=20240419
+#export VERSION=2.0.0
+#export VERSIONDATE=20260806
 wl-showstatus --package-version
 export DEPENDENCIES=gettext,libdl,yasm,sys_queue_h
 export OPTIONALDEPENDENCIES=libslax
@@ -132,6 +134,31 @@ EOF
 for F in $(grep -lw bzero */*.h */*.c */*/*.c); do
  sed -i.bak -e "s/bzero\(([^,]*\),/memset\1, 0,/" $F
 done
+## fix filter/xo_xparse.h (version >= 2.0.0)
+#patch -ulbf filter/xo_xparse.h << EOF
+#@@ -146,3 +146,3 @@
+#     xdp->xd_last_node = new_node;
+#-    bzero(xo_buf_data(xbp, off), sizeof(xo_xparse_node_t));
+#+    memset(xo_buf_data(xbp, off), 0, sizeof(xo_xparse_node_t));
+#
+#EOF
+## fix already defined bool in filter/xo_filter.c (version >= 2.0.0)
+#sed -i.bak -e "s/\bbool\b/bln/g" filter/xo_filter.c
+## fix missing strndup in filter/xo_filter.c (version >= 2.0.0)
+#mv filter/xo_filter.c filter/xo_filter.c.bak2
+#cat > filter/xo_filter.c << EOF
+##include <stdlib.h>
+##include <string.h>
+#char* strndup (const char *str, size_t maxlen)
+#{
+#  int l = strnlen(str, maxlen);
+#  char* s = (char*)malloc(l + 1);
+#  memcpy(s, str, l);
+#  s[l] = 0;
+#  return s;
+#}
+#EOF
+#cat filter/xo_filter.c.bak2 >> filter/xo_filter.c
 # fix location of DLL
 sed -i.bak -e 's/"\$(build_os)" = "cygwin"/true/' encoder/cbor/Makefile.in encoder/test/Makefile.in
 # skip making test
@@ -144,6 +171,8 @@ install-strip:
 EOF
 ## fix path issues (version >= 1.1.0)
 #sed -i.bak -e "s/cygwin/&_IGNORE_THIS/" encoder/*/Makefile.in
+## ignore error detecting msgfmt.exe in configure (version >= 2.0.0)
+#sed -i.bak -e "s/as_fn_error\(.*could not find msgfmt tool\)/echo\1/" configure
 wl-showstatus configure &&
  ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --disable-printflike --disable-libxo-options CFLAGS="-I$(pwd)/winfix -I$MINGWPREFIX/win32ports/include -I$MINGWPREFIX/include/libdl-win32" LDFLAGS="-Wl,--as-needed -ldl" &&
  # fix building DLLs
