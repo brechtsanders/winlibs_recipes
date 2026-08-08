@@ -22,12 +22,14 @@ export TYPE=library
 #export VERSIONDATE=20221121
 #export VERSION=1.6.0
 #export VERSIONDATE=20230620
-export VERSION=1.7.0
-export VERSIONDATE=20250202
+#export VERSION=1.7.0
+#export VERSIONDATE=20250202
 #export VERSION=1.8.0
 #export VERSIONDATE=20250608
 #export VERSION=1.8.1
 #export VERSIONDATE=20260727
+export VERSION=1.8.2
+export VERSIONDATE=20260808
 wl-showstatus --package-version
 export DEPENDENCIES=fftw
 export OPTIONALDEPENDENCIES=
@@ -50,25 +52,86 @@ wl-showstatus extract
 #tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tar.gz
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd liquid-dsp-$VERSION
-## fix missing strsep in src/core/src/logging.c (version >= 1.8.0)
-#mv src/core/src/logging.c src/core/src/logging.c.bak
-#cat > src/core/src/logging.c << EOF
-##include <stdlib.h> 
-##include <string.h>
-#char* strsep (char** s, const char* delim)
-#{
-#  char* p = *s;
-#  char* q = (p ? strpbrk(p, delim) : NULL);
-#  if (q == NULL) {
-#    *s = NULL;
-#  } else {
-#    *q = '\0';
-#    *s = q + 1;
-#  }
-#  return p;
-#}
-#EOF
-#sed -e "s/#if 0/#if _WIN32/" src/core/src/logging.c.bak >> src/core/src/logging.c
+# fix missing strsep in src/core/src/logging.c (version >= 1.8.0)
+mv src/core/src/logging.c src/core/src/logging.c.bak
+cat > src/core/src/logging.c << EOF
+#include <stdlib.h> 
+#include <string.h>
+char* strsep (char** s, const char* delim)
+{
+  char* p = *s;
+  char* q = (p ? strpbrk(p, delim) : NULL);
+  if (q == NULL) {
+    *s = NULL;
+  } else {
+    *q = '\0';
+    *s = q + 1;
+  }
+  return p;
+}
+EOF
+sed -e "s/#if 0/#if _WIN32/" src/core/src/logging.c.bak >> src/core/src/logging.c
+# avoid use of rusage in include/liquid.h (version >= 1.8.2)
+patch -ulbf include/liquid.h << EOF
+@@ -592,3 +592,5 @@
+ // timer based on resource usage
++#ifndef _WIN32
+ #define LIQUID_TIMER_RUSAGE (2)
++#endif
+
+EOF
+# avoid use of rusage in src/core/src/timer.c (version >= 1.8.2)
+patch -ulbf src/core/src/timer.c << EOF
+@@ -26,3 +26,5 @@
+ #include <sys/time.h>
++#ifndef _WIN32
+ #include <sys/resource.h>
++#endif
+
+@@ -40,3 +42,5 @@
+     // time object was created (LIQUID_TIMER_RUSAGE)
++#ifdef LIQUID_TIMER_RUSAGE
+     struct rusage tic_rusage;
++#endif
+ };
+@@ -51,3 +55,5 @@
+     if (q->type == LIQUID_TIMER_CLOCK) {
++#ifdef LIQUID_TIMER_RUSAGE
+     } else if (q->type == LIQUID_TIMER_RUSAGE) {
++#endif
+     } else {
+@@ -79,4 +85,6 @@
+             return liquid_error(LIQUID_EINT,"liquid_timer_tic(), gettimeofday() returned invalid flag");
++#ifdef LIQUID_TIMER_RUSAGE
+     } else if (_q->type == LIQUID_TIMER_RUSAGE) {
+         getrusage(RUSAGE_SELF, &_q->tic_rusage);
++#endif
+     } else {
+@@ -103,2 +111,3 @@
+
++#ifdef LIQUID_TIMER_RUSAGE
+     } else if (_q->type == LIQUID_TIMER_RUSAGE) {
+@@ -112,2 +121,3 @@
+         return time_s + 1e-6f*time_us;
++#endif
+     }
+EOF
+# avoid use of rusage in autotest/autotest.c (version >= 1.8.2)
+patch -ulbf autotest/autotest.c << EOF
+@@ -86,3 +86,5 @@
+     // create and start timer
++#ifdef LIQUID_TIMER_RUSAGE
+     liquid_timer timer = liquid_timer_create(LIQUID_TIMER_RUSAGE);
++#endif
+     // run test, passing reference to itself as argument
+@@ -90,4 +92,6 @@
+     // update runtime and destroy timer
++#ifdef LIQUID_TIMER_RUSAGE
+     _q->runtime = liquid_timer_toc(timer);
+     liquid_timer_destroy(timer);
++#endif
+     _q->status = _q->num_fail > 0 ? LIQUID_AUTOTEST_FAIL : LIQUID_AUTOTEST_PASS;
+EOF
 wl-showstatus configure &&
  autoreconf -f -i -I $MINGWPREFIX/share/aclocal &&
  # remove -c compiler option
