@@ -364,10 +364,18 @@ patch -ulbf gn/build/gen.py << EOF
 +      ar = os.environ.get('AR', 'ar')
    else:
 EOF
-# create build_mingw.ninja.template (version >= main)
-cp -n gn/build/build_linux.ninja.template gn/build/build_mingw.ninja.template
 # fix undefined int64_t in src/gn/pool.h (version >= main)
 sed -i.bak -e "1i #include <cstdint>" src/gn/pool.h
+# don't use cmd.exe in gn/build/ninja_file.py (version >= main)
+patch -ulbf gn/build/ninja_file.py << EOF
+@@ -164,4 +164,2 @@
+     joined = ' && '.join(commands)
+-    if self.platform.is_windows():
+-      return f'cmd.exe /s /c "{joined}"'
+     return joined
+EOF
+# create build_mingw.ninja.template (version >= main)
+cp -n gn/build/build_linux.ninja.template gn/build/build_mingw.ninja.template
 ## don't abort on warnings
 #sed -i.bak -e "s/'\(-Wall\|-Wextra\)',//g" gn/build/gen.py
 ## avoid invalid linker flag -Wl,--gc-sections
@@ -390,7 +398,8 @@ wl-showstatus configure &&
  CXX="${CXX:-g++}" sed -i.bak2 -e "s?^\(ld = \).*?\1$(cygpath -m ${CXX%% *}) ${CXX#* }?" build_win/build.ninja &&
  wl-showstatus build &&
  #CPLUS_INCLUDE_PATH=$MINGWPREFIX/include/mman-win32${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH} ninja -Cbuild_win &&
- ninja -Cbuild_win &&
+ #ninja -Cbuild_win &&
+ ( ninja -Cbuild_win || ninja -Cbuild_win gn.exe ) &&
  #build_win/gn_unittests.exe &&
  wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/bin $INSTALLPREFIX/share/doc/gn &&
