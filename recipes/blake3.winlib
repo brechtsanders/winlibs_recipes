@@ -59,12 +59,16 @@ export TYPE=library
 #export VERSIONDATE=20260425
 #export VERSION=1.8.6
 #export VERSIONDATE=20260806
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
 export VERSION=1.8.7
 export VERSIONDATE=20260820
 wl-showstatus --package-version
-export DEPENDENCIES=
+export DEPENDENCIES=tbb
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 #export LICENSEFILE=LICENSE
 export LICENSEFILE=LICENSE_A2
@@ -79,36 +83,46 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
 cd BLAKE3-$VERSION
-wl-showstatus build &&
- touch SUCCESS &&
- for F in c/blake3.c c/blake3_dispatch.c c/blake3_portable.c; do
-  ${CC:-gcc} -c -o $F.o $F || ( rm -f SUCCESS; break )
- done &&
- rm SUCCESS &&
- if ( echo $RUNPLATFORM | grep -q x86_64 ); then
-  touch SUCCESS &&
-  #for F in c/*_unix.S; do
-  for F in c/*_windows_gnu.S; do
-   ${CC:-gcc} -c -O3 -o $F.o $F || ( rm -f SUCCESS; break )
-  done &&
-  rm SUCCESS
- else
-  ${CC:-gcc} -c -O3 -msse2 c/blake3_sse2.c -o c/blake3_sse2.o &&
-  ${CC:-gcc} -c -O3 -msse4.1 c/blake3_sse41.c -o c/blake3_sse41.o &&
-  ${CC:-gcc} -c -O3 -mavx2 c/blake3_avx2.c -o c/blake3_avx2.o &&
-  ${CC:-gcc} -c -O3 -mavx512f -mavx512vl c/blake3_avx512.c -o c/blake3_avx512.o
- fi &&
- ${AR:-ar} cr libblake3.a c/*.o &&
- ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libblake3.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > blake3.def &&
- ${CC:-gcc} -shared -s -mwindows -def blake3.def -o blake3.dll libblake3.a -Wl,--out-implib,libblake3.dll.a &&
- wl-showstatus install &&
- mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
- cp -f c/*.h $INSTALLPREFIX/include/ &&
- cp -f *.a *.def $INSTALLPREFIX/lib/ &&
- cp -f *.dll $INSTALLPREFIX/bin/ &&
- sed -e "s?@CMAKE_INSTALL_PREFIX@?$INSTALLPREFIX?; s?@PKG_CONFIG_INSTALL_LIBDIR@?$INSTALLPREFIX/lib?; s?@PKG_CONFIG_INSTALL_INCLUDEDIR@?$INSTALLPREFIX/include?; s?@PROJECT_NAME@?$NAME?; s?@PROJECT_DESCRIPTION@?$DESCRIPTION?; s?@PROJECT_VERSION@?$VERSION?; s?@\(BLAKE3_PKGCONFIG_CFLAGS\|PKG_CONFIG_REQUIRES\|PKG_CONFIG_LIBS\|PKG_CONFIG_CFLAGS\)@??" c/libblake3.pc.in > $INSTALLPREFIX/lib/pkgconfig/libblake3.pc &&
+#wl-showstatus build &&
+# touch SUCCESS &&
+# for F in c/blake3.c c/blake3_dispatch.c c/blake3_portable.c; do
+#  ${CC:-gcc} -c -o $F.o $F || ( rm -f SUCCESS; break )
+# done &&
+# rm SUCCESS &&
+# if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+#  touch SUCCESS &&
+#  #for F in c/*_unix.S; do
+#  for F in c/*_windows_gnu.S; do
+#   ${CC:-gcc} -c -O3 -o $F.o $F || ( rm -f SUCCESS; break )
+#  done &&
+#  rm SUCCESS
+# else
+#  ${CC:-gcc} -c -O3 -msse2 c/blake3_sse2.c -o c/blake3_sse2.o &&
+#  ${CC:-gcc} -c -O3 -msse4.1 c/blake3_sse41.c -o c/blake3_sse41.o &&
+#  ${CC:-gcc} -c -O3 -mavx2 c/blake3_avx2.c -o c/blake3_avx2.o &&
+#  ${CC:-gcc} -c -O3 -mavx512f -mavx512vl c/blake3_avx512.c -o c/blake3_avx512.o
+# fi &&
+# ${AR:-ar} cr libblake3.a c/*.o &&
+# ( echo "EXPORTS" && ${NM:-nm} -f posix --defined-only -p libblake3.a | sed -n -e "s/^_*\([^ ]*\) T .*$/\1/p" ) > blake3.def &&
+# ${CC:-gcc} -shared -s -mwindows -def blake3.def -o blake3.dll libblake3.a -Wl,--out-implib,libblake3.dll.a &&
+# wl-showstatus install &&
+# mkdir -p $INSTALLPREFIX/include $INSTALLPREFIX/lib/pkgconfig $INSTALLPREFIX/bin &&
+# cp -f c/*.h $INSTALLPREFIX/include/ &&
+# cp -f *.a *.def $INSTALLPREFIX/lib/ &&
+# cp -f *.dll $INSTALLPREFIX/bin/ &&
+# sed -e "s?@CMAKE_INSTALL_PREFIX@?$INSTALLPREFIX?; s?@PKG_CONFIG_INSTALL_LIBDIR@?$INSTALLPREFIX/lib?; s?@PKG_CONFIG_INSTALL_INCLUDEDIR@?$INSTALLPREFIX/include?; s?@PROJECT_NAME@?$NAME?; s?@PROJECT_DESCRIPTION@?$DESCRIPTION?; s?@PROJECT_VERSION@?$VERSION?; s?@\(BLAKE3_PKGCONFIG_CFLAGS\|PKG_CONFIG_REQUIRES\|PKG_CONFIG_LIBS\|PKG_CONFIG_CFLAGS\)@??" c/libblake3.pc.in > $INSTALLPREFIX/lib/pkgconfig/libblake3.pc &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf BLAKE3-$VERSION
+#####Note: replace -O3 with -O0 in case of errors like: undefined reference to LC1
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBLAKE3_USE_TBB:BOOL=ON -DBLAKE3_FETCH_TBB:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -Sc -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBLAKE3_USE_TBB:BOOL=ON -DBLAKE3_FETCH_TBB:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -Sc -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf BLAKE3-$VERSION
-####Note: replace -O3 with -O0 in case of errors like: undefined reference to LC1
 
 
 
