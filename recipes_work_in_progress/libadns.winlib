@@ -17,8 +17,10 @@ export TYPE=library
 #export VERSIONDATE=20200612
 #export VERSION=1.6.1
 #export VERSIONDATE=20240506
-export VERSION=1.6.2
-export VERSIONDATE=20260506
+#export VERSION=1.6.2
+#export VERSIONDATE=20260506
+export VERSION=1.7.0
+export VERSIONDATE=20260912
 ####configure: error: cannot find library function socket
 wl-showstatus --package-version
 export DEPENDENCIES=
@@ -35,10 +37,15 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 tar xz --force-local -f $TARBALLDIR/$BASENAME/adns-$VERSION.tar.gz
 cd adns-$VERSION
-
-mkdir win32fix win32fix/sys win32fix/netinet win32fix/arpa
-echo "#include <winsock2.h>" > win32fix/sys/socket.h
-touch win32fix/netinet/in.h win32fix/arpa/inet.h win32fix/netdb.h
+# fix missing file
+mkdir -p win32fix/sys win32fix/netinet win32fix/arpa win32fix/net
+#echo "#include <winsock2.h>" > win32fix/sys/socket.h
+cat > win32fix/sys/socket.h << EOF
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define inet_aton(cp,inp) (inet_pton(AF_INET, (cp), (inp)) == 1)
+EOF
+touch win32fix/netinet/in.h win32fix/arpa/inet.h win32fix/netdb.h win32fix/net/if.h
 
 mv src/internal.h src/internal.h.bak
 cat > src/internal.h << EOF
@@ -55,11 +62,13 @@ cat src/internal.h.bak >> src/internal.h
 
 # workaround for socket detection
 sed -i.bak -e "s/-lsocket\|-lnsl\|-lresolv/-lws2_32/; s?^\(socket();\)?//\1?; s?^\(inet_ntoa();\)?//\1?; s?^\(inet_aton();\)?//\1?" configure
+# ignore not finding inet_aton()
+sed -i.bak2 -e "s/as_fn_error\(.*cannot find library function inet_aton\)/echo\1/" configure
 
 wl-showstatus configure &&
-./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I`pwd`/win32fix" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM CFLAGS="-I$PWD/win32fix" &&
  #make install-strip &&
- XCFLAGS="-I`pwd`/win32fix" make all install &&
+ XCFLAGS="-I$PWD/win32fix" make all install &&
     echo OK
 #mv settings.make settings.make.bak
 #sed -e "s?^\(CFLAGS=.*\)?\1 -I`pwd`/win32fix?" settings.make.bak > settings.make
