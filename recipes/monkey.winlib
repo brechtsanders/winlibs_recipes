@@ -36,6 +36,8 @@ export TYPE=application
 #export VERSIONDATE=20251224
 export VERSION=1.8.7
 export VERSIONDATE=20260410
+#export VERSION=1.8.10
+#export VERSIONDATE=20260920
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -339,6 +341,52 @@ patch -ulbf plugins/mandril/mandril.c << EOF
 EOF
 # fix missing file (version >= 1.8.3)
 cp -u include/monkey/mk_core.h include/
+## fix mk_bin/monkey.c (version >= 1.8.10)
+#patch -ulbf mk_bin/monkey.c << EOF
+#@@ -29,2 +29,5 @@
+# #include <unistd.h>
+#+#ifdef _WIN32
+#+#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
+#+#endif
+#
+#@@ -160,3 +163,7 @@
+#
+#+#ifdef _WIN32
+#+    len = GetModuleFileNameA(NULL, exe_path, PATH_MAX);
+#+#else
+#     len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+#+#endif
+#     if (len > 0) {
+#EOF
+## fix mk_core/CMakeLists.txt (version >= 1.8.10)
+#patch -ulbf mk_core/CMakeLists.txt << EOF
+#@@ -8,2 +8,3 @@
+#   mk_utils.c
+#+  mk_string.c
+#   )
+#EOF
+## fix plugins/dirlisting/CMakeLists.txt (version >= 1.8.10)
+#patch -ulbf plugins/dirlisting/CMakeLists.txt << EOF
+#@@ -2,2 +2,4 @@
+#   dirlisting.c
+#+  ../../mk_core/mk_string.c
+#+  ../../mk_server/mk_stream.c
+#   )
+#EOF
+## fix plugins/dirlisting/CMakeLists.txt (version >= 1.8.10)
+#patch -ulbf plugins/dirlisting/CMakeLists.txt << EOF
+#@@ -6,2 +6,8 @@
+#
+#-add_subdirectory(conf)
+#\\ No newline at end of file
+#+add_subdirectory(conf)
+#+
+#+if(IS_STATIC)
+#+  add_dependencies(monkey-dirlisting-static mk_core)
+#+else()
+#+  add_dependencies(monkey-dirlisting-shared mk_core)
+#+endif()
+#EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DMK_STATIC_LIB_MODE:BOOL=ON -DMK_MBEDTLS_SHARED:BOOL=OFF -DMK_PLUGIN_TLS:BOOL=OFF -DLIBEVENT_LIBRARIES:STRING= -DMK_TESTS:BOOL=OFF -S. -Bbuild_static &&
