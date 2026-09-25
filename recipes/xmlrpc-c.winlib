@@ -102,185 +102,6 @@
 
 
 
-export NAME="xmlrpc-c"
-export STATUS=
-export URL=https://github.com/ifm/xmlrpc-c
-export BASENAME=xmlrpc-c
-export DESCRIPTION="XML-RPC for C/C++ is programming libraries and related tools to help you write an XML-RPC server or client in C or C++."
-export CATEGORY=communication
-export TYPE=library
-export VERSION=1.33.14
-export VERSIONDATE=20201120
-wl-showstatus --package-version
-export DEPENDENCIES=libcurl,readline
-export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=cmake,ninja
-export OPTIONALBUILDDEPENDENCIES=
-export LICENSEFILE=
-export LICENSETYPE=BSD
-export DOWNLOADURL="https://sourceforge.net/projects/xmlrpc-c/files/Xmlrpc-c%20Super%20Stable/"
-#export DOWNLOADURL="https://github.com/ifm/xmlrpc-c/releases"
-export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-export DOWNLOADSOURCEURL=https://github.com/ifm/xmlrpc-c/archive/$VERSION-cmake.zip
-wl-showstatus download
-wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
-wl-wait4deps
-wl-showstatus extract
-unzip -oq $TARBALLDIR/$BASENAME/$VERSION-cmake.zip
-cd xmlrpc-c-$VERSION-cmake
-# fix redefined bool/true/false in lib/util/include/bool.h (version >= 1.33.14)
-patch -ulbf lib/util/include/bool.h << EOF
-@@ -11,2 +11,3 @@
- #define __bool_true_false_are_defined
-+#if !(defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L)
- typedef enum {
-@@ -16,2 +17,3 @@
- #endif
-+#endif
- #endif
-EOF
-# manually generate xmlrpc-c-config
-cat > xmlrpc-c-config << EOF
-#!/bin/sh
-PREFIX=\$(dirname \$(dirname \$0))
-HEADERINST_DIR=\$PREFIX/include
-LIBINST_DIR=\$PREFIX/lib
-$(sed -ne "s/^\(XMLRPC_.*_RELEASE\)\s*=\s*\(.*\)$/\1=\2/p" version.mk)
-EOF
-cat xmlrpc-c-config.main >> xmlrpc-c-config
-# fix link flag
-sed -i.bak -e "s/\(ws2_32\)\.lib/-l\1/" CMakeLists.txt
-# fix installing xmlrpc-c-config
-sed -i.bak2 -e "s/\(if(NOT \)WIN32/\1MSVC/" CMakeLists.txt
-mkdir -p build_win &&
- wl-showstatus configure &&
- #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
- #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"; fi)" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
- # fix link issue
- #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lws2_32/" build_win/build.ninja &&
- sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32 -lcurl/" build_win/build.ninja &&
- #wl-showstatus build &&
- #make -Cbuild_win &&
- wl-showstatus build-install &&
- ninja -Cbuild_win install/strip &&
- wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xmlrpc-c-$VERSION-cmake
-## fix also building static libraries
-#sed -i.bak -e "s/\(add_library\s*(.*\)\(SHARED\|STATIC\)/\1/" $(grep -l add_library $(find -name 'CMakeLists.txt' -or -name '*.cmake'))
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
-# ## fix execution of Python scripts
-# #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
-# #wl-showstatus build &&
-# #ninja -Cbuild_static &&
-# #wl-showstatus build &&
-# #ninja -Cbuild_shared &&
-# # fix link issue
-# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lws2_32/" build_*/build.ninja &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_static install/strip &&
-# wl-showstatus build-install &&
-# ninja -Cbuild_shared install/strip &&
-#    echo OK
-# #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xmlrpc-c-$VERSION-cmake
-####TO DO: also build static libraries
-
-
-
-cat > Makefile.mingw << EOF
-# Makefile to compile xmlrpc (client) with msys
-# Requires: libexpat
-
-prefix=/C/MinGW
-bindir= \$(prefix)/bin
-libdir= \$(prefix)/lib
-includedir = \$(prefix)/include
-
-CC   = ${CC:-gcc}
-LIBTOOL = libtool
-CFLAGS = \$(INCS) -O2 -Wall -mms-bitfields -D__GNUWIN32__ -DNDEBUG -DWIN32 -D_MBCS -D_LIB -DHAVE_EXPAT_H
-RM = rm -f
-
-LIBRARY = libxmlrpc.la
-STATIC_LIBRARY=libxmlrpc.a
-DLL = xmlrpc.dll
-DLL_LIBRARY = libxmlrpc.dll.a
-
-VSNFLAG = -version-info 7:0:4
-COMPILE = \$(CC) \$(CFLAGS) \$(DEFS) \$(INCLUDES)
-LTCOMPILE = \$(LIBTOOL) \$(LTFLAGS) --mode=compile \$(COMPILE)
-LINK_LIB = \$(LIBTOOL) \$(LTFLAGS) --mode=link \$(COMPILE) \$(LDFLAGS) -o \$@ -no-undefined \$(VSNFLAG) -rpath "\${prefix}/lib"
-
-LIBS = -lwininet -lexpat
-INCLUDES:=  -I"$(pwd)" -I. -Iinclude -Ilib/util/include -Ilib/wininet_transport
-
-LIB_HEADERS = \\
-$(echo -e '\t')include/xmlrpc-c/base.h \\
-$(echo -e '\t')include/xmlrpc-c/client.h \\
-$(echo -e '\t')include/xmlrpc-c/transport.h
-
-LIB_OBJS  = \\
-$(echo -e '\t')lib/util/casprintf.lo \\
-$(echo -e '\t')lib/util/pthreadx_win32.lo \\
-$(echo -e '\t')src/xmlrpc_array.lo \\
-$(echo -e '\t')src/xmlrpc_authcookie.lo \\
-$(echo -e '\t')src/xmlrpc_base64.lo \\
-$(echo -e '\t')src/xmlrpc_builddecomp.lo \\
-$(echo -e '\t')src/xmlrpc_client.lo \\
-$(echo -e '\t')src/xmlrpc_data.lo \\
-$(echo -e '\t')src/xmlrpc_datetime.lo \\
-$(echo -e '\t')src/xmlrpc_expat.lo \\
-$(echo -e '\t')src/xmlrpc_parse.lo \\
-$(echo -e '\t')src/xmlrpc_registry.lo \\
-$(echo -e '\t')src/xmlrpc_serialize.lo \\
-$(echo -e '\t')src/xmlrpc_struct.lo \\
-$(echo -e '\t')src/xmlrpc_strutil.lo \\
-$(echo -e '\t')src/xmlrpc_support.lo \\
-$(echo -e '\t')src/xmlrpc_utf8.lo \\
-$(echo -e '\t')lib/wininet_transport/xmlrpc_wininet_transport.lo
-
-all: \$(STATIC_LIBRARY) \$(LIBRARY) \$(DLL)
-
-clean:
-$(echo -e '\t')\${RM} \$(LIB_OBJS) \$(LIBRARY) \$(DLL) \$(DLL_LIBRARY)
-$(echo -e '\t')-rm -rf .libs
-$(echo -e '\t')-\${RM} src/*.o
-$(echo -e '\t')-\${RM} lib/util/*.o
-$(echo -e '\t')-\${RM} lib/util/wininet_transport/*.o
-
-install: \$(DLL) \$(LIBRARY) \$(STATIC_LIBRARY) \$(DLL_LIBRARY) \$(LIB_HEADERS)
-$(echo -e '\t')\$(LIBTOOL) --mode=install install -s \$(DLL) \$(bindir)
-$(echo -e '\t')\$(LIBTOOL) --mode=install install -s \$(LIBRARY) \$(STATIC_LIBRARY) \$(DLL_LIBRARY) \$(libdir)
-$(echo -e '\t')mkdir -p \$(includedir)/xmlrpc-c
-$(echo -e '\t')\$(LIBTOOL) --mode=install install -D \$(LIB_HEADERS) \$(includedir)/xmlrpc-c
-
-\$(LIBRARY): \$(LIB_OBJS)
-$(echo -e '\t')\$(LINK_LIB) \$(LIB_OBJS)
-
-\$(STATIC_LIBRARY): \$(LIBRARY)
-
-\$(DLL): \$(LIB_OBJS)
-$(echo -e '\t')\$(LIBTOOL) --mode=link gcc \$(CFLAGS) -shared -o \$(DLL) \$(LIB_OBJS) \$(LIBS) -Wl,--out-implib,\$(DLL_LIBRARY)
-
-\$(STATIC_LIBRARY): \$(LIB_OBJS)
-$(echo -e '\t')\$(LINK_LIB) \$(LIB_OBJS)
-
-.SUFFIXES: .c .lo .o
-
-.c.o:
-$(echo -e '\t')\$(COMPILE) -o \$@ -c \$<
-.c.lo:
-$(echo -e '\t')\$(LTCOMPILE) -o \$@ -c \$<
-
-.PHONY: all
-EOF
-
-
-
-
 #export NAME="xmlrpc-c"
 #export STATUS=
 #export URL=https://github.com/ifm/xmlrpc-c
@@ -288,106 +109,290 @@ EOF
 #export DESCRIPTION="XML-RPC for C/C++ is programming libraries and related tools to help you write an XML-RPC server or client in C or C++."
 #export CATEGORY=communication
 #export TYPE=library
-##export VERSION=1.54.05
-##export VERSIONDATE=20220328
-##export VERSION=1.54.06
-##export VERSIONDATE=20220925
-##export VERSION=1.59.02
-##export VERSIONDATE=20231227
-##export VERSION=1.59.03
-##export VERSIONDATE=20240326
-##export VERSION=1.60.04
-##export VERSIONDATE=20241227
-##export VERSION=1.60.05
-##export VERSIONDATE=20250329
-#export VERSION=1.64.04
-#export VERSIONDATE=20260925
+#export VERSION=1.33.14
+#export VERSIONDATE=20201120
 #wl-showstatus --package-version
-#export DEPENDENCIES=expat,openssl,libcurl,readline
+#export DEPENDENCIES=libcurl,readline
 #export OPTIONALDEPENDENCIES=
-##export OPTIONALDEPENDENCIES=libwww,abyss
 #export BUILDDEPENDENCIES=cmake,ninja
 #export OPTIONALBUILDDEPENDENCIES=
-#export LICENSEFILE=doc/COPYING
+#export LICENSEFILE=
 #export LICENSETYPE=BSD
 #export DOWNLOADURL="https://sourceforge.net/projects/xmlrpc-c/files/Xmlrpc-c%20Super%20Stable/"
+##export DOWNLOADURL="https://github.com/ifm/xmlrpc-c/releases"
 #export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
-#export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/xmlrpc-c/Xmlrpc-c%20Super%20Stable/$VERSION/$BASENAME-$VERSION.tgz
+#export DOWNLOADSOURCEURL=https://github.com/ifm/xmlrpc-c/archive/$VERSION-cmake.zip
 #wl-showstatus download
 #wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 #wl-wait4deps
 #wl-showstatus extract
-#tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
-#cd $BASENAME-$VERSION
-## fix include/xmlrpc-c/c_util.h (version >= 1.54.06)
-#patch -ulbf include/xmlrpc-c/c_util.h << EOF
-#@@ -25,4 +25,6 @@
-# */
-#-#if defined(XMLRPC_BUILD_DLL) && defined(_MSC_VER)
-#+#if defined(_WIN32) && defined(XMLRPC_BUILD_DLL) && !defined(XMLRPC_STATIC) && !defined(STATIC)
-# #define XMLRPC_DLLEXPORT __declspec(dllexport)
-#+#elif defined(_WIN32) && !defined(XMLRPC_STATIC) && !defined(STATIC)
-#+#define XMLRPC_DLLEXPORT __declspec(dllimport)
-# #else
-#EOF
-## fix lib/util/include/bool.h (version >= 1.64.04)
+#unzip -oq $TARBALLDIR/$BASENAME/$VERSION-cmake.zip
+#cd xmlrpc-c-$VERSION-cmake
+## fix redefined bool/true/false in lib/util/include/bool.h (version >= 1.33.14)
 #patch -ulbf lib/util/include/bool.h << EOF
-#@@ -11,2 +11,5 @@
+#@@ -11,2 +11,3 @@
 # #define __bool_true_false_are_defined
-#+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
-#+#include <stdbool.h>
-#+#else
+#+#if !(defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L)
 # typedef enum {
-#@@ -17,2 +20,3 @@
+#@@ -16,2 +17,3 @@
 # #endif
 #+#endif
-#
+# #endif
 #EOF
-#wl-showstatus configure &&
-# #mkdir -p m4 &&
-# ##intltoolize -f -c &&
-# #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
-# #./autogen.sh &&
-# #    echo OK
-# ## fix building DLLs on 64-bit
-# #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
-# # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
-# # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
-# #fi
-# #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
-# #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
-# #PYTHON=$PYDIR/python.exe 
-# #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
-# #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
-# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
-# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-libxml2-backend --disable-libwww-client --disable-abyss-server LDFLAGS="-Wl,--as-needed" LIBS="-lws2_32" &&
-# ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-libxml2-backend --disable-libwww-client --disable-abyss-server CFLAGS="-DXMLRPC_BUILD_DLL" CXXFLAGS="-DXMLRPC_BUILD_DLL" LDFLAGS="-Wl,--as-needed" LIBS="-lws2_32" &&
-# #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-libwww-ssl LDFLAGS="-Wl,--as-needed -lws2_32" &&
-# ## fix building DLLs
-# #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
-# ## fix detection of shared libraries
-# #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
-# #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
-# #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
-# wl-showstatus build &&
-# (
-#  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmlparse -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf" ||
-#  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf" ||
-#  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32 -L$PWD/lib/libutil -lxmlrpc_util -lxml2 -lcurl" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf" ||
-#  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32 -L$PWD/lib/libutil -lxmlrpc_util -lxmlrpc -lxml2 -lcurl" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf"
-#  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32 -L$PWD/src -L$PWD/lib/libutil -lxmlrpc_util -lxmlrpc -lxmlrpc_packetsocket -lxmlrpc_cpp -lxmlrpc_server -lxmlrpc_client -L$PWD/cpp -L$PWD/lib/libutil++ -lxmlrpc_util++ -lxmlrpc++ -lxmlrpc_server++ -lxmlrpc_client++ -lxmlrpc_server_pstream++ -lxml2 -lcurl" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf"
-# ) &&
-# make \
-#  CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" \
-#  CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" \
-#  LIBDEP="-Wl,--as-needed -lxml2 -lcurl -lws2_32 $(for F in $(ls -rt $(find -name 'lib*.dll.a')); do echo $F|sed -e "s?\(.*\)/lib\([^/]*\)\.dll\.a?-L\1 -l\2?"; done)" \
-#  LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" \
-#  LN_S="echo cp -rf" &&
+## manually generate xmlrpc-c-config
+#cat > xmlrpc-c-config << EOF
+##!/bin/sh
+#PREFIX=\$(dirname \$(dirname \$0))
+#HEADERINST_DIR=\$PREFIX/include
+#LIBINST_DIR=\$PREFIX/lib
+#$(sed -ne "s/^\(XMLRPC_.*_RELEASE\)\s*=\s*\(.*\)$/\1=\2/p" version.mk)
+#EOF
+#cat xmlrpc-c-config.main >> xmlrpc-c-config
+## fix link flag
+#sed -i.bak -e "s/\(ws2_32\)\.lib/-l\1/" CMakeLists.txt
+## fix installing xmlrpc-c-config
+#sed -i.bak2 -e "s/\(if(NOT \)WIN32/\1MSVC/" CMakeLists.txt
+#mkdir -p build_win &&
+# wl-showstatus configure &&
+# #PKG_CONFIG= cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
+# #cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_win &&
+# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -DCMAKE_C_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"; fi)" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -S. -Bbuild_win &&
+# # fix link issue
+# #sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lws2_32/" build_win/build.ninja &&
+# sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -Wl,--as-needed -lws2_32 -lcurl/" build_win/build.ninja &&
+# #wl-showstatus build &&
+# #make -Cbuild_win &&
 # wl-showstatus build-install &&
-# make install LN_S="echo cp -rf" &&
-# mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
-#    echo OK
-## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xmlrpc-c-$VERSION-cmake
+# ninja -Cbuild_win install/strip &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xmlrpc-c-$VERSION-cmake
+### fix also building static libraries
+##sed -i.bak -e "s/\(add_library\s*(.*\)\(SHARED\|STATIC\)/\1/" $(grep -l add_library $(find -name 'CMakeLists.txt' -or -name '*.cmake'))
+##mkdir -p build_static build_shared &&
+## wl-showstatus configure &&
+## cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_static &&
+## wl-showstatus configure &&
+## cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DENABLE_CPLUSPLUS:BOOL=ON -DMUST_BUILD_CURL_CLIENT:BOOL=ON -DMUST_BUILD_LIBWWW_CLIENT:BOOL=OFF -DMUST_BUILD_WININET_CLIENT:BOOL=OFF -DENABLE_EXAMPLES:BOOL=OFF -S. -Bbuild_shared &&
+## ## fix execution of Python scripts
+## #sed -i.bak -e "s?\(COMMAND\|POST_BUILD\)\( *=.*\&\& *\)\([^ ]*\)\(\.py\|glib-mkenums\|g-ir-scanner\)\( \)?\1\2$(echo $PYDIR/python.exe|sed -e "s?^/\([a-zA-Z]\)/?\1:\\\\\\\\?; s?/?\\\\\\\\?g") \3\4\5?" build_*/build.ninja &&
+## #wl-showstatus build &&
+## #ninja -Cbuild_static &&
+## #wl-showstatus build &&
+## #ninja -Cbuild_shared &&
+## # fix link issue
+## sed -i.bak -e "s/^\s*LINK_LIBRARIES\s*=.*-ladvapi32/& -lws2_32/" build_*/build.ninja &&
+## wl-showstatus build-install &&
+## ninja -Cbuild_static install/strip &&
+## wl-showstatus build-install &&
+## ninja -Cbuild_shared install/strip &&
+##    echo OK
+## #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xmlrpc-c-$VERSION-cmake
+#####TO DO: also build static libraries
+#
+#
+#
+#cat > Makefile.mingw << EOF
+## Makefile to compile xmlrpc (client) with msys
+## Requires: libexpat
+#
+#prefix=/C/MinGW
+#bindir= \$(prefix)/bin
+#libdir= \$(prefix)/lib
+#includedir = \$(prefix)/include
+#
+#CC   = ${CC:-gcc}
+#LIBTOOL = libtool
+#CFLAGS = \$(INCS) -O2 -Wall -mms-bitfields -D__GNUWIN32__ -DNDEBUG -DWIN32 -D_MBCS -D_LIB -DHAVE_EXPAT_H
+#RM = rm -f
+#
+#LIBRARY = libxmlrpc.la
+#STATIC_LIBRARY=libxmlrpc.a
+#DLL = xmlrpc.dll
+#DLL_LIBRARY = libxmlrpc.dll.a
+#
+#VSNFLAG = -version-info 7:0:4
+#COMPILE = \$(CC) \$(CFLAGS) \$(DEFS) \$(INCLUDES)
+#LTCOMPILE = \$(LIBTOOL) \$(LTFLAGS) --mode=compile \$(COMPILE)
+#LINK_LIB = \$(LIBTOOL) \$(LTFLAGS) --mode=link \$(COMPILE) \$(LDFLAGS) -o \$@ -no-undefined \$(VSNFLAG) -rpath "\${prefix}/lib"
+#
+#LIBS = -lwininet -lexpat
+#INCLUDES:=  -I"$(pwd)" -I. -Iinclude -Ilib/util/include -Ilib/wininet_transport
+#
+#LIB_HEADERS = \\
+#$(echo -e '\t')include/xmlrpc-c/base.h \\
+#$(echo -e '\t')include/xmlrpc-c/client.h \\
+#$(echo -e '\t')include/xmlrpc-c/transport.h
+#
+#LIB_OBJS  = \\
+#$(echo -e '\t')lib/util/casprintf.lo \\
+#$(echo -e '\t')lib/util/pthreadx_win32.lo \\
+#$(echo -e '\t')src/xmlrpc_array.lo \\
+#$(echo -e '\t')src/xmlrpc_authcookie.lo \\
+#$(echo -e '\t')src/xmlrpc_base64.lo \\
+#$(echo -e '\t')src/xmlrpc_builddecomp.lo \\
+#$(echo -e '\t')src/xmlrpc_client.lo \\
+#$(echo -e '\t')src/xmlrpc_data.lo \\
+#$(echo -e '\t')src/xmlrpc_datetime.lo \\
+#$(echo -e '\t')src/xmlrpc_expat.lo \\
+#$(echo -e '\t')src/xmlrpc_parse.lo \\
+#$(echo -e '\t')src/xmlrpc_registry.lo \\
+#$(echo -e '\t')src/xmlrpc_serialize.lo \\
+#$(echo -e '\t')src/xmlrpc_struct.lo \\
+#$(echo -e '\t')src/xmlrpc_strutil.lo \\
+#$(echo -e '\t')src/xmlrpc_support.lo \\
+#$(echo -e '\t')src/xmlrpc_utf8.lo \\
+#$(echo -e '\t')lib/wininet_transport/xmlrpc_wininet_transport.lo
+#
+#all: \$(STATIC_LIBRARY) \$(LIBRARY) \$(DLL)
+#
+#clean:
+#$(echo -e '\t')\${RM} \$(LIB_OBJS) \$(LIBRARY) \$(DLL) \$(DLL_LIBRARY)
+#$(echo -e '\t')-rm -rf .libs
+#$(echo -e '\t')-\${RM} src/*.o
+#$(echo -e '\t')-\${RM} lib/util/*.o
+#$(echo -e '\t')-\${RM} lib/util/wininet_transport/*.o
+#
+#install: \$(DLL) \$(LIBRARY) \$(STATIC_LIBRARY) \$(DLL_LIBRARY) \$(LIB_HEADERS)
+#$(echo -e '\t')\$(LIBTOOL) --mode=install install -s \$(DLL) \$(bindir)
+#$(echo -e '\t')\$(LIBTOOL) --mode=install install -s \$(LIBRARY) \$(STATIC_LIBRARY) \$(DLL_LIBRARY) \$(libdir)
+#$(echo -e '\t')mkdir -p \$(includedir)/xmlrpc-c
+#$(echo -e '\t')\$(LIBTOOL) --mode=install install -D \$(LIB_HEADERS) \$(includedir)/xmlrpc-c
+#
+#\$(LIBRARY): \$(LIB_OBJS)
+#$(echo -e '\t')\$(LINK_LIB) \$(LIB_OBJS)
+#
+#\$(STATIC_LIBRARY): \$(LIBRARY)
+#
+#\$(DLL): \$(LIB_OBJS)
+#$(echo -e '\t')\$(LIBTOOL) --mode=link gcc \$(CFLAGS) -shared -o \$(DLL) \$(LIB_OBJS) \$(LIBS) -Wl,--out-implib,\$(DLL_LIBRARY)
+#
+#\$(STATIC_LIBRARY): \$(LIB_OBJS)
+#$(echo -e '\t')\$(LINK_LIB) \$(LIB_OBJS)
+#
+#.SUFFIXES: .c .lo .o
+#
+#.c.o:
+#$(echo -e '\t')\$(COMPILE) -o \$@ -c \$<
+#.c.lo:
+#$(echo -e '\t')\$(LTCOMPILE) -o \$@ -c \$<
+#
+#.PHONY: all
+#EOF
+
+
+
+
+export NAME="xmlrpc-c"
+export STATUS=
+export URL=https://github.com/ifm/xmlrpc-c
+export BASENAME=xmlrpc-c
+export DESCRIPTION="XML-RPC for C/C++ is programming libraries and related tools to help you write an XML-RPC server or client in C or C++."
+export CATEGORY=communication
+export TYPE=library
+#export VERSION=1.54.05
+#export VERSIONDATE=20220328
+#export VERSION=1.54.06
+#export VERSIONDATE=20220925
+#export VERSION=1.59.02
+#export VERSIONDATE=20231227
+#export VERSION=1.59.03
+#export VERSIONDATE=20240326
+#export VERSION=1.60.04
+#export VERSIONDATE=20241227
+#export VERSION=1.60.05
+#export VERSIONDATE=20250329
+export VERSION=1.64.04
+export VERSIONDATE=20260925
+wl-showstatus --package-version
+export DEPENDENCIES=expat,openssl,libcurl,readline
+export OPTIONALDEPENDENCIES=
+#export OPTIONALDEPENDENCIES=libwww,abyss
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=doc/COPYING
+export LICENSETYPE=BSD
+export DOWNLOADURL="https://sourceforge.net/projects/xmlrpc-c/files/Xmlrpc-c%20Super%20Stable/"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://downloads.sourceforge.net/project/xmlrpc-c/Xmlrpc-c%20Super%20Stable/$VERSION/$BASENAME-$VERSION.tgz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/$BASENAME-$VERSION.tgz
+cd $BASENAME-$VERSION
+# fix include/xmlrpc-c/c_util.h (version >= 1.54.06)
+patch -ulbf include/xmlrpc-c/c_util.h << EOF
+@@ -25,4 +25,6 @@
+ */
+-#if defined(XMLRPC_BUILD_DLL) && defined(_MSC_VER)
++#if defined(_WIN32) && defined(XMLRPC_BUILD_DLL) && !defined(XMLRPC_STATIC) && !defined(STATIC)
+ #define XMLRPC_DLLEXPORT __declspec(dllexport)
++#elif defined(_WIN32) && !defined(XMLRPC_STATIC) && !defined(STATIC)
++#define XMLRPC_DLLEXPORT __declspec(dllimport)
+ #else
+EOF
+# fix lib/util/include/bool.h (version >= 1.64.04)
+patch -ulbf lib/util/include/bool.h << EOF
+@@ -11,2 +11,5 @@
+ #define __bool_true_false_are_defined
++#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
++#include <stdbool.h>
++#else
+ typedef enum {
+@@ -17,2 +20,3 @@
+ #endif
++#endif
+
+EOF
+wl-showstatus configure &&
+ #mkdir -p m4 &&
+ ##intltoolize -f -c &&
+ #autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal &&
+ #./autogen.sh &&
+ #    echo OK
+ ## fix building DLLs on 64-bit
+ #if ( echo $RUNPLATFORM | grep -q x86_64 ); then
+ # echo "AM_GNU_GETTEXT_VERSION([$(gettext --version|head -n1|sed -e "s/^.* \([0-9\.]*\) *$/\1/")])" >> configure.ac &&
+ # autoreconf -f -i -I m4 -I $MINGWPREFIX/share/aclocal
+ #fi
+ #PATH=$PATH:$PERLDIR/../c/bin INTLTOOL_PERL="$PERLDIR/bin/perl.exe" 
+ #PERL="$PERLDIR/bin/perl.exe -I$PERLDIR/lib" 
+ #PYTHON=$PYDIR/python.exe 
+ #PYTHON=$PYDIR/python.exe C_INCLUDE_PATH=$C_INCLUDE_PATH:$PYDIR/include 
+ #PKG_CONFIG_PATH=$MINGWPREFIX/libav/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} 
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --enable-shared --enable-static --host=$RUNPLATFORM LDFLAGS="-Wl,-no-undefined -Wl,--as-needed" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-libxml2-backend --disable-libwww-client --disable-abyss-server LDFLAGS="-Wl,--as-needed" LIBS="-lws2_32" &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-libxml2-backend --disable-libwww-client --disable-abyss-server CFLAGS="-DXMLRPC_BUILD_DLL -I$PWD/lib/util/include" CXXFLAGS="-DXMLRPC_BUILD_DLL" LDFLAGS="-Wl,--as-needed" LIBS="-lws2_32" &&
+ #--with-libwww-ssl 
+ ## fix building DLLs
+ #sed -i.bak -e "s/\(allow_undefined=\)yes/\1no/" libtool &&
+ ## fix detection of shared libraries
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1file_magic ^x86 archive import|^x86 DLL|PE32+* executable (DLL)|pe-i386|pe-x86-64/; s/'file format pe-i386[^']*'/\"\$deplibs_check_method\"/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1none/" libtool &&
+ #sed -i.bak2 -e "s/\(deplibs_check_method=\"\)[^\"]*/\1pass_all/" libtool &&
+ wl-showstatus build &&
+ (
+  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmlparse -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf" ||
+  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf" ||
+  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32 -L$PWD/lib/libutil -lxmlrpc_util -lxml2 -lcurl" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf" ||
+  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32 -L$PWD/lib/libutil -lxmlrpc_util -lxmlrpc -lxml2 -lcurl" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf" ||
+  make CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" LIBDEP="-Wl,--as-needed -lws2_32 -L$PWD/src -L$PWD/lib/libutil -L$PWD/src/cpp -lxmlrpc_util -lxmlrpc -lxmlrpc_packetsocket -lxmlrpc_cpp -lxmlrpc_server -lxmlrpc_client -L$PWD/cpp -L$PWD/lib/libutil++ -lxmlrpc_util++ -lxmlrpc++ -lxmlrpc_server++ -lxmlrpc_client++ -lxmlrpc_server_pstream++ -lxml2 -lcurl" LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" LN_S="echo cp -rf"
+ ) &&
+ make \
+  CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" \
+  CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" \
+  LIBDEP="-Wl,--as-needed -L$PWD/src -L$PWD/lib/libutil -L$PWD/src/cpp -lxmlrpc -lxml2 -lcurl -lws2_32 $(for F in $(ls -rt $(find -name 'lib*.dll.a')); do echo $F|sed -e "s?\(.*\)/lib\([^/]*\)\.dll\.a?-L\1 -l\2?"; done)" \
+  LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" \
+  LN_S="echo cp -rf" &&
+ wl-showstatus build-install &&
+ #make install LN_S="echo cp -rf" &&
+ make install \
+  CC="${CC:-gcc} -I$PWD/lib/util/include -I$PWD/lib/expat/xmltok -I$PWD/include -I$PWD" \
+  CXX="${CXX:-g++} -I$PWD/lib/util/include -I$PWD/include -I$PWD" \
+  LIBDEP="-Wl,--as-needed -L$PWD/src -L$PWD/lib/libutil -L$PWD/src/cpp -lxmlrpc -lxml2 -lcurl -lws2_32 $(for F in $(ls -rt $(find -name 'lib*.dll.a')); do echo $F|sed -e "s?\(.*\)/lib\([^/]*\)\.dll\.a?-L\1 -l\2?"; done)" \
+  LDFLAGS_SHLIB="-s -shared -Wl,--out-implib,\$(SONAME).a \$(SHLIB_CLIB)" \
+  LN_S="echo cp -rf" &&
+ mv -f $INSTALLPREFIX/lib/*.dll $INSTALLPREFIX/bin/ &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf xmlrpc-c-$VERSION-cmake
 
 
 
