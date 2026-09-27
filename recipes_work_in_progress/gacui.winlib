@@ -91,8 +91,10 @@ export TYPE=library
 #export VERSIONDATE=20260831
 #export VERSION=1.4.1.1
 #export VERSIONDATE=20260904
-export VERSION=1.4.1.2
-export VERSIONDATE=20260912
+#export VERSION=1.4.1.2
+#export VERSIONDATE=20260912
+export VERSION=1.4.1.3
+export VERSIONDATE=20260927
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -110,11 +112,19 @@ wl-showstatus extract
 mkdir -p $BASENAME-$VERSION
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz -C$BASENAME-$VERSION
 cd $BASENAME-$VERSION/Release-$VERSION
+# fix Import/Vlpp.h (version >= 1.4.1.3)
+patch -ulbf Import/Vlpp.h << EOF
+@@ -30,3 +30,3 @@
+
+-#if defined _MSC_VER
++#if defined _WIN32
+ #define VCZH_MSVC
+EOF
 wl-showstatus build &&
  touch SUCCESS &&
  for F in Import/*.cpp; do
   echo CXX $F
-  ${CXX:-g++} -c -o $F.o $F -std=c++17 || ( rm -f SUCCESS; false ) || break
+  ${CXX:-g++} -c -o $F.o $F -std=c++17 -D_MSC_VER -Wno-error=template-body || ( rm -f SUCCESS; false ) || break
   #-municode 
  done &&
  ls -1 SUCCESS &> /dev/null &&
@@ -123,22 +133,16 @@ wl-showstatus build &&
 
 
 
-# fix undefined cmake_dependent_option
-mv Import/CMakeLists.txt Import/CMakeLists.txt.bak &&
-echo "include(CMakeDependentOption)" > Import/CMakeLists.txt &&
-cat Import/CMakeLists.txt.bak >> Import/CMakeLists.txt
+# fix undefined cmake_dependent_option in Import/CMakeLists.txt
+sed -i.bak -e "1i include(CMakeDependentOption)" Import/CMakeLists.txt
 
-mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -SImport -Bbuild_test -LH && echo OK; rm -rf build_test
+mkdir -p build_test && cmake.exe -G"MSYS Makefiles" -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -SImport -Bbuild_test -LH && echo OK; rm -rf build_test
 
 export BUILDDEPENDENCIES=cmake,ninja
 
-# fix Import/CMakeLists.txt (version >= 1.2.5.0)
-mv Import/CMakeLists.txt Import/CMakeLists.txt.bak &&
-echo "include(CMakeDependentOption)" > Import/CMakeLists.txt &&
-cat Import/CMakeLists.txt.bak >> Import/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -SImport -Bbuild_win &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -SImport -Bbuild_win &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
     echo OK
