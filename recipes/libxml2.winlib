@@ -450,6 +450,22 @@ if [ "$PYDIR" != "$PY2DIR" ]; then
  (( grep -q Py_InitModule4_64 py2libs/python2.def && echo "Py_InitModule4 = Py_InitModule4_64" >> py2libs/python2.def ) || true ) &&
  ${DLLTOOL:-dlltool} -D $PY2DIR/python[0-9][0-9]*.dll -d py2libs/python2.def -l py2libs/libpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p").dll.a
 fi
+# allow building without doxygen in python/generator.py (version >= 2.15.4)
+patch -ulbf python/generator.py << EOF
+@@ -359,3 +359,3 @@
+     if not os.path.isdir(xmlDocDir):
+-        raise Exception('Doxygen XML not found in %s' % dstPref)
++        xmlDocDir = "../doc"
+
+EOF
+# allow building without doxygen in configure.ac (version >= 2.15.4)
+patch -ulbf configure.ac << EOF
+@@ -588,3 +588,3 @@
+
+-if test "\$with_python" = "yes" || test "\$with_docs" = "yes"; then
++if test "\$with_docs" = "yes"; then
+     AC_PATH_PROG(DOXYGEN, doxygen, [no])
+EOF
 ## fix linking to Python
 #sed -i.bak -e "s/python2.[0-9]/$(ls -1 $PYDIR/libs/libpython[0-9][0-9]*.a|sed -e "s/^.*\(python[0-9]*\).*$/\1/")/" configure
 ##; s?\(PYTHON_LIBS=\)\$(python\$PYTHON_VERSION-config --ldflags\)?\1-Wl,--as-needed -Wl,--enable-auto-import -L$(pwd)/python -l$(ls -1 $PY2DIR/libs/libpython[0-9][0-9]*.a|sed -e "s/^.*\(python[0-9]*\).*$/\1/")
@@ -474,7 +490,7 @@ wl-showstatus preconfigure &&
  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --without-icu --with-python=$PYDIR CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python PYTHON=$PYDIR/python.exe PYTHON_CFLAGS="-I$PYDIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
  #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --with-thread-alloc --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python PYTHON=$PYDIR/python.exe PYTHON_CFLAGS="-I$PYDIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
- ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --with-thread-alloc --with-writer --with-zlib --without-icu --with-http --with-python --with-python_prefix=$INSTALLPREFIX/python PYTHON=$PYDIR/python.exe PYTHON_CFLAGS="-I$PYDIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
+ ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --with-thread-alloc --with-writer --with-zlib --without-icu --with-http $(if doxygen --version &> /dev/null; then echo "--with-docs"; else echo "--without-docs"; fi) --with-python --with-python_prefix=$INSTALLPREFIX/python PYTHON=$PYDIR/python.exe PYTHON_CFLAGS="-I$PYDIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
  #--with-icu 
  #--with-legacy 
  #CFLAGS="-I$PYDIR/include" LDFLAGS="-Wl,--enable-auto-import"
@@ -492,7 +508,7 @@ wl-showstatus preconfigure &&
   #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python2 PYTHON=$PY2DIR/python.exe PYTHON_CFLAGS="-I$PY2DIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
   #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python2 PYTHON=$PY2DIR/python.exe PYTHON_CFLAGS="-I$PY2DIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PY2DIR/include -Wno-implicit-function-declaration" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
   #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --with-thread-alloc --with-writer --with-zlib --without-icu --with-python --with-python_prefix=$INSTALLPREFIX/python2 PYTHON=$PY2DIR/python.exe PYTHON_CFLAGS="-I$PY2DIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PY2DIR/include -Wno-implicit-function-declaration" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
-  ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --with-thread-alloc --with-writer --with-zlib --without-icu --with-http --with-python --with-python_prefix=$INSTALLPREFIX/python2 PYTHON=$PY2DIR/python.exe PYTHON_CFLAGS="-I$PY2DIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PY2DIR/include -Wno-implicit-function-declaration" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
+  ../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --enable-static --enable-shared --with-threads --with-thread-alloc --with-writer --with-zlib --without-icu --with-http --without-docs --with-python --with-python_prefix=$INSTALLPREFIX/python2 PYTHON=$PY2DIR/python.exe PYTHON_CFLAGS="-I$PY2DIR/include" PYTHON_LIBS="-L$PWD/../pylibs -lpython$($PY2DIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" CFLAGS="-I$PY2DIR/include -Wno-implicit-function-declaration" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
   #../configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM --with-writer --with-zlib --with-icu --with-python=$PY2DIR CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,-no-undefined -Wl,--enable-auto-import" &&
   #--without-docs 
   #CFLAGS="-I$PY2DIR/include" LDFLAGS="-Wl,--enable-auto-import"
@@ -507,7 +523,7 @@ wl-showstatus preconfigure &&
  fi &&
  wl-showstatus build-install &&
  # fix missing html.stamp (version >= 2.15.1)
- make -Cbuild_win/doc html.stamp &&
+ ( make -Cbuild_win/doc html.stamp || touch build_win/doc/html.stamp ) &&
  #PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" &&
  #PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) &&
  PATH=$PYDIR:$PATH make -Cbuild_win install-strip PYTHON_VERSION=$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p") PYTHON_SITE_PACKAGES=$INSTALLPREFIX/python/Lib/site-packages PYLDFLAGS="-s -L$(pwd)/pylibs -lpython$($PYDIR/python.exe --version 2>&1|sed -ne "s/^Python \([0-9][0-9]*\)\.\([0-9][0-9]*\).*$/\1.\2/p")" $(if ! gcc --help -v 2>/dev/null | grep -q " --version-script"; then echo "LIBXML2_VERSION_SCRIPT="; fi) pythondir=$INSTALLPREFIX/python/Lib/site-packages pyexecdir=$INSTALLPREFIX/python/Lib/site-packages &&
@@ -522,7 +538,7 @@ wl-showstatus preconfigure &&
  if [ -f PY2_CONFIGURED ]; then
   wl-showstatus build-install &&
   # fix missing html.stamp (version >= 2.15.0)
-  make -Cbuild_win_py2/doc html.stamp &&
+  ( make -Cbuild_win_py2/doc html.stamp || touch build_win_py2/doc/html.stamp ) &&
   ## fix python/generator.py (version >= 2.15.2)
   #sed -i.bak -e "s/^\([^']*\)f\('\)/\1\2/" python/generator.py &&
   cp build_win/libxml2.la build_win_py2/ &&
