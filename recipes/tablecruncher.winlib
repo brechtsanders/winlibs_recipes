@@ -25,6 +25,31 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
+# fix src/helper.cpp (version >= 1.8.1)
+patch -ulbf src/helper.cpp << EOF
+@@ -650,3 +650,3 @@
+                if (hModule != NULL) {
+-               GetModuleFileName(hModule, own_path, MAX_PATH);
++               GetModuleFileNameA(hModule, own_path, MAX_PATH);
+                        cpp_path = own_path;
+@@ -801,3 +801,3 @@
+ void Helper::openInputStream(std::ifstream& stream, const std::string& utf8Path, std::ios_base::openmode mode) {
+-#ifdef _WIN64
++#if defined(_WIN64) && !defined(__MINGW32__)
+        stream.open(utf8_to_ws(utf8Path), mode);
+@@ -810,3 +810,3 @@
+ void Helper::openOutputStream(std::ofstream& stream, const std::string& utf8Path, std::ios_base::openmode mode) {
+-#ifdef _WIN64
++#if defined(_WIN64) && !defined(__MINGW32__)
+        stream.open(utf8_to_ws(utf8Path), mode);
+EOF
+# fix missing wWinMain in src/main.cpp
+cat >> src/main.cpp << EOF
+int WINAPI wWinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nShowCmd)
+{
+    return WinMain(hInstance, hPrevInstance, GetCommandLineA(), nShowCmd);
+}
+EOF
 # fix CMakeLists.txt (version >= 1.8.1)
 patch -ulbf CMakeLists.txt << EOF
 @@ -72,3 +72,3 @@
@@ -45,9 +70,12 @@ mkdir -p build_win &&
  wl-showstatus build &&
  ninja -Cbuild_win &&
  wl-showstatus build-install &&
- ninja -Cbuild_win install/strip &&
-    echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+ strip build_win/dist/*.exe &&
+ mkdir -p $INSTALLPREFIX/bin &&
+ cp -f build_win/dist/*.exe $INSTALLPREFIX/bin/ &&
+ #ninja -Cbuild_win install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+####$MINGWPREFIX/bin/Tablecruncher.exe
 
 
 
