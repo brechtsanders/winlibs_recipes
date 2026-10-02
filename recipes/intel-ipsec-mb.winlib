@@ -1,3 +1,92 @@
+#export NAME="intel-ipsec-mb"
+#export STATUS=
+#export URL=https://github.com/intel/intel-ipsec-mb
+#export BASENAME=intel-ipsec-mb
+#export DESCRIPTION="Intel(R) Multi-Buffer Crypto for IPsec Library is highly-optimized software implementations of the core cryptographic processing for IPsec, which provides industry-leading performance on a range of Intel(R) Processors."
+#export CATEGORY=security
+#export TYPE=library
+##export VERSION=0.55
+##export VERSIONDATE=20201203
+##export VERSION=1.0
+##export VERSIONDATE=20210506
+##export VERSION=1.1
+##export VERSIONDATE=20211030
+##export VERSION=1.2
+##export VERSIONDATE=20220222
+##export VERSION=1.3
+##export VERSIONDATE=20220927
+##export VERSION=1.4
+##export VERSIONDATE=20230615
+#export VERSION=1.5
+#export VERSIONDATE=20231108
+##export VERSION=2.0
+##export VERSIONDATE=20241102
+##export VERSION=3.0.0
+##export VERSIONDATE=20261002
+#wl-showstatus --package-version
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=LICENSE
+#export LICENSETYPE=BSD
+#export DOWNLOADURL="https://github.com/intel/intel-ipsec-mb/releases/"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/intel/intel-ipsec-mb/archive/v$VERSION.tar.gz
+##export DOWNLOADSOURCEURL=https://github.com/intel/intel-ipsec-mb/archive/refs/tags/v$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix lib/intel-ipsec-mb.h
+#patch -ulbf lib/intel-ipsec-mb.h << EOF
+#@@ -47,3 +47,3 @@
+#  */
+#-#if defined __linux__ || defined __FreeBSD__
+#+#if defined __linux__ || defined __FreeBSD__ || defined __MINGW32__
+# /* Linux/FreeBSD */
+#EOF
+## fix missing ALL_PROCESSOR_GROUPS in perf/ipsec_perf.c
+#patch -ulbf perf/ipsec_perf.c << EOF
+#@@ -38,2 +38,3 @@
+# #include <windows.h>
+#+#include <ntdef.h>
+# #include <process.h>
+#EOF
+## fix Linux defines
+##sed -i.bak -e "s/-DLINUX/-DWIN_ABI/; s/-D__linux__//; s/ -z / /g" */Makefile
+##sed -i.bak -e "s/-DLINUX//; s/-D__linux__//; s/-z \(noexecstack\|relro\|now\) //g" */Makefile
+##sed -i.bak -e "s/-DLINUX/-DWIN_ABI/; s/-D__linux__//; s/-z \(noexecstack\)/-fno-stack-protector -Wl,-z,\1/; s/-z \(relro\|now\)/-Wl,-z,\1/g" */Makefile
+#sed -i.bak -e "s/-DLINUX//; s/-D__linux__//; s/-z \([^ ]*\)//g" */Makefile
+##sed -i.bak -e "s/-DLINUX//; s/-D__linux__//; s/-z noexecstack/-fno-stack-protector/; s/-z \([^ ]*\)//g" */Makefile
+## fix invalid linker option -lc in lib/Makefile
+#sed -i.bak2 -e "s/-lc/-fstack-protector/; s/-Wl,-soname,[^ ]*/-s -Wl,--out-implib,\$@.a/; s/\(ln -f -s\|ldconfig\)/echo SKIPPING: &/" lib/Makefile
+## fix invalid linker option -z in lib/Makefile (version >= 1.0)
+#sed -i.bak3 -e "s/-Wl,-z,[^ ]*//g" lib/Makefile
+## avoid -fPIC (useless on Windows and not supported by clang) in lib/Makefile
+#sed -i.bak4 -e "s/-fPIC//" lib/Makefile
+#wl-showstatus build &&
+# make -Clib SHARED=y LIBNAME=libIPSec_MB.dll CC="${CC:-gcc}" &&
+# # manually build .dll.a file if missing
+# ( ls -1 lib/libIPSec_MB.dll.a &> /dev/null || dlltool -l lib/libIPSec_MB.dll.a -D lib/libIPSec_MB.dll -d lib/libIPSec_MB.def ) &&
+# make -Clib SHARED=n CC="${CC:-gcc}" &&
+# #make CC="${CC:-gcc} -fstack-protector" &&
+# #make CC="${CC:-gcc}" -Cperf LDFLAGS="-fstack-protector -pthread -L$(pwd)/lib" &&
+# #PATH=$(pwd)/lib:$PATH perf/ipsec_perf.exe &&
+# #make CC="${CC:-gcc}" &&
+# wl-showstatus install &&
+# make -Clib install CC="${CC:-gcc}" SHARED=n PREFIX=$INSTALLPREFIX &&
+# mkdir -p $INSTALLPREFIX/bin &&
+# mv -f lib/*.dll $INSTALLPREFIX/bin/ &&
+# cp -f lib/*.dll.a lib/*.def $INSTALLPREFIX/lib/ &&
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+#####TO DO: ipsec_perf crashes
+#####TO DO: build fails on 32-bit
+
+
+
 export NAME="intel-ipsec-mb"
 export STATUS=
 export URL=https://github.com/intel/intel-ipsec-mb
@@ -5,28 +94,12 @@ export BASENAME=intel-ipsec-mb
 export DESCRIPTION="Intel(R) Multi-Buffer Crypto for IPsec Library is highly-optimized software implementations of the core cryptographic processing for IPsec, which provides industry-leading performance on a range of Intel(R) Processors."
 export CATEGORY=security
 export TYPE=library
-#export VERSION=0.55
-#export VERSIONDATE=20201203
-#export VERSION=1.0
-#export VERSIONDATE=20210506
-#export VERSION=1.1
-#export VERSIONDATE=20211030
-#export VERSION=1.2
-#export VERSIONDATE=20220222
-#export VERSION=1.3
-#export VERSIONDATE=20220927
-#export VERSION=1.4
-#export VERSIONDATE=20230615
-export VERSION=1.5
-export VERSIONDATE=20231108
-#export VERSION=2.0
-#export VERSIONDATE=20241102
-#export VERSION=3.0.0
-#export VERSIONDATE=20261002
+export VERSION=3.0.0
+export VERSIONDATE=20261002
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
-export BUILDDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
 export OPTIONALBUILDDEPENDENCIES=
 export LICENSEFILE=LICENSE
 export LICENSETYPE=BSD
@@ -40,61 +113,28 @@ wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
 cd $BASENAME-$VERSION
-# fix lib/intel-ipsec-mb.h
-patch -ulbf lib/intel-ipsec-mb.h << EOF
-@@ -47,3 +47,3 @@
-  */
--#if defined __linux__ || defined __FreeBSD__
-+#if defined __linux__ || defined __FreeBSD__ || defined __MINGW32__
- /* Linux/FreeBSD */
-EOF
-# fix missing ALL_PROCESSOR_GROUPS in perf/ipsec_perf.c
-patch -ulbf perf/ipsec_perf.c << EOF
-@@ -38,2 +38,3 @@
- #include <windows.h>
-+#include <ntdef.h>
- #include <process.h>
-EOF
-# fix Linux defines
-#sed -i.bak -e "s/-DLINUX/-DWIN_ABI/; s/-D__linux__//; s/ -z / /g" */Makefile
-#sed -i.bak -e "s/-DLINUX//; s/-D__linux__//; s/-z \(noexecstack\|relro\|now\) //g" */Makefile
-#sed -i.bak -e "s/-DLINUX/-DWIN_ABI/; s/-D__linux__//; s/-z \(noexecstack\)/-fno-stack-protector -Wl,-z,\1/; s/-z \(relro\|now\)/-Wl,-z,\1/g" */Makefile
-sed -i.bak -e "s/-DLINUX//; s/-D__linux__//; s/-z \([^ ]*\)//g" */Makefile
-#sed -i.bak -e "s/-DLINUX//; s/-D__linux__//; s/-z noexecstack/-fno-stack-protector/; s/-z \([^ ]*\)//g" */Makefile
-# fix invalid linker option -lc in lib/Makefile
-sed -i.bak2 -e "s/-lc/-fstack-protector/; s/-Wl,-soname,[^ ]*/-s -Wl,--out-implib,\$@.a/; s/\(ln -f -s\|ldconfig\)/echo SKIPPING: &/" lib/Makefile
-# fix invalid linker option -z in lib/Makefile (version >= 1.0)
-sed -i.bak3 -e "s/-Wl,-z,[^ ]*//g" lib/Makefile
-# avoid -fPIC (useless on Windows and not supported by clang) in lib/Makefile
-sed -i.bak4 -e "s/-fPIC//" lib/Makefile
-wl-showstatus build &&
- make -Clib SHARED=y LIBNAME=libIPSec_MB.dll CC="${CC:-gcc}" &&
- # manually build .dll.a file if missing
- ( ls -1 lib/libIPSec_MB.dll.a &> /dev/null || dlltool -l lib/libIPSec_MB.dll.a -D lib/libIPSec_MB.dll -d lib/libIPSec_MB.def ) &&
- make -Clib SHARED=n CC="${CC:-gcc}" &&
- #make CC="${CC:-gcc} -fstack-protector" &&
- #make CC="${CC:-gcc}" -Cperf LDFLAGS="-fstack-protector -pthread -L$(pwd)/lib" &&
- #PATH=$(pwd)/lib:$PATH perf/ipsec_perf.exe &&
- #make CC="${CC:-gcc}" &&
- wl-showstatus install &&
- make -Clib install CC="${CC:-gcc}" SHARED=n PREFIX=$INSTALLPREFIX &&
- mkdir -p $INSTALLPREFIX/bin &&
- mv -f lib/*.dll $INSTALLPREFIX/bin/ &&
- cp -f lib/*.dll.a lib/*.def $INSTALLPREFIX/lib/ &&
+## only build test when requested in CMakeLists.txt (version >= 3.0.0)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -97,3 +97,5 @@
+#   # build test applications
+#+ if (BUILD_TESTING)
+#   add_subdirectory(test)
+#+ endif()
+#
+#EOF
+# fix compiler flags (version >= 3.0.0)
+####Bug reported: https://github.com/intel/intel-ipsec-mb/issues/185
+sed -i.bak -e "s/\(if(\)CMAKE_GENERATOR MATCHES \"MinGW Makefiles\"\()\)/\1MINGW\2/" $(grep -l "if(CMAKE_GENERATOR MATCHES \"MinGW Makefiles\")" $(find -name CMakeLists.txt))
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSAFE_OPTIONS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSAFE_OPTIONS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####TO DO: ipsec_perf crashes
-####TO DO: build fails on 32-bit
 
 
 
-##export BUILDDEPENDENCIES=cmake
-#mkdir -p build_static build_shared &&
-# wl-showstatus configure-static &&
-# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DSAFE_OPTIONS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
-# wl-showstatus configure-shared &&
-# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DSAFE_OPTIONS:BOOL=ON -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
-# wl-showstatus build-install-static &&
-# make -Cbuild_static install/strip &&
-# wl-showstatus build-install-shared &&
-# make -Cbuild_shared install/strip &&
-#    echo OK
