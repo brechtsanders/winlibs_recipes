@@ -1,0 +1,55 @@
+export NAME="Level Zero"
+export STATUS=
+export URL=https://oneapi-src.github.io/level-zero-spec/level-zero/latest/
+export BASENAME=level-zero
+export DESCRIPTION="oneAPI Level Zero Specification Headers and Loader"
+export CATEGORY=hardware
+export TYPE=library
+export VERSION=1.34.0
+export VERSIONDATE=2026102
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE
+export LICENSETYPE=MIT
+export DOWNLOADURL="https://github.com/oneapi-src/level-zero/releases"
+export INSTALLPREFIX=$PWD/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/oneapi-src/level-zero/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix missing std::find_if in source/loader/windows/driver_discovery_win.cpp
+sed -i.bak -e "1i #include <algorithm>" source/loader/windows/driver_discovery_win.cpp
+# fix missing int32_t in third_party/xla/graphcycles.h
+sed -i.bak -e "1i #include <cstdint>" third_party/xla/graphcycles.h
+# fix missing _dupenv_s in source/layers/validation/checkers/system_resource_tracker/zel_system_resource_tracker_checker.cpp
+patch -ulbf source/layers/validation/checkers/system_resource_tracker/zel_system_resource_tracker_checker.cpp << EOF
+@@ -456,3 +456,3 @@
+             // Check if CSV output is requested
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+             char* csvPath = nullptr;
+@@ -504,3 +504,3 @@
+             }
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+             free(csvPath);
+EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure-static &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_STATIC:BOOL=ON -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wstrict-aliasing" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=strict-aliasing"; fi)" -S. -Bbuild_static &&
+ wl-showstatus configure-shared &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DBUILD_STATIC:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DCMAKE_CXX_FLAGS:STRING="$(if ${CC:-gcc} --help -v 2>/dev/null|grep -q "\-Wstrict-aliasing" || ${CC:-gcc} --version|grep -q "^clang"; then echo "-Wno-error=strict-aliasing"; fi)" -S. -Bbuild_shared &&
+ wl-showstatus build-install-static &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install-shared &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+

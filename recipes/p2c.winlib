@@ -1,3 +1,45 @@
+#export NAME="p2c"
+#export STATUS=
+#export URL=https://github.com/FranklinChen/p2c
+#export BASENAME=p2c
+#export DESCRIPTION="Pascal to C translator"
+#export CATEGORY=development
+#export TYPE=application
+#export VERSION=1.21
+#export VERSIONDATE=20230723
+#wl-showstatus --package-version
+#export DEPENDENCIES=
+#export OPTIONALDEPENDENCIES=
+#export BUILDDEPENDENCIES=
+#export OPTIONALBUILDDEPENDENCIES=
+#export LICENSEFILE=src/COPYING
+#export LICENSETYPE=GPL
+#export DOWNLOADURL="https://github.com/FranklinChen/p2c/tags"
+#export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+#export DOWNLOADSOURCEURL=https://github.com/FranklinChen/p2c/archive/refs/tags/$VERSION.tar.gz
+#wl-showstatus download
+#wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+#wl-wait4deps
+#wl-showstatus extract
+#tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
+#cd $BASENAME-$VERSION
+## fix src/trans.h (version >= 1.21)
+#patch -ulbf src/trans.h << EOF
+#@@ -1865,4 +1865,6 @@
+#
+#+#ifndef __MINGW32__
+# int link           PP( (char *, char *) );
+# int unlink         PP( (char *) );
+#+#endif
+#
+#EOF
+#wl-showstatus build &&
+# make CC="${CC:-gcc}" DEFS="-O3" &&
+#    echo OK
+## wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
 export NAME="p2c"
 export STATUS=
 export URL=https://github.com/FranklinChen/p2c
@@ -5,8 +47,10 @@ export BASENAME=p2c
 export DESCRIPTION="Pascal to C compiler"
 export CATEGORY=development
 export TYPE=application
-export VERSION=1.21
-export VERSIONDATE=20200531
+#export VERSION=1.21
+#export VERSIONDATE=20200531
+export VERSION=2.02.1
+export VERSIONDATE=20261002
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -32,6 +76,38 @@ patch -ulbf src/trans.h << EOF
 +#define unlink P2C_unlink
  int unlink         PP( (char *) );
 EOF
+# use relative path for default P2C_HOME in src/trans.c (version >= 2.02.1)
+patch -ulbf src/trans.c << EOF
+@@ -33,2 +33,5 @@
+ #include <time.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+
+@@ -683,2 +686,6 @@
+
++#ifdef _WIN32
++    char p2c_home_buffer[MAX_PATH];
++    p2c_home = NULL;
++#endif
+     i = 0;
+@@ -692,2 +699,14 @@
+     }
++#ifdef _WIN32
++    if (p2c_home == NULL) {
++      char* p;
++      if (GetModuleFileNameA(0, p2c_home_buffer, MAX_PATH) && (p = strrchr(p2c_home_buffer, '\\\\')) != NULL) {
++        *p = 0;
++        if ((p = strrchr(p2c_home_buffer, '\\\\')) != NULL) {
++          strcpy(p + 1, "lib\\\\p2c");
++          p2c_home = p2c_home_buffer;
++        }
++      }
++    }
++#endif
+     init_stuff();
+EOF
+# fix mkdir in src/Makefile
 sed -i.bak -e "s/mkdir /&-p /" src/Makefile
 # fix building with LLVM/CLang
 if ${CC:-gcc} --help -v 2>/dev/null | grep -q "\-Wimplicit-function-declaration" || ${CC:-gcc} --version|grep -q "^clang"; then
@@ -44,7 +120,9 @@ wl-showstatus build-install &&
  strip $INSTALLPREFIX/bin/*.exe &&
  sed -i "s?$(pwd)/home?\$(dirname \$0)/lib?g" $INSTALLPREFIX/bin/p2cc &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
-####To do: fix error when running p2c: Unable to find required system p2crc file
+####P2C_HOME=$MINGWPREFIX/lib/p2c $MINGWPREFIX/bin/p2c.exe
+####$MINGWPREFIX/bin/p2c.exe -H $MINGWPREFIX/lib/p2c
+####$MINGWPREFIX/bin/p2c.exe
 
 
 
