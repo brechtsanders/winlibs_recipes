@@ -7,10 +7,12 @@ export CATEGORY=fileformat
 export TYPE=application
 #export VERSION=0.20.4
 #export VERSIONDATE=20220427
-export VERSION=0.20.5
-export VERSIONDATE=20220501
+#export VERSION=0.20.5
+#export VERSIONDATE=20220501
 #export VERSION=0.21.10
 #export VERSIONDATE=20220428
+export VERSION=0.21.12
+export VERSIONDATE=20261003
 wl-showstatus --package-version
 export DEPENDENCIES=
 export OPTIONALDEPENDENCIES=
@@ -49,17 +51,58 @@ EOF
 #mv src/output.c src/output.c.bak &&
 #echo "#include <stdint.h>" > src/output.c &&
 #cat src/output.c.bak >> src/output.c
-# fix src/attr.c (version >= 0.20.5)                                            
-patch -ulbf src/attr.c << EOF
-@@ -343,3 +343,3 @@
-                warning_handler("No stack to get attribute from");
--               return;
-+               return NULL;
-        }
+## fix src/attr.c (version = 0.20.5)                                            
+#patch -ulbf src/attr.c << EOF
+#@@ -343,3 +343,3 @@
+#                warning_handler("No stack to get attribute from");
+#-               return;
+#+               return NULL;
+#        }
+#EOF
+# fix missing strcasestr in src/convert.c (version >= 0.21.12)
+patch -ulbf src/convert.c << EOF
+@@ -124,2 +124,22 @@
+
++#ifdef _WIN32
++static char* strcasestr (const char* str, const char* pattern)
++{
++  size_t i;
++  if (!*pattern)
++    return (char*)str;
++  for (; *str; str++) {
++    if (toupper((unsigned char)*str) == toupper((unsigned char)*pattern)) {
++      for (i = 1;; i++) {
++        if (!pattern[i])
++          return (char*)str;
++        if (toupper((unsigned char)str[i]) != toupper((unsigned char)pattern[i]))
++          break;
++      }
++    }
++  }
++  return NULL;
++}
++#endif
++
+ typedef struct
 EOF
+# fix ::WideCharToMultiByte in src/execdir.c (version >= 0.21.12)
+patch -ulbf src/execdir.c << EOF
+@@ -59,3 +59,3 @@
+     flags = WC_ERR_INVALID_CHARS;
+-    bytes = ::WideCharToMultiByte(CP_UTF8, flags, in, wlen, nullptr, 0, nullptr, nullptr);
++    bytes = WideCharToMultiByte(CP_UTF8, flags, in, wlen, nullptr, 0, nullptr, nullptr);
+     if (bytes <= 0) {
+@@ -73,3 +73,3 @@
+     /* Perform the conversion */
+-    bytes = ::WideCharToMultiByte(CP_UTF8, flags, in, wlen, out, outlen, nullptr, nullptr);
++    bytes = WideCharToMultiByte(CP_UTF8, flags, in, wlen, out, outlen, nullptr, nullptr);
+     if (bytes <= 0) {
+EOF
+# fix missing uint32_t and unrtf_ntohl() in src/output.c (version >= 0.21.12)
+sed -i.bak -e "1i #include <stdint.h>\n#include \"../Windows/unrtf_w.c\"" src/output.c
 wl-showstatus configure &&
- ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
- #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed -liconv" &&
+ #./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM &&
+ ./configure --prefix=$INSTALLPREFIX --build=$BUILDPLATFORM --host=$RUNPLATFORM LDFLAGS="-Wl,--as-needed" LIBS="-liconv -lshlwapi" &&
  wl-showstatus build-install &&
  make install-strip &&
  #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf unrtf_$VERSION
