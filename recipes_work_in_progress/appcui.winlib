@@ -6,8 +6,10 @@ export BASENAME=appcui
 export DESCRIPTION="AppCUI is a cross-platform TUI builder. The users of this library can construct an interface using its basic building blocks such as: Window, Button, Label, etc."
 export CATEGORY=tui
 export TYPE=library
-export VERSION=1.241.0
-export VERSIONDATE=20261009
+#export VERSION=1.241.0
+#export VERSIONDATE=20261009
+export VERSION=1.250.0
+export VERSIONDATE=20261011
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libbz2,libjpeg,libpng,libjpeg-turbo,freetype2,sdl2,sdl2ttf,brotli
 export OPTIONALDEPENDENCIES=
@@ -23,7 +25,7 @@ wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
 wl-wait4deps
 wl-showstatus extract
 tar xz --force-local -f $TARBALLDIR/$BASENAME/$VERSION.tar.gz
-cd $BASENAME-$VERSION
+cd AppCUI-$VERSION
 # fix missing #include <algorithm>
 sed -i.bak -e "1i #include <algorithm>" Examples/Snake/Board.cpp Examples/Tetris/Board.cpp AppCUI/src/Controls/TreeView.cpp AppCUI/src/Utils/IniObject.cpp
 sed -i.bak -e "1i #include <chrono>" Examples/TreeView/main.cpp
@@ -40,28 +42,71 @@ patch -ulbf AppCUI/include/AppCUI.hpp << EOF
 EOF
 # also allow building static library
 sed -i.bak -e "s/\(add_library([^ ]*\) SHARED/\1/" AppCUI/CMakeLists.txt
-# fix AppCUI/CMakeLists.txt (version >= 1.241.0)
-#sed -i.bak -e "s/\(find_package(\)unofficial-\(brotli\)/\1\2/" AppCUI/CMakeLists.txt
+## fix AppCUI/CMakeLists.txt (version = 1.241.0)
+##sed -i.bak -e "s/\(find_package(\)unofficial-\(brotli\)/\1\2/" AppCUI/CMakeLists.txt
+#patch -ulbf AppCUI/CMakeLists.txt << EOF
+#@@ -38,3 +38,5 @@
+# set_target_properties(\${PROJECT_NAME} PROPERTIES PREFIX "lib")
+#+if(BUILD_SHARED_LIBS)
+# target_compile_definitions(\${PROJECT_NAME} PRIVATE -DBUILD_AS_DYNAMIC_LIB)
+#+endif()
+#
+#@@ -51,3 +53,9 @@
+#
+#-find_package(unofficial-brotli CONFIG REQUIRED)
+#+find_package(unofficial-brotli CONFIG)
+#+if (NOT TARGET unofficial-brotli)
+#+  find_package(PkgConfig QUIET)
+#+  if(PkgConfig_FOUND)
+#+    pkg_check_modules(unofficial-brotli libbrotlicommon REQUIRED)
+#+  endif()
+#+endif()
+# find_package(BZip2 REQUIRED)
+#EOF
+# fix AppCUI/CMakeLists.txt (version >= 1.250.0)
 patch -ulbf AppCUI/CMakeLists.txt << EOF
-@@ -38,3 +38,5 @@
- set_target_properties(\${PROJECT_NAME} PROPERTIES PREFIX "lib")
-+if(BUILD_SHARED_LIBS)
- target_compile_definitions(\${PROJECT_NAME} PRIVATE -DBUILD_AS_DYNAMIC_LIB)
-+endif()
+@@ -5,3 +5,3 @@
 
-@@ -51,3 +53,9 @@
-
--find_package(unofficial-brotli CONFIG REQUIRED)
-+find_package(unofficial-brotli CONFIG)
-+if (NOT TARGET unofficial-brotli)
-+  find_package(PkgConfig QUIET)
-+  if(PkgConfig_FOUND)
-+    pkg_check_modules(unofficial-brotli libbrotlicommon REQUIRED)
+-if( supported )
++if( supported AND NOT MINGW )
+        message(STATUS "\${PROJECT_NAME} => IPO / LTO enabled")
+@@ -65,3 +65,5 @@
+     set_target_properties(\${target} PROPERTIES POSITION_INDEPENDENT_CODE ON FOLDER "AppCUI")
++  if(BUILD_SHARED_LIBS)
+     target_compile_definitions(\${target} PRIVATE -DBUILD_AS_DYNAMIC_LIB)
 +  endif()
-+endif()
- find_package(BZip2 REQUIRED)
+ endfunction()
+@@ -113,3 +115,9 @@
+
+-    find_package(unofficial-brotli CONFIG REQUIRED)
++    find_package(unofficial-brotli CONFIG)
++    if (NOT TARGET unofficial-brotli)
++      find_package(PkgConfig QUIET)
++      if(PkgConfig_FOUND)
++        pkg_check_modules(unofficial-brotli libbrotlicommon REQUIRED)
++      endif()
++    endif()
+     find_package(BZip2 REQUIRED)
+@@ -229,3 +237,3 @@
+ # ---------------------------------------------------------------------------------------------------------------------
+-add_library(\${PROJECT_NAME} SHARED)
++add_library(\${PROJECT_NAME})
+
 EOF
-# fix CMakeLists.txt (version >= 1.241.0)
+## fix CMakeLists.txt (version = 1.241.0)
+#patch -ulbf CMakeLists.txt << EOF
+#@@ -2,4 +2,2 @@
+#
+#-set(CMAKE_TOOLCHAIN_FILE "\${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+#-  CACHE STRING "Vcpkg toolchain file")
+#
+#@@ -25,2 +23,4 @@
+#     add_compile_options(-W3 /MP)
+#+elseif (WIN32)
+#+    add_definitions(-DBUILD_FOR_WINDOWS)
+# elseif (APPLE)
+#EOF
+# fix CMakeLists.txt (version >= 1.250.0)
 patch -ulbf CMakeLists.txt << EOF
 @@ -2,4 +2,2 @@
 
@@ -73,43 +118,12 @@ patch -ulbf CMakeLists.txt << EOF
 +elseif (WIN32)
 +    add_definitions(-DBUILD_FOR_WINDOWS)
  elseif (APPLE)
+@@ -108,3 +108,3 @@
+ if(APPCUI_ENABLE_TESTS)
+-    if (NOT UNIX)
++    if (NOT UNIX AND NOT MINGW)
+         add_subdirectory(Tests/Tester)
 EOF
-
-#grep -wi add_library $(find -name CMakeLists.txt -or -name '*.cmake')
-#mkdir -p build_test && cmake.exe -Wno-dev -G"MSYS Makefiles" -Dlibjpeg-turbo_DIR:PATH=$MINGWPREFIX/share/libjpeg-turbo/lib/cmake/libjpeg-turbo -S. -Bbuild_test -LH && echo OK; rm -rf build_test
-#-DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 
-
-#export BUILDDEPENDENCIES=cmake
-#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
-#PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ 
-#-DCMAKE_SYSTEM_NAME=Windows 
-#-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
-# #wl-showstatus build &&
-# #cmake.exe --build build_win &&
-# #make -Cbuild_win &&
-# wl-showstatus build-install &&
-# make -Cbuild_win install/strip &&
-#    echo OK
-
-#export BUILDDEPENDENCIES=cmake,ninja
-#PATH=$PATH:$MINGWPREFIX/qt/bin QTDIR=$MINGWPREFIX/qt QMAKESPEC=$MINGWPREFIX/qt/mkspecs/win32-g++ 
-#-DPKG_CONFIG_EXECUTABLE:FILEPATH=$(which pkg-config.exe) 
-#mkdir -p build_win &&
-# wl-showstatus configure &&
-# cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
-# #wl-showstatus build &&
-# #cmake.exe --build build_win &&
-# #ninja -Cbuild_win &&
-# wl-showstatus build-install &&
-# #cmake.exe --install build_win --strip &&
-# #cmake.exe --build build_win --target "install/strip" &&
-# ninja -Cbuild_win install/strip &&
-#    echo OK
-
-#export BUILDDEPENDENCIES=cmake,ninja
 mkdir -p build_static build_shared &&
  wl-showstatus configure-static &&
  cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -Dlibjpeg-turbo_DIR:PATH=$MINGWPREFIX/share/libjpeg-turbo/lib/cmake/libjpeg-turbo -DCMAKE_CXX_STANDARD:STRING=20 -S. -Bbuild_static &&
@@ -138,7 +152,7 @@ mkdir -p build_static build_shared &&
  #cmake.exe --build build_shared --target "install/strip" &&
  ninja -Cbuild_shared install/strip &&
     echo OK
-# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+# wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf AppCUI-$VERSION
 
 
 
