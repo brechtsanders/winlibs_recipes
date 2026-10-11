@@ -1056,7 +1056,7 @@ export TYPE=application
 export VERSION=23.1.3
 export VERSIONDATE=20261006
 wl-showstatus --package-version
-export DEPENDENCIES=pthreads,zlib,xz,libxml2,libffi,isl,z3,swig,ncurses,protobuf,wineditline,cpython-mingw
+export DEPENDENCIES=pthreads,zlib,xz,zstd,libxml2,libffi,isl,z3,swig,ncurses,protobuf,wineditline,cpython-mingw
 export OPTIONALDEPENDENCIES=udis86,graphviz,hwloc,libpfm4,tbb
 export BUILDDEPENDENCIES=cmake,ninja,jwasm
 export OPTIONALBUILDDEPENDENCIES=
@@ -1114,14 +1114,13 @@ patch -ulbf llvm/cmake/modules/AddLLVM.cmake << EOF
 +  endif()
    set_property(SOURCE \${resource_file}
 EOF
-# fix llvm/cmake/modules/Findzstd.cmake (version >= 23.1.3)
-patch -ulbf llvm/cmake/modules/Findzstd.cmake << EOF
-@@ -35,3 +35,3 @@
-     add_library(zstd::libzstd_shared SHARED IMPORTED)
--    if(WIN32 OR CYGWIN)
-+    if(MSVC OR CYGWIN)
-       include(GNUInstallDirs) # For CMAKE_INSTALL_LIBDIR and friends.
-EOF
+#patch -ulbf llvm/cmake/modules/Findzstd.cmake << EOF
+#@@ -35,3 +35,3 @@
+#     add_library(zstd::libzstd_shared SHARED IMPORTED)
+#-    if(WIN32 OR CYGWIN)
+#+    if(MSVC OR CYGWIN)
+#       include(GNUInstallDirs) # For CMAKE_INSTALL_LIBDIR and friends.
+#EOF
 # avoid z3 version detection issue (version >= 15.0.7)
 sed -i.bak -e "s/\(find_package(Z3 \)[0-9.]*/\1/" llvm/CMakeLists.txt
 mkdir -p build_shared &&
@@ -1132,6 +1131,7 @@ mkdir -p build_shared &&
  # -DCLANG_LINK_CLANG_DYLIB:BOOL=ON \
  # -DLLVM_LINK_LLVM_DYLIB:BOOL=ON \
  # -DLLVM_TARGETS_TO_BUILD:STRING="X86;ARM;AArch64;NVPTX;AMDGPU;AVR;WebAssembly" \
+ # -DLLVM_TARGETS_TO_BUILD:STRING="$(if echo $RUNPLATFORM|grep -q "^\(i.\|x\)86"; then echo "X86"; else echo echo "AArch64"; fi);NVPTX;AMDGPU;AVR;WebAssembly" \
  # -DLLVM_TARGETS_TO_BUILD:STRING=all \
  # -DLLVM_DYLIB_COMPONENTS:STRING=all \
  #
@@ -1189,7 +1189,7 @@ mkdir -p build_shared &&
   -DLLDB_ENABLE_LIBXML2:BOOL=ON \
   -DLLDB_ENABLE_LZMA:BOOL=ON \
   -DLLDB_ENABLE_LUA:BOOL=OFF \
-  -DLLDB_ENABLE_PYTHON:BOOL=ON \
+  -DLLDB_ENABLE_PYTHON:BOOL=OFF \
   -DLLDB_ENABLE_TREESITTER:BOOL=OFF \
   -DLLVM_ENABLE_SPHINX=OFF \
   -DLLVM_INCLUDE_DOCS:BOOL=OFF \
@@ -1221,8 +1221,6 @@ mkdir -p build_shared &&
   -DLLVM_TOOL_OPENMP_BUILD:BOOL=ON \
   -DLLVM_TOOL_PARALLEL_LIBS_BUILD:BOOL=ON \
   -DLLDB_TOOL_LLDB_INSTR_BUILD:BOOL=OFF \
-  -DLLDB_DISABLE_PYTHON:BOOL=OFF \
-  -DLLDB_ENABLE_PYTHON:BOOL=ON \
   -DLLDB_EMBED_PYTHON_HOME:BOOL=OFF \
   -DLLDB_PYTHON_RELATIVE_PATH:PATH=libexec/site-packages -DLLDB_PYTHON_EXE_RELATIVE_PATH:FILEPATH=bin/python.exe -DLLDB_PYTHON_EXT_SUFFIX:STRING=.pyd \
   -DPython3_FIND_REGISTRY:BOOL=NEVER \
@@ -1249,6 +1247,7 @@ mkdir -p build_shared &&
  #-DLLVM_ENABLE_PROJECTS:STRING="libunwind;polly;flang"
  #-DLLVM_ENABLE_PROJECTS:STRING="openmp"
  #-DLLVM_ENABLE_DOXYGEN:BOOL=OFF -DDOXYGEN_DOT_EXECUTABLE:FILEPATH= -DDOXYGEN_EXECUTABLE:FILEPATH= \
+ #-DLLDB_ENABLE_PYTHON:BOOL=OFF \
  #-DLLDB_EXPORT_ALL_SYMBOLS:BOOL=ON \
  #-DPython3_INCLUDE_DIRS:PATH=$MINGWPREFIX/share/python/include/python3.9 -DPython3_LIBRARIES:STRING="-L$MINGWPREFIX/share/python/lib -lpython3.9" \
  #-DHAVE_STEADY_CLOCK:BOOL=ON 
@@ -1266,6 +1265,8 @@ mkdir -p build_shared &&
  #PATH=$MINGWPREFIX/share/python/bin:$PATH ninja -Cbuild_shared install/strip &&
  ( PATH=$MINGWPREFIX/share/python/bin:$PATH ninja -Cbuild_shared install/strip || PATH=$MINGWPREFIX/share/python/bin:$PATH ninja -j1 -Cbuild_shared install/strip || PATH=$PWD/build_shared/bin:$PWD/build_shared/tools:$PATH ninja -Cbuild_shared install/strip ) &&
  #( ninja -Cbuild_shared install/strip || ninja -j1 -Cbuild_shared install/strip ) &&
+ # fix llvm/cmake/modules/Findzstd.cmake (version >= 23.1.3)
+ sed -i -e "s/WIN32\( OR CYGWIN\)/MSVC\1/" $INSTALLPREFIX/share/llvm/lib/cmake/llvm/Findzstd.cmake &&
  #wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-project-$VERSION.src
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf llvm-project-llvmorg-$VERSION
 
