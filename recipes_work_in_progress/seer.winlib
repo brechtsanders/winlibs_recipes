@@ -27,8 +27,10 @@ export TYPE=application
 #export VERSIONDATE=20251008
 #export VERSION=2.7
 #export VERSIONDATE=20260406
-export VERSION=2.7.1
-export VERSIONDATE=20261006
+#export VERSION=2.7.1
+#export VERSIONDATE=20261006
+export VERSION=2.8
+export VERSIONDATE=20261013
 wl-showstatus --package-version
 export DEPENDENCIES=qt
 export OPTIONALDEPENDENCIES=
@@ -66,6 +68,36 @@ patch -ulbf src/SeerConsoleWidget.cpp << EOF
 +#endif
 
 EOF
+# fix src/SeerConsoleWidget.cpp (version >= 2.8)
+patch -ulbf src/SeerConsoleWidget.cpp << EOF
+@@ -238,2 +238,3 @@
+
++#ifdef F_GETFD
+     // If stdout is not valid, don't set it.
+@@ -247,2 +248,3 @@
+     }
++#endif
+
+@@ -273,3 +275,7 @@
+
++#ifdef _WIN32
++    _commit(_ttyFD);
++#else
+     fsync(_ttyFD);
++#endif
+ }
+@@ -316,3 +322,5 @@
+     }
+-
++#ifdef _WIN32
++    qDebug() << "Terminal configuration disabled on Windows";
++#else
+     // Create tty and its permissions.
+@@ -364,2 +372,3 @@
+     setScrollLines(0);
++#endif
+ }
+EOF
 # fix src/QProcessInfo.cpp (version >= 1.15)
 patch -ulbf src/QProcessInfo.cpp << EOF
 @@ -16,3 +16,5 @@
@@ -74,6 +106,39 @@ patch -ulbf src/QProcessInfo.cpp << EOF
  #include <pwd.h>
 +#endif
  #include <stdio.h>
+EOF
+# fix src/QProcessInfo.cpp (version >= 2.8)
+patch -ulbf src/QProcessInfo.cpp << EOF
+@@ -14,3 +14,5 @@
+ #ifndef _WIN32
+-#include <pwd.h>
++#else
++#include <windows.h>
++#include <lmcons.h>
+ #endif
+@@ -78,2 +80,9 @@
+
++#ifdef _WIN32
++        char buf[UNLEN + 1];
++        DWORD buflen = UNLEN + 1;
++        if (GetUserNameA(buf, &buflen)) {
++            info.setUsername(buf);
++        }
++#else
+         struct passwd* pw = getpwuid(info.username().toULong());
+@@ -82,2 +91,3 @@
+         }
++#endif
+     }
+EOF
+# fix src/SeerGdbWidget.cpp (version >= 2.8)
+patch -ulbf src/SeerGdbWidget.cpp << EOF
+@@ -4,2 +4,5 @@
+
++#ifdef _WIN32
++#define _POSIX
++#endif
+ #include "SeerGdbWidget.h"
 EOF
 mkdir -p build_win &&
  wl-showstatus configure &&
