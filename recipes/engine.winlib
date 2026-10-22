@@ -18,8 +18,10 @@ export TYPE=library
 #export VERSIONDATE=20220523
 #export VERSION=3.0.2
 #export VERSIONDATE=20230814
-export VERSION=3.0.3
-export VERSIONDATE=20231118
+#export VERSION=3.0.3
+#export VERSIONDATE=20231118
+export VERSION=3.0.5
+export VERSIONDATE=20261022
 wl-showstatus --package-version
 export DEPENDENCIES=openssl
 #libprov
@@ -45,6 +47,16 @@ cd $BASENAME-$VERSION
 sed -i.bak -e "s/%z\(u] \", \)/%l\1(unsigned long)/" test_digest.c
 # fix test_keyexpimp.c (version >= 3.0.3)
 sed -i.bak -e "s/_MSC_VER/_WIN32/" test_keyexpimp.c
+# fix test_tls12additional.c (version >= 3.0.5)
+sed -i.bak -e "s/_MSC_VER/_WIN32/" test_tls12additional.c
+# fix test_raw_sign_prehash.c (version >= 3.0.5)
+patch -ulbf test_raw_sign_prehash.c << EOF
+@@ -127,3 +127,3 @@
+
+-    printf("test_raw_sign_prehash: OK (dlen=%u siglen=%zu)\\n", dlen, siglen);
++    printf("test_raw_sign_prehash: OK (dlen=%u siglen=%lu)\\n", dlen, (unsigned long)siglen);
+     ret = 0;
+EOF
 # fix CMakeLists.txt (version >= 3.0.3)
 sed -i.bak -e "s/\(if\s*(NOT\s*\)MSVC/\1WIN32/" CMakeLists.txt
 ## allow also buiding static libraries in CMakeLists.txt (version >= 3.0.3)
@@ -53,7 +65,8 @@ sed -i.bak -e "s/\(if\s*(NOT\s*\)MSVC/\1WIN32/" CMakeLists.txt
 touch libprov/CMakeLists.txt
 mkdir -p build_win &&
  wl-showstatus configure &&
- cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ #cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -S. -Bbuild_win &&
+ cmake.exe -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DOPENSSL_ROOT_DIR:PATH=$MINGWPREFIX -DOPENSSL_ENGINES_DIR:PATH=$MINGWPREFIX/lib/engines-3 -S. -Bbuild_win &&
  wl-showstatus build-install &&
  ninja -Cbuild_win install/strip &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
