@@ -23,12 +23,14 @@ export TYPE=application
 #export VERSIONDATE=20240221
 #export VERSION=17.0.2
 #export VERSIONDATE=20240626
-export VERSION=18.0.0
-export VERSIONDATE=20240718
+#export VERSION=18.0.0
+#export VERSIONDATE=20240718
 #export VERSION=19.0.0
 #export VERSIONDATE=20241217
 #export VERSION=21.0.0
 #export VERSIONDATE=20250917
+export VERSION=22.0.0
+export VERSIONDATE=20261028
 wl-showstatus --package-version
 export DEPENDENCIES=zlib,libjpeg,libpng,libxml2,mman-win32
 export OPTIONALDEPENDENCIES=
@@ -54,6 +56,34 @@ cat > src/Util.cpp << EOF
 #endif
 EOF
 cat src/Util.cpp.bak >> src/Util.cpp
+# fix src/Util.cpp (version >= 22.0.0)
+patch -ulbf src/Util.cpp << EOF
+@@ -20,3 +24,4 @@
+
+-#ifdef _MSC_VER
++#ifdef _WIN32
++#include <intrin.h>
+ #include <fcntl.h>
+EOF
+# fix src/Util.cpp (version >= 22.0.0)
+sed -i.bak2 -e "s/_MSC_VER/_WIN32/" src/Util.cpp
+# fix missing __cpuidex in src/Target.cpp (version >= 22.0.0)
+sed -i.bak2 -e "s/_MSC_VER/_WIN32/" src/Target.cpp
+# fix src/Target.cpp (version >= 22.0.0)
+patch -ulbf src/Target.cpp << EOF
+@@ -103,3 +103,3 @@
+     [[nodiscard]] uint64_t xgetbv(uint32_t xcr) {
+-#if defined(_M_IX86) || defined(_M_AMD64)
++#if (defined(_M_IX86) || defined(_M_AMD64)) && !defined(__MINGW32__)
+         return _xgetbv(xcr);
+EOF
+# fix undefined _S_IWRITE in src/Debug.cpp (version >= 22.0.0)
+patch -ulbf src/Debug.cpp << EOF
+@@ -15,2 +15,3 @@
+ #ifdef _WIN32
++#include <sys/stat.h>
+ #include <io.h>
+EOF
 mkdir -p build_static build_shared &&
  wl-showstatus configure &&
  PATH=$MINGWPREFIX/share/llvm/bin:$PATH cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DHalide_SHARED_LLVM:BOOL=OFF -DFETCHCONTENT_FULLY_DISCONNECTED:BOOL=ON -DFLATBUFFERS_USE_FETCHCONTENT:BOOL=OFF -DWITH_PYTHON_BINDINGS:BOOL=OFF -DWITH_TUTORIALS:BOOL=OFF -DWITH_DOCS:BOOL=OFF -DWITH_TESTS:BOOL=OFF -DLLVM_DIR:PATH=$MINGWPREFIX/share/llvm -DPython3_EXECUTABLE:FILEPATH=$PYDIR/python.exe -DCMAKE_CXX_FLAGS:STRING="-I$MINGWPREFIX/include/mman-win32" -S. -Bbuild_static &&
