@@ -1,0 +1,78 @@
+export NAME="HPX"
+export STATUS=
+export URL=https://hpx.stellar-group.org/
+export BASENAME=hpx
+export DESCRIPTION="The C++ Standard Library for Parallelism and Concurrency"
+export CATEGORY=development
+export TYPE=library
+#export VERSION=1.9.1
+#export VERSIONDATE=20231011
+#export VERSION=1.10.0
+#export VERSIONDATE=20240530
+#export VERSION=1.11.0
+#export VERSIONDATE=20250630
+export VERSION=2.0.0
+export VERSIONDATE=20261101
+wl-showstatus --package-version
+export DEPENDENCIES=
+export OPTIONALDEPENDENCIES=
+export BUILDDEPENDENCIES=cmake,ninja
+export OPTIONALBUILDDEPENDENCIES=
+export LICENSEFILE=LICENSE_1_0.txt
+export LICENSETYPE=Boost
+export DOWNLOADURL="https://github.com/STEllAR-GROUP/hpx/releases"
+export INSTALLPREFIX=`pwd`/inst_$BASENAME-$VERSION
+export DOWNLOADSOURCEURL=https://github.com/STEllAR-GROUP/hpx/archive/refs/tags/v$VERSION.tar.gz
+wl-showstatus download
+wl-download -v -d $TARBALLDIR/$BASENAME $DOWNLOADSOURCEURL
+wl-wait4deps
+wl-showstatus extract
+tar xz --force-local -f $TARBALLDIR/$BASENAME/v$VERSION.tar.gz
+cd $BASENAME-$VERSION
+# fix undefined std::timespec in libs/core/thread_support/include/hpx/thread_support/win_nanosleep.hpp (version >= 2.0.0)
+patch -ulbf libs/core/thread_support/include/hpx/thread_support/win_nanosleep.hpp << EOF
+@@ -16,7 +16,7 @@
+     HPX_CXX_CORE_EXPORT HPX_CORE_EXPORT int win_nanosleep(
+-        std::timespec const& delay);
++        struct timespec const& delay);
+
+-    HPX_CXX_CORE_EXPORT inline constexpr std::timespec wait_0ns = {.tv_sec = 0,
++    HPX_CXX_CORE_EXPORT inline constexpr struct timespec wait_0ns = {.tv_sec = 0,
+         .tv_nsec = 0};
+-    HPX_CXX_CORE_EXPORT inline constexpr std::timespec wait_1000ns = {
++    HPX_CXX_CORE_EXPORT inline constexpr struct timespec wait_1000ns = {
+         .tv_sec = 0,
+EOF
+# fix undefined std::timespec in libs/core/thread_support/src/win_nanosleep.cpp (version >= 2.0.0)
+patch -ulbf libs/core/thread_support/src/win_nanosleep.cpp << EOF
+@@ -35,3 +35,3 @@
+     // our own (crude) implementation of nanosleep
+-    int win_nanosleep(std::timespec const& delay)
++    int win_nanosleep(struct timespec const& delay)
+     {
+EOF
+## fix cmake/HPX_GeneratePackage.cmake (version >= 1.9.1)
+#patch -ulbf cmake/HPX_GeneratePackage.cmake << EOF
+#@@ -169,6 +169,5 @@
+#
+#-  string(TOLOWER \${CMAKE_BUILD_TYPE} build_type)
+#   install(
+#-    FILES \${OUTPUT_DIR_PC}/hpx_application_\${build_type}.pc
+#-          \${OUTPUT_DIR_PC}/hpx_component_\${build_type}.pc
+#+    FILES \${OUTPUT_DIR_PC}/hpx_application.pc
+#+          \${OUTPUT_DIR_PC}/hpx_component.pc
+#     DESTINATION \${CMAKE_INSTALL_LIBDIR}/pkgconfig
+#EOF
+mkdir -p build_static build_shared &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=OFF -DHPX_WITH_STATIC_LINKING:STRING=STATIC -DHPX_WITH_EXAMPLES:BOOL=OFF -DHPX_WITH_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_static &&
+ wl-showstatus configure &&
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_SHARED_LIBS:BOOL=ON -DHPX_WITH_STATIC_LINKING:STRING=SHARED -DHPX_WITH_EXAMPLES:BOOL=OFF -DHPX_WITH_TESTS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -S. -Bbuild_shared &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_static install/strip &&
+ wl-showstatus build-install &&
+ ninja -Cbuild_shared install/strip &&
+ wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
+
+
+
