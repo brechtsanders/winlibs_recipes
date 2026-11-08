@@ -250,7 +250,7 @@ EOF
 #patch -ulbf lib/malloca.h << EOF
 #@@ -26,3 +26,7 @@
 #
-#+#ifdef __MINGW32
+#+#ifdef __MINGW32__
 #+#include <malloc.h>
 #+#else
 # #include <alloca.h>
@@ -268,6 +268,35 @@ EOF
 ## avoid redefinition of putenv() in lib/putenv.c (version >= 1.24.2)
 #mv lib/putenv.c lib/putenv.c.bak && touch lib/putenv.c
 #sed -i.bak -e "s?#\s*define putenv _putenv?//&?" lib/stdlib.in.h
+## fix src/include/errarg.h (version >= 1.25.0)
+#patch -ulbf src/include/errarg.h << EOF
+#@@ -38,2 +38,3 @@
+#   errarg(unsigned long int);
+#+  errarg(size_t s) : errarg((unsigned long int)s) {}
+#   errarg(double);
+#EOF
+## fix missing memmem() in src/libs/libgroff/string.cpp (version >= 1.25.0)
+#mv src/libs/libgroff/string.cpp src/libs/libgroff/string.cpp.bak
+#cat > src/libs/libgroff/string.cpp << EOF
+##include <string.h>
+#static inline const void* memmem (const void *haystack, size_t hlen, const void *needle, size_t nlen)
+#{
+#  if (!nlen)
+#    return haystack;
+#  if (nlen > hlen)
+#    return NULL;
+#  const char* p = (const char*)haystack;
+#  const char* end = p + hlen - nlen;
+#  for (; p <= end; ++p) {
+#    if (!memcmp(p, needle, nlen))
+#      return p;
+#  }
+#  return NULL;
+#}
+#EOF
+#cat src/libs/libgroff/string.cpp.bak >> src/libs/libgroff/string.cpp
+## fix missing countof (version >= 1.25.0)
+#sed -i.bak -e "s?countof(\([^)]*\))?(sizeof(\1) / sizeof(*\1))?g" $(grep -l "\bcountof(" $(find -name '*.c*'))
 # fix missing _GL_INLINE_HEADER_BEGIN/_GL_INLINE_HEADER_END in src/libs/gnulib/lib/wctype.in.h for 64-bit (version >= 1.22.2 <= 1.22.4)
 mv src/libs/gnulib/lib/wctype.in.h src/libs/gnulib/lib/wctype.in.h.bak
 cat > src/libs/gnulib/lib/wctype.in.h << EOF
