@@ -406,8 +406,8 @@ wl-showstatus build &&
  sed -e "s?/inc/?/include/?; s?-\${arch}??" src/dll/fuse/fuse.pc.in > fuse.pc &&
  ar cr libwinfsp.a obj/*.o &&
  ${CC:-gcc} -shared -s -mwindows -o winfsp.dll obj/*.o -Wl,--out-implib,libwinfsp.dll.a -Wl,--output-def winfsp.def -lrpcrt4 -lcredui -lsecur32 -lversion -lnetapi32 -lwldap32 -lole32 &&
- #${CC:-gcc} -shared -s -mwindows -o winfsp.dll libwinfsp.a -Wl,--out-implib,libwinfsp.dll.a -Wl,--output-def winfsp.def -lrpcrt4 -lcredui -lsecur32 -lversion -lnetapi32 -lwldap32 -lole32 -lshlwapi &&
- wl-showstatus build &&
+ #${CC:-gcc} -shared -s -mwindows -o winfsp.dll libwinfsp.a -Wl,--out-implib,libwinfsp.dll.a -Wl,--output-def winfsp.def -lrpcrt4 -lcredui -lsecur32 -lversion -lnetapi32 -lwldap32 -lole32 -lshlwapi -luuid &&
+ wl-showstatus install &&
  mkdir -p $INSTALLPREFIX/share/winfsp/include $INSTALLPREFIX/share/winfsp/lib/pkgconfig $INSTALLPREFIX/share/winfsp/bin &&
  cp -rf inc/* $INSTALLPREFIX/share/winfsp/include/ &&
  cp -f *.a $INSTALLPREFIX/share/winfsp/lib/ &&
@@ -415,6 +415,77 @@ wl-showstatus build &&
  cp -f *.pc $INSTALLPREFIX/share/winfsp/lib/pkgconfig/ &&
  wl-makepackage -c -d && wl-install -d $BASENAME-$VERSION && cd .. && wl-showstatus cleanup && rm -rf $BASENAME-$VERSION
 ####TO DO: also build winfsp.sys
+
+
+
+## fix src/dll/eventlog.c (version >= 2.2)
+#patch -ulbf src/dll/eventlog.c << EOF
+#@@ -1,3 +1,3 @@
+# /**
+#- * @file dll/eventlog.c
+#+        * @file dll/eventlog.c
+#  *
+#@@ -104,2 +104,5 @@
+#
+#+#ifndef MyEventLogRegisterPath
+#+#define MyEventLogRegisterPath ""
+#+#endif
+#     Result = FspGetModuleFileName(DllInstance, Path, MAX_PATH, L"" MyEventLogRegisterPath);
+#EOF
+## fix src/dll/np.c (version >= 2.2)
+#patch -ulbf src/dll/np.c << EOF
+#@@ -919,2 +919,3 @@
+#
+#+#define NPGetUniversalName RPL_NPGetUniversalName
+# DWORD APIENTRY NPGetUniversalName(
+#@@ -1220,2 +1221,5 @@
+#     HasPercent = FALSE;
+#+#ifndef MyNpRegisterPath
+#+#define MyNpRegisterPath ""
+#+#endif
+#     for (P = L"" MyNpRegisterPath; *P; P++)
+#EOF
+## fix src/dll/fsctl.c (version >= 2.2)
+#patch -ulbf src/dll/fsctl.c << EOF
+#@@ -866,2 +866,5 @@
+#
+#+#ifndef MyFsctlRegisterPath
+#+#define MyFsctlRegisterPath ""
+#+#endif
+#     Result = FspGetModuleFileName(DllInstance, DriverPath, MAX_PATH, L"" MyFsctlRegisterPath);
+#EOF
+## fix inc/winfsp/fsctl.h (version >= 2.2)
+#patch -ulbf inc/winfsp/fsctl.h << EOF
+#@@ -32,2 +32,4 @@
+# #if defined(__MINGW32__)
+#+#include <intrin.h>
+#+#include <windows.h>
+# #define FSP_FSCTL_STATIC_ASSERT(e,m)
+#@@ -757,3 +759,2 @@
+# #elif defined(_M_X64) || defined(_M_IX86)
+#-    void _ReadWriteBarrier(void);
+#     INT32 v = FSP_INTERLOCKED__LOAD32(p);
+#@@ -787,3 +788,2 @@
+# #elif defined(_M_X64)
+#-    void _ReadWriteBarrier(void);
+#     VOID *v = (VOID *)FSP_INTERLOCKED__LOAD64((__int64 volatile *)(p));
+#@@ -793,3 +793,2 @@
+# #elif defined(_M_IX86)
+#-    void _ReadWriteBarrier(void);
+#     VOID *v = (VOID *)FSP_INTERLOCKED__LOAD32((__int32 volatile *)(p));
+#EOF
+## fix src/dll/mount.c (version >= 2.2)
+#patch -ulbf src/dll/mount.c << EOF
+#@@ -1,1 +1,2 @@
+#+#include <ntdef.h>
+# /**
+#EOF
+## fix src/dll/fs.c (version >= 2.2)
+#patch -ulbf src/dll/fs.c << EOF
+#@@ -1,1 +1,2 @@
+#+#include <windows.h>
+# /**
+#EOF
 
 
 
