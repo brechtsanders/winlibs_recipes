@@ -21,10 +21,12 @@ export TYPE=application
 #export VERSIONDATE=20251227
 #export VERSION=2.55
 #export VERSIONDATE=20260516
-export VERSION=2.57
-export VERSIONDATE=20260627
+#export VERSION=2.57
+#export VERSIONDATE=20260627
+export VERSION=2.69
+export VERSIONDATE=20261121
 wl-showstatus --package-version
-export DEPENDENCIES=qt,ncurses,taglib
+export DEPENDENCIES=qt,ncurses,taglib,wcwidth
 export OPTIONALDEPENDENCIES=
 export BUILDDEPENDENCIES=
 #export BUILDDEPENDENCIES=cmake,ninja
@@ -89,3 +91,81 @@ wl-showstatus configure &&
 
 
 
+
+# fix undefined S_IRUSR and S_IWUSR in src/main.cpp (version >= 2.69)
+patch -ulbf src/main.cpp << EOF
+@@ -12,2 +12,3 @@
+ #include <unistd.h>
++#include <sys/stat.h>
+
+EOF
+# fix src/log.cpp (version >= 2.69)
+patch -ulbf src/log.cpp << EOF
+@@ -94,3 +94,4 @@
+     gettimeofday(&tv, NULL);
+-    struct tm* tminfo = localtime(&tv.tv_sec);
++    time_t t = tv.tv_sec;
++    struct tm* tminfo = localtime(&t);
+     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tminfo);
+EOF
+# fix src/scrobbler.cpp (version >= 2.69)
+####TO DO: hide password being entered
+patch -ulbf src/scrobbler.cpp << EOF
+@@ -20,3 +20,5 @@
+ #include <stdio.h>
++#ifndef _WIN32
+ #include <termios.h>
++#endif
+ #include <unistd.h>
+@@ -124,2 +126,6 @@
+   std::string pass;
++#ifdef _WIN32
++  std::getline(std::cin, pass);
++  std::cout << std::endl;
++#else
+   struct termios told, tnew;
+@@ -137,2 +143,3 @@
+   }
++#endif
+
+EOF
+# fix missing wcswidth() in src/util.cpp (version >= 2.69)
+patch -ulbf src/util.cpp << EOF
+@@ -13,2 +13,5 @@
+ #include <ncurses.h>
++#ifdef _WIN32
++#include <compat/wcwidth.h>
++#endif
+
+EOF
+# fix src/util.cpp (version >= 2.69)
+patch -ulbf src/util.cpp << EOF
+@@ -12,2 +12,5 @@
+
++#ifdef _WIN32
++#include <compat/wcwidth.h>
++#endif
+ #include <ncurses.h>
+@@ -23,4 +26,9 @@
+   refresh();
++#ifdef _WIN32
++  int key = 0;
++  while ((key = getchar()) != EOF)
++#else
+   wint_t key = 0;
+   while (get_wch(&key) != ERR)
++#endif
+   {
+EOF
+mkdir -p build_win &&
+ wl-showstatus configure &&
+ PATH=$PATH:$MINGWPREFIX/qt6/bin QTDIR=$MINGWPREFIX/qt6 QMAKESPEC=$MINGWPREFIX/qt6/mkspecs/win32-g++ \
+ cmake.exe -Wno-dev -GNinja -DCMAKE_INSTALL_PREFIX:PATH=$INSTALLPREFIX -DCMAKE_BUILD_TYPE:STRING=Release -DNO_GUI:BOOL=OFF -DCMAKE_CXX_FLAGS:STRING="-I$(cygpath -m $MINGWPREFIX/include/ncurses) -DNCURSES_WIDECHAR=1 -D_XOPEN_SOURCE_EXTENDED=1 -I$(cygpath -m $MINGWPREFIX/include/taglib)" -S. -Bbuild_win &&
+ #wl-showstatus build &&
+ #cmake.exe --build build_win &&
+ #ninja -Cbuild_win &&
+ wl-showstatus build-install &&
+ #cmake.exe --install build_win --strip &&
+ #cmake.exe --build build_win --target "install/strip" &&
+ ninja -Cbuild_win install/strip &&
+    echo OK
